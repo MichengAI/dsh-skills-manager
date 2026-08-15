@@ -9,13 +9,12 @@ import { tmpdir } from "node:os";
 import {
   toKebab,
   parseSkillDoc,
-  serializeSkillDoc,
-  yamlScalar,
   unquote,
   parseBoolValue,
   setSkillEnabled,
   deleteSkill,
   importSkill,
+  scanEntries,
   state,
   resolveEntry,
   userRoots,
@@ -80,13 +79,6 @@ eq(parseBoolValue("off"), false, "parseBoolValue off");
 eq(parseBoolValue("0"), false, "parseBoolValue 0");
 eq(parseBoolValue("notabool"), undefined, "parseBoolValue invalid");
 
-eq(yamlScalar(true), "true", "yamlScalar bool");
-eq(yamlScalar("has: colon"), '"has: colon"', "yamlScalar quote special");
-eq(yamlScalar("plain"), "plain", "yamlScalar plain");
-eq(yamlScalar("first\nsecond"), '"first\\nsecond"', "yamlScalar escapes multiline text");
-const roundtrip = serializeSkillDoc({ name: "foo", description: "has: colon", "disable-model-invocation": true }, "body");
-ok(roundtrip.includes('description: "has: colon"'), "serializeSkillDoc quotes special");
-ok(roundtrip.includes("disable-model-invocation: true"), "serializeSkillDoc bool");
 const folded = parseSkillDoc("---\nname: folded\ndescription: >-\n  First line.\n  Second line.\n---\nbody");
 eq(folded.map.description, "First line. Second line.", "parseSkillDoc reads folded description");
 const deeplyIndented = parseSkillDoc("---\nname: indented\ndescription: |\n    First line.\n    Second line.\n---\nbody");
@@ -136,6 +128,12 @@ await writeFile(join(process.env.DSH_HOME, "SKILL.md"), "---\nname: dsh-home\n--
 ok(await resolveEntry(dshRoot, ".") === null, "resolveEntry rejects current-directory traversal");
 ok(await resolveEntry(dshRoot, "..") === null, "resolveEntry rejects parent-directory traversal");
 ok(await resolveEntry(dshRoot, "...") === null, "resolveEntry rejects Windows-normalized dot names");
+const dotDelete = await deleteSkill(dshRoot, ".");
+ok(dotDelete.ok === false, "deleteSkill rejects current-directory traversal");
+await makeSkill(dshRoot, "safe-bar", "---\nname: safe-bar\n---\nbody");
+const nestedDelete = await deleteSkill(dshRoot, "foo/../safe-bar");
+ok(nestedDelete.ok === false, "deleteSkill rejects nested traversal");
+ok(await resolveEntry(dshRoot, "safe-bar") !== null, "nested delete leaves the target skill unchanged");
 await writeFile(join(dshRoot, "flat-delete.md"), "---\nname: flat-delete\n---\nbody", "utf8");
 const flatDeleted = await deleteSkill(dshRoot, "flat-delete");
 eq(flatDeleted.name, "flat-delete", "deleteSkill deletes a flat skill");
@@ -154,6 +152,10 @@ const selfImport = await importSkill(dshRoot, null, { dryRun: true });
 ok(selfImport.ok === false, "import rejects a source inside the DSH skills root");
 const parentImport = await importSkill(tmp, null, { dryRun: true });
 ok(parentImport.ok === false, "import rejects a source that contains the DSH skills root");
+const namesBeforeHomeImport = (await scanEntries(dshRoot)).entries.map((entry) => entry.name).sort().join(",");
+const homeSkillImport = await importSkill(join(process.env.DSH_HOME, "SKILL.md"), null, { dryRun: true });
+ok(homeSkillImport.ok === false && homeSkillImport.error.includes("导入来源不能与 DSH 技能目录相同、包含或位于其中"), "import rejects a SKILL.md whose parent contains the DSH skills root");
+eq((await scanEntries(dshRoot)).entries.map((entry) => entry.name).sort().join(","), namesBeforeHomeImport, "rejected home SKILL.md import leaves skills unchanged");
 
 // 重名 dry-run
 const dry = await importSkill(join(srcSkill, "SKILL.md"), null, { dryRun: true });
@@ -198,6 +200,22 @@ await writeFile(join(duplicateBatchDir, "foo-bar.md"), "---\nname: foo-bar\n---\
 const duplicateBatch = await importSkill(duplicateBatchDir, null, { dryRun: true });
 ok(duplicateBatch.ok === false, "batch import rejects candidates with the same normalized name");
 eq(duplicateBatch.failed.length, 2, "duplicate batch reports every colliding candidate");
+
+const deepSource = await makeSkill(tmp, "deep-source", "---\nname: deep-source\n---\nbody");
+let deepPath = deepSource;
+for (let i = 0; i < 65; i++) {
+  deepPath = join(deepPath, `nested-${i}`);
+  await mkdir(deepPath);
+}
+const deepImport = await importSkill(join(deepSource, "SKILL.md"), null);
+ok(deepImport.ok === false, "import rejects sources that exceed the directory depth limit");
+
+await makeSkill(dshRoot, "invalid-policy", "---\nname: invalid-policy\ndisable-model-invocation: maybe\n---\nbody");
+const invalidPolicyEntries = await scanEntries(dshRoot);
+eq(invalidPolicyEntries.entries.find((entry) => entry.name === "invalid-policy").invocationPolicyValid, false, "scan marks invalid invocation policy values");
+await writeFile(join(dshRoot, "UPPER.MD"), "---\nname: upper\n---\nbody", "utf8");
+const upperCaseEntries = await scanEntries(dshRoot);
+ok(upperCaseEntries.entries.some((entry) => entry.name === "UPPER"), "scan recognizes uppercase Markdown extensions");
 
 // 批量导入
 const batchDir = join(tmp, "batch");
@@ -256,6 +274,11 @@ try {
 
   const publicResponse = await fetch(api + "/disable", { method: "POST", headers: secureHeaders, body: JSON.stringify({ name: "public-skill", root: "agents" }) });
   eq(publicResponse.status, 400, "HTTP route rejects public Agent mutations");
+  const httpDotDelete = await fetch(api + "/delete", { method: "POST", headers: secureHeaders, body: JSON.stringify({ name: "." }) });
+  eq(httpDotDelete.status, 400, "HTTP delete rejects current-directory traversal");
+  const httpNestedDelete = await fetch(api + "/delete", { method: "POST", headers: secureHeaders, body: JSON.stringify({ name: "foo/../safe-bar" }) });
+  eq(httpNestedDelete.status, 400, "HTTP delete rejects nested traversal");
+  ok(await resolveEntry(dshRoot, "safe-bar") !== null, "HTTP traversal deletes leave skills unchanged");
   const unknownResponse = await fetch(api + "/unknown", { method: "POST", headers: secureHeaders, body: "{}" });
   eq(unknownResponse.status, 404, "unknown mutation route returns 404");
 } finally {
