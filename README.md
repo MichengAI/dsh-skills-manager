@@ -50,19 +50,17 @@ The shared Agent directory is intentionally read-only in both the interface and 
 
 ## Install
 
-Requirements: Node.js 20 or later and a working DeepSeek Harness Web installation.
+Requirements: a working DeepSeek Harness Web installation. The published package declares Node.js 20 or later for the DSH runtime.
 
-Run the following from the parent directory of this plugin:
+Install the published package into the Web profile:
 
 ```powershell
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $OutputEncoding = [System.Text.Encoding]::UTF8
-git clone https://github.com/MichengAI/dsh-skills-manager.git dsh-skills-manager
-Set-Location .\dsh-skills-manager
-dsh plugin --profile web add .
+dsh plugin --profile web add dsh-skills-manager
 ```
 
-Restart DSH, then open **Settings → Skills**. If the old page remains visible, reload the active Web profile after installing the plugin.
+No source checkout is required. Restart DSH, then open **Settings → Skills**. If the old page remains visible, reload the active Web profile after installing the plugin.
 
 ## How to use it
 
@@ -83,7 +81,20 @@ node test\core-test.mjs
 
 ## Project documentation
 
-Project status, usage boundaries, architecture, and iteration records start at the [documentation entry point](docs/00-交接入口/00-阅读导航.md). The Chinese operational guide is available at `docs\02-产品与业务\01-使用说明.md`.
+Project status, usage boundaries, architecture, and iteration records start at the [documentation entry point](https://github.com/MichengAI/dsh-skills-manager/blob/master/docs/00-%E4%BA%A4%E6%8E%A5%E5%85%A5%E5%8F%A3/00-%E9%98%85%E8%AF%BB%E5%AF%BC%E8%88%AA.md). The Chinese operational guide is available at `docs\02-产品与业务\01-使用说明.md` in the repository.
+
+## Publishing
+
+The package name `dsh-skills-manager` was available when this release setup was prepared. A publisher with npm access can release the current version with:
+
+```powershell
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
+npm login
+npm publish
+```
+
+`prepublishOnly` runs the core test suite before publication. Use `npm run pack:check` to inspect the exact tarball contents without publishing.
 
 ## License
 

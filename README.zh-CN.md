@@ -50,19 +50,17 @@
 
 ## 安装
 
-环境要求：Node.js 20 或更高版本，以及可正常运行的 DeepSeek Harness Web 环境。
+环境要求：可正常运行的 DeepSeek Harness Web 环境。已发布的包会声明 DSH 运行时需要 Node.js 20 或更高版本。
 
-在插件仓库的上级目录执行：
+将已发布 npm 包安装到 Web profile：
 
 ```powershell
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $OutputEncoding = [System.Text.Encoding]::UTF8
-git clone https://github.com/MichengAI/dsh-skills-manager.git dsh-skills-manager
-Set-Location .\dsh-skills-manager
-dsh plugin --profile web add .
+dsh plugin --profile web add dsh-skills-manager
 ```
 
-重启 DSH 后，打开「设置 → 技能」。若仍显示旧页面，请在安装插件后重新加载当前 Web profile。
+无需下载源码。重启 DSH 后，打开「设置 → 技能」。若仍显示旧页面，请在安装插件后重新加载当前 Web profile。
 
 ## 使用说明
 
@@ -83,7 +81,20 @@ node test\core-test.mjs
 
 ## 项目文档
 
-项目状态、使用边界、技术架构和迭代记录从[文档交接入口](docs/00-交接入口/00-阅读导航.md)开始；详细操作说明见 `docs\02-产品与业务\01-使用说明.md`。
+项目状态、使用边界、技术架构和迭代记录从[文档交接入口](https://github.com/MichengAI/dsh-skills-manager/blob/master/docs/00-%E4%BA%A4%E6%8E%A5%E5%85%A5%E5%8F%A3/00-%E9%98%85%E8%AF%BB%E5%AF%BC%E8%88%AA.md)开始；详细操作说明见仓库中的 `docs\02-产品与业务\01-使用说明.md`。
+
+## 发布 npm 包
+
+准备发布时，`dsh-skills-manager` 尚未被 npm 占用。具备 npm 发布权限的维护者可执行：
+
+```powershell
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
+npm login
+npm publish
+```
+
+发布前会由 `prepublishOnly` 自动运行核心测试。执行 `npm run pack:check` 可在不发布的情况下检查最终 tarball 内容。
 
 ## 许可证
 

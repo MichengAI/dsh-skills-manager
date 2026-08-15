@@ -3,6 +3,14 @@
   "version": "0.1.0",
   "description": "DSH Web plugin: manage local DSH skills and safely view shared Agent skills.",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MichengAI/dsh-skills-manager.git"
+  },
+  "bugs": {
+    "url": "https://github.com/MichengAI/dsh-skills-manager/issues"
+  },
+  "homepage": "https://github.com/MichengAI/dsh-skills-manager#readme",
   "type": "module",
   "main": "lib/index.js",
   "exports": {
@@ -12,6 +20,7 @@
   },
   "files": [
     "lib",
+    "assets",
     "cordis.patch.yml"
   ],
   "dsh": {
@@ -28,7 +37,12 @@
     }
   },
   "scripts": {
-    "test": "node test/core-test.mjs"
+    "test": "node test/core-test.mjs",
+    "pack:check": "npm pack --dry-run --json",
+    "prepublishOnly": "npm test"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": ">=4.0.1 <5.0.0",
