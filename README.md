@@ -39,6 +39,7 @@
 - **Safe shared-skill view** — public Agent skills are visible but strictly read-only; their global metadata is never changed.
 - **Native file selection** — select a plugin `SKILL.md` from the operating system file picker, or explicitly choose its directory when the client cannot expose the selected file path.
 - **Protected replacement** — a same-name import always requires confirmation, including a flat skill and a bundled skill with the same normalized name.
+- **Safer imports** — importing from the DSH skills directory itself, its parent, or a child path is rejected; symbolic links are also rejected.
 - **Predictable dialogs** — Escape closes only the active upload or confirmation dialog, leaving the Settings page open.
 
 ## Directory permissions
@@ -49,6 +50,12 @@
 | `$DSH_AGENTS_HOME\skills` | Yes | No | No | No |
 
 The shared Agent directory is intentionally read-only in both the interface and the server API.
+
+## Safety behavior
+
+- Enable, disable, and delete only accept one ordinary skill-name path segment; directory traversal names are rejected.
+- Replacements are first copied to a temporary sibling path. Existing files are kept until that copy succeeds.
+- Mutation endpoints require JSON and the DSH client request marker, so a cross-site browser request cannot trigger a local file operation.
 
 ## Quick start
 

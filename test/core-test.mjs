@@ -2,6 +2,7 @@
 // 运行：node test/core-test.mjs
 
 import { mkdtemp, mkdir, writeFile, readFile, rm } from "node:fs/promises";
+import { createServer } from "node:http";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -19,6 +20,7 @@ import {
   resolveEntry,
   userRoots,
 } from "../lib/core.js";
+import { apply as applyHost } from "../lib/index.js";
 
 let passed = 0;
 let failed = 0;
@@ -49,18 +51,13 @@ const agentsRoot = join(process.env.DSH_AGENTS_HOME, "skills");
 await mkdir(dshRoot, { recursive: true });
 await mkdir(agentsRoot, { recursive: true });
 
-// ── 客户端静态约束 ──
+// ── 客户端装配约束 ──
+// 客户端 bundle 由宿主 AMD 加载，无法在零依赖测试中直接挂载；仅保留协议常量锚点。
 const clientSource = await readFile(new URL("../lib/client.js", import.meta.url), "utf8");
-const hostSource = await readFile(new URL("../lib/index.js", import.meta.url), "utf8");
-ok(clientSource.includes("order: 17"), "settings section follows plugins");
-ok(clientSource.includes("ctx.workspaces.pickDirectory()"), "upload falls back to native directory picker");
-ok(clientSource.includes('window.addEventListener("keydown", closeTopModal, true)'), "Escape closes the innermost modal");
-ok(clientSource.includes("正在打开系统原生目录选择窗口"), "upload fallback status is visible in the modal");
-ok(clientSource.includes("部分上传成功"), "partial import failures are visible to the user");
-ok(clientSource.includes("已选择 SKILL.md，但当前运行环境无法读取文件路径"), "file selection without a path does not reopen the directory picker");
-ok(hostSource.includes('const inject = ["webServer", "skills"]'), "host injects the skill registry for immediate catalog refresh");
-ok(hostSource.includes("skills-manager catalog invalidator"), "host registers a catalog invalidator");
-ok(hostSource.includes('String(body.root || "dsh") === "dsh"'), "host rejects public Agent skill mutations");
+ok(clientSource.includes('"x-dsh-skills-manager": "1"'), "client sends the mutation request marker");
+const packageJson = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
+ok(packageJson.peerDependencies["@deepseek-ai/dsh-client-runtime"], "package declares the client runtime peer");
+ok(packageJson.peerDependencies["@deepseek-ai/dsh-client-ui-slots"], "package declares the settings slots peer");
 
 // ── 命名规整 ──
 eq(toKebab("FooBar"), "foo-bar", "toKebab camelCase");
@@ -86,11 +83,14 @@ eq(parseBoolValue("notabool"), undefined, "parseBoolValue invalid");
 eq(yamlScalar(true), "true", "yamlScalar bool");
 eq(yamlScalar("has: colon"), '"has: colon"', "yamlScalar quote special");
 eq(yamlScalar("plain"), "plain", "yamlScalar plain");
+eq(yamlScalar("first\nsecond"), '"first\\nsecond"', "yamlScalar escapes multiline text");
 const roundtrip = serializeSkillDoc({ name: "foo", description: "has: colon", "disable-model-invocation": true }, "body");
 ok(roundtrip.includes('description: "has: colon"'), "serializeSkillDoc quotes special");
 ok(roundtrip.includes("disable-model-invocation: true"), "serializeSkillDoc bool");
 const folded = parseSkillDoc("---\nname: folded\ndescription: >-\n  First line.\n  Second line.\n---\nbody");
 eq(folded.map.description, "First line. Second line.", "parseSkillDoc reads folded description");
+const deeplyIndented = parseSkillDoc("---\nname: indented\ndescription: |\n    First line.\n    Second line.\n---\nbody");
+eq(deeplyIndented.map.description, "First line.\nSecond line.", "parseSkillDoc removes common block indentation");
 
 // ── 启用 / 停用 ──
 await makeSkill(dshRoot, "good-skill", "---\nname: good-skill\ndescription: A good skill.\n---\nbody");
@@ -102,6 +102,10 @@ await setSkillEnabled(dshRoot, "good-skill", true);
 goodDoc = parseSkillDoc(await readFile(join(dshRoot, "good-skill", "SKILL.md"), "utf8"));
 ok(goodDoc.map["disable-model-invocation"] === undefined, "enable removes flag");
 ok(goodDoc.map["user-invocable"] === undefined, "enable restores slash command visibility");
+await makeSkill(dshRoot, "crlf-skill", "---\r\nname: crlf-skill\r\n---\r\nbody");
+await setSkillEnabled(dshRoot, "crlf-skill", false);
+const crlfAfterDisable = await readFile(join(dshRoot, "crlf-skill", "SKILL.md"), "utf8");
+ok(!/(^|[^\r])\n/.test(crlfAfterDisable), "toggle preserves CRLF frontmatter files");
 const quotedFrontmatter = '---\nname: quoted-skill\ndescription: "Quoted description: unchanged"\nmetadata:\n  source: retained\n---\nbody';
 await makeSkill(dshRoot, "quoted-skill", quotedFrontmatter);
 await setSkillEnabled(dshRoot, "quoted-skill", false);
@@ -110,6 +114,10 @@ const quotedAfterToggle = await readFile(join(dshRoot, "quoted-skill", "SKILL.md
 eq(quotedAfterToggle, quotedFrontmatter, "toggle preserves quoted and nested frontmatter exactly");
 const missing = await setSkillEnabled(dshRoot, "no-such-skill", true);
 ok(missing.ok === false, "setSkillEnabled missing returns error");
+await makeSkill(dshRoot, "plain-skill", "没有 frontmatter 的正文");
+const plainToggle = await setSkillEnabled(dshRoot, "plain-skill", false);
+ok(plainToggle.ok === false, "setSkillEnabled rejects skills without frontmatter");
+eq(await readFile(join(dshRoot, "plain-skill", "SKILL.md"), "utf8"), "没有 frontmatter 的正文", "missing frontmatter remains unchanged");
 await makeSkill(agentsRoot, "public-skill", "---\nname: public-skill\ndescription: Public skill.\n---\nbody");
 const publicToggle = await setSkillEnabled(agentsRoot, "public-skill", false);
 ok(publicToggle.ok === false, "public Agent skill rejects enable and disable");
@@ -123,6 +131,15 @@ ok(await resolveEntry(dshRoot, "good-skill") === null, "deleteSkill removes bund
 const publicDelete = await deleteSkill(agentsRoot, "public-skill");
 ok(publicDelete.ok === false, "deleteSkill rejects public Agent directory");
 ok(await resolveEntry(agentsRoot, "public-skill") !== null, "public skill remains after rejected delete");
+await writeFile(join(dshRoot, "SKILL.md"), "---\nname: root\n---\nbody", "utf8");
+await writeFile(join(process.env.DSH_HOME, "SKILL.md"), "---\nname: dsh-home\n---\nbody", "utf8");
+ok(await resolveEntry(dshRoot, ".") === null, "resolveEntry rejects current-directory traversal");
+ok(await resolveEntry(dshRoot, "..") === null, "resolveEntry rejects parent-directory traversal");
+ok(await resolveEntry(dshRoot, "...") === null, "resolveEntry rejects Windows-normalized dot names");
+await writeFile(join(dshRoot, "flat-delete.md"), "---\nname: flat-delete\n---\nbody", "utf8");
+const flatDeleted = await deleteSkill(dshRoot, "flat-delete");
+eq(flatDeleted.name, "flat-delete", "deleteSkill deletes a flat skill");
+ok(await resolveEntry(dshRoot, "flat-delete") === null, "flat skill no longer resolves after delete");
 
 // ── 导入 ──
 const srcSkill = await makeSkill(tmp, "Import Me", "---\nname: import-me\ndescription: Imported.\n---\nbody");
@@ -131,6 +148,12 @@ eq(imp.imported.length, 1, "import single dir");
 eq(imp.imported[0].name, "import-me", "import kebabifies name");
 const importedEntry = await resolveEntry(dshRoot, "import-me");
 ok(importedEntry !== null, "imported entry resolvable");
+
+// 已安装目录不能作为导入来源，否则覆盖会先删除来源再复制。
+const selfImport = await importSkill(dshRoot, null, { dryRun: true });
+ok(selfImport.ok === false, "import rejects a source inside the DSH skills root");
+const parentImport = await importSkill(tmp, null, { dryRun: true });
+ok(parentImport.ok === false, "import rejects a source that contains the DSH skills root");
 
 // 重名 dry-run
 const dry = await importSkill(join(srcSkill, "SKILL.md"), null, { dryRun: true });
@@ -168,6 +191,14 @@ const partialImport = await importSkill(partialBatchDir, null);
 eq(partialImport.imported.length, 1, "partial import keeps successful entries");
 eq(partialImport.failed.length, 1, "partial import returns failed entry details");
 
+const duplicateBatchDir = join(tmp, "duplicate-batch");
+await mkdir(duplicateBatchDir, { recursive: true });
+await writeFile(join(duplicateBatchDir, "Foo Bar.md"), "---\nname: foo-bar\n---\nfirst", "utf8");
+await writeFile(join(duplicateBatchDir, "foo-bar.md"), "---\nname: foo-bar\n---\nsecond", "utf8");
+const duplicateBatch = await importSkill(duplicateBatchDir, null, { dryRun: true });
+ok(duplicateBatch.ok === false, "batch import rejects candidates with the same normalized name");
+eq(duplicateBatch.failed.length, 2, "duplicate batch reports every colliding candidate");
+
 // 批量导入
 const batchDir = join(tmp, "batch");
 await mkdir(batchDir, { recursive: true });
@@ -175,6 +206,61 @@ await makeSkill(batchDir, "Alpha Beta", "---\nname: alpha-beta\ndescription: A.\
 await writeFile(join(batchDir, "gamma.md"), "---\nname: gamma\ndescription: G.\n---\nbody", "utf8");
 const batch = await importSkill(batchDir, null);
 eq(batch.imported.length, 2, "import batch dir");
+
+// ── HTTP 路由 ──
+await makeSkill(dshRoot, "http-skill", "---\nname: http-skill\n---\nbody");
+let route;
+let invalidated = 0;
+applyHost({
+  webServer: { register(value) { route = value; return function () {}; } },
+  skills: { registerProvider(register) { register({ invalidate() { invalidated++; } }); return function () {}; } },
+  effect(register) { return register(); },
+});
+const server = createServer((req, res) => route.handler(req, res));
+await new Promise((resolve, reject) => {
+  server.once("error", reject);
+  server.listen(0, "127.0.0.1", () => {
+    server.off("error", reject);
+    resolve();
+  });
+});
+const address = server.address();
+const api = `http://127.0.0.1:${address.port}/api/dsh-skills-manager`;
+const secureHeaders = { "content-type": "application/json", "x-dsh-skills-manager": "1" };
+try {
+  const stateResponse = await fetch(api + "/state");
+  eq(stateResponse.status, 200, "state route returns 200");
+
+  const csrfResponse = await fetch(api + "/disable", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: "http-skill" }) });
+  eq(csrfResponse.status, 403, "mutating route rejects requests without the client marker");
+
+  const contentTypeResponse = await fetch(api + "/disable", { method: "POST", headers: { "x-dsh-skills-manager": "1" }, body: JSON.stringify({ name: "http-skill" }) });
+  eq(contentTypeResponse.status, 415, "mutating route requires JSON content type");
+
+  const invalidJsonResponse = await fetch(api + "/disable", { method: "POST", headers: secureHeaders, body: "{" });
+  eq(invalidJsonResponse.status, 400, "invalid JSON returns 400");
+
+  let oversizedStatus = 0;
+  try {
+    const oversizedResponse = await fetch(api + "/disable", { method: "POST", headers: secureHeaders, body: JSON.stringify({ name: "http-skill", padding: "x".repeat(1 << 20) }) });
+    oversizedStatus = oversizedResponse.status;
+  } catch {
+    oversizedStatus = -1;
+  }
+  eq(oversizedStatus, 413, "oversized JSON returns 413 without dropping the response");
+
+  const disableResponse = await fetch(api + "/disable", { method: "POST", headers: secureHeaders, body: JSON.stringify({ name: "http-skill" }) });
+  eq(disableResponse.status, 200, "valid mutation returns 200");
+  ok((await readFile(join(dshRoot, "http-skill", "SKILL.md"), "utf8")).includes("disable-model-invocation: true"), "HTTP disable updates the skill policy");
+  ok(invalidated > 0, "successful mutation invalidates the skill catalog");
+
+  const publicResponse = await fetch(api + "/disable", { method: "POST", headers: secureHeaders, body: JSON.stringify({ name: "public-skill", root: "agents" }) });
+  eq(publicResponse.status, 400, "HTTP route rejects public Agent mutations");
+  const unknownResponse = await fetch(api + "/unknown", { method: "POST", headers: secureHeaders, body: "{}" });
+  eq(unknownResponse.status, 404, "unknown mutation route returns 404");
+} finally {
+  await new Promise((resolve) => server.close(resolve));
+}
 
 // ── 状态快照 ──
 const snap = await state();
