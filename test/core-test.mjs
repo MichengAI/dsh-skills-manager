@@ -53,6 +53,7 @@ await mkdir(agentsRoot, { recursive: true });
 // ── 客户端装配约束 ──
 // 客户端 bundle 由宿主 AMD 加载，无法在零依赖测试中直接挂载；仅保留协议常量锚点。
 const clientSource = await readFile(new URL("../lib/client.js", import.meta.url), "utf8");
+ok(clientSource.includes('id: "@michengai/dsh-skills-manager"'), "client registers the scoped package module ID");
 ok(clientSource.includes('"x-dsh-skills-manager": "1"'), "client sends the mutation request marker");
 const packageJson = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
 ok(packageJson.peerDependencies["@deepseek-ai/dsh-client-runtime"], "package declares the client runtime peer");
