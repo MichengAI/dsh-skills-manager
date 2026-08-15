@@ -56,6 +56,7 @@ ok(clientSource.includes("ctx.workspaces.pickDirectory()"), "upload falls back t
 ok(clientSource.includes('window.addEventListener("keydown", closeTopModal, true)'), "Escape closes the innermost modal");
 ok(clientSource.includes("正在打开系统原生目录选择窗口"), "upload fallback status is visible in the modal");
 ok(clientSource.includes("部分上传成功"), "partial import failures are visible to the user");
+ok(clientSource.includes("已选择 SKILL.md，但当前运行环境无法读取文件路径"), "file selection without a path does not reopen the directory picker");
 
 // ── 命名规整 ──
 eq(toKebab("FooBar"), "foo-bar", "toKebab camelCase");
@@ -90,9 +91,11 @@ await makeSkill(dshRoot, "good-skill", "---\nname: good-skill\ndescription: A go
 await setSkillEnabled(dshRoot, "good-skill", false);
 let goodDoc = parseSkillDoc(await readFile(join(dshRoot, "good-skill", "SKILL.md"), "utf8"));
 eq(parseBoolValue(goodDoc.map["disable-model-invocation"]), true, "disable sets flag");
+eq(parseBoolValue(goodDoc.map["user-invocable"]), false, "disable hides the skill from slash commands");
 await setSkillEnabled(dshRoot, "good-skill", true);
 goodDoc = parseSkillDoc(await readFile(join(dshRoot, "good-skill", "SKILL.md"), "utf8"));
 ok(goodDoc.map["disable-model-invocation"] === undefined, "enable removes flag");
+ok(goodDoc.map["user-invocable"] === undefined, "enable restores slash command visibility");
 const missing = await setSkillEnabled(dshRoot, "no-such-skill", true);
 ok(missing.ok === false, "setSkillEnabled missing returns error");
 await makeSkill(agentsRoot, "public-skill", "---\nname: public-skill\ndescription: Public skill.\n---\nbody");

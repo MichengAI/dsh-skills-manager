@@ -7,8 +7,8 @@
 ## 功能
 
 - 展示 `$DSH_HOME\skills` 和 `$DSH_AGENTS_HOME\skills` 中的技能名称、说明、形态及启用状态。
-- 启用或停用任一目录中的技能：仅更新 `SKILL.md` 的 `disable-model-invocation`。
-- 仅向 `$DSH_HOME\skills` 上传插件：优先使用系统原生文件选择器选择 `SKILL.md`；无法取得文件路径时，可选择包含该文件的插件目录。
+- 启用或停用任一目录中的技能：同时更新 `SKILL.md` 的 `disable-model-invocation` 与 `user-invocable`。
+- 仅向 `$DSH_HOME\skills` 上传插件：优先使用系统原生文件选择器选择 `SKILL.md`；无法取得文件路径时，可由用户主动选择包含该文件的插件目录。
 - 上传同名插件时，明确确认后才覆盖。
 - 仅删除 `$DSH_HOME\skills` 中的插件，且删除前需要确认。
 - 支持使用 ESC 从内到外关闭确认框或上传框，不会关闭设置页。

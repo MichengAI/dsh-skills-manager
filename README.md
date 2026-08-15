@@ -7,8 +7,8 @@ A DeepSeek Harness (DSH) Web plugin for managing local DSH skills and safely vie
 ## Features
 
 - Lists skill name, description, type, and invocation status from `$DSH_HOME\skills` and `$DSH_AGENTS_HOME\skills`.
-- Enables or disables skills in either directory by updating `disable-model-invocation` in `SKILL.md`.
-- Uploads only to `$DSH_HOME\skills`: select a plugin `SKILL.md` with the native system picker; when no file path is available, select the plugin directory instead.
+- Enables or disables skills in either directory by updating both `disable-model-invocation` and `user-invocable` in `SKILL.md`.
+- Uploads only to `$DSH_HOME\skills`: select a plugin `SKILL.md` with the native system picker; when no file path is available, choose the plugin directory explicitly instead.
 - Requires an explicit confirmation before replacing a skill with the same name, including bundle and flat skills with the same normalized name.
 - Deletes only skills inside `$DSH_HOME\skills`, with confirmation.
 - Handles Escape from the topmost confirmation or upload dialog without closing the Settings page.
