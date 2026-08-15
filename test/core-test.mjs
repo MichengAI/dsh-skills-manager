@@ -63,6 +63,7 @@ try {
   publishWorkflow = await readFile(new URL("../.github/workflows/publish.yml", import.meta.url), "utf8");
 } catch {}
 ok(publishWorkflow.includes("id-token: write"), "publish workflow enables OIDC trusted publishing");
+ok(!publishWorkflow.includes("registry-url:"), "publish workflow relies on package publishConfig instead of token-backed registry setup");
 ok(publishWorkflow.includes("npm test"), "publish workflow runs the project tests");
 ok(publishWorkflow.includes("npm publish"), "publish workflow publishes the package after tests");
 
