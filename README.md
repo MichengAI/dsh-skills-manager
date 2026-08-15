@@ -5,11 +5,12 @@
 <h1 align="center">DSH Skills Manager</h1>
 
 <p align="center">
-  <strong>Manage local DeepSeek Harness skills with a clear boundary for shared Agent skills.</strong>
+  <strong>An npm-installable DeepSeek Harness Web plugin for managing local skills safely.</strong>
 </p>
 
 <p align="center">
   <a href="https://github.com/MichengAI/dsh-skills-manager/issues">Report an issue</a>
+  · <a href="https://www.npmjs.com/package/@michengai/dsh-skills-manager">View on npm</a>
 </p>
 
 <p align="center">
@@ -18,6 +19,7 @@
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue.svg" alt="Apache License 2.0"></a>
+  <a href="https://www.npmjs.com/package/@michengai/dsh-skills-manager"><img src="https://img.shields.io/npm/v/%40michengai/dsh-skills-manager?label=npm" alt="npm package"></a>
   <img src="https://img.shields.io/badge/DSH-Web%20Plugin-10b981" alt="DSH Web Plugin">
   <img src="https://img.shields.io/badge/Node.js-%E2%89%A520-339933?logo=nodedotjs&logoColor=white" alt="Node.js 20 or later">
 </p>
@@ -48,11 +50,11 @@
 
 The shared Agent directory is intentionally read-only in both the interface and the server API.
 
-## Install
+## Quick start
 
-Requirements: a working DeepSeek Harness Web installation. The published package declares Node.js 20 or later for the DSH runtime.
+You need a working DeepSeek Harness Web installation. Do not run `npm install` in an arbitrary directory: install the plugin into the DSH Web profile instead.
 
-Install the published package into the Web profile:
+1. Run:
 
 ```powershell
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
@@ -60,16 +62,23 @@ $OutputEncoding = [System.Text.Encoding]::UTF8
 dsh plugin --profile web add @michengai/dsh-skills-manager
 ```
 
-No source checkout is required. Restart DSH, then open **Settings → Skills**. If a package mirror has not synchronized the latest version yet, append `--registry=https://registry.npmjs.org/` to the install command.
+2. Restart DSH or reload the active Web profile.
+3. Open **Settings → Skills**. No source checkout is required.
 
-## How to use it
+If a package mirror has not synchronized the latest version yet, append `--registry=https://registry.npmjs.org/` to the install command.
 
-1. Open **Settings → Skills**. The panel separates **DSH Skills** from **Shared Agent Skills** and shows each skill's name, form, description, and current invocation status.
-2. In **DSH Skills**, choose **Enable** or **Disable** to control both model invocation and the `/` manual command. Other `SKILL.md` metadata remains untouched.
-3. Choose **Upload Plugin** in the upper-right corner. Select the plugin directory's `SKILL.md`; the complete plugin directory is copied to `$DSH_HOME\skills`.
-4. When the browser does not provide the selected file path, use **Choose Plugin Directory** in the dialog and select the directory that contains `SKILL.md`.
-5. Confirm any replacement of a same-name skill. Use **Delete** only for DSH-local skills you no longer need.
-6. Treat **Shared Agent Skills** as an inspection list: their controls are deliberately unavailable so the shared global skill metadata stays unchanged.
+## Use the Skills panel
+
+| Goal | What to do | Scope |
+| --- | --- | --- |
+| Check a skill | Open **Settings → Skills** to see its name, form, description, and invocation status. | DSH and shared Agent skills |
+| Enable or disable | Choose **Enable** or **Disable**. This changes model invocation and the `/` manual command without rewriting other `SKILL.md` metadata. | DSH skills only |
+| Upload a plugin | Choose **Upload Plugin**, then select the plugin directory's `SKILL.md`. DSH copies the complete directory, including scripts and resources. | DSH skills only |
+| Select a directory instead | If the selected file has no usable path, choose **Choose Plugin Directory** and select the directory that contains `SKILL.md`. | DSH skills only |
+| Replace or delete | Confirm a same-name replacement; use **Delete** for a DSH-local skill you no longer need. | DSH skills only |
+| Inspect shared skills | Review shared Agent skills without changing their metadata. | Read-only |
+
+Press **Escape** to close only the frontmost upload or confirmation dialog; the Settings page remains open.
 
 ## Development and verification
 
@@ -83,18 +92,18 @@ node test\core-test.mjs
 
 Project status, usage boundaries, architecture, and iteration records start at the [documentation entry point](https://github.com/MichengAI/dsh-skills-manager/blob/master/docs/00-%E4%BA%A4%E6%8E%A5%E5%85%A5%E5%8F%A3/00-%E9%98%85%E8%AF%BB%E5%AF%BC%E8%88%AA.md). The Chinese operational guide is available at `docs\02-产品与业务\01-使用说明.md` in the repository.
 
-## Publishing
+## Maintainer release
 
-The user-level npm registry may point to a download mirror such as `registry.npmmirror.com`; mirrors do not accept publication. This package therefore pins publication to the official npm registry. A maintainer with npm publishing access can release the current version with:
+The package is published as [`@michengai/dsh-skills-manager`](https://www.npmjs.com/package/@michengai/dsh-skills-manager). To release a new version:
 
 ```powershell
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $OutputEncoding = [System.Text.Encoding]::UTF8
-npm login --registry=https://registry.npmjs.org/
+npm version patch
 npm publish
 ```
 
-`prepublishOnly` runs the core test suite before publication, and `publishConfig.registry` prevents `npm publish` from going to a configured download mirror. Use `npm run pack:check` to inspect the exact tarball contents without publishing.
+`prepublishOnly` runs the core test suite before publication. The package always publishes to the official npm registry; use `npm run pack:check` to inspect the tarball first.
 
 ## License
 
