@@ -60,7 +60,7 @@ $OutputEncoding = [System.Text.Encoding]::UTF8
 dsh plugin --profile web add dsh-skills-manager
 ```
 
-无需下载源码。重启 DSH 后，打开「设置 → 技能」。若仍显示旧页面，请在安装插件后重新加载当前 Web profile。
+无需下载源码。重启 DSH 后，打开「设置 → 技能」。若软件源镜像尚未同步最新版本，可在安装命令末尾添加 `--registry=https://registry.npmjs.org/`。
 
 ## 使用说明
 
@@ -85,16 +85,16 @@ node test\core-test.mjs
 
 ## 发布 npm 包
 
-准备发布时，`dsh-skills-manager` 尚未被 npm 占用。具备 npm 发布权限的维护者可执行：
+用户级 npm registry 可能指向 `registry.npmmirror.com` 等下载镜像；镜像不接受发布。本包已固定发布目标为官方 npm registry，拥有 npm 发布权限的维护者可执行：
 
 ```powershell
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $OutputEncoding = [System.Text.Encoding]::UTF8
-npm login
+npm login --registry=https://registry.npmjs.org/
 npm publish
 ```
 
-发布前会由 `prepublishOnly` 自动运行核心测试。执行 `npm run pack:check` 可在不发布的情况下检查最终 tarball 内容。
+发布前会由 `prepublishOnly` 自动运行核心测试，`publishConfig.registry` 会避免 `npm publish` 写入下载镜像。执行 `npm run pack:check` 可在不发布的情况下检查最终 tarball 内容。
 
 ## 许可证
 

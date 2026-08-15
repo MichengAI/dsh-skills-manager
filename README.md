@@ -60,7 +60,7 @@ $OutputEncoding = [System.Text.Encoding]::UTF8
 dsh plugin --profile web add dsh-skills-manager
 ```
 
-No source checkout is required. Restart DSH, then open **Settings → Skills**. If the old page remains visible, reload the active Web profile after installing the plugin.
+No source checkout is required. Restart DSH, then open **Settings → Skills**. If a package mirror has not synchronized the latest version yet, append `--registry=https://registry.npmjs.org/` to the install command.
 
 ## How to use it
 
@@ -85,16 +85,16 @@ Project status, usage boundaries, architecture, and iteration records start at t
 
 ## Publishing
 
-The package name `dsh-skills-manager` was available when this release setup was prepared. A publisher with npm access can release the current version with:
+The user-level npm registry may point to a download mirror such as `registry.npmmirror.com`; mirrors do not accept publication. This package therefore pins publication to the official npm registry. A maintainer with npm publishing access can release the current version with:
 
 ```powershell
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $OutputEncoding = [System.Text.Encoding]::UTF8
-npm login
+npm login --registry=https://registry.npmjs.org/
 npm publish
 ```
 
-`prepublishOnly` runs the core test suite before publication. Use `npm run pack:check` to inspect the exact tarball contents without publishing.
+`prepublishOnly` runs the core test suite before publication, and `publishConfig.registry` prevents `npm publish` from going to a configured download mirror. Use `npm run pack:check` to inspect the exact tarball contents without publishing.
 
 ## License
 
