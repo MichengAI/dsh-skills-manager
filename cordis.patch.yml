@@ -4,4 +4,4 @@
 # 手动挂载的用户也可在 profiles/web/cordis.patch.yml 自行添加 insert 条目。
 - insert:
     - id: skills-manager
-      name: 'dsh-skills-manager'
+      name: '@michengai/dsh-skills-manager'

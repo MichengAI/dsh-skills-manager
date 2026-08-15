@@ -57,7 +57,7 @@ Install the published package into the Web profile:
 ```powershell
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $OutputEncoding = [System.Text.Encoding]::UTF8
-dsh plugin --profile web add dsh-skills-manager
+dsh plugin --profile web add @michengai/dsh-skills-manager
 ```
 
 No source checkout is required. Restart DSH, then open **Settings → Skills**. If a package mirror has not synchronized the latest version yet, append `--registry=https://registry.npmjs.org/` to the install command.

@@ -1,5 +1,5 @@
 {
-  "name": "dsh-skills-manager",
+  "name": "@michengai/dsh-skills-manager",
   "version": "0.1.0",
   "description": "DSH Web plugin: manage local DSH skills and safely view shared Agent skills.",
   "license": "Apache-2.0",

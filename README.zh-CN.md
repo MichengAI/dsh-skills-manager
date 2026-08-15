@@ -57,7 +57,7 @@
 ```powershell
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $OutputEncoding = [System.Text.Encoding]::UTF8
-dsh plugin --profile web add dsh-skills-manager
+dsh plugin --profile web add @michengai/dsh-skills-manager
 ```
 
 无需下载源码。重启 DSH 后，打开「设置 → 技能」。若软件源镜像尚未同步最新版本，可在安装命令末尾添加 `--registry=https://registry.npmjs.org/`。
