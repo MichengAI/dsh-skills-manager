@@ -127,7 +127,7 @@ await makeSkill(agentsRoot, "public-skill", "---\nname: public-skill\ndescriptio
 const publicToggle = await setSkillEnabled(agentsRoot, "public-skill", false);
 ok(publicToggle.ok === false, "public Agent skill rejects enable and disable");
 eq(publicToggle.code, "error.root.readonly", "public toggle carries the readonly code");
-eq(publicToggle.params && publicToggle.params.action, "disable", "public toggle params.action");
+eq(publicToggle.params && publicToggle.params.action, "toggle", "public toggle params.action");
 const publicDoc = parseSkillDoc(await readFile(join(agentsRoot, "public-skill", "SKILL.md"), "utf8"));
 ok(publicDoc.map["disable-model-invocation"] === undefined, "public skill metadata remains unchanged");
 
@@ -313,7 +313,7 @@ try {
   eq(publicResponse.status, 400, "HTTP route rejects public Agent mutations");
   const publicPayload = await publicResponse.json();
   eq(publicPayload.code, "error.root.readonly", "HTTP route returns the readonly code");
-  eq(publicPayload.params && publicPayload.params.action, "disable", "HTTP route readonly params.action");
+  eq(publicPayload.params && publicPayload.params.action, "toggle", "HTTP route readonly params.action");
   const httpDotDelete = await fetch(api + "/delete", { method: "POST", headers: secureHeaders, body: JSON.stringify({ name: "." }) });
   eq(httpDotDelete.status, 400, "HTTP delete rejects current-directory traversal");
   const httpNestedDelete = await fetch(api + "/delete", { method: "POST", headers: secureHeaders, body: JSON.stringify({ name: "foo/../safe-bar" }) });

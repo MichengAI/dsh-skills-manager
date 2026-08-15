@@ -73,5 +73,43 @@ for (const key of zhKeys) {
   ok(typeof DICT.en[key] === "string" && DICT.en[key].length > 0, "en value of \"" + key + "\" is a non-empty string");
 }
 
+// ── translateError 纯函数测试（模拟宿主 translate 行为：{name} 占位符，miss 返回 key 本身）──
+const translateError = bundle.translateError;
+ok(typeof translateError === "function", "factory exports translateError");
+
+function mockT(key, params) {
+  const template = DICT.en[key] || key;
+  if (!params) return template;
+  return template.replace(/\{(\w+)\}/g, (m, name) => (name in params ? String(params[name]) : m));
+}
+
+eq(
+  translateError(mockT, { code: "error.skill.notFound", params: { name: "foo" }, error: "技能不存在: foo" }),
+  "Skill not found: foo",
+  "translateError translates a known error code with params"
+);
+eq(
+  translateError(mockT, { code: "error.unknown", error: "原文错误" }),
+  "原文错误",
+  "translateError falls back to error text on an unknown code"
+);
+eq(
+  translateError(mockT, { code: "error.root.readonly", params: { action: "toggle" }, error: "公共 Agent 技能目录不允许启用或停用" }),
+  "The shared Agent skills directory does not allow enabling or disabling",
+  "translateError maps the action param through the action.* dictionary"
+);
+eq(translateError(mockT, new Error("boom")), "boom", "translateError handles Error objects");
+eq(translateError(mockT, "plain"), "plain", "translateError passes through plain strings");
+eq(
+  translateError(() => null, { code: "error.skill.notFound", params: {}, error: "原文" }),
+  "原文",
+  "translateError falls back when the host t returns null (not a string)"
+);
+eq(
+  translateError(() => undefined, { code: "error.skill.notFound", params: {}, error: "原文" }),
+  "原文",
+  "translateError falls back when the host t returns undefined"
+);
+
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);
