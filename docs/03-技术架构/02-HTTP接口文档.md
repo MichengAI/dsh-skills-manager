@@ -1,13 +1,19 @@
 # HTTP 接口文档
 
-更新时间：2026-08-15 17:26（Asia/Shanghai）
+更新时间：2026-08-15 23:54（Asia/Shanghai）
 
 ## 通用约定
 
 - 前缀：`/api/dsh-skills-manager`
 - 仅本机同源面板调用。
-- 响应：成功为 `{ "ok": true, "data": {} }`；失败为 `{ "ok": false, "error": "原因" }`。
+- 响应：成功为 `{ "ok": true, "data": {} }`；失败为 `{ "ok": false, "error": "原因", "code": "错误码", "params": { "参数": "值" } }`。业务与协议错误均携带 `code`；`params` 为词典占位符参数；导入失败时带 `failed` 明细数组。
 - `POST` 使用 `application/json`。
+
+## 错误码约定
+
+- 业务码 `error.*`：由 core 产生（如 `error.skill.notFound`、`error.import.overlap`），client 按当前语言词典翻译；`error` 字段保留中文原文，供非浏览器调用方兜底。
+- 协议码 `error.proto.*`：HTTP 层校验失败——缺少请求标记 403、content-type 415、方法不允许 405、未知操作 404、请求体过大 413、非法 JSON 400。
+- 系统异常（如 ENOENT）不携带 `code`，保留原始 `error` 文本。
 
 ## 接口列表
 

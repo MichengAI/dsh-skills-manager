@@ -111,5 +111,27 @@ eq(
   "translateError falls back when the host t returns undefined"
 );
 
+// ── 注册契约断言：inject 声明 locale，settings.section 注册携带 locale 命名空间 ──
+ok(Array.isArray(bundle.inject) && bundle.inject.includes("locale"), "bundle.inject declares the locale service");
+ok(Array.isArray(bundle.inject) && bundle.inject.includes("slots"), "bundle.inject declares slots");
+
+let registerOptions = null;
+const fakeCtx = {
+  effect(fn) { return fn(); },
+  locale: {
+    register() { return () => {}; },
+    bind() { return () => "title"; },
+  },
+  slots: {
+    inject(name, fn) { if (name === "settings.section") registerOptions = fn(); },
+    register(opts) { return opts; },
+  },
+  workspaces: { pickDirectory() { return Promise.resolve(null); } },
+};
+bundle.apply(fakeCtx);
+ok(registerOptions !== null && registerOptions.name === "settings.section", "apply registers the settings.section entry");
+ok(registerOptions !== null && registerOptions.locale === "skills-manager", "settings.section registration declares the locale namespace");
+ok(registerOptions !== null && typeof registerOptions.label === "function", "settings.section label is a thunk (re-read per locale revision)");
+
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);
