@@ -55,6 +55,7 @@ ok(clientSource.includes("order: 17"), "settings section follows plugins");
 ok(clientSource.includes("ctx.workspaces.pickDirectory()"), "upload falls back to native directory picker");
 ok(clientSource.includes('window.addEventListener("keydown", closeTopModal, true)'), "Escape closes the innermost modal");
 ok(clientSource.includes("正在打开系统原生目录选择窗口"), "upload fallback status is visible in the modal");
+ok(clientSource.includes("部分上传成功"), "partial import failures are visible to the user");
 
 // ── 命名规整 ──
 eq(toKebab("FooBar"), "foo-bar", "toKebab camelCase");
@@ -126,6 +127,33 @@ eq(dry.pending.length, 0, "import dryRun pending empty on conflict");
 const overwrite = await importSkill(join(srcSkill, "SKILL.md"), null, { conflict: "overwrite" });
 eq(overwrite.imported.length, 1, "import overwrite");
 ok(overwrite.imported[0].overwritten === true, "import overwrite marks overwritten");
+
+// 跨形态重名：foo.md 与 foo\SKILL.md 视为同一技能，覆盖时只保留新形态。
+await writeFile(join(dshRoot, "cross-shape.md"), "---\nname: cross-shape\n---\nflat", "utf8");
+const crossShapeSource = await makeSkill(tmp, "cross-shape", "---\nname: cross-shape\n---\nbundle");
+const crossShapeDryRun = await importSkill(join(crossShapeSource, "SKILL.md"), null, { dryRun: true });
+eq(crossShapeDryRun.conflicts.length, 1, "cross-shape duplicate is detected as a conflict");
+const crossShapeOverwrite = await importSkill(join(crossShapeSource, "SKILL.md"), null, { conflict: "overwrite" });
+eq(crossShapeOverwrite.imported.length, 1, "cross-shape overwrite imports bundle");
+ok(await resolveEntry(dshRoot, "cross-shape").then((entry) => entry.kind === "bundle"), "cross-shape overwrite keeps bundle");
+let crossShapeFlatExists = true;
+try { await readFile(join(dshRoot, "cross-shape.md"), "utf8"); } catch { crossShapeFlatExists = false; }
+ok(crossShapeFlatExists === false, "cross-shape overwrite removes flat entry");
+
+// 单条导入完全失败必须返回错误，不能被客户端显示为上传完成。
+const invalidSource = join(tmp, "中文技能.md");
+await writeFile(invalidSource, "---\nname: invalid\n---\nbody", "utf8");
+const invalidImport = await importSkill(invalidSource, null);
+ok(invalidImport.ok === false, "failed single import returns an error result");
+eq(invalidImport.failed.length, 1, "failed single import includes failure detail");
+
+const partialBatchDir = join(tmp, "partial-batch");
+await mkdir(partialBatchDir, { recursive: true });
+await writeFile(join(partialBatchDir, "valid.md"), "---\nname: valid\n---\nbody", "utf8");
+await writeFile(join(partialBatchDir, "无效.md"), "---\nname: invalid\n---\nbody", "utf8");
+const partialImport = await importSkill(partialBatchDir, null);
+eq(partialImport.imported.length, 1, "partial import keeps successful entries");
+eq(partialImport.failed.length, 1, "partial import returns failed entry details");
 
 // 批量导入
 const batchDir = join(tmp, "batch");
