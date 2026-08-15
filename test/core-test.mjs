@@ -58,6 +58,13 @@ ok(clientSource.includes('"x-dsh-skills-manager": "1"'), "client sends the mutat
 const packageJson = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
 ok(packageJson.peerDependencies["@deepseek-ai/dsh-client-runtime"], "package declares the client runtime peer");
 ok(packageJson.peerDependencies["@deepseek-ai/dsh-client-ui-slots"], "package declares the settings slots peer");
+let publishWorkflow = "";
+try {
+  publishWorkflow = await readFile(new URL("../.github/workflows/publish.yml", import.meta.url), "utf8");
+} catch {}
+ok(publishWorkflow.includes("id-token: write"), "publish workflow enables OIDC trusted publishing");
+ok(publishWorkflow.includes("npm test"), "publish workflow runs the project tests");
+ok(publishWorkflow.includes("npm publish"), "publish workflow publishes the package after tests");
 
 // ── 命名规整 ──
 eq(toKebab("FooBar"), "foo-bar", "toKebab camelCase");
