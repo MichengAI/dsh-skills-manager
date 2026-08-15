@@ -1,7 +1,7 @@
 {
   "name": "dsh-skills-manager",
   "version": "0.1.0",
-  "description": "DSH Web plugin: fully manage DSH skills and view, enable, or disable shared Agent skills.",
+  "description": "DSH Web plugin: manage local DSH skills and safely view shared Agent skills.",
   "license": "Apache-2.0",
   "type": "module",
   "main": "lib/index.js",
