@@ -33,6 +33,7 @@
   "peerDependencies": {
     "@deepseek-ai/cordis": ">=4.0.1 <5.0.0",
     "@deepseek-ai/dsh-host-webserver": ">=0.1.0-rc.5",
+    "@deepseek-ai/dsh-skill": ">=0.1.0-rc.5",
     "@deepseek-ai/dsh-client-ui-workspace": ">=0.1.0-rc.5"
   },
   "engines": {

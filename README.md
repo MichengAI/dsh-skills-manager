@@ -2,12 +2,12 @@
 
 English | [中文](README.zh-CN.md)
 
-A DeepSeek Harness (DSH) Web plugin for managing local DSH skills and safely viewing or toggling shared Agent skills from **Settings → Skills**.
+A DeepSeek Harness (DSH) Web plugin for managing local DSH skills and safely viewing shared Agent skills from **Settings → Skills**.
 
 ## Features
 
 - Lists skill name, description, type, and invocation status from `$DSH_HOME\skills` and `$DSH_AGENTS_HOME\skills`.
-- Enables or disables skills in either directory by updating both `disable-model-invocation` and `user-invocable` in `SKILL.md`.
+- Enables or disables DSH skills by updating both `disable-model-invocation` and `user-invocable` in `SKILL.md`.
 - Uploads only to `$DSH_HOME\skills`: select a plugin `SKILL.md` with the native system picker; when no file path is available, choose the plugin directory explicitly instead.
 - Requires an explicit confirmation before replacing a skill with the same name, including bundle and flat skills with the same normalized name.
 - Deletes only skills inside `$DSH_HOME\skills`, with confirmation.
@@ -18,9 +18,9 @@ A DeepSeek Harness (DSH) Web plugin for managing local DSH skills and safely vie
 | Directory | View | Enable/Disable | Upload/Replace | Delete |
 |---|---|---|---|---|
 | `$DSH_HOME\skills` | Yes | Yes | Yes | Yes |
-| `$DSH_AGENTS_HOME\skills` | Yes | Yes | No | No |
+| `$DSH_AGENTS_HOME\skills` | Yes | No | No | No |
 
-The shared Agent directory is intentionally read-only for upload and deletion. Both the UI and server enforce this boundary.
+The shared Agent directory is intentionally read-only. The UI and server both prevent changes to its skill metadata.
 
 ## Requirements
 

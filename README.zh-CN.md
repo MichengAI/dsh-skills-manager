@@ -2,12 +2,12 @@
 
 中文 | [English](README.md)
 
-用于 DeepSeek Harness（DSH）的 Web 插件，在「设置 → 技能」中管理 DSH 本地技能，并安全地查看和启停公共 Agent 技能。
+用于 DeepSeek Harness（DSH）的 Web 插件，在「设置 → 技能」中管理 DSH 本地技能，并安全地查看公共 Agent 技能。
 
 ## 功能
 
 - 展示 `$DSH_HOME\skills` 和 `$DSH_AGENTS_HOME\skills` 中的技能名称、说明、形态及启用状态。
-- 启用或停用任一目录中的技能：同时更新 `SKILL.md` 的 `disable-model-invocation` 与 `user-invocable`。
+- 启用或停用 DSH 目录中的技能：同时更新 `SKILL.md` 的 `disable-model-invocation` 与 `user-invocable`。
 - 仅向 `$DSH_HOME\skills` 上传插件：优先使用系统原生文件选择器选择 `SKILL.md`；无法取得文件路径时，可由用户主动选择包含该文件的插件目录。
 - 上传同名插件时，明确确认后才覆盖。
 - 仅删除 `$DSH_HOME\skills` 中的插件，且删除前需要确认。
@@ -18,9 +18,9 @@
 | 目录 | 查看 | 启用/停用 | 上传/覆盖 | 删除 |
 |---|---|---|---|---|
 | `$DSH_HOME\skills` | 支持 | 支持 | 支持 | 支持 |
-| `$DSH_AGENTS_HOME\skills` | 支持 | 支持 | 不支持 | 不支持 |
+| `$DSH_AGENTS_HOME\skills` | 支持 | 不支持 | 不支持 | 不支持 |
 
-公共 Agent 目录是共享目录。客户端不会提供上传或删除入口，服务端也会拒绝相应请求。
+公共 Agent 目录是共享目录，只读展示。客户端不提供修改入口，服务端也会拒绝所有修改请求。
 
 ## 环境要求
 

@@ -51,12 +51,16 @@ await mkdir(agentsRoot, { recursive: true });
 
 // ── 客户端静态约束 ──
 const clientSource = await readFile(new URL("../lib/client.js", import.meta.url), "utf8");
+const hostSource = await readFile(new URL("../lib/index.js", import.meta.url), "utf8");
 ok(clientSource.includes("order: 17"), "settings section follows plugins");
 ok(clientSource.includes("ctx.workspaces.pickDirectory()"), "upload falls back to native directory picker");
 ok(clientSource.includes('window.addEventListener("keydown", closeTopModal, true)'), "Escape closes the innermost modal");
 ok(clientSource.includes("正在打开系统原生目录选择窗口"), "upload fallback status is visible in the modal");
 ok(clientSource.includes("部分上传成功"), "partial import failures are visible to the user");
 ok(clientSource.includes("已选择 SKILL.md，但当前运行环境无法读取文件路径"), "file selection without a path does not reopen the directory picker");
+ok(hostSource.includes('const inject = ["webServer", "skills"]'), "host injects the skill registry for immediate catalog refresh");
+ok(hostSource.includes("skills-manager catalog invalidator"), "host registers a catalog invalidator");
+ok(hostSource.includes('String(body.root || "dsh") === "dsh"'), "host rejects public Agent skill mutations");
 
 // ── 命名规整 ──
 eq(toKebab("FooBar"), "foo-bar", "toKebab camelCase");
@@ -71,7 +75,7 @@ eq(bomDoc.map.name, "foo", "parseSkillDoc strips BOM");
 eq(bomDoc.body, "body", "parseSkillDoc body");
 
 const q = parseSkillDoc('---\nname: foo\ndescription: "has: colon"\ndisable-model-invocation: true\n---\nhello');
-eq(q.map.description, '"has: colon"', "parseSkillDoc quoted value raw");
+eq(q.map.description, "has: colon", "parseSkillDoc reads quoted value");
 eq(unquote(q.map.description), "has: colon", "unquote");
 eq(parseBoolValue("true"), true, "parseBoolValue true");
 eq(parseBoolValue("YES"), true, "parseBoolValue yes");
@@ -85,6 +89,8 @@ eq(yamlScalar("plain"), "plain", "yamlScalar plain");
 const roundtrip = serializeSkillDoc({ name: "foo", description: "has: colon", "disable-model-invocation": true }, "body");
 ok(roundtrip.includes('description: "has: colon"'), "serializeSkillDoc quotes special");
 ok(roundtrip.includes("disable-model-invocation: true"), "serializeSkillDoc bool");
+const folded = parseSkillDoc("---\nname: folded\ndescription: >-\n  First line.\n  Second line.\n---\nbody");
+eq(folded.map.description, "First line. Second line.", "parseSkillDoc reads folded description");
 
 // ── 启用 / 停用 ──
 await makeSkill(dshRoot, "good-skill", "---\nname: good-skill\ndescription: A good skill.\n---\nbody");
@@ -96,15 +102,19 @@ await setSkillEnabled(dshRoot, "good-skill", true);
 goodDoc = parseSkillDoc(await readFile(join(dshRoot, "good-skill", "SKILL.md"), "utf8"));
 ok(goodDoc.map["disable-model-invocation"] === undefined, "enable removes flag");
 ok(goodDoc.map["user-invocable"] === undefined, "enable restores slash command visibility");
+const quotedFrontmatter = '---\nname: quoted-skill\ndescription: "Quoted description: unchanged"\nmetadata:\n  source: retained\n---\nbody';
+await makeSkill(dshRoot, "quoted-skill", quotedFrontmatter);
+await setSkillEnabled(dshRoot, "quoted-skill", false);
+await setSkillEnabled(dshRoot, "quoted-skill", true);
+const quotedAfterToggle = await readFile(join(dshRoot, "quoted-skill", "SKILL.md"), "utf8");
+eq(quotedAfterToggle, quotedFrontmatter, "toggle preserves quoted and nested frontmatter exactly");
 const missing = await setSkillEnabled(dshRoot, "no-such-skill", true);
 ok(missing.ok === false, "setSkillEnabled missing returns error");
 await makeSkill(agentsRoot, "public-skill", "---\nname: public-skill\ndescription: Public skill.\n---\nbody");
-await setSkillEnabled(agentsRoot, "public-skill", false);
-let publicDoc = parseSkillDoc(await readFile(join(agentsRoot, "public-skill", "SKILL.md"), "utf8"));
-eq(parseBoolValue(publicDoc.map["disable-model-invocation"]), true, "public skill can be disabled");
-await setSkillEnabled(agentsRoot, "public-skill", true);
-publicDoc = parseSkillDoc(await readFile(join(agentsRoot, "public-skill", "SKILL.md"), "utf8"));
-ok(publicDoc.map["disable-model-invocation"] === undefined, "public skill can be enabled");
+const publicToggle = await setSkillEnabled(agentsRoot, "public-skill", false);
+ok(publicToggle.ok === false, "public Agent skill rejects enable and disable");
+const publicDoc = parseSkillDoc(await readFile(join(agentsRoot, "public-skill", "SKILL.md"), "utf8"));
+ok(publicDoc.map["disable-model-invocation"] === undefined, "public skill metadata remains unchanged");
 
 // ── 删除 ──
 const deleted = await deleteSkill(dshRoot, "good-skill");
