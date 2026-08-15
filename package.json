@@ -31,13 +31,14 @@
       "inject": [
         "@deepseek-ai/dsh-client-runtime",
         "@deepseek-ai/dsh-client-ui-slots",
+        "@deepseek-ai/dsh-client-locale",
         "@deepseek-ai/dsh-client-ui-workspace"
       ],
       "platform": "web"
     }
   },
   "scripts": {
-    "test": "node test/core-test.mjs",
+    "test": "node test/core-test.mjs && node test/locale-test.mjs",
     "pack:check": "npm pack --dry-run --json",
     "prepublishOnly": "npm test"
   },
@@ -49,6 +50,7 @@
     "@deepseek-ai/cordis": ">=4.0.1 <5.0.0",
     "@deepseek-ai/dsh-client-runtime": ">=0.1.0-rc.0 <0.2.0",
     "@deepseek-ai/dsh-client-ui-slots": ">=0.1.0-rc.0 <0.2.0",
+    "@deepseek-ai/dsh-client-locale": ">=0.1.0-rc.0 <0.2.0",
     "@deepseek-ai/dsh-host-webserver": ">=0.1.0-rc.5",
     "@deepseek-ai/dsh-skill": ">=0.1.0-rc.5",
     "@deepseek-ai/dsh-client-ui-workspace": ">=0.1.0-rc.5",

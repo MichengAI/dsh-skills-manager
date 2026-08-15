@@ -115,13 +115,19 @@ const quotedAfterToggle = await readFile(join(dshRoot, "quoted-skill", "SKILL.md
 eq(quotedAfterToggle, quotedFrontmatter, "toggle preserves quoted and nested frontmatter exactly");
 const missing = await setSkillEnabled(dshRoot, "no-such-skill", true);
 ok(missing.ok === false, "setSkillEnabled missing returns error");
+eq(missing.code, "error.skill.notFound", "missing skill carries the notFound code");
+eq(missing.params && missing.params.name, "no-such-skill", "missing skill params.name");
 await makeSkill(dshRoot, "plain-skill", "没有 frontmatter 的正文");
 const plainToggle = await setSkillEnabled(dshRoot, "plain-skill", false);
 ok(plainToggle.ok === false, "setSkillEnabled rejects skills without frontmatter");
+eq(plainToggle.code, "error.skill.noFrontmatter", "no-frontmatter toggle carries the code");
+eq(plainToggle.params && plainToggle.params.action, "disable", "no-frontmatter params.action");
 eq(await readFile(join(dshRoot, "plain-skill", "SKILL.md"), "utf8"), "没有 frontmatter 的正文", "missing frontmatter remains unchanged");
 await makeSkill(agentsRoot, "public-skill", "---\nname: public-skill\ndescription: Public skill.\n---\nbody");
 const publicToggle = await setSkillEnabled(agentsRoot, "public-skill", false);
 ok(publicToggle.ok === false, "public Agent skill rejects enable and disable");
+eq(publicToggle.code, "error.root.readonly", "public toggle carries the readonly code");
+eq(publicToggle.params && publicToggle.params.action, "disable", "public toggle params.action");
 const publicDoc = parseSkillDoc(await readFile(join(agentsRoot, "public-skill", "SKILL.md"), "utf8"));
 ok(publicDoc.map["disable-model-invocation"] === undefined, "public skill metadata remains unchanged");
 
@@ -131,6 +137,8 @@ eq(deleted.name, "good-skill", "deleteSkill returns deleted name");
 ok(await resolveEntry(dshRoot, "good-skill") === null, "deleteSkill removes bundle");
 const publicDelete = await deleteSkill(agentsRoot, "public-skill");
 ok(publicDelete.ok === false, "deleteSkill rejects public Agent directory");
+eq(publicDelete.code, "error.root.readonly", "public delete carries the readonly code");
+eq(publicDelete.params && publicDelete.params.action, "delete", "public delete params.action");
 ok(await resolveEntry(agentsRoot, "public-skill") !== null, "public skill remains after rejected delete");
 await writeFile(join(dshRoot, "SKILL.md"), "---\nname: root\n---\nbody", "utf8");
 await writeFile(join(process.env.DSH_HOME, "SKILL.md"), "---\nname: dsh-home\n---\nbody", "utf8");
@@ -159,11 +167,14 @@ ok(importedEntry !== null, "imported entry resolvable");
 // 已安装目录不能作为导入来源，否则覆盖会先删除来源再复制。
 const selfImport = await importSkill(dshRoot, null, { dryRun: true });
 ok(selfImport.ok === false, "import rejects a source inside the DSH skills root");
+eq(selfImport.code, "error.import.overlap", "self import carries the overlap code");
 const parentImport = await importSkill(tmp, null, { dryRun: true });
 ok(parentImport.ok === false, "import rejects a source that contains the DSH skills root");
+eq(parentImport.code, "error.import.overlap", "parent import carries the overlap code");
 const namesBeforeHomeImport = (await scanEntries(dshRoot)).entries.map((entry) => entry.name).sort().join(",");
 const homeSkillImport = await importSkill(join(process.env.DSH_HOME, "SKILL.md"), null, { dryRun: true });
 ok(homeSkillImport.ok === false && homeSkillImport.error.includes("导入来源不能与 DSH 技能目录相同、包含或位于其中"), "import rejects a SKILL.md whose parent contains the DSH skills root");
+eq(homeSkillImport.code, "error.import.overlap", "home SKILL.md import carries the overlap code");
 eq((await scanEntries(dshRoot)).entries.map((entry) => entry.name).sort().join(","), namesBeforeHomeImport, "rejected home SKILL.md import leaves skills unchanged");
 
 // 重名 dry-run
@@ -193,6 +204,10 @@ await writeFile(invalidSource, "---\nname: invalid\n---\nbody", "utf8");
 const invalidImport = await importSkill(invalidSource, null);
 ok(invalidImport.ok === false, "failed single import returns an error result");
 eq(invalidImport.failed.length, 1, "failed single import includes failure detail");
+eq(invalidImport.failed[0].code, "error.import.invalidName", "invalid kebab name carries the code");
+eq(invalidImport.failed[0].params && invalidImport.failed[0].params.name, "中文技能", "invalid kebab name params");
+eq(invalidImport.code, "error.import.failed", "fully failed import carries the aggregate code");
+eq(invalidImport.error, invalidImport.failed.map((item) => item.error).join("；"), "aggregate error preserves the original zh text");
 
 const partialBatchDir = join(tmp, "partial-batch");
 await mkdir(partialBatchDir, { recursive: true });
@@ -201,6 +216,8 @@ await writeFile(join(partialBatchDir, "无效.md"), "---\nname: invalid\n---\nbo
 const partialImport = await importSkill(partialBatchDir, null);
 eq(partialImport.imported.length, 1, "partial import keeps successful entries");
 eq(partialImport.failed.length, 1, "partial import returns failed entry details");
+eq(partialImport.failed[0].code, "error.import.invalidName", "partial import failed item carries the code");
+ok(partialImport.error === undefined, "partial import does not surface a top-level error");
 
 const duplicateBatchDir = join(tmp, "duplicate-batch");
 await mkdir(duplicateBatchDir, { recursive: true });
@@ -209,6 +226,15 @@ await writeFile(join(duplicateBatchDir, "foo-bar.md"), "---\nname: foo-bar\n---\
 const duplicateBatch = await importSkill(duplicateBatchDir, null, { dryRun: true });
 ok(duplicateBatch.ok === false, "batch import rejects candidates with the same normalized name");
 eq(duplicateBatch.failed.length, 2, "duplicate batch reports every colliding candidate");
+eq(duplicateBatch.failed[0].code, "error.import.duplicateName", "duplicate batch carries the code");
+eq(duplicateBatch.failed[0].params && duplicateBatch.failed[0].params.name, "foo-bar", "duplicate batch params.name");
+
+const emptyBatchDir = join(tmp, "empty-batch");
+await mkdir(emptyBatchDir, { recursive: true });
+const emptyImport = await importSkill(emptyBatchDir, null);
+ok(emptyImport.ok === false, "empty batch dir returns an error result");
+eq(emptyImport.code, "error.import.emptySource", "empty batch carries the emptySource code");
+eq(emptyImport.params && emptyImport.params.path, emptyBatchDir, "empty batch params.path");
 
 const deepSource = await makeSkill(tmp, "deep-source", "---\nname: deep-source\n---\nbody");
 let deepPath = deepSource;
@@ -218,6 +244,8 @@ for (let i = 0; i < 65; i++) {
 }
 const deepImport = await importSkill(join(deepSource, "SKILL.md"), null);
 ok(deepImport.ok === false, "import rejects sources that exceed the directory depth limit");
+eq(deepImport.failed[0].code, "error.source.tooDeep", "too-deep import carries the code");
+eq(deepImport.failed[0].params && deepImport.failed[0].params.depth, 64, "too-deep params.depth");
 
 await makeSkill(dshRoot, "invalid-policy", "---\nname: invalid-policy\ndisable-model-invocation: maybe\n---\nbody");
 const invalidPolicyEntries = await scanEntries(dshRoot);
@@ -283,6 +311,9 @@ try {
 
   const publicResponse = await fetch(api + "/disable", { method: "POST", headers: secureHeaders, body: JSON.stringify({ name: "public-skill", root: "agents" }) });
   eq(publicResponse.status, 400, "HTTP route rejects public Agent mutations");
+  const publicPayload = await publicResponse.json();
+  eq(publicPayload.code, "error.root.readonly", "HTTP route returns the readonly code");
+  eq(publicPayload.params && publicPayload.params.action, "disable", "HTTP route readonly params.action");
   const httpDotDelete = await fetch(api + "/delete", { method: "POST", headers: secureHeaders, body: JSON.stringify({ name: "." }) });
   eq(httpDotDelete.status, 400, "HTTP delete rejects current-directory traversal");
   const httpNestedDelete = await fetch(api + "/delete", { method: "POST", headers: secureHeaders, body: JSON.stringify({ name: "foo/../safe-bar" }) });
