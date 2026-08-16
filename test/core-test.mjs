@@ -93,10 +93,6 @@ if (process.platform !== "win32") {
       ok(result.ok === false, `import rejects reserved device name: ${name}`);
       eq(result.failed[0].code, "error.import.invalidName", `reserved device name carries invalidName: ${name}`);
     }
-    const linkedSourceImport = await importSkill(linkSource, null);
-    eq(linkedSourceImport.code, "error.source.symlink", "import rejects a symbolic-link source");
-    const nestedLinkImport = await importSkill(join(nestedLinkSource, "SKILL.md"), null);
-    eq(nestedLinkImport.failed[0].code, "error.source.symlink", "import rejects a source containing a symbolic link");
     let targetCreated = true;
     try { await stat(reservedRoot); } catch { targetCreated = false; }
     ok(targetCreated === false, "reserved-name imports do not create the target root");
@@ -104,6 +100,10 @@ if (process.platform !== "win32") {
     await makeSkill(reservedRoot, "con", "---\nname: con\n---\nbody");
     await writeFile(join(reservedRoot, "nul.md"), "---\nname: nul\n---\nbody", "utf8");
     eq((await scanEntries(reservedRoot)).entries.length, 0, "scan hides entries that cannot be resolved safely");
+    const linkedSourceImport = await importSkill(linkSource, null);
+    eq(linkedSourceImport.code, "error.source.symlink", "import rejects a symbolic-link source");
+    const nestedLinkImport = await importSkill(join(nestedLinkSource, "SKILL.md"), null);
+    eq(nestedLinkImport.failed[0].code, "error.source.symlink", "import rejects a source containing a symbolic link");
   } finally {
     process.env.DSH_HOME = originalDshHome;
   }
