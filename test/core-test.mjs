@@ -115,6 +115,7 @@ const clientSource = await readFile(new URL("../lib/client.js", import.meta.url)
 ok(clientSource.includes('id: "@michengai/dsh-skills-manager"'), "client registers the scoped package module ID");
 ok(clientSource.includes('"x-dsh-skills-manager": "1"'), "client sends the mutation request marker");
 ok(clientSource.includes('className: "dssm-modal dssm-modal-upload"'), "upload dialog uses the adaptive modal class");
+ok(clientSource.includes('.dssm-modal{box-sizing:border-box;display:flex;width:min(480px,100%)!important;height:auto!important;'), "all plugin dialogs stay compact against host stretch");
 ok(clientSource.includes('.dssm-modal-upload{width:min(480px,100%)!important;height:auto!important;'), "upload dialog stays compact against host stretch");
 ok(clientSource.includes('.dssm-dropzone{box-sizing:border-box;display:flex;width:100%;min-height:144px;flex:none;'), "dropzone keeps a compact height");
 ok(clientSource.includes('.dssm-modal-actions{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:8px}'), "upload actions wrap instead of stretching the dialog");
