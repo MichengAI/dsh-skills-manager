@@ -114,6 +114,11 @@ if (process.platform !== "win32") {
 const clientSource = await readFile(new URL("../lib/client.js", import.meta.url), "utf8");
 ok(clientSource.includes('id: "@michengai/dsh-skills-manager"'), "client registers the scoped package module ID");
 ok(clientSource.includes('"x-dsh-skills-manager": "1"'), "client sends the mutation request marker");
+ok(clientSource.includes('className: "dssm-modal dssm-modal-upload"'), "upload dialog uses the adaptive modal class");
+ok(clientSource.includes('.dssm-modal-upload{width:min(880px,100%);height:100%;max-height:100%;align-self:stretch;overflow:hidden}'), "upload dialog stretches with the host overlay");
+ok(clientSource.includes('.dssm-dropzone{box-sizing:border-box;display:flex;width:100%;min-height:min(144px,40%);flex:1 1 auto;'), "dropzone grows with the upload dialog");
+ok(clientSource.includes('.dssm-modal-upload .dssm-modal-actions{margin-top:auto}'), "upload actions stay at the bottom of the adaptive dialog");
+ok(clientSource.includes('@media (max-width:560px){.dssm-mask{padding:12px;align-items:stretch}'), "upload dialog collapses to the narrow viewport");
 const packageJson = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
 ok(packageJson.peerDependencies["@deepseek-ai/dsh-client-runtime"], "package declares the client runtime peer");
 ok(packageJson.peerDependencies["@deepseek-ai/dsh-client-ui-slots"], "package declares the settings slots peer");
