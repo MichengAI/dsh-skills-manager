@@ -132,6 +132,7 @@ bundle.apply(fakeCtx);
 ok(registerOptions !== null && registerOptions.name === "settings.section", "apply registers the settings.section entry");
 ok(registerOptions !== null && registerOptions.locale === "skills-manager", "settings.section registration declares the locale namespace");
 ok(registerOptions !== null && typeof registerOptions.label === "function", "settings.section label is a thunk (re-read per locale revision)");
+ok(registerOptions !== null && registerOptions.icon === "skill", "settings.section registers the skill nav icon");
 
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);
