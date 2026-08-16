@@ -79,7 +79,7 @@ const hostSources = await Promise.all([
 ]);
 const hostCodes = new Set();
 for (const hostSource of hostSources) {
-  for (const match of hostSource.matchAll(/["'](error\.[A-Za-z]+(?:\.[A-Za-z]+)*)["']/g)) hostCodes.add(match[1]);
+  for (const match of hostSource.matchAll(/["']((?:error|warning)\.[A-Za-z]+(?:\.[A-Za-z]+)*)["']/g)) hostCodes.add(match[1]);
 }
 for (const code of hostCodes) {
   ok(code in DICT.zh && code in DICT.en, "host error code exists in both dictionaries: " + code);
@@ -147,6 +147,21 @@ eq(
   translateError(() => undefined, { code: "error.skill.notFound", params: {}, error: "原文" }),
   "原文",
   "translateError falls back when the host t returns undefined"
+);
+eq(
+  translateError(mockT, { code: "error.proto.forbiddenHost", error: "forbidden host" }),
+  "Forbidden request origin (invalid host)",
+  "translateError maps illegal Host to forbiddenHost"
+);
+eq(
+  translateError(mockT, { code: "error.import.rollbackFailed", params: { path: "C:\\bak", error: "EPERM" }, error: "覆盖导入回滚失败" }),
+  "Overwrite import rollback failed; backups kept at: C:\\bak (EPERM)",
+  "translateError translates rollback failure with params"
+);
+eq(
+  translateError(mockT, { code: "warning.backupUncleaned", params: { path: "C:\\bak", error: "EPERM" }, error: "旧版本备份未清理" }),
+  "Old version backup was not cleaned up: C:\\bak (EPERM)",
+  "translateError translates backup cleanup warning"
 );
 
 // ── 注册契约断言：inject 声明 locale，settings.section 注册携带 locale 命名空间 ──

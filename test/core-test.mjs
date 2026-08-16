@@ -396,7 +396,7 @@ try {
 
   const evilStateResponse = await requestJson(api + "/state", "GET", { host: "evil.example" });
   eq(evilStateResponse.status, 403, "state route rejects non-loopback Host headers");
-  eq(evilStateResponse.payload.code, "error.proto.forbidden", "non-loopback Host on GET carries the forbidden code");
+  eq(evilStateResponse.payload.code, "error.proto.forbiddenHost", "non-loopback Host on GET carries the forbiddenHost code");
 
   const localhostStateResponse = await requestJson(api + "/state", "GET", { host: "localhost:" + address.port });
   eq(localhostStateResponse.status, 200, "state route accepts localhost Host headers");
@@ -404,7 +404,7 @@ try {
 
   const evilHostResponse = await requestJson(api + "/disable", "POST", { ...secureHeaders, host: "evil.example" }, JSON.stringify({ name: "http-skill" }));
   eq(evilHostResponse.status, 403, "mutating route rejects non-loopback Host headers");
-  eq(evilHostResponse.payload.code, "error.proto.forbidden", "non-loopback Host carries the forbidden code");
+  eq(evilHostResponse.payload.code, "error.proto.forbiddenHost", "non-loopback Host carries the forbiddenHost code");
 
   const localhostHostResponse = await requestJson(api + "/enable", "POST", { ...secureHeaders, host: "localhost:" + address.port }, JSON.stringify({ name: "http-skill" }));
   eq(localhostHostResponse.status, 200, "mutating route accepts localhost Host headers");

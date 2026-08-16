@@ -1,6 +1,6 @@
 # HTTP 接口文档
 
-更新时间：2026-08-17 02:07（Asia/Shanghai）
+更新时间：2026-08-17 02:52（Asia/Shanghai）
 
 ## 通用约定
 
@@ -13,7 +13,9 @@
 ## 错误码约定
 
 - 业务码 `error.*`：由 core 产生（如 `error.skill.notFound`、`error.import.overlap`），client 按当前语言词典翻译；`error` 字段保留中文原文，供非浏览器调用方兜底。
-- 协议码 `error.proto.*`：HTTP 层校验失败——非法 Host 403、缺少请求标记 403、content-type 415、方法不允许 405、未知操作 404、请求体过大 413、非法 JSON 400。
+- 协议码 `error.proto.*`：HTTP 层校验失败——非法 Host 403（`error.proto.forbiddenHost`）、缺少请求标记 403（`error.proto.forbidden`）、content-type 415、方法不允许 405、未知操作 404、请求体过大 413、非法 JSON 400。
+- 覆盖导入回滚失败返回 `error.import.rollbackFailed`，`params.path` 为备份路径，`params.error` 为原始原因。
+- 导入成功但旧备份未删除时，`imported[].warnings[]` 带 `warning.backupUncleaned`；前端按当前语言展示。
 - 系统异常（如 ENOENT）不携带 `code`，保留原始 `error` 文本。
 
 ## 接口列表
