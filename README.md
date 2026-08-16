@@ -23,6 +23,12 @@
 
 > DSH Skills Manager is a community-maintained plugin, not an official DeepSeek AI product.
 
+<p align="center">
+  <img src="assets/screenshots/skills-manager.png" alt="Skills Manager settings page" width="960">
+</p>
+
+> The screenshot shows DSH-local skills with enable, disable, and delete actions. Shared Agent skills stay read-only.
+
 ## Features
 
 - Shows local `$DSH_HOME\skills` and shared `$DSH_AGENTS_HOME\skills` in one Settings page.
@@ -30,8 +36,6 @@
 - Keeps shared Agent skills strictly read-only and never changes their global metadata.
 - Imports a plugin directory containing `SKILL.md` through the native file picker and confirms every name collision.
 - Rejects traversal names, imports from the DSH skills directory itself, and symbolic links.
-
-![Skills Manager settings page](assets/screenshots/skills-manager.png)
 
 ## Prerequisites
 
@@ -84,6 +88,30 @@ Open **Settings → Skills**, then use the panel as follows:
 | Choose the directory | If the selected file has no usable path, choose the directory containing `SKILL.md`. | DSH-local skills only |
 | Replace or delete | Confirm a name collision, or select **Delete** for an unneeded local skill. | DSH-local skills only |
 | Inspect shared skills | Review shared Agent skills without changing their metadata. | Read-only |
+
+<p align="center">
+  <img src="assets/screenshots/skills-public.png" alt="Shared Agent skills remain visible when no local skills are installed" width="960">
+</p>
+
+> Shared Agent skills stay visible when the DSH-local group is empty.
+
+<p align="center">
+  <img src="assets/screenshots/upload-plugin.png" alt="Upload plugin dialog" width="960">
+</p>
+
+> The compact upload dialog accepts a plugin `SKILL.md`, a plugin directory, or drag-and-drop.
+
+<p align="center">
+  <img src="assets/screenshots/delete-plugin.png" alt="Delete plugin confirmation" width="960">
+</p>
+
+> Deleting a DSH-local skill requires confirmation and cannot be undone.
+
+<p align="center">
+  <img src="assets/screenshots/slash-command.png" alt="Chat slash command after enabling a local skill" width="640">
+</p>
+
+> Enabling a DSH-local skill restores its `/` command in the chat composer.
 
 Escape closes only the frontmost upload or confirmation dialog and leaves Settings open.
 

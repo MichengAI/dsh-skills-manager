@@ -23,6 +23,12 @@
 
 > DSH Skills Manager 是社区维护的插件，并非 DeepSeek AI 官方产品。
 
+<p align="center">
+  <img src="assets/screenshots/skills-manager.png" alt="技能管理设置页面" width="960">
+</p>
+
+> 截图展示 DSH 本地技能的启用、停用和删除入口。公共 Agent 技能保持只读，不显示操作按钮。
+
 ## 功能概览
 
 - 在同一设置页查看本地 `$DSH_HOME\skills` 与公共 `$DSH_AGENTS_HOME\skills`。
@@ -30,8 +36,6 @@
 - 公共 Agent 技能始终只读，不改写共享的全局元数据。
 - 使用系统文件选择器导入包含 `SKILL.md` 的插件目录，并对同名覆盖强制确认。
 - 拒绝目录穿越、从 DSH 技能目录导入自身及符号链接导入。
-
-![技能管理设置页面](assets/screenshots/skills-manager.png)
 
 ## 前置条件
 
@@ -84,6 +88,30 @@ dsh --profile web --dump-config
 | 改选插件目录 | 所选文件无可用路径时，选择包含 `SKILL.md` 的目录。 | 仅 DSH 本地技能 |
 | 覆盖或删除 | 同名时确认覆盖；使用「删除」移除不再需要的本地技能。 | 仅 DSH 本地技能 |
 | 查看公共技能 | 查看公共 Agent 技能，不修改其元数据。 | 只读 |
+
+<p align="center">
+  <img src="assets/screenshots/skills-public.png" alt="未安装本地技能时仍可查看公共 Agent 技能" width="960">
+</p>
+
+> 本地 DSH 技能为空时，公共 Agent 技能仍然可见。
+
+<p align="center">
+  <img src="assets/screenshots/upload-plugin.png" alt="上传插件弹窗" width="960">
+</p>
+
+> 紧凑上传弹窗支持选择 `SKILL.md`、选择插件目录，或直接拖放文件。
+
+<p align="center">
+  <img src="assets/screenshots/delete-plugin.png" alt="删除插件确认框" width="960">
+</p>
+
+> 删除 DSH 本地技能需要确认，删除后无法恢复。
+
+<p align="center">
+  <img src="assets/screenshots/slash-command.png" alt="启用本地技能后的斜杠命令" width="640">
+</p>
+
+> 启用 DSH 本地技能后，聊天输入框会恢复对应的 `/` 命令。
 
 按 ESC 只关闭最上层上传框或确认框，设置页会保持打开。
 
