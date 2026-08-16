@@ -2,7 +2,7 @@
 // 运行：node test/core-test.mjs
 
 import { mkdtemp, mkdir, writeFile, readFile, rm, stat, symlink } from "node:fs/promises";
-import { createServer } from "node:http";
+import { createServer, request } from "node:http";
 import { join, sep } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -34,6 +34,25 @@ function ok(cond, msg) {
 }
 function eq(actual, expected, msg) {
   ok(actual === expected, msg + " (got " + JSON.stringify(actual) + ", want " + JSON.stringify(expected) + ")");
+}
+
+function requestJson(url, method, headers, body) {
+  return new Promise((resolve, reject) => {
+    const req = request(url, { method, headers }, (res) => {
+      const chunks = [];
+      res.on("data", (chunk) => chunks.push(chunk));
+      res.on("end", () => {
+        try {
+          resolve({ status: res.statusCode, payload: JSON.parse(Buffer.concat(chunks).toString("utf8")) });
+        } catch (error) {
+          reject(error);
+        }
+      });
+    });
+    req.on("error", reject);
+    if (body) req.write(body);
+    req.end();
+  });
 }
 
 async function makeSkill(root, name, content) {
@@ -339,6 +358,13 @@ const secureHeaders = { "content-type": "application/json", "x-dsh-skills-manage
 try {
   const stateResponse = await fetch(api + "/state");
   eq(stateResponse.status, 200, "state route returns 200");
+
+  const evilHostResponse = await requestJson(api + "/disable", "POST", { ...secureHeaders, host: "evil.example" }, JSON.stringify({ name: "http-skill" }));
+  eq(evilHostResponse.status, 403, "mutating route rejects non-loopback Host headers");
+  eq(evilHostResponse.payload.code, "error.proto.forbidden", "non-loopback Host carries the forbidden code");
+
+  const localhostHostResponse = await requestJson(api + "/enable", "POST", { ...secureHeaders, host: "localhost:" + address.port }, JSON.stringify({ name: "http-skill" }));
+  eq(localhostHostResponse.status, 200, "mutating route accepts localhost Host headers");
 
   const csrfResponse = await fetch(api + "/disable", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: "http-skill" }) });
   eq(csrfResponse.status, 403, "mutating route rejects requests without the client marker");

@@ -97,7 +97,10 @@ const parseApiResponse = bundle.parseApiResponse;
 ok(typeof parseApiResponse === "function", "factory exports API response parsing for regression tests");
 await parseApiResponse({ status: 502, json: function () { return Promise.reject(new SyntaxError("Unexpected token <")); } }).then(
   function () { ok(false, "non-JSON API response rejects"); },
-  function (error) { eq(error.message, "HTTP 502 返回非 JSON 响应", "non-JSON API error includes HTTP status"); }
+  function (error) {
+    eq(error.code, "error.proto.nonJson", "non-JSON API error carries a translatable code");
+    eq(translateError(mockT, error), "Server returned a non-JSON response (HTTP 502)", "non-JSON API error uses the locale dictionary");
+  }
 );
 const trapModalFocus = bundle.trapModalFocus;
 ok(typeof trapModalFocus === "function", "factory exports modal focus trapping for regression tests");
