@@ -20,7 +20,7 @@ import {
   entryPath,
   userRoots,
 } from "../lib/core.js";
-import { apply as applyHost } from "../lib/index.js";
+import { apply as applyHost, notifyChatCatalog } from "../lib/index.js";
 
 let passed = 0;
 let failed = 0;
@@ -339,15 +339,44 @@ await writeFile(join(batchDir, "gamma.md"), "---\nname: gamma\ndescription: G.\n
 const batch = await importSkill(batchDir, null);
 eq(batch.imported.length, 2, "import batch dir");
 
+
+// ── 斜杠菜单刷新通知 ──
+{
+  const events = [];
+  let catalog = 0;
+  notifyChatCatalog({
+    emit() { events.push(Array.from(arguments)); },
+    get(name) {
+      if (name === "sessions") return { list() { return [{ id: "s1", header: { agentPreset: "web" } }]; } };
+    },
+  }, () => { catalog++; });
+  eq(catalog, 1, "notifyChatCatalog invalidates the host skill catalog");
+  ok(events.some((event) => event[0] === "commands/change"), "notifyChatCatalog emits commands/change");
+  ok(events.some((event) => event[0] === "agent-preset/selected" && event[1] === "s1" && event[2] === "web"), "notifyChatCatalog emits the live session preset");
+}
 // ── HTTP 路由 ──
 await makeSkill(dshRoot, "http-skill", "---\nname: http-skill\n---\nbody");
 const concurrentImportSource = await makeSkill(tmp, "concurrent-import", "---\nname: concurrent-import\n---\nbody");
 let route;
 let invalidated = 0;
+const emitted = [];
 applyHost({
   webServer: { register(value) { route = value; return function () {}; } },
   skills: { registerProvider(register) { register({ invalidate() { invalidated++; } }); return function () {}; } },
   effect(register) { return register(); },
+  emit() { emitted.push(Array.from(arguments)); },
+  get(name) {
+    if (name === "sessions") {
+      return {
+        list() {
+          return [
+            { id: "sess-live", header: { id: "sess-live", agentPreset: "cordis" } },
+            { id: "sess-blank", header: { id: "sess-blank" } },
+          ];
+        },
+      };
+    }
+  },
 });
 const server = createServer((req, res) => route.handler(req, res));
 await new Promise((resolve, reject) => {
@@ -399,6 +428,9 @@ try {
   eq(disableResponse.status, 200, "valid mutation returns 200");
   ok((await readFile(join(dshRoot, "http-skill", "SKILL.md"), "utf8")).includes("disable-model-invocation: true"), "HTTP disable updates the skill policy");
   ok(invalidated > 0, "successful mutation invalidates the skill catalog");
+ok(emitted.some((event) => event[0] === "commands/change"), "successful mutation notifies the command catalog");
+ok(emitted.some((event) => event[0] === "agent-preset/selected" && event[1] === "sess-live" && event[2] === "cordis"), "successful mutation refreshes live session slash menus");
+ok(!emitted.some((event) => event[0] === "agent-preset/selected" && event[1] === "sess-blank"), "sessions without a preset are not rewritten");
 
   const publicResponse = await fetch(api + "/disable", { method: "POST", headers: secureHeaders, body: JSON.stringify({ name: "public-skill", root: "agents" }) });
   eq(publicResponse.status, 400, "HTTP route rejects public Agent mutations");
