@@ -1,9 +1,9 @@
 // dsh-skills-manager core 单元测试（临时根，零第三方依赖）
 // 运行：node test/core-test.mjs
 
-import { mkdtemp, mkdir, writeFile, readFile, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, writeFile, readFile, rm, stat, symlink } from "node:fs/promises";
 import { createServer } from "node:http";
-import { join } from "node:path";
+import { join, sep } from "node:path";
 import { tmpdir } from "node:os";
 
 import {
@@ -17,6 +17,7 @@ import {
   scanEntries,
   state,
   resolveEntry,
+  entryPath,
   userRoots,
 } from "../lib/core.js";
 import { apply as applyHost } from "../lib/index.js";
@@ -50,6 +51,45 @@ const agentsRoot = join(process.env.DSH_AGENTS_HOME, "skills");
 await mkdir(dshRoot, { recursive: true });
 await mkdir(agentsRoot, { recursive: true });
 
+// Linux 同样必须拒绝 Windows 保留设备名；Windows 无法创建这类来源，故仅在可创建的系统上做端到端断言。
+if (process.platform !== "win32") {
+  const reservedSourceRoot = join(tmp, "reserved-source");
+  const reservedHome = join(tmp, "reserved-home");
+  const reservedRoot = join(reservedHome, "skills");
+  await mkdir(reservedSourceRoot, { recursive: true });
+  const conSource = await makeSkill(reservedSourceRoot, "con", "---\nname: con\n---\nbody");
+  const nulSource = join(reservedSourceRoot, "nul.md");
+  await writeFile(nulSource, "---\nname: nul\n---\nbody", "utf8");
+  const linkTarget = join(reservedSourceRoot, "link-target.md");
+  await writeFile(linkTarget, "---\nname: link-target\n---\nbody", "utf8");
+  const linkSource = join(reservedSourceRoot, "linked-source.md");
+  await symlink(linkTarget, linkSource);
+  const nestedLinkSource = await makeSkill(reservedSourceRoot, "nested-link", "---\nname: nested-link\n---\nbody");
+  await symlink(linkTarget, join(nestedLinkSource, "linked-content.md"));
+  const originalDshHome = process.env.DSH_HOME;
+  process.env.DSH_HOME = reservedHome;
+  try {
+    for (const [source, name] of [[conSource, "con"], [nulSource, "nul"]]) {
+      const result = await importSkill(source, null);
+      ok(result.ok === false, `import rejects reserved device name: ${name}`);
+      eq(result.failed[0].code, "error.import.invalidName", `reserved device name carries invalidName: ${name}`);
+    }
+    const linkedSourceImport = await importSkill(linkSource, null);
+    eq(linkedSourceImport.code, "error.source.symlink", "import rejects a symbolic-link source");
+    const nestedLinkImport = await importSkill(join(nestedLinkSource, "SKILL.md"), null);
+    eq(nestedLinkImport.failed[0].code, "error.source.symlink", "import rejects a source containing a symbolic link");
+    let targetCreated = true;
+    try { await stat(reservedRoot); } catch { targetCreated = false; }
+    ok(targetCreated === false, "reserved-name imports do not create the target root");
+
+    await makeSkill(reservedRoot, "con", "---\nname: con\n---\nbody");
+    await writeFile(join(reservedRoot, "nul.md"), "---\nname: nul\n---\nbody", "utf8");
+    eq((await scanEntries(reservedRoot)).entries.length, 0, "scan hides entries that cannot be resolved safely");
+  } finally {
+    process.env.DSH_HOME = originalDshHome;
+  }
+}
+
 // ── 客户端装配约束 ──
 // 客户端 bundle 由宿主 AMD 加载，无法在零依赖测试中直接挂载；仅保留协议常量锚点。
 const clientSource = await readFile(new URL("../lib/client.js", import.meta.url), "utf8");
@@ -73,6 +113,7 @@ eq(toKebab("Foo Bar_Test"), "foo-bar-test", "toKebab mixed separators");
 eq(toKebab("guizang-ppt-skill-main"), "guizang-ppt-skill-main", "toKebab already kebab");
 eq(toKebab("  GuiZangPPT-Skill  "), "gui-zang-ppt-skill", "toKebab trim + acronym-ish");
 eq(toKebab("中文名"), "", "toKebab non-ascii strips to empty");
+eq(entryPath(dshRoot, "foo:bar"), null, "entryPath rejects Windows ADS names");
 
 // ── frontmatter 解析 ──
 const bomDoc = parseSkillDoc("\uFEFF---\nname: foo\n---\nbody");
@@ -113,6 +154,14 @@ await setSkillEnabled(dshRoot, "quoted-skill", false);
 await setSkillEnabled(dshRoot, "quoted-skill", true);
 const quotedAfterToggle = await readFile(join(dshRoot, "quoted-skill", "SKILL.md"), "utf8");
 eq(quotedAfterToggle, quotedFrontmatter, "toggle preserves quoted and nested frontmatter exactly");
+const literalFrontmatter = "---\nname: literal-skill\ndescription: |\n  disable-model-invocation: explanatory text\n  user-invocable: explanatory text\n---\nbody";
+await makeSkill(dshRoot, "literal-skill", literalFrontmatter);
+await setSkillEnabled(dshRoot, "literal-skill", false);
+const literalAfterToggle = await readFile(join(dshRoot, "literal-skill", "SKILL.md"), "utf8");
+ok(literalAfterToggle.includes("  disable-model-invocation: explanatory text") && literalAfterToggle.includes("  user-invocable: explanatory text"), "toggle preserves block-scalar content that resembles policy fields");
+await makeSkill(dshRoot, "trailing-root", "---\nname: trailing-root\n---\nbody");
+const trailingRootToggle = await setSkillEnabled(dshRoot + sep, "trailing-root", false);
+ok(trailingRootToggle.ok !== false, "toggle accepts a normalized DSH root path");
 const missing = await setSkillEnabled(dshRoot, "no-such-skill", true);
 ok(missing.ok === false, "setSkillEnabled missing returns error");
 eq(missing.code, "error.skill.notFound", "missing skill carries the notFound code");
@@ -155,6 +204,10 @@ await writeFile(join(dshRoot, "flat-delete.md"), "---\nname: flat-delete\n---\nb
 const flatDeleted = await deleteSkill(dshRoot, "flat-delete");
 eq(flatDeleted.name, "flat-delete", "deleteSkill deletes a flat skill");
 ok(await resolveEntry(dshRoot, "flat-delete") === null, "flat skill no longer resolves after delete");
+await makeSkill(dshRoot, "dual-shape", "---\nname: dual-shape\n---\nbundle");
+await writeFile(join(dshRoot, "dual-shape.md"), "---\nname: dual-shape\n---\nflat", "utf8");
+await deleteSkill(dshRoot, "dual-shape");
+ok(await resolveEntry(dshRoot, "dual-shape") === null, "deleteSkill removes both bundle and flat forms of one skill");
 
 // ── 导入 ──
 const srcSkill = await makeSkill(tmp, "Import Me", "---\nname: import-me\ndescription: Imported.\n---\nbody");
@@ -264,6 +317,7 @@ eq(batch.imported.length, 2, "import batch dir");
 
 // ── HTTP 路由 ──
 await makeSkill(dshRoot, "http-skill", "---\nname: http-skill\n---\nbody");
+const concurrentImportSource = await makeSkill(tmp, "concurrent-import", "---\nname: concurrent-import\n---\nbody");
 let route;
 let invalidated = 0;
 applyHost({
@@ -288,9 +342,15 @@ try {
 
   const csrfResponse = await fetch(api + "/disable", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: "http-skill" }) });
   eq(csrfResponse.status, 403, "mutating route rejects requests without the client marker");
+  eq((await csrfResponse.json()).code, "error.proto.forbidden", "403 response carries the protocol error code");
 
   const contentTypeResponse = await fetch(api + "/disable", { method: "POST", headers: { "x-dsh-skills-manager": "1" }, body: JSON.stringify({ name: "http-skill" }) });
   eq(contentTypeResponse.status, 415, "mutating route requires JSON content type");
+  eq((await contentTypeResponse.json()).code, "error.proto.contentType", "415 response carries the protocol error code");
+
+  const methodResponse = await fetch(api + "/disable", { method: "PUT" });
+  eq(methodResponse.status, 405, "unsupported method returns 405");
+  eq((await methodResponse.json()).code, "error.proto.method", "405 response carries the protocol error code");
 
   const invalidJsonResponse = await fetch(api + "/disable", { method: "POST", headers: secureHeaders, body: "{" });
   eq(invalidJsonResponse.status, 400, "invalid JSON returns 400");
@@ -321,6 +381,13 @@ try {
   ok(await resolveEntry(dshRoot, "safe-bar") !== null, "HTTP traversal deletes leave skills unchanged");
   const unknownResponse = await fetch(api + "/unknown", { method: "POST", headers: secureHeaders, body: "{}" });
   eq(unknownResponse.status, 404, "unknown mutation route returns 404");
+  eq((await unknownResponse.json()).code, "error.proto.unknownAction", "404 response carries the protocol error code");
+
+  const concurrentResponses = await Promise.all([1, 2].map(function () {
+    return fetch(api + "/import", { method: "POST", headers: secureHeaders, body: JSON.stringify({ source: concurrentImportSource }) }).then(function (response) { return response.json(); });
+  }));
+  eq(concurrentResponses.reduce(function (count, payload) { return count + payload.data.imported.length; }, 0), 1, "concurrent imports perform one installation");
+  eq(concurrentResponses.reduce(function (count, payload) { return count + payload.data.skipped.length; }, 0), 1, "concurrent imports serialize the second conflict check");
 } finally {
   await new Promise((resolve) => server.close(resolve));
 }

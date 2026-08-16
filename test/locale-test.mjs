@@ -73,9 +73,44 @@ for (const key of zhKeys) {
   ok(typeof DICT.en[key] === "string" && DICT.en[key].length > 0, "en value of \"" + key + "\" is a non-empty string");
 }
 
+const hostSources = await Promise.all([
+  readFile(new URL("../lib/core.js", import.meta.url), "utf8"),
+  readFile(new URL("../lib/index.js", import.meta.url), "utf8"),
+]);
+const hostCodes = new Set();
+for (const hostSource of hostSources) {
+  for (const match of hostSource.matchAll(/["'](error\.[A-Za-z]+(?:\.[A-Za-z]+)*)["']/g)) hostCodes.add(match[1]);
+}
+for (const code of hostCodes) {
+  ok(code in DICT.zh && code in DICT.en, "host error code exists in both dictionaries: " + code);
+}
+
 // ── translateError 纯函数测试（模拟宿主 translate 行为：{name} 占位符，miss 返回 key 本身）──
 const translateError = bundle.translateError;
 ok(typeof translateError === "function", "factory exports translateError");
+const isSkillEnabled = bundle.isSkillEnabled;
+ok(typeof isSkillEnabled === "function", "factory exports the shared enabled-state predicate");
+ok(isSkillEnabled({ invocationPolicyValid: true, modelInvocable: true, userInvocable: true }), "valid model and user invocation is enabled");
+ok(!isSkillEnabled({ invocationPolicyValid: true, modelInvocable: true, userInvocable: false }), "user-disabled skill is not enabled");
+ok(!isSkillEnabled({ invocationPolicyValid: false, modelInvocable: true, userInvocable: true }), "invalid invocation policy is not enabled");
+const parseApiResponse = bundle.parseApiResponse;
+ok(typeof parseApiResponse === "function", "factory exports API response parsing for regression tests");
+await parseApiResponse({ status: 502, json: function () { return Promise.reject(new SyntaxError("Unexpected token <")); } }).then(
+  function () { ok(false, "non-JSON API response rejects"); },
+  function (error) { eq(error.message, "HTTP 502 返回非 JSON 响应", "non-JSON API error includes HTTP status"); }
+);
+const trapModalFocus = bundle.trapModalFocus;
+ok(typeof trapModalFocus === "function", "factory exports modal focus trapping for regression tests");
+let focused = "";
+const firstButton = { focus: function () { focused = "first"; } };
+const lastButton = { focus: function () { focused = "last"; } };
+const fakeModal = { querySelectorAll: function () { return [firstButton, lastButton]; }, contains: function (node) { return node === firstButton || node === lastButton; } };
+const previousDocument = globalThis.document;
+globalThis.document = { activeElement: lastButton };
+let focusPrevented = false;
+trapModalFocus(fakeModal, { key: "Tab", shiftKey: false, preventDefault: function () { focusPrevented = true; } });
+globalThis.document = previousDocument;
+ok(focusPrevented && focused === "first", "modal focus trap wraps Tab from the last element");
 
 function mockT(key, params) {
   const template = DICT.en[key] || key;
