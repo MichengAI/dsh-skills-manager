@@ -124,7 +124,9 @@ Escape closes only the frontmost upload or confirmation dialog and leaves Settin
 
 - Enable, disable, and delete accept only one ordinary skill-name path segment.
 - Replacements copy to a temporary sibling path first and keep the original until that succeeds.
-- Write endpoints require JSON and the DSH client request marker, so cross-site browser requests cannot trigger local file operations.
+- All endpoints, including GET `/state`, accept only loopback `Host` values (`localhost`, `127.0.0.1`, `[::1]`).
+- Write endpoints also require JSON and the DSH client request marker, so cross-site browser requests cannot trigger local file operations.
+- Import accepts the local path the user selected. The HTTP API trusts loopback callers only; do not expose the host web server beyond this machine.
 
 ## Secondary development
 

@@ -394,6 +394,14 @@ try {
   const stateResponse = await fetch(api + "/state");
   eq(stateResponse.status, 200, "state route returns 200");
 
+  const evilStateResponse = await requestJson(api + "/state", "GET", { host: "evil.example" });
+  eq(evilStateResponse.status, 403, "state route rejects non-loopback Host headers");
+  eq(evilStateResponse.payload.code, "error.proto.forbidden", "non-loopback Host on GET carries the forbidden code");
+
+  const localhostStateResponse = await requestJson(api + "/state", "GET", { host: "localhost:" + address.port });
+  eq(localhostStateResponse.status, 200, "state route accepts localhost Host headers");
+  ok(localhostStateResponse.payload.ok === true, "loopback GET /state still returns the snapshot");
+
   const evilHostResponse = await requestJson(api + "/disable", "POST", { ...secureHeaders, host: "evil.example" }, JSON.stringify({ name: "http-skill" }));
   eq(evilHostResponse.status, 403, "mutating route rejects non-loopback Host headers");
   eq(evilHostResponse.payload.code, "error.proto.forbidden", "non-loopback Host carries the forbidden code");
