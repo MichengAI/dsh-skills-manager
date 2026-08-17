@@ -135,6 +135,7 @@ ok(packageJson.peerDependencies["@deepseek-ai/dsh-client-ui-workspace"].includes
 ok(clientSource.includes("inflightRef"), "client guards mutations with a synchronous in-flight flag");
 ok(clientSource.includes('if (inflightRef.current && busy !== "import-check") return;'), "overwrite import rejects a second in-flight executeImport");
 ok(clientSource.includes("importResult && !uploadOpen && !isUploadPickerError(importResult)"), "import results stay off the page while the upload dialog is open");
+ok(/setUploadOpen\(false\);\s*setSelected\(null\);\s*setImportResult\(\{ error: error \}\)/.test(clientSource), "import failure clears the selected source with the dialog");
 const publishWorkflow = await readFile(new URL("../.github/workflows/publish.yml", import.meta.url), "utf8");
 ok(publishWorkflow.includes("id-token: write"), "publish workflow enables OIDC trusted publishing");
 ok(!publishWorkflow.includes("registry-url:"), "publish workflow relies on package publishConfig instead of token-backed registry setup");
@@ -294,6 +295,22 @@ await writeFile(join(dshRoot, "dual-scan.md"), "---\nname: dual-scan\n---\nflat"
 eq((await scanEntries(dshRoot)).entries.filter((item) => item.name === "dual-scan").length, 1, "scan keeps one row when bundle and flat share a name");
 eq((await scanEntries(dshRoot)).entries.find((item) => item.name === "dual-scan").kind, "bundle", "scan prefers the bundle form over the flat file");
 
+// 删除必须清掉指向目录的伴随链接本身，且不跟随链接误删目标内容。
+const altDirTarget = join(tmp, "alt-dir-target");
+await mkdir(altDirTarget, { recursive: true });
+if (await tryLink(altDirTarget, join(dshRoot, "alt-dir.md"), linkType)) {
+  await makeSkill(dshRoot, "alt-dir", "---\nname: alt-dir\n---\nbundle");
+  await deleteSkill(dshRoot, "alt-dir");
+  let altDirLinkExists = true;
+  try { await stat(join(dshRoot, "alt-dir.md")); } catch { altDirLinkExists = false; }
+  ok(altDirLinkExists === false, "deleteSkill removes an alternate link that points at a directory");
+  let targetStillExists = true;
+  try { await stat(altDirTarget); } catch { targetStillExists = false; }
+  ok(targetStillExists, "deleteSkill does not follow the alternate link to its target");
+} else {
+  ok(true, "alternate-link delete test skipped because this environment cannot create directory links");
+}
+
 // ── 导入 ──
 const srcSkill = await makeSkill(tmp, "Import Me", "---\nname: import-me\ndescription: Imported.\n---\nbody");
 const imp = await importSkill(join(srcSkill, "SKILL.md"), null);
@@ -319,6 +336,26 @@ eq((await scanEntries(dshRoot)).entries.map((entry) => entry.name).sort().join("
 const dry = await importSkill(join(srcSkill, "SKILL.md"), null, { dryRun: true });
 eq(dry.conflicts.length, 1, "import dryRun detects conflict");
 eq(dry.pending.length, 0, "import dryRun pending empty on conflict");
+
+// dry-run 预检与实际导入对符号链接口径一致：SKILL.md 本身是链接时，预检阶段即拒绝。
+const docLinkTarget = join(tmp, "doc-link-target.md");
+await writeFile(docLinkTarget, "---\nname: doc-link\n---\nbody", "utf8");
+const linkedDocSkill = join(tmp, "linked-doc-skill");
+await mkdir(linkedDocSkill, { recursive: true });
+if (await tryLink(docLinkTarget, join(linkedDocSkill, "SKILL.md"))) {
+  const singleDryLink = await importSkill(linkedDocSkill, null, { dryRun: true });
+  ok(singleDryLink.ok === false, "dry-run rejects a single source whose SKILL.md is a symlink");
+  eq(singleDryLink.code, "error.source.symlink", "single dry-run symlink carries the code");
+  const batchLinkDir = join(tmp, "batch-link");
+  await mkdir(batchLinkDir, { recursive: true });
+  await mkdir(join(batchLinkDir, "holder"), { recursive: true });
+  await tryLink(docLinkTarget, join(batchLinkDir, "holder", "SKILL.md"));
+  const batchDryLink = await importSkill(batchLinkDir, null, { dryRun: true });
+  ok(batchDryLink.ok === false, "dry-run rejects a batch containing a symlinked SKILL.md");
+  eq(batchDryLink.code, "error.source.symlink", "batch dry-run symlink carries the code");
+} else {
+  ok(true, "symlink dry-run tests skipped because this environment cannot create file links");
+}
 // 覆盖
 const overwrite = await importSkill(join(srcSkill, "SKILL.md"), null, { conflict: "overwrite" });
 eq(overwrite.imported.length, 1, "import overwrite");
@@ -456,9 +493,12 @@ try {
   const headState = await fetch(api + "/state", { method: "HEAD" });
   eq(headState.status, 200, "HEAD /state returns 200");
   eq(await headState.text(), "", "HEAD /state has an empty body");
+  const stateGet = await fetch(api + "/state");
+  eq(headState.headers.get("content-length"), stateGet.headers.get("content-length"), "HEAD /state content-length matches the GET entity");
   const headDisable = await fetch(api + "/disable", { method: "HEAD" });
   eq(headDisable.status, 405, "HEAD on a mutation route returns 405");
   eq(await headDisable.text(), "", "HEAD 405 has an empty body");
+  eq(headDisable.headers.get("content-length"), String(Buffer.byteLength(JSON.stringify({ ok: false, code: "error.proto.method", error: "method not allowed: HEAD" })), "utf8"), "HEAD 405 content-length matches the POST 405 payload shape");
 
   const evilStateResponse = await requestJson(api + "/state", "GET", { host: "evil.example" });
   eq(evilStateResponse.status, 403, "state route rejects non-loopback Host headers");
