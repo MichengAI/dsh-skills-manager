@@ -104,6 +104,18 @@ if (process.platform !== "win32") {
     eq(linkedSourceImport.code, "error.source.symlink", "import rejects a symbolic-link source");
     const nestedLinkImport = await importSkill(join(nestedLinkSource, "SKILL.md"), null);
     eq(nestedLinkImport.failed[0].code, "error.source.symlink", "import rejects a source containing a symbolic link");
+    // 预检必须与实导同口径：嵌套链接与深度超限在 dry-run 阶段即拒绝，不能等用户确认覆盖后才失败。
+    const nestedLinkDry = await importSkill(join(nestedLinkSource, "SKILL.md"), null, { dryRun: true });
+    ok(nestedLinkDry.ok === false, "dry-run rejects a source containing a nested symbolic link");
+    eq(nestedLinkDry.failed[0].code, "error.source.symlink", "nested-link dry-run carries the symlink code");
+    const mixedBatch = join(reservedSourceRoot, "mixed-batch");
+    const taintedSkill = await makeSkill(mixedBatch, "tainted", "---\nname: tainted\n---\nbody");
+    await symlink(linkTarget, join(taintedSkill, "linked.md"));
+    await writeFile(join(mixedBatch, "clean.md"), "---\nname: clean\n---\nbody", "utf8");
+    const mixedDry = await importSkill(mixedBatch, null, { dryRun: true });
+    ok(mixedDry.ok !== false, "mixed dry-run still reports the clean candidate");
+    eq(mixedDry.pending.length, 1, "mixed dry-run keeps only the clean candidate pending");
+    eq(mixedDry.failed[0].code, "error.source.symlink", "mixed dry-run fails the tainted candidate");
   } finally {
     process.env.DSH_HOME = originalDshHome;
   }
@@ -421,6 +433,9 @@ const deepImport = await importSkill(join(deepSource, "SKILL.md"), null);
 ok(deepImport.ok === false, "import rejects sources that exceed the directory depth limit");
 eq(deepImport.failed[0].code, "error.source.tooDeep", "too-deep import carries the code");
 eq(deepImport.failed[0].params && deepImport.failed[0].params.depth, 64, "too-deep params.depth");
+const deepDry = await importSkill(join(deepSource, "SKILL.md"), null, { dryRun: true });
+ok(deepDry.ok === false, "dry-run rejects sources that exceed the directory depth limit");
+eq(deepDry.failed[0].code, "error.source.tooDeep", "too-deep dry-run carries the code");
 
 await makeSkill(dshRoot, "invalid-policy", "---\nname: invalid-policy\ndisable-model-invocation: maybe\n---\nbody");
 const invalidPolicyEntries = await scanEntries(dshRoot);
