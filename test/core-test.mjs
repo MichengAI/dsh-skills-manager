@@ -145,7 +145,8 @@ ok(packageJson.peerDependencies["@deepseek-ai/dsh-host-webserver"].includes("<0.
 ok(packageJson.peerDependencies["@deepseek-ai/dsh-skill"].includes("<0.2.0"), "skill peer has an upper bound");
 ok(packageJson.peerDependencies["@deepseek-ai/dsh-client-ui-workspace"].includes("<0.2.0"), "workspace peer has an upper bound");
 ok(clientSource.includes("inflightRef"), "client guards mutations with a synchronous in-flight flag");
-ok(clientSource.includes('if (inflightRef.current && busy !== "import-check") return;'), "overwrite import rejects a second in-flight executeImport");
+ok(clientSource.includes('function executeImport(source, conflict, chained)') && clientSource.includes('if (inflightRef.current && !chained) return;'), "executeImport rejects a second in-flight call unless chained from the dry-run");
+ok(clientSource.includes('executeImport(selected.source, "skip", true)'), "installSelected chains into executeImport explicitly, never via stale busy closures");
 ok(clientSource.includes("importResult && !uploadOpen && !isUploadPickerError(importResult)"), "import results stay off the page while the upload dialog is open");
 ok(/setUploadOpen\(false\);\s*setSelected\(null\);\s*setImportResult\(\{ error: error \}\)/.test(clientSource), "import failure clears the selected source with the dialog");
 const publishWorkflow = await readFile(new URL("../.github/workflows/publish.yml", import.meta.url), "utf8");
