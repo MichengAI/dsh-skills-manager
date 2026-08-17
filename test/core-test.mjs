@@ -120,6 +120,12 @@ ok(clientSource.includes('.dssm-modal-upload{width:min(480px,100%)!important;hei
 ok(clientSource.includes('.dssm-dropzone{box-sizing:border-box;display:flex;width:100%;min-height:144px;flex:none;'), "dropzone keeps a compact height");
 ok(clientSource.includes('.dssm-modal-actions{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:8px}'), "upload actions wrap instead of stretching the dialog");
 ok(clientSource.includes('@media (max-width:560px){.dssm-mask{padding:12px;align-items:center}'), "upload dialog stays centered on a narrow viewport");
+ok(clientSource.includes('id: "dssm-filter-search"'), "settings panel registers a skill search input");
+ok(clientSource.includes('className: "dssm-field dssm-field-search"'), "search field follows the expert plugin filter layout");
+ok(clientSource.includes('.dssm-search-clear{'), "search input provides a visible clear control");
+ok(clientSource.includes('className: "dssm-select-trigger"'), "category filter uses the styled custom select");
+ok(clientSource.includes('.dssm-select-menu{'), "custom select menu uses design tokens instead of native chrome");
+ok(!/h\(\s*"select"/.test(clientSource), "category filter does not use a native select");
 const packageJson = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
 ok(packageJson.peerDependencies["@deepseek-ai/dsh-client-runtime"], "package declares the client runtime peer");
 ok(packageJson.peerDependencies["@deepseek-ai/dsh-client-ui-slots"], "package declares the settings slots peer");
@@ -482,3 +488,5 @@ delete process.env.DSH_AGENTS_HOME;
 
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);
+
+

@@ -93,6 +93,33 @@ ok(typeof isSkillEnabled === "function", "factory exports the shared enabled-sta
 ok(isSkillEnabled({ invocationPolicyValid: true, modelInvocable: true, userInvocable: true }), "valid model and user invocation is enabled");
 ok(!isSkillEnabled({ invocationPolicyValid: true, modelInvocable: true, userInvocable: false }), "user-disabled skill is not enabled");
 ok(!isSkillEnabled({ invocationPolicyValid: false, modelInvocable: true, userInvocable: true }), "invalid invocation policy is not enabled");
+
+// ── 技能列表检索：对齐专家插件的名称/简介包含匹配与分类收窄 ──
+const normalizeSkillQuery = bundle.normalizeSkillQuery;
+const matchSkillQuery = bundle.matchSkillQuery;
+const filterSkills = bundle.filterSkills;
+ok(typeof normalizeSkillQuery === "function", "factory exports normalizeSkillQuery");
+ok(typeof matchSkillQuery === "function", "factory exports matchSkillQuery");
+ok(typeof filterSkills === "function", "factory exports filterSkills");
+eq(normalizeSkillQuery("  UI  "), "ui", "normalizeSkillQuery trims and lowercases");
+eq(normalizeSkillQuery("   "), "", "normalizeSkillQuery treats whitespace-only as empty");
+const sampleSkills = [
+  { name: "travel-plan-viz", description: "把旅行行程做成网页", kind: "bundle", kindLabel: "目录插件", statusLabel: "已启用", rootKey: "dsh", rootLabel: "DSH skills" },
+  { name: "photo-revival", description: "Turn photos into illustrations", kind: "single", kindLabel: "单文件", statusLabel: "已停用", rootKey: "agents", rootLabel: "Shared Agent skills" },
+];
+ok(matchSkillQuery(sampleSkills[0], ""), "empty query matches every skill");
+ok(matchSkillQuery(sampleSkills[0], "  "), "whitespace-only query matches every skill");
+ok(matchSkillQuery(sampleSkills[0], "行程"), "matchSkillQuery hits Chinese description");
+ok(matchSkillQuery(sampleSkills[1], "Photo"), "matchSkillQuery is case-insensitive on name");
+ok(matchSkillQuery(sampleSkills[0], "目录插件"), "matchSkillQuery hits localized kind label");
+ok(matchSkillQuery(sampleSkills[1], "shared"), "matchSkillQuery hits root label");
+ok(!matchSkillQuery(sampleSkills[0], "photo"), "unrelated query does not match");
+eq(filterSkills(sampleSkills, { query: "   " }).length, 2, "blank query keeps the full list");
+eq(filterSkills(sampleSkills, { query: "illustration" }).map(function (item) { return item.name; }).join(","), "photo-revival", "filterSkills matches English description");
+eq(filterSkills(sampleSkills, { rootKey: "dsh" }).map(function (item) { return item.name; }).join(","), "travel-plan-viz", "filterSkills narrows by root category");
+eq(filterSkills(sampleSkills, { rootKey: "dsh", query: "photo" }).length, 0, "category and query are combined");
+eq(filterSkills(sampleSkills, { query: "SINGLE" }).map(function (item) { return item.name; }).join(","), "photo-revival", "filterSkills matches kind");
+
 const parseApiResponse = bundle.parseApiResponse;
 ok(typeof parseApiResponse === "function", "factory exports API response parsing for regression tests");
 await parseApiResponse({ status: 502, json: function () { return Promise.reject(new SyntaxError("Unexpected token <")); } }).then(
@@ -189,3 +216,4 @@ ok(registerOptions !== null && registerOptions.icon === "skill", "settings.secti
 
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);
+
