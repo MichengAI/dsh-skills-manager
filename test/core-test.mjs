@@ -129,10 +129,11 @@ ok(!/h\(\s*"select"/.test(clientSource), "category filter does not use a native 
 const packageJson = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
 ok(packageJson.peerDependencies["@deepseek-ai/dsh-client-runtime"], "package declares the client runtime peer");
 ok(packageJson.peerDependencies["@deepseek-ai/dsh-client-ui-slots"], "package declares the settings slots peer");
-let publishWorkflow = "";
-try {
-  publishWorkflow = await readFile(new URL("../.github/workflows/publish.yml", import.meta.url), "utf8");
-} catch {}
+ok(packageJson.peerDependencies["@deepseek-ai/dsh-host-webserver"].includes("<0.2.0"), "host-webserver peer has an upper bound");
+ok(packageJson.peerDependencies["@deepseek-ai/dsh-skill"].includes("<0.2.0"), "skill peer has an upper bound");
+ok(packageJson.peerDependencies["@deepseek-ai/dsh-client-ui-workspace"].includes("<0.2.0"), "workspace peer has an upper bound");
+ok(clientSource.includes("inflightRef"), "client guards mutations with a synchronous in-flight flag");
+const publishWorkflow = await readFile(new URL("../.github/workflows/publish.yml", import.meta.url), "utf8");
 ok(publishWorkflow.includes("id-token: write"), "publish workflow enables OIDC trusted publishing");
 ok(!publishWorkflow.includes("registry-url:"), "publish workflow relies on package publishConfig instead of token-backed registry setup");
 ok(publishWorkflow.includes("npm test"), "publish workflow runs the project tests");
@@ -145,8 +146,13 @@ eq(toKebab("guizang-ppt-skill-main"), "guizang-ppt-skill-main", "toKebab already
 eq(toKebab("  GuiZangPPT-Skill  "), "gui-zang-ppt-skill", "toKebab trim + acronym-ish");
 eq(toKebab("中文名"), "", "toKebab non-ascii strips to empty");
 eq(entryPath(dshRoot, "foo:bar"), null, "entryPath rejects Windows ADS names");
+eq(entryPath(dshRoot, ".hidden"), null, "entryPath rejects leading-dot names");
+eq(entryPath(dshRoot, ".good-skill.dssm-stage-dead"), null, "entryPath rejects leftover stage directories");
 
 // ── frontmatter 解析 ──
+const protoDoc = parseSkillDoc("---\n__proto__: polluted\nname: proto\n---\nbody");
+ok(Object.getPrototypeOf(protoDoc.map) === null, "frontmatter map uses a null prototype");
+eq(protoDoc.map.name, "proto", "frontmatter still reads ordinary keys");
 const bomDoc = parseSkillDoc("\uFEFF---\nname: foo\n---\nbody");
 eq(bomDoc.map.name, "foo", "parseSkillDoc strips BOM");
 eq(bomDoc.body, "body", "parseSkillDoc body");
@@ -217,6 +223,43 @@ eq(deleted.name, "good-skill", "deleteSkill returns deleted name");
 ok(await resolveEntry(dshRoot, "good-skill") === null, "deleteSkill removes bundle");
 const publicDelete = await deleteSkill(agentsRoot, "public-skill");
 ok(publicDelete.ok === false, "deleteSkill rejects public Agent directory");
+
+async function tryLink(target, path, type) {
+  try {
+    if (type) await symlink(target, path, type);
+    else await symlink(target, path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+const leftoverDir = join(dshRoot, ".good-skill.dssm-stage-dead");
+await mkdir(leftoverDir, { recursive: true });
+await writeFile(join(leftoverDir, "SKILL.md"), "---\nname: leftover\n---\nbody", "utf8");
+ok(!(await scanEntries(dshRoot)).entries.some((item) => item.name.startsWith(".")), "scan hides crash leftover stage directories");
+
+const outsidePayload = await makeSkill(join(tmp, "outside-payload"), "payload", "---\nname: payload\n---\nsecret");
+const plantedLink = join(dshRoot, "evil-link");
+const linkType = process.platform === "win32" ? "junction" : undefined;
+if (await tryLink(outsidePayload, plantedLink, linkType)) {
+  eq(await resolveEntry(dshRoot, "evil-link"), null, "resolveEntry ignores a symlink bundle that leaves the skill root");
+  const linkedToggle = await setSkillEnabled(dshRoot, "evil-link", false);
+  ok(linkedToggle.ok === false, "enable/disable refuses a symlink planted in the skill root");
+  const outsideDoc = await readFile(join(outsidePayload, "SKILL.md"), "utf8");
+  ok(!outsideDoc.includes("disable-model-invocation: true"), "symlink toggle does not rewrite files outside the skill root");
+  ok(!(await scanEntries(dshRoot)).entries.some((item) => item.name === "evil-link"), "scan hides symlink bundles");
+} else {
+  ok(true, "symlink write-through test skipped because this environment cannot create directory links");
+}
+
+const aliasHome = join(tmp, "alias-home");
+if (await tryLink(process.env.DSH_HOME, aliasHome, linkType)) {
+  const viaAlias = await importSkill(join(aliasHome, "skills"), null, { dryRun: true });
+  eq(viaAlias.code, "error.import.overlap", "import overlap follows intermediate directory links");
+} else {
+  ok(true, "intermediate-link overlap test skipped because this environment cannot create directory links");
+}
 eq(publicDelete.code, "error.root.readonly", "public delete carries the readonly code");
 eq(publicDelete.params && publicDelete.params.action, "delete", "public delete params.action");
 ok(await resolveEntry(agentsRoot, "public-skill") !== null, "public skill remains after rejected delete");
@@ -452,6 +495,10 @@ ok(!emitted.some((event) => event[0] === "agent-preset/selected" && event[1] ===
   const publicPayload = await publicResponse.json();
   eq(publicPayload.code, "error.root.readonly", "HTTP route returns the readonly code");
   eq(publicPayload.params && publicPayload.params.action, "toggle", "HTTP route readonly params.action");
+  const httpDeleteAgents = await fetch(api + "/delete", { method: "POST", headers: secureHeaders, body: JSON.stringify({ name: "http-skill", root: "agents" }) });
+  eq(httpDeleteAgents.status, 400, "HTTP delete rejects public Agent root");
+  eq((await httpDeleteAgents.json()).code, "error.root.readonly", "HTTP delete with agents root is readonly");
+  ok(await resolveEntry(dshRoot, "http-skill") !== null, "HTTP delete with agents root does not remove the DSH skill");
   const httpDotDelete = await fetch(api + "/delete", { method: "POST", headers: secureHeaders, body: JSON.stringify({ name: "." }) });
   eq(httpDotDelete.status, 400, "HTTP delete rejects current-directory traversal");
   const httpNestedDelete = await fetch(api + "/delete", { method: "POST", headers: secureHeaders, body: JSON.stringify({ name: "foo/../safe-bar" }) });
