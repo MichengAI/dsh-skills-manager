@@ -115,7 +115,7 @@ dsh plugin --profile web add @michengai/dsh-skills-manager@latest --registry=htt
 dsh --profile web --dump-config
 ```
 
-需要钉死某一版时，把 `@latest` 换成具体版本，例如 `@0.1.19`。
+需要钉死某一版时，把 `@latest` 换成具体版本，例如 `@0.1.20`。
 
 配置输出中应包含 `skills-manager`。安装后重启 DSH Web 并在浏览器硬刷新。不要手工复制客户端文件，`dsh plugin add` 会同时应用 `cordis.patch.yml`。
 
