@@ -1,41 +1,66 @@
-<p align="center">
-  <img src="assets/icon.png" alt="DSH Skills Manager" width="96">
-</p>
+<div align="center">
+<table cellpadding="0" cellspacing="0">
+<tr>
+<td valign="middle" align="center">
+  <img src="assets/branding/dsh-logo.png" alt="DeepSeek Harness logo" width="168">
+</td>
+<td valign="middle">
+<pre>
+   ____  ____  _   _
+  |  _ \/ ___|| | | |
+  | | | \___ \| |_| |
+  | |_| |___) |  _  |
+  |____/|____/|_| |_|
+     SKILLS MANAGER
+Local + shared Agent skills
+ DeepSeek Harness plugin
+</pre>
+</td>
+</tr>
+</table>
+</div>
 
-<h1 align="center">DSH Skills Manager</h1>
+<div align="center">
 
-<p align="center">
-  <strong>A DeepSeek Harness Web plugin for safely managing local skills and viewing shared Agent skills.</strong>
-</p>
+  # DSH Skills Manager
 
-<p align="center">
-  <a href="https://github.com/MichengAI/dsh-skills-manager/issues">Report an issue</a>
-  · <a href="https://www.npmjs.com/package/@michengai/dsh-skills-manager">View on npm</a>
-  · <a href="README.zh-CN.md">简体中文</a>
-</p>
+  **Safely manage local skills and inspect shared Agent skills in DeepSeek Harness**
 
-<p align="center">
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue.svg" alt="Apache License 2.0"></a>
-  <a href="https://www.npmjs.com/package/@michengai/dsh-skills-manager"><img src="https://img.shields.io/npm/v/%40michengai/dsh-skills-manager?label=npm" alt="npm package"></a>
-  <img src="https://img.shields.io/badge/DSH-Web%20Plugin-10b981" alt="DSH Web Plugin">
-  <img src="https://img.shields.io/badge/Node.js-%E2%89%A520-339933?logo=nodedotjs&logoColor=white" alt="Node.js 20 or later">
-</p>
+  [简体中文](README.zh-CN.md) · [Apache-2.0](LICENSE)
 
-> DSH Skills Manager is a community-maintained plugin, not an official DeepSeek AI product.
+  [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
+  [![npm package](https://img.shields.io/npm/v/%40michengai%2Fdsh-skills-manager.svg?label=npm%20package)](https://www.npmjs.com/package/@michengai/dsh-skills-manager)
+  [![DSH Web Plugin](https://img.shields.io/badge/DSH%20Web-Plugin-0f766e.svg)](https://github.com/MichengAI/dsh-skills-manager)
+  [![Node.js 20 or later](https://img.shields.io/badge/Node.js-20%20or%20later-339933.svg?logo=node.js&logoColor=white)](https://nodejs.org/)
+</div>
 
-<p align="center">
-  <img src="assets/screenshots/skills-manager.png" alt="Skills Manager settings page" width="960">
-</p>
-
-> The screenshot shows DSH-local skills with enable, disable, and delete actions. Shared Agent skills stay read-only.
+> DSH Skills Manager is a community-maintained DeepSeek Harness (DSH) plugin, not an official DeepSeek AI product.
 
 ## Features
 
-- Shows local `$DSH_HOME\skills` and shared `$DSH_AGENTS_HOME\skills` in one Settings page.
-- Enables, disables, uploads, replaces, and deletes DSH-local skills.
-- Keeps shared Agent skills strictly read-only and never changes their global metadata.
-- Imports a plugin directory containing `SKILL.md` through the native file picker and confirms every name collision.
-- Rejects traversal names, imports from the DSH skills directory itself, and symbolic links.
+- Filter by category or search, then inspect DSH-local and shared Agent skills in **Settings → Skills**.
+- Enable, disable, upload, replace, and delete DSH-local skills.
+- Keep shared Agent skills strictly read-only and never change their global metadata.
+- Import a plugin directory containing `SKILL.md` through the native file picker and confirm every name collision.
+- Paste one sentence into DSH, Codex, or WorkBuddy and let that agent install the plugin locally.
+
+## Screenshots
+
+Filter by category or search in **Settings → Skills**. DSH-local skills can be enabled, disabled, or deleted; shared Agent skills stay read-only:
+
+![Skills Manager settings page](assets/screenshots/skills-manager-en.png)
+
+Shared Agent skills stay visible when the DSH-local group is empty:
+
+![Shared Agent skills remain visible](assets/screenshots/skills-public.png)
+
+The compact upload dialog accepts a plugin `SKILL.md`, a plugin directory, or drag-and-drop:
+
+![Upload plugin dialog](assets/screenshots/upload-plugin.png)
+
+Enabling a DSH-local skill restores its `/` command in the chat composer:
+
+![Chat slash command after enabling a local skill](assets/screenshots/slash-command.png)
 
 ## Prerequisites
 
@@ -45,18 +70,54 @@
 
 ## Installation
 
-### Install from npm
+`dsh plugin add` forwards to `pnpm add` in the profile directory. Without a version and official registry, a local mirror or minimum-release-age policy can leave you on an older build.
 
-Run this from any PowerShell directory. Install into the DSH profile through `dsh plugin`:
+### Ask another agent to install it
+
+This plugin runs inside DeepSeek Harness Web. Copy one of the sentences below into DSH, Codex, or WorkBuddy and let that agent install it into your local `web` profile.
+
+From npm:
+
+```text
+Install the latest DSH plugin @michengai/dsh-skills-manager into my local web profile using the official npm registry: dsh plugin --profile web add @michengai/dsh-skills-manager@latest --registry=https://registry.npmjs.org/. Then run dsh --profile web --dump-config, confirm skills-manager is mounted, and remind me to restart DSH Web and hard-refresh the browser.
+```
+
+From source:
+
+```text
+Install the DSH plugin from source at https://github.com/MichengAI/dsh-skills-manager: clone it, run npm install and npm test, then run dsh plugin --profile web add . from that directory. Do not copy lib by itself. Then run dsh --profile web --dump-config, confirm skills-manager is mounted, and remind me to restart DSH Web and hard-refresh the browser.
+```
+
+| Product | How to use it |
+| --- | --- |
+| DSH | Send one of the sentences above to the current session. |
+| Codex | Send one of the sentences above to Codex and let it install locally. |
+| WorkBuddy | Send one of the sentences above to WorkBuddy; for a source install you can also paste `https://github.com/MichengAI/dsh-skills-manager`. |
+
+Codex and WorkBuddy only install the plugin. After that, open DSH Web and use **Settings → Skills**.
+
+You can also run the same npm command yourself:
+
+```powershell
+dsh plugin --profile web add @michengai/dsh-skills-manager@latest --registry=https://registry.npmjs.org/
+```
+
+If `dsh` is not on PATH, replace the leading `dsh` with `npx --yes @deepseek-ai/dsh`.
+
+### Install the latest package from the official npm registry
+
+Run this from any PowerShell directory:
 
 ```powershell
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $OutputEncoding = [System.Text.Encoding]::UTF8
-dsh plugin --profile web add @michengai/dsh-skills-manager
+dsh plugin --profile web add @michengai/dsh-skills-manager@latest --registry=https://registry.npmjs.org/
 dsh --profile web --dump-config
 ```
 
-Restart DSH Web or reload the active Web profile. If a package mirror is behind, append `--registry=https://registry.npmjs.org/`.
+To pin a release, replace `@latest` with a version such as `@0.1.18`.
+
+The configuration output should contain `skills-manager`. Restart DSH Web and hard-refresh the browser. Do not copy client files manually: `dsh plugin add` also applies `cordis.patch.yml`.
 
 ### Install from source
 
@@ -74,7 +135,7 @@ dsh plugin --profile web add .
 dsh --profile web --dump-config
 ```
 
-Restart DSH Web or reload the active Web profile. Local installation reads and applies `cordis.patch.yml`; do not copy `lib` files manually.
+Restart DSH Web and hard-refresh the browser. `dsh plugin ... add .` reads the package metadata and `cordis.patch.yml`; do not install by copying `lib` directly.
 
 ## Usage
 
@@ -82,36 +143,17 @@ Open **Settings → Skills**, then use the panel as follows:
 
 | Goal | Action | Scope |
 | --- | --- | --- |
+| Search or filter | Use **Category** and **Search** to narrow by directory, name, kind, or description. | DSH and shared Agent skills |
 | Inspect a skill | Review its name, form, description, and invocation state. | DSH and shared Agent skills |
 | Enable or disable | Select **Enable** or **Disable**; this controls model invocation and the `/` command. | DSH-local skills only |
-| Upload a plugin | Select **Upload Plugin**, then choose the plugin directory’s `SKILL.md`. Its scripts and resources are copied too. | DSH-local skills only |
+| Upload a plugin | Select **Upload**, then choose the plugin directory’s `SKILL.md`. Its scripts and resources are copied too. | DSH-local skills only |
 | Choose the directory | If the selected file has no usable path, choose the directory containing `SKILL.md`. | DSH-local skills only |
 | Replace or delete | Confirm a name collision, or select **Delete** for an unneeded local skill. | DSH-local skills only |
 | Inspect shared skills | Review shared Agent skills without changing their metadata. | Read-only |
 
-<p align="center">
-  <img src="assets/screenshots/skills-public.png" alt="Shared Agent skills remain visible when no local skills are installed" width="960">
-</p>
-
-> Shared Agent skills stay visible when the DSH-local group is empty.
-
-<p align="center">
-  <img src="assets/screenshots/upload-plugin.png" alt="Upload plugin dialog" width="960">
-</p>
-
-> The compact upload dialog accepts a plugin `SKILL.md`, a plugin directory, or drag-and-drop.
-
-<p align="center">
-  <img src="assets/screenshots/delete-plugin.png" alt="Delete plugin confirmation" width="960">
-</p>
+![Delete plugin confirmation](assets/screenshots/delete-plugin.png)
 
 > Deleting a DSH-local skill requires confirmation and cannot be undone.
-
-<p align="center">
-  <img src="assets/screenshots/slash-command.png" alt="Chat slash command after enabling a local skill" width="640">
-</p>
-
-> Enabling a DSH-local skill restores its `/` command in the chat composer.
 
 Escape closes only the frontmost upload or confirmation dialog and leaves Settings open.
 
@@ -165,4 +207,3 @@ npm run pack:check
 Project status, usage boundaries, architecture, and iteration records begin at the [documentation entry point](docs/00-交接入口/00-阅读导航.md). The detailed operational guide is `docs\02-产品与业务\01-使用说明.md`.
 
 Licensed under [Apache License 2.0](LICENSE).
-
