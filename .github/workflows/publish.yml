@@ -18,5 +18,6 @@ jobs:
         with:
           node-version: "24"
           package-manager-cache: false
+      # host 测试为零第三方依赖，无需 npm ci；新增运行时依赖时先补 lockfile 再改为 npm ci。
       - run: npm test
       - run: npm publish

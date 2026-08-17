@@ -133,6 +133,8 @@ ok(packageJson.peerDependencies["@deepseek-ai/dsh-host-webserver"].includes("<0.
 ok(packageJson.peerDependencies["@deepseek-ai/dsh-skill"].includes("<0.2.0"), "skill peer has an upper bound");
 ok(packageJson.peerDependencies["@deepseek-ai/dsh-client-ui-workspace"].includes("<0.2.0"), "workspace peer has an upper bound");
 ok(clientSource.includes("inflightRef"), "client guards mutations with a synchronous in-flight flag");
+ok(clientSource.includes('if (inflightRef.current && busy !== "import-check") return;'), "overwrite import rejects a second in-flight executeImport");
+ok(clientSource.includes("isUploadPickerError"), "picker errors stay in the upload dialog instead of duplicating on the page");
 const publishWorkflow = await readFile(new URL("../.github/workflows/publish.yml", import.meta.url), "utf8");
 ok(publishWorkflow.includes("id-token: write"), "publish workflow enables OIDC trusted publishing");
 ok(!publishWorkflow.includes("registry-url:"), "publish workflow relies on package publishConfig instead of token-backed registry setup");
@@ -148,6 +150,8 @@ eq(toKebab("中文名"), "", "toKebab non-ascii strips to empty");
 eq(entryPath(dshRoot, "foo:bar"), null, "entryPath rejects Windows ADS names");
 eq(entryPath(dshRoot, ".hidden"), null, "entryPath rejects leading-dot names");
 eq(entryPath(dshRoot, ".good-skill.dssm-stage-dead"), null, "entryPath rejects leftover stage directories");
+eq(entryPath(dshRoot, "a".repeat(129)), null, "entryPath rejects names longer than 128 characters");
+ok(entryPath(dshRoot, "a".repeat(128)) !== null, "entryPath accepts a 128-character name");
 
 // ── frontmatter 解析 ──
 const protoDoc = parseSkillDoc("---\n__proto__: polluted\nname: proto\n---\nbody");
@@ -173,11 +177,14 @@ eq(deeplyIndented.map.description, "First line.\nSecond line.", "parseSkillDoc r
 
 // ── 启用 / 停用 ──
 await makeSkill(dshRoot, "good-skill", "---\nname: good-skill\ndescription: A good skill.\n---\nbody");
-await setSkillEnabled(dshRoot, "good-skill", false);
+const audit = [];
+await setSkillEnabled(dshRoot, "good-skill", false, (event) => audit.push(event));
 let goodDoc = parseSkillDoc(await readFile(join(dshRoot, "good-skill", "SKILL.md"), "utf8"));
 eq(parseBoolValue(goodDoc.map["disable-model-invocation"]), true, "disable sets flag");
 eq(parseBoolValue(goodDoc.map["user-invocable"]), false, "disable hides the skill from slash commands");
-await setSkillEnabled(dshRoot, "good-skill", true);
+eq(audit.join(","), "disable", "disable writes an audit log event");
+await setSkillEnabled(dshRoot, "good-skill", true, (event) => audit.push(event));
+eq(audit.join(","), "disable,enable", "enable writes an audit log event");
 goodDoc = parseSkillDoc(await readFile(join(dshRoot, "good-skill", "SKILL.md"), "utf8"));
 ok(goodDoc.map["disable-model-invocation"] === undefined, "enable removes flag");
 ok(goodDoc.map["user-invocable"] === undefined, "enable restores slash command visibility");
@@ -282,6 +289,10 @@ await makeSkill(dshRoot, "dual-shape", "---\nname: dual-shape\n---\nbundle");
 await writeFile(join(dshRoot, "dual-shape.md"), "---\nname: dual-shape\n---\nflat", "utf8");
 await deleteSkill(dshRoot, "dual-shape");
 ok(await resolveEntry(dshRoot, "dual-shape") === null, "deleteSkill removes both bundle and flat forms of one skill");
+await makeSkill(dshRoot, "dual-scan", "---\nname: dual-scan\n---\nbundle");
+await writeFile(join(dshRoot, "dual-scan.md"), "---\nname: dual-scan\n---\nflat", "utf8");
+eq((await scanEntries(dshRoot)).entries.filter((item) => item.name === "dual-scan").length, 1, "scan keeps one row when bundle and flat share a name");
+eq((await scanEntries(dshRoot)).entries.find((item) => item.name === "dual-scan").kind, "bundle", "scan prefers the bundle form over the flat file");
 
 // ── 导入 ──
 const srcSkill = await makeSkill(tmp, "Import Me", "---\nname: import-me\ndescription: Imported.\n---\nbody");
@@ -442,6 +453,12 @@ const secureHeaders = { "content-type": "application/json", "x-dsh-skills-manage
 try {
   const stateResponse = await fetch(api + "/state");
   eq(stateResponse.status, 200, "state route returns 200");
+  const headState = await fetch(api + "/state", { method: "HEAD" });
+  eq(headState.status, 200, "HEAD /state returns 200");
+  eq(await headState.text(), "", "HEAD /state has an empty body");
+  const headDisable = await fetch(api + "/disable", { method: "HEAD" });
+  eq(headDisable.status, 405, "HEAD on a mutation route returns 405");
+  eq(await headDisable.text(), "", "HEAD 405 has an empty body");
 
   const evilStateResponse = await requestJson(api + "/state", "GET", { host: "evil.example" });
   eq(evilStateResponse.status, 403, "state route rejects non-loopback Host headers");
