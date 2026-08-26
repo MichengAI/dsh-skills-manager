@@ -24,7 +24,7 @@
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| GET | `/state` | 获取 DSH、公共 Agent、Codex、Claude、Gemini、OpenCode 与回收站状态快照。 |
+| GET | `/state` | 获取 DSH、公共 Agent、Codex、Claude、Gemini、OpenCode 与回收站状态快照；技能项包含 `hasFrontmatter`、`invocationPolicyValid` 与 `loadable` 诊断字段。 |
 | HEAD | `/state` | 返回与 GET 相同的状态码及响应头，不发送实体。 |
 | POST | `/enable` | 启用指定技能。 |
 | POST | `/disable` | 停用指定技能。 |
