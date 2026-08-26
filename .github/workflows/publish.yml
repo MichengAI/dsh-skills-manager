@@ -1,6 +1,7 @@
 name: 发布 npm 包
 
 on:
+  workflow_dispatch:
   push:
     tags:
       - "v*"
