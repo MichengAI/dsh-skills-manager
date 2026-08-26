@@ -93,6 +93,8 @@ ok(typeof isSkillEnabled === "function", "factory exports the shared enabled-sta
 ok(isSkillEnabled({ invocationPolicyValid: true, modelInvocable: true, userInvocable: true }), "valid model and user invocation is enabled");
 ok(!isSkillEnabled({ invocationPolicyValid: true, modelInvocable: true, userInvocable: false }), "user-disabled skill is not enabled");
 ok(!isSkillEnabled({ invocationPolicyValid: false, modelInvocable: true, userInvocable: true }), "invalid invocation policy is not enabled");
+const summarizeImportResult = bundle.summarizeImportResult;
+ok(typeof summarizeImportResult === "function", "factory exports import-result summarization");
 
 // ── 技能列表检索：对齐专家插件的名称/简介包含匹配与分类收窄 ──
 const normalizeSkillQuery = bundle.normalizeSkillQuery;
@@ -162,6 +164,14 @@ function mockT(key, params) {
   return template.replace(/\{(\w+)\}/g, (m, name) => (name in params ? String(params[name]) : m));
 }
 
+eq(summarizeImportResult(mockT, { imported: [{ name: "alpha" }], skipped: [] }).text, "Import complete: alpha", "successful import names the imported skill");
+eq(summarizeImportResult(mockT, { imported: [], skipped: [{ name: "alpha" }] }).text, "No skills were imported; existing skills were skipped: alpha", "all-skipped import is never reported as completed");
+ok(summarizeImportResult(mockT, { imported: [], skipped: [{ name: "alpha" }] }).ok === false, "all-skipped import is rendered as a warning/error state");
+eq(summarizeImportResult(mockT, { imported: [{ name: "alpha" }], skipped: [{ name: "beta" }] }).text, "Imported: alpha; skipped existing skills: beta", "partial import reports both imported and skipped names");
+const importWarning = summarizeImportResult(mockT, { imported: [{ name: "alpha", warnings: [{ code: "warning.backupUncleaned", params: { path: "C:\\bak", error: "EPERM" } }] }], skipped: [] });
+ok(importWarning.warning === true, "import cleanup warnings use the warning presentation state");
+eq(importWarning.text, "Import complete: alpha; warnings: Old version backup was not cleaned up: C:\\bak (EPERM)", "import cleanup warnings remain visible in the result summary");
+
 eq(
   translateError(mockT, { code: "error.skill.notFound", params: { name: "foo" }, error: "技能不存在: foo" }),
   "Skill not found: foo",
@@ -200,6 +210,16 @@ eq(
   "translateError translates rollback failure with params"
 );
 eq(
+  translateError(mockT, { code: "error.trash.rollbackFailed", params: { path: "C:\\stage", error: "EPERM" }, error: "移入回收站回滚失败" }),
+  "Move-to-trash rollback failed; unrecovered content was kept at: C:\\stage (EPERM)",
+  "translateError translates move-to-trash rollback preservation"
+);
+eq(
+  translateError(mockT, { code: "error.state.invalid", params: { path: "C:\\state.json" }, error: "状态不可读" }),
+  "The manager state file could not be read, so overwriting it was refused: C:\\state.json",
+  "translateError translates invalid-state write refusal"
+);
+eq(
   translateError(mockT, { code: "warning.backupUncleaned", params: { path: "C:\\bak", error: "EPERM" }, error: "旧版本备份未清理" }),
   "Old version backup was not cleaned up: C:\\bak (EPERM)",
   "translateError translates backup cleanup warning"
@@ -215,6 +235,9 @@ ok(source.includes('callApi("/browse"'), "missing file paths fall back to the in
 ok(source.includes('setModal("browse")'), "folder browsing stays inside the foreground settings flow");
 ok(source.includes('className: "dssm-modal-browser"'), "in-app directory browser uses the shared styled modal");
 ok(source.includes('"aria-pressed": showHidden'), "folder browser can reveal common dot-prefixed Agent directories");
+ok(source.includes('repairable ? h("button"') && source.includes('t("btn.repair.enable")'), "invalid local invocation policy exposes Repair & enable instead of a disabled switch");
+ok(source.includes("(data.warnings || []).map"), "state-level warnings are rendered in the settings page");
+ok(source.includes("dssm-warning"), "warning feedback has a distinct visual state");
 ok(source.includes("@container(max-width:780px)"), "skill rows respond to the settings content width rather than only the viewport");
 ok(source.includes(".dssm-source-head{box-sizing:border-box"), "source toggles stay inside narrow settings cards");
 

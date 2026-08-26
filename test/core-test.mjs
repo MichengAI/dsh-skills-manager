@@ -1,7 +1,7 @@
 // dsh-skills-manager core 单元测试（临时根，零第三方依赖）
 // 运行：node test/core-test.mjs
 
-import { mkdtemp, mkdir, writeFile, readFile, rm, stat, symlink } from "node:fs/promises";
+import { mkdtemp, mkdir, writeFile, readFile, rm, stat, symlink, rename } from "node:fs/promises";
 import { createServer, request } from "node:http";
 import { join, sep } from "node:path";
 import { tmpdir } from "node:os";
@@ -29,6 +29,8 @@ import {
   entryPath,
   userRoots,
   browseDirectories,
+  managerStatePath,
+  readManagerState,
 } from "../lib/core.js";
 import { apply as applyHost, notifyChatCatalog, registerAgentSkillProviders } from "../lib/index.js";
 
@@ -190,6 +192,14 @@ eq(browseResult.path, browseRoot, "browseDirectories returns the canonical curre
 eq(browseResult.entries.map((entry) => entry.name).join(","), ".hidden,zeta", "browseDirectories lists directories only and sorts them");
 ok(browseResult.entries.find((entry) => entry.name === ".hidden").hidden, "browseDirectories marks dot directories hidden");
 eq((await browseDirectories("relative-folder")).code, "error.browse.absolute", "browseDirectories rejects relative paths");
+const browseLinkedTarget = join(tmp, "browse-linked-target");
+await mkdir(browseLinkedTarget, { recursive: true });
+const browseLinkType = process.platform === "win32" ? "junction" : undefined;
+if (await tryLink(browseLinkedTarget, join(browseRoot, "junction"), browseLinkType)) {
+  ok(!(await browseDirectories(browseRoot)).entries.some((entry) => entry.name === "junction"), "browseDirectories excludes directory links and Windows junctions");
+} else {
+  ok(true, "directory-link browser test skipped because this environment cannot create links");
+}
 eq(entryPath(dshRoot, "foo:bar"), null, "entryPath rejects Windows ADS names");
 eq(entryPath(dshRoot, ".hidden"), null, "entryPath rejects leading-dot names");
 eq(entryPath(dshRoot, ".good-skill.dssm-stage-dead"), null, "entryPath rejects leftover stage directories");
@@ -314,6 +324,19 @@ providerCandidates = await listProviderCandidates();
 ok(providerCandidates.find((item) => item.name === "code-review").invocation.userInvocable === false, "source disable keeps external candidates disabled");
 await setSourceEnabled("codex", true);
 
+// 已存在但损坏的状态文件必须 fail-closed，且任何后续启停不得覆盖原文件。
+const validManagerState = await readFile(managerStatePath(), "utf8");
+await writeFile(managerStatePath(), "{broken", "utf8");
+const invalidManagerState = await readManagerState();
+ok(invalidManagerState.writable === false, "invalid manager state locks subsequent writes");
+ok(Object.values(invalidManagerState.state.sources).every((enabled) => enabled === false), "invalid manager state fails closed for every external source");
+const rejectedStateToggle = await setSourceEnabled("codex", true);
+eq(rejectedStateToggle.code, "error.state.invalid", "source toggle refuses to overwrite an invalid manager state file");
+eq(await readFile(managerStatePath(), "utf8"), "{broken", "rejected state toggle preserves the unreadable file for recovery");
+providerCandidates = await listProviderCandidates();
+ok(providerCandidates.find((item) => item.name === "code-review").invocation.userInvocable === false, "provider keeps external candidates disabled while manager state is invalid");
+await writeFile(managerStatePath(), validManagerState, "utf8");
+
 // ── 创建与详情 ──
 const created = await createSkill({ name: "Conversation Helper", description: "Create reusable prompts.", body: "Follow the user request carefully." });
 eq(created.name, "conversation-helper", "createSkill normalizes a conversation title to kebab-case");
@@ -335,6 +358,44 @@ await permanentlyDeleteTrash(deletedAgain.id);
 ok(!(await listTrash()).some((item) => item.id === deletedAgain.id), "permanent trash deletion removes the second-stage entry");
 const publicDelete = await deleteSkill(agentsRoot, "public-skill");
 ok(publicDelete.ok === false, "deleteSkill rejects public Agent directory");
+
+// 删除发生二次故障时必须保留未恢复的 stage，不能清理唯一副本。
+const rollbackBundle = await makeSkill(dshRoot, "rollback-risk", "---\nname: rollback-risk\ndescription: Bundle.\n---\nbody");
+const rollbackFlat = join(dshRoot, "rollback-risk.md");
+await writeFile(rollbackFlat, "---\nname: rollback-risk\ndescription: Flat.\n---\nbody", "utf8");
+let rollbackDeleteError = null;
+try {
+  await deleteSkill(dshRoot, "rollback-risk", null, {
+    renameOptions: {
+      maxAttempts: 1,
+      delayMs: 0,
+      async rename(source, destination) {
+        if (source === rollbackFlat) {
+          const error = new Error("primary move failure");
+          error.code = "EIO";
+          throw error;
+        }
+        if (destination === rollbackBundle && source.includes(`${sep}.stage-`)) {
+          const error = new Error("rollback failure");
+          error.code = "EACCES";
+          throw error;
+        }
+        return rename(source, destination);
+      },
+    },
+  });
+} catch (error) {
+  rollbackDeleteError = error;
+}
+eq(rollbackDeleteError && rollbackDeleteError.code, "error.trash.rollbackFailed", "deleteSkill reports a rollback-specific error after a double failure");
+ok(rollbackDeleteError && rollbackDeleteError.params && rollbackDeleteError.params.path, "delete rollback failure reports the preserved stage path");
+let preservedRollbackCopy = false;
+try {
+  const kept = await stat(join(rollbackDeleteError.params.path, "rollback-risk"));
+  preservedRollbackCopy = kept.isDirectory();
+} catch {}
+ok(preservedRollbackCopy, "deleteSkill preserves the only unrecovered bundle copy in stage");
+ok(await stat(rollbackFlat).then(() => true, () => false), "deleteSkill leaves the entry that never moved at its original path");
 
 async function tryLink(target, path, type) {
   try {
