@@ -1,7 +1,7 @@
 {
   "name": "@michengai/dsh-skills-manager",
   "version": "0.1.24",
-  "description": "NPM-installable DSH Web plugin for managing local skills and viewing shared Agent skills safely.",
+  "description": "NPM-installable DSH Web plugin for safely loading and managing skills across DSH and common local Agents.",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
@@ -33,8 +33,7 @@
       "inject": [
         "@deepseek-ai/dsh-client-runtime",
         "@deepseek-ai/dsh-client-ui-slots",
-        "@deepseek-ai/dsh-client-locale",
-        "@deepseek-ai/dsh-client-ui-workspace"
+        "@deepseek-ai/dsh-client-locale"
       ],
       "platform": "web"
     }
@@ -55,7 +54,7 @@
     "@deepseek-ai/dsh-client-locale": ">=0.1.0-rc.0 <0.2.0",
     "@deepseek-ai/dsh-host-webserver": ">=0.1.0-rc.5 <0.2.0",
     "@deepseek-ai/dsh-skill": ">=0.1.0-rc.5 <0.2.0",
-    "@deepseek-ai/dsh-client-ui-workspace": ">=0.1.0-rc.5 <0.2.0",
+    "@deepseek-ai/dsh-tools": ">=0.1.0-rc.5 <0.2.0",
     "react": "^18.2.0"
   },
   "engines": {

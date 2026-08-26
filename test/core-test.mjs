@@ -11,16 +11,26 @@ import {
   parseSkillDoc,
   unquote,
   parseBoolValue,
+  renameWithRetry,
   setSkillEnabled,
+  setSourceEnabled,
   deleteSkill,
+  listTrash,
+  restoreTrash,
+  permanentlyDeleteTrash,
   importSkill,
+  createSkill,
+  skillDetail,
+  listProviderCandidates,
+  getProviderSkill,
   scanEntries,
   state,
   resolveEntry,
   entryPath,
   userRoots,
+  browseDirectories,
 } from "../lib/core.js";
-import { apply as applyHost, notifyChatCatalog } from "../lib/index.js";
+import { apply as applyHost, notifyChatCatalog, registerAgentSkillProviders } from "../lib/index.js";
 
 let passed = 0;
 let failed = 0;
@@ -65,10 +75,16 @@ async function makeSkill(root, name, content) {
 const tmp = await mkdtemp(join(tmpdir(), "dssm-test-"));
 process.env.DSH_HOME = join(tmp, "dsh");
 process.env.DSH_AGENTS_HOME = join(tmp, "agents");
+process.env.DSH_CODEX_HOME = join(tmp, "codex");
+process.env.DSH_CLAUDE_HOME = join(tmp, "claude");
+process.env.DSH_GEMINI_HOME = join(tmp, "gemini");
+process.env.DSH_OPENCODE_HOME = join(tmp, "opencode");
 const dshRoot = join(process.env.DSH_HOME, "skills");
 const agentsRoot = join(process.env.DSH_AGENTS_HOME, "skills");
+const codexRoot = join(process.env.DSH_CODEX_HOME, "skills");
 await mkdir(dshRoot, { recursive: true });
 await mkdir(agentsRoot, { recursive: true });
+await mkdir(codexRoot, { recursive: true });
 
 // Linux 同样必须拒绝 Windows 保留设备名；Windows 无法创建这类来源，故仅在可创建的系统上做端到端断言。
 if (process.platform !== "win32") {
@@ -126,15 +142,13 @@ if (process.platform !== "win32") {
 const clientSource = await readFile(new URL("../lib/client.js", import.meta.url), "utf8");
 ok(clientSource.includes('id: "@michengai/dsh-skills-manager"'), "client registers the scoped package module ID");
 ok(clientSource.includes('"x-dsh-skills-manager": "1"'), "client sends the mutation request marker");
-ok(clientSource.includes('className: "dssm-modal dssm-modal-upload"'), "upload dialog uses the adaptive modal class");
-ok(clientSource.includes('.dssm-modal{box-sizing:border-box;display:flex;width:min(480px,100%)!important;height:auto!important;'), "all plugin dialogs stay compact against host stretch");
-ok(clientSource.includes('.dssm-modal-upload{width:min(480px,100%)!important;height:auto!important;'), "upload dialog stays compact against host stretch");
-ok(clientSource.includes('.dssm-dropzone{box-sizing:border-box;display:flex;width:100%;min-height:144px;flex:none;'), "dropzone keeps a compact height");
-ok(clientSource.includes('.dssm-modal-actions{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:8px}'), "upload actions wrap instead of stretching the dialog");
-ok(clientSource.includes('@media (max-width:560px){.dssm-mask{padding:12px;align-items:center}'), "upload dialog stays centered on a narrow viewport");
-ok(clientSource.includes('id: "dssm-filter-search"'), "settings panel registers a skill search input");
-ok(clientSource.includes('className: "dssm-field dssm-field-search"'), "search field follows the expert plugin filter layout");
-ok(clientSource.includes('.dssm-search-clear{'), "search input provides a visible clear control");
+ok(clientSource.includes('className: "dssm-modal" + (props.wide ? " dssm-modal-wide" : "") + (props.className ? " " + props.className : "")'), "dialogs use the shared adaptive modal component");
+ok(clientSource.includes('.dssm-modal{box-sizing:border-box;display:flex;width:min(560px,100%)!important;'), "all plugin dialogs stay compact against host stretch");
+ok(clientSource.includes('.dssm-modal-wide{width:min(720px,100%)!important}'), "detail dialog has a bounded wider layout");
+ok(clientSource.includes('.dssm-modal-actions{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:8px}'), "dialog actions wrap instead of stretching the dialog");
+ok(clientSource.includes('placeholder: t("search.placeholder")'), "settings panel registers a skill search input");
+ok(clientSource.includes('className: "dssm-control dssm-search"'), "search field follows the source-first filter layout");
+ok(clientSource.includes('className: "dssm-sources"'), "settings panel renders source-first skill groups");
 ok(clientSource.includes('className: "dssm-select-trigger"'), "category filter uses the styled custom select");
 ok(clientSource.includes('.dssm-select-menu{'), "custom select menu uses design tokens instead of native chrome");
 ok(!/h\(\s*"select"/.test(clientSource), "category filter does not use a native select");
@@ -143,12 +157,15 @@ ok(packageJson.peerDependencies["@deepseek-ai/dsh-client-runtime"], "package dec
 ok(packageJson.peerDependencies["@deepseek-ai/dsh-client-ui-slots"], "package declares the settings slots peer");
 ok(packageJson.peerDependencies["@deepseek-ai/dsh-host-webserver"].includes("<0.2.0"), "host-webserver peer has an upper bound");
 ok(packageJson.peerDependencies["@deepseek-ai/dsh-skill"].includes("<0.2.0"), "skill peer has an upper bound");
-ok(packageJson.peerDependencies["@deepseek-ai/dsh-client-ui-workspace"].includes("<0.2.0"), "workspace peer has an upper bound");
+ok(packageJson.peerDependencies["@deepseek-ai/dsh-tools"].includes("<0.2.0"), "tools peer has an upper bound");
+ok(!packageJson.peerDependencies["@deepseek-ai/dsh-client-ui-workspace"], "browser-native import no longer depends on the workspace directory picker");
 ok(clientSource.includes("inflightRef"), "client guards mutations with a synchronous in-flight flag");
-ok(clientSource.includes('function executeImport(source, conflict, chained)') && clientSource.includes('if (inflightRef.current && !chained) return;'), "executeImport rejects a second in-flight call unless chained from the dry-run");
-ok(clientSource.includes('executeImport(selected.source, "skip", true)'), "installSelected chains into executeImport explicitly, never via stale busy closures");
-ok(clientSource.includes("importResult && !uploadOpen && !isUploadPickerError(importResult)"), "import results stay off the page while the upload dialog is open");
-ok(/setUploadOpen\(false\);\s*setSelected\(null\);\s*setImportResult\(\{ error: error \}\)/.test(clientSource), "import failure clears the selected source with the dialog");
+ok(clientSource.includes('if (inflightRef.current) return Promise.reject'), "post rejects a second in-flight mutation synchronously");
+ok(clientSource.includes('function submitImport()') && clientSource.includes('post("/import", { source: form.source }'), "import uses the shared guarded mutation path");
+ok(clientSource.includes('function submitCreate()') && clientSource.includes('post("/create", form'), "create uses the shared guarded mutation path");
+ok(clientSource.includes('callApi("/browse"'), "folder picker browses in-app through the plugin API");
+ok(clientSource.includes('className: "dssm-modal-browser"'), "folder picker uses a foreground DSH-styled modal");
+ok(!clientSource.includes("ctx.workspaces.pickDirectory"), "folder picker never launches the Node-hosted workspace chooser");
 const publishWorkflow = await readFile(new URL("../.github/workflows/publish.yml", import.meta.url), "utf8");
 ok(publishWorkflow.includes("id-token: write"), "publish workflow enables OIDC trusted publishing");
 ok(!publishWorkflow.includes("registry-url:"), "publish workflow relies on package publishConfig instead of token-backed registry setup");
@@ -161,6 +178,18 @@ eq(toKebab("Foo Bar_Test"), "foo-bar-test", "toKebab mixed separators");
 eq(toKebab("guizang-ppt-skill-main"), "guizang-ppt-skill-main", "toKebab already kebab");
 eq(toKebab("  GuiZangPPT-Skill  "), "gui-zang-ppt-skill", "toKebab trim + acronym-ish");
 eq(toKebab("中文名"), "", "toKebab non-ascii strips to empty");
+
+// ── 前台目录浏览器：只列真实子目录，并返回可导航的绝对路径 ──
+const browseRoot = join(tmp, "browse-root");
+await mkdir(join(browseRoot, "zeta"), { recursive: true });
+await mkdir(join(browseRoot, ".hidden"), { recursive: true });
+await writeFile(join(browseRoot, "file.txt"), "not a directory", "utf8");
+const browseResult = await browseDirectories(browseRoot);
+ok(browseResult.ok !== false, "browseDirectories lists an absolute directory");
+eq(browseResult.path, browseRoot, "browseDirectories returns the canonical current path");
+eq(browseResult.entries.map((entry) => entry.name).join(","), ".hidden,zeta", "browseDirectories lists directories only and sorts them");
+ok(browseResult.entries.find((entry) => entry.name === ".hidden").hidden, "browseDirectories marks dot directories hidden");
+eq((await browseDirectories("relative-folder")).code, "error.browse.absolute", "browseDirectories rejects relative paths");
 eq(entryPath(dshRoot, "foo:bar"), null, "entryPath rejects Windows ADS names");
 eq(entryPath(dshRoot, ".hidden"), null, "entryPath rejects leading-dot names");
 eq(entryPath(dshRoot, ".good-skill.dssm-stage-dead"), null, "entryPath rejects leftover stage directories");
@@ -183,6 +212,38 @@ eq(parseBoolValue("YES"), true, "parseBoolValue yes");
 eq(parseBoolValue("off"), false, "parseBoolValue off");
 eq(parseBoolValue("0"), false, "parseBoolValue 0");
 eq(parseBoolValue("notabool"), undefined, "parseBoolValue invalid");
+
+let transientRenameAttempts = 0;
+await renameWithRetry("from", "to", {
+  delayMs: 0,
+  rename: async function () {
+    transientRenameAttempts++;
+    if (transientRenameAttempts < 3) {
+      const error = new Error("temporary Windows lock");
+      error.code = "EPERM";
+      throw error;
+    }
+  },
+});
+eq(transientRenameAttempts, 3, "renameWithRetry retries transient Windows EPERM errors");
+
+let permanentRenameAttempts = 0;
+let permanentRenameCode = "";
+try {
+  await renameWithRetry("from", "to", {
+    delayMs: 0,
+    rename: async function () {
+      permanentRenameAttempts++;
+      const error = new Error("invalid path");
+      error.code = "EINVAL";
+      throw error;
+    },
+  });
+} catch (error) {
+  permanentRenameCode = error.code;
+}
+eq(permanentRenameAttempts, 1, "renameWithRetry does not retry permanent errors");
+eq(permanentRenameCode, "EINVAL", "renameWithRetry preserves permanent errors");
 
 const folded = parseSkillDoc("---\nname: folded\ndescription: >-\n  First line.\n  Second line.\n---\nbody");
 eq(folded.map.description, "First line. Second line.", "parseSkillDoc reads folded description");
@@ -232,16 +293,46 @@ eq(plainToggle.params && plainToggle.params.action, "disable", "no-frontmatter p
 eq(await readFile(join(dshRoot, "plain-skill", "SKILL.md"), "utf8"), "没有 frontmatter 的正文", "missing frontmatter remains unchanged");
 await makeSkill(agentsRoot, "public-skill", "---\nname: public-skill\ndescription: Public skill.\n---\nbody");
 const publicToggle = await setSkillEnabled(agentsRoot, "public-skill", false);
-ok(publicToggle.ok === false, "public Agent skill rejects enable and disable");
-eq(publicToggle.code, "error.root.readonly", "public toggle carries the readonly code");
-eq(publicToggle.params && publicToggle.params.action, "toggle", "public toggle params.action");
+ok(publicToggle.ok !== false && publicToggle.enabled === false, "public Agent skill supports manager-local disable");
 const publicDoc = parseSkillDoc(await readFile(join(agentsRoot, "public-skill", "SKILL.md"), "utf8"));
 ok(publicDoc.map["disable-model-invocation"] === undefined, "public skill metadata remains unchanged");
+
+// ── 外部来源 provider 与本地策略 ──
+await makeSkill(codexRoot, "code-review", "---\nname: code-review\ndescription: Review code safely.\n---\nCodex review body");
+let providerCandidates = await listProviderCandidates();
+const codexCandidate = providerCandidates.find((item) => item.source === "agent-codex" && item.name === "code-review");
+ok(codexCandidate && codexCandidate.invocation.modelInvocable === true, "Codex skill is exposed to the DSH provider");
+eq(codexCandidate.rank, 520, "Codex provider rank stays below native DSH and public Agents");
+const loadedCodex = await getProviderSkill(codexCandidate);
+eq(loadedCodex.content, "Codex review body", "provider loads the external skill body");
+await setSkillEnabled(codexRoot, "code-review", false);
+providerCandidates = await listProviderCandidates();
+ok(providerCandidates.find((item) => item.name === "code-review").invocation.modelInvocable === false, "external skill disable keeps a disabled winning candidate");
+ok(!(await readFile(join(codexRoot, "code-review", "SKILL.md"), "utf8")).includes("disable-model-invocation"), "external skill toggle never modifies the source file");
+await setSourceEnabled("codex", false);
+providerCandidates = await listProviderCandidates();
+ok(providerCandidates.find((item) => item.name === "code-review").invocation.userInvocable === false, "source disable keeps external candidates disabled");
+await setSourceEnabled("codex", true);
+
+// ── 创建与详情 ──
+const created = await createSkill({ name: "Conversation Helper", description: "Create reusable prompts.", body: "Follow the user request carefully." });
+eq(created.name, "conversation-helper", "createSkill normalizes a conversation title to kebab-case");
+const createdDetail = await skillDetail("dsh", "conversation-helper");
+eq(createdDetail.body, "Follow the user request carefully.", "skillDetail returns the markdown body");
+ok(createdDetail.loadable === true && createdDetail.diagnostics.length === 0, "created skill passes diagnostics");
+eq((await createSkill({ name: "Conversation Helper", description: "Duplicate.", body: "body" })).code, "error.create.conflict", "createSkill rejects overwrite by default");
 
 // ── 删除 ──
 const deleted = await deleteSkill(dshRoot, "good-skill");
 eq(deleted.name, "good-skill", "deleteSkill returns deleted name");
 ok(await resolveEntry(dshRoot, "good-skill") === null, "deleteSkill removes bundle");
+ok((await listTrash()).some((item) => item.id === deleted.id), "deleteSkill moves the skill into trash");
+const restored = await restoreTrash(deleted.id);
+eq(restored.name, "good-skill", "restoreTrash returns restored name");
+ok(await resolveEntry(dshRoot, "good-skill") !== null, "restoreTrash restores the skill bundle");
+const deletedAgain = await deleteSkill(dshRoot, "good-skill");
+await permanentlyDeleteTrash(deletedAgain.id);
+ok(!(await listTrash()).some((item) => item.id === deletedAgain.id), "permanent trash deletion removes the second-stage entry");
 const publicDelete = await deleteSkill(agentsRoot, "public-skill");
 ok(publicDelete.ok === false, "deleteSkill rejects public Agent directory");
 
@@ -468,15 +559,70 @@ eq(batch.imported.length, 2, "import batch dir");
   ok(events.some((event) => event[0] === "commands/change"), "notifyChatCatalog emits commands/change");
   ok(events.some((event) => event[0] === "agent-preset/selected" && event[1] === "s1" && event[2] === "web"), "notifyChatCatalog emits the live session preset");
 }
+
+// ── Agent preset 作用域覆盖 ──
+{
+  const listeners = new Map();
+  const invalidators = new Set();
+  const registered = [];
+  function agent(id) {
+    return {
+      id,
+      ctx: {
+        get(name) {
+          if (name !== "skills") return undefined;
+          return {
+            registerProvider(create) {
+              const lifecycle = new AbortController();
+              const provider = create({ signal: lifecycle.signal, invalidate() {} });
+              registered.push({ id, provider });
+              let live = true;
+              return () => {
+                if (!live) return;
+                live = false;
+                lifecycle.abort();
+              };
+            },
+          };
+        },
+      },
+    };
+  }
+  const existing = agent("existing");
+  const later = agent("later");
+  const dispose = registerAgentSkillProviders({
+    on(event, callback) {
+      listeners.set(event, callback);
+      return () => listeners.delete(event);
+    },
+    get(name) {
+      if (name === "agents") return { list() { return [existing]; } };
+    },
+  }, invalidators);
+  eq(registered.length, 1, "existing live agent receives an agent-scoped manager provider");
+  eq(registered[0].provider.name, "dsh-skills-manager-external", "agent-scoped provider keeps the manager provider identity");
+  eq(invalidators.size, 1, "agent-scoped provider contributes an invalidator");
+  listeners.get("agent/created")({ agent: existing });
+  eq(registered.length, 1, "duplicate agent creation notification does not register twice");
+  listeners.get("agent/created")({ agent: later });
+  eq(registered.length, 2, "new live agent receives an agent-scoped manager provider");
+  listeners.get("agent/disposed")({ agent: existing });
+  eq(invalidators.size, 1, "disposing an agent removes its scoped invalidator");
+  dispose();
+  eq(invalidators.size, 0, "plugin teardown disposes all remaining scoped providers");
+  eq(listeners.size, 0, "plugin teardown removes agent lifecycle listeners");
+}
 // ── HTTP 路由 ──
 await makeSkill(dshRoot, "http-skill", "---\nname: http-skill\n---\nbody");
 const concurrentImportSource = await makeSkill(tmp, "concurrent-import", "---\nname: concurrent-import\n---\nbody");
 let route;
 let invalidated = 0;
 const emitted = [];
+let registeredTool = null;
 applyHost({
   webServer: { register(value) { route = value; return function () {}; } },
   skills: { registerProvider(register) { register({ invalidate() { invalidated++; } }); return function () {}; } },
+  tools: { register(definition) { registeredTool = definition; return function () {}; } },
   effect(register) { return register(); },
   emit() { emitted.push(Array.from(arguments)); },
   get(name) {
@@ -564,10 +710,9 @@ ok(emitted.some((event) => event[0] === "agent-preset/selected" && event[1] === 
 ok(!emitted.some((event) => event[0] === "agent-preset/selected" && event[1] === "sess-blank"), "sessions without a preset are not rewritten");
 
   const publicResponse = await fetch(api + "/disable", { method: "POST", headers: secureHeaders, body: JSON.stringify({ name: "public-skill", root: "agents" }) });
-  eq(publicResponse.status, 400, "HTTP route rejects public Agent mutations");
+  eq(publicResponse.status, 200, "HTTP route stores public Agent toggles locally");
   const publicPayload = await publicResponse.json();
-  eq(publicPayload.code, "error.root.readonly", "HTTP route returns the readonly code");
-  eq(publicPayload.params && publicPayload.params.action, "toggle", "HTTP route readonly params.action");
+  ok(publicPayload.ok === true && publicPayload.data.enabled === false, "HTTP public toggle returns disabled manager state");
   const httpDeleteAgents = await fetch(api + "/delete", { method: "POST", headers: secureHeaders, body: JSON.stringify({ name: "http-skill", root: "agents" }) });
   eq(httpDeleteAgents.status, 400, "HTTP delete rejects public Agent root");
   eq((await httpDeleteAgents.json()).code, "error.root.readonly", "HTTP delete with agents root is readonly");
@@ -592,7 +737,7 @@ ok(!emitted.some((event) => event[0] === "agent-preset/selected" && event[1] ===
 
 // ── 状态快照 ──
 const snap = await state();
-eq(snap.roots.length, 2, "state returns DSH and public Agent roots");
+eq(snap.roots.length, 6, "state returns DSH and common Agent roots");
 const dshSnap = snap.roots.find((r) => r.key === "dsh");
 ok(dshSnap.mutable === true, "DSH root allows destructive actions");
 ok(dshSnap.skills.some((s) => s.name === "import-me"), "state lists imported skill");
@@ -600,13 +745,16 @@ ok(dshSnap.skills.find((s) => s.name === "import-me").modelInvocable === true, "
 const agentsSnap = snap.roots.find((r) => r.key === "agents");
 ok(agentsSnap.mutable === false, "public Agent root disallows destructive actions");
 ok(agentsSnap.skills.some((s) => s.name === "public-skill"), "state lists public Agent skill");
+ok(registeredTool && registeredTool.name === "create_skill", "host registers the conversational create_skill tool");
 
 // 清理
 await rm(tmp, { recursive: true, force: true });
 delete process.env.DSH_HOME;
 delete process.env.DSH_AGENTS_HOME;
+delete process.env.DSH_CODEX_HOME;
+delete process.env.DSH_CLAUDE_HOME;
+delete process.env.DSH_GEMINI_HOME;
+delete process.env.DSH_OPENCODE_HOME;
 
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);
-
-

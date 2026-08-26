@@ -6,7 +6,7 @@
 
   # DSH Skills Manager
 
-  **在 DeepSeek Harness 中安全管理本地技能，并查看公共 Agent 技能**
+  **在 DeepSeek Harness 中统一加载并安全管理本机 Agent Skills**
 
   [English](README.md) · [Apache-2.0](LICENSE)
 
@@ -21,23 +21,24 @@
 
 ## 功能概览
 
-- 在「设置 → 技能」中按分类筛选或搜索，查看 DSH 本地技能与公共 Agent 技能。
-- 对 DSH 本地技能执行启用、停用、上传、覆盖和删除。
-- 公共 Agent 技能始终只读，不改写共享的全局元数据。
-- 使用系统文件选择器导入包含 `SKILL.md` 的插件目录，并对同名覆盖强制确认。
-- 可把一句话复制到 DSH、Codex 或 WorkBuddy，让对方代装到本机 DSH。
+- 自动发现并把 `.agents`、Codex、Claude、Gemini 和 OpenCode 的用户级技能真正加载进 DSH。
+- 外部来源启停只写入 `$DSH_HOME\skills-manager\state.json`，绝不改写共享源文件。
+- 按来源折叠、搜索和筛选，并查看技能正文、frontmatter、加载状态、重名遮蔽与格式诊断。
+- 在设置页或对话中创建 DSH 本地技能；对话工具在写入前请求用户确认。
+- DSH 本地技能删除后先进入回收站，支持恢复和二次永久删除。
+- 继续支持把包含 `SKILL.md` 的目录安全导入 `$DSH_HOME\skills`。
 
 ## 界面预览
 
-在「设置 → 技能」中按分类筛选或搜索。DSH 本地技能可启用、停用和删除；公共 Agent 技能只读：
+在「设置 → 技能」中按来源管理 DSH 与其他本机 Agent 的技能；外部技能通过 manager provider 加载，源文件保持只读：
 
-![技能管理设置页面](assets/screenshots/skills-manager.png)
+![按来源管理技能的设置页面](assets/screenshots/skills-manager-v2-preview.png)
 
 本地 DSH 技能为空时，公共 Agent 技能仍然可见：
 
 ![未安装本地技能时仍可查看公共 Agent 技能](assets/screenshots/skills-public.png)
 
-紧凑上传弹窗支持选择 `SKILL.md`、选择插件目录，或直接拖放文件：
+紧凑上传弹窗支持选择 `SKILL.md`、选择插件目录，或直接拖放文件。内置目录浏览器始终保持在前台，不再启动 Node 宿主选择框：
 
 ![上传插件弹窗](assets/screenshots/upload-plugin.png)
 
@@ -137,26 +138,26 @@ dsh --profile web --dump-config
 
 | 目标 | 操作 | 范围 |
 | --- | --- | --- |
-| 搜索或筛选 | 用「分类」和「搜索」按目录、名称、形态或简介收窄列表。 | DSH 与公共 Agent 技能 |
-| 查看技能 | 查看名称、形态、说明和调用状态。 | DSH 与公共 Agent 技能 |
-| 启用或停用 | 点击「启用」或「停用」。它会同步控制模型调用和 `/` 手动命令。 | 仅 DSH 本地技能 |
-| 上传插件 | 点击「上传插件」，选择插件目录内的 `SKILL.md`。完整目录、脚本和资源都会被复制。 | 仅 DSH 本地技能 |
-| 改选插件目录 | 所选文件无可用路径时，选择包含 `SKILL.md` 的目录。 | 仅 DSH 本地技能 |
-| 覆盖或删除 | 同名时确认覆盖；使用「删除」移除不再需要的本地技能。 | 仅 DSH 本地技能 |
-| 查看公共技能 | 查看公共 Agent 技能，不修改其元数据。 | 只读 |
+| 搜索或筛选 | 按来源、名称或简介收窄列表。 | 全部来源 |
+| 查看详情与诊断 | 查看正文、frontmatter、源文件路径、格式问题和重名遮蔽。 | 全部来源 |
+| 启用或停用 | DSH 技能更新自身调用策略；外部技能只更新 manager 本地状态。 | 全部来源 |
+| 创建或导入 | 在设置页创建，或导入包含 `SKILL.md` 的文件/目录。 | `$DSH_HOME\skills` |
+| 从对话创建 | 让 Agent 调用 `create_skill`；写入前由 DSH 审批界面确认。 | `$DSH_HOME\skills` |
+| 删除与恢复 | 删除先进入回收站；可恢复或永久二次删除。 | DSH 本地技能 |
 
 ![删除插件确认框](assets/screenshots/delete-plugin.png)
 
-> 删除 DSH 本地技能需要确认，删除后无法恢复。
+> 共享来源的启停不会修改源文件；只有 DSH 本地技能可以移入回收站。
 
 按 ESC 只关闭最上层上传框或确认框，设置页会保持打开。
 
 ## 权限与安全边界
 
-| 目录 | 查看 | 启用或停用 | 上传或覆盖 | 删除 |
+| 目录 | 查看/加载 | 启用或停用 | 创建/导入 | 删除 |
 | --- | --- | --- | --- | --- |
-| `$DSH_HOME\skills` | 支持 | 支持 | 支持 | 支持 |
-| `$DSH_AGENTS_HOME\skills` | 支持 | 不支持 | 不支持 | 不支持 |
+| `$DSH_HOME\skills` | 支持 | 改写本地调用策略 | 支持 | 进入回收站 |
+| `$DSH_AGENTS_HOME\skills` | 支持 | 仅写 manager 状态 | 不支持 | 不支持 |
+| `~/.codex/skills`、`~/.claude/skills`、`~/.gemini/skills`、`~/.config/opencode/skills` | 支持 | 仅写 manager 状态 | 不支持 | 不支持 |
 
 - 启用、停用和删除只接受单个普通技能名称，目录穿越名称会被拒绝。
 - 覆盖前先复制到同目录临时路径；复制成功前不会改动现有技能。

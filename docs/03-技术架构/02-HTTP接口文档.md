@@ -1,6 +1,6 @@
 # HTTP 接口文档
 
-更新时间：2026-08-17 02:52（Asia/Shanghai）
+更新时间：2026-08-26（Asia/Shanghai）
 
 ## 通用约定
 
@@ -26,10 +26,13 @@
 | POST | `/enable` | 启用指定插件。 |
 | POST | `/disable` | 停用指定插件。 |
 | POST | `/delete` | 删除指定插件。 |
+| POST | `/browse` | 为前台目录选择器列出一个本机目录层级。 |
 | POST | `/import` | 预检或导入本机插件路径。 |
 
 `/enable` 与 `/disable` 请求体为 `{ "name": "foo-bar", "root": "dsh" }`；仅接受 `dsh`，缺省为 `dsh`，公共 Agent 根目录请求会被拒绝。
 
 `/delete` 请求体为 `{ "name": "foo-bar" }`；只删除 DSH 根目录，服务端拒绝公共 Agent 目录删除。
+
+`/browse` 请求体为 `{ "path": "C:\\path\\to\\folder" }`；省略 `path` 时从宿主用户主目录开始。返回当前绝对路径、面包屑和真实子目录列表，不跟随目录符号链接，最多返回 500 项。它是只读 POST，但仍要求 JSON 与 `x-dsh-skills-manager: 1`，用于避免调用会弹出 Node 宿主窗口的 `workspaces.pickDirectory()`。
 
 `/import` 请求体为 `{ "source": "C:\\path\\to\\SKILL.md", "conflict": "skip", "dryRun": false }`。当 `source` 为 `SKILL.md` 时，服务端导入其父目录；`conflict` 仅支持 `skip`（默认）与 `overwrite`；`dryRun: true` 只返回冲突预检结果。`source` 可以是用户选定的任意本机技能路径，不限制在 `$DSH_HOME` 内；服务端拒绝符号链接、过深目录，以及与目标技能目录重叠的来源。

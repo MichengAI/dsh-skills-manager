@@ -131,6 +131,20 @@ await parseApiResponse({ status: 502, json: function () { return Promise.reject(
 );
 const trapModalFocus = bundle.trapModalFocus;
 ok(typeof trapModalFocus === "function", "factory exports modal focus trapping for regression tests");
+const handleModalEscape = bundle.handleModalEscape;
+ok(typeof handleModalEscape === "function", "factory exports modal Escape handling for regression tests");
+let escapePrevented = false;
+let escapeStopped = false;
+let nativeEscapeStopped = false;
+let escapeClosed = 0;
+ok(handleModalEscape({ key: "Escape", preventDefault: function () { escapePrevented = true; }, stopPropagation: function () { escapeStopped = true; }, nativeEvent: { stopImmediatePropagation: function () { nativeEscapeStopped = true; } } }, function () { escapeClosed += 1; }), "Escape is handled by the topmost plugin modal");
+ok(escapePrevented && escapeStopped && nativeEscapeStopped && escapeClosed === 1, "modal Escape is consumed before the Settings dialog can close");
+ok(!handleModalEscape({ key: "Enter" }, function () { escapeClosed += 1; }), "non-Escape keys pass through modal Escape handling");
+const inspectImportFile = bundle.inspectImportFile;
+ok(typeof inspectImportFile === "function", "factory exports native SKILL.md selection validation");
+eq(inspectImportFile({ name: "README.md", path: "C:\\tmp\\README.md" }).error.code, "select.file.invalid", "native picker rejects files other than SKILL.md");
+eq(inspectImportFile({ name: "SKILL.md" }).error.code, "select.path.missing", "native picker reports when the host hides the absolute path");
+eq(inspectImportFile({ name: "SKILL.md", path: "C:\\tmp\\demo\\SKILL.md" }).source, "C:\\tmp\\demo\\SKILL.md", "native picker keeps the absolute SKILL.md path");
 let focused = "";
 const firstButton = { focus: function () { focused = "first"; } };
 const lastButton = { focus: function () { focused = "last"; } };
@@ -194,6 +208,15 @@ eq(
 // ── 注册契约断言：inject 声明 locale，settings.section 注册携带 locale 命名空间 ──
 ok(Array.isArray(bundle.inject) && bundle.inject.includes("locale"), "bundle.inject declares the locale service");
 ok(Array.isArray(bundle.inject) && bundle.inject.includes("slots"), "bundle.inject declares slots");
+ok(!bundle.inject.includes("workspaces"), "bundle no longer invokes the Node-hosted workspace directory picker");
+ok(source.includes('type: "file"') && source.includes('accept: ".md"'), "import dialog restores the browser-native SKILL.md picker");
+ok(source.includes("pickerOpenRef.current"), "native picker has a synchronous multi-click guard");
+ok(source.includes('callApi("/browse"'), "missing file paths fall back to the in-app directory browser");
+ok(source.includes('setModal("browse")'), "folder browsing stays inside the foreground settings flow");
+ok(source.includes('className: "dssm-modal-browser"'), "in-app directory browser uses the shared styled modal");
+ok(source.includes('"aria-pressed": showHidden'), "folder browser can reveal common dot-prefixed Agent directories");
+ok(source.includes("@container(max-width:780px)"), "skill rows respond to the settings content width rather than only the viewport");
+ok(source.includes(".dssm-source-head{box-sizing:border-box"), "source toggles stay inside narrow settings cards");
 
 let registerOptions = null;
 const fakeCtx = {
@@ -206,7 +229,6 @@ const fakeCtx = {
     inject(name, fn) { if (name === "settings.section") registerOptions = fn(); },
     register(opts) { return opts; },
   },
-  workspaces: { pickDirectory() { return Promise.resolve(null); } },
 };
 bundle.apply(fakeCtx);
 ok(registerOptions !== null && registerOptions.name === "settings.section", "apply registers the settings.section entry");
