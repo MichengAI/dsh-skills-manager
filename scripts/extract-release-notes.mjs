@@ -1,7 +1,12 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 
 const tag = process.argv[2] || process.env.GITHUB_REF_NAME
-const outputPath = process.argv[3] || 'release-notes.md'
+const outputPath = resolve(process.argv[3] || 'release-notes.md')
+
+if (!outputPath.startsWith(resolve('.'))) {
+  throw new Error('Output path must be within the current working directory')
+}
 
 if (!tag) {
   throw new Error('Usage: node scripts/extract-release-notes.mjs <tag> [output]')
