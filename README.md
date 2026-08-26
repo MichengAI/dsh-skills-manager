@@ -110,7 +110,7 @@ dsh plugin --profile web add @michengai/dsh-skills-manager@latest --registry=htt
 dsh --profile web --dump-config
 ```
 
-To pin a release, replace `@latest` with a version such as `@0.1.23`.
+To pin a release, replace `@latest` with a version such as `@0.1.25`.
 
 The configuration output should contain `skills-manager`. Restart DSH Web and hard-refresh the browser. Do not copy client files manually: `dsh plugin add` also applies `cordis.patch.yml`.
 

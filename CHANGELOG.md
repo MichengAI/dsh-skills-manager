@@ -4,6 +4,15 @@
 
 The five most recent published versions are listed below.
 
+## 0.1.25 — 2026-08-27
+
+- Added provider-backed loading for public Agents, Codex, Claude, Gemini, and OpenCode while keeping external source files read-only and persisting toggles in manager state.
+- Added Markdown details, diagnostics, conversational creation, recoverable Trash, and second-stage permanent deletion.
+- Replaced chained importing with one upload dialog for `.zip`, skill folders, and a single `SKILL.md`, with path, size, count, and archive safety limits.
+- Fixed corrupted-state overwrite, trash rollback data loss, Windows `EPERM` publication failures, and the missing Repair-and-enable payload field.
+
+Published package: [`@michengai/dsh-skills-manager@0.1.25`](https://www.npmjs.com/package/@michengai/dsh-skills-manager/v/0.1.25).
+
 ## 0.1.24 — 2026-08-23
 
 - Added bilingual changelogs covering the five most recent releases.
@@ -29,9 +38,3 @@ Release tag: [`v0.1.22`](https://github.com/MichengAI/dsh-skills-manager/tree/v0
 - Aligned dry-run cleanup, deletion handling, and HEAD behavior.
 
 Release tag: [`v0.1.21`](https://github.com/MichengAI/dsh-skills-manager/tree/v0.1.21).
-
-## 0.1.20 — 2026-08-17
-
-- Avoided duplicate import errors while the upload dialog is open.
-
-Release tag: [`v0.1.20`](https://github.com/MichengAI/dsh-skills-manager/tree/v0.1.20).

@@ -157,6 +157,7 @@ ok(clientSource.includes('className: "dssm-select-trigger"'), "category filter u
 ok(clientSource.includes('.dssm-select-menu{'), "custom select menu uses design tokens instead of native chrome");
 ok(!/h\(\s*"select"/.test(clientSource), "category filter does not use a native select");
 const packageJson = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
+eq(packageJson.version, "0.1.25", "release contract tracks the package version");
 ok(packageJson.peerDependencies["@deepseek-ai/dsh-client-runtime"], "package declares the client runtime peer");
 ok(packageJson.peerDependencies["@deepseek-ai/dsh-client-ui-slots"], "package declares the settings slots peer");
 ok(packageJson.peerDependencies["@deepseek-ai/dsh-host-webserver"].includes("<0.2.0"), "host-webserver peer has an upper bound");
@@ -172,6 +173,7 @@ ok(!clientSource.includes('className: "dssm-modal-browser"'), "folder selection 
 ok(!clientSource.includes("ctx.workspaces.pickDirectory"), "folder picker never launches the Node-hosted workspace chooser");
 const publishWorkflow = await readFile(new URL("../.github/workflows/publish.yml", import.meta.url), "utf8");
 ok(publishWorkflow.includes("id-token: write"), "publish workflow enables OIDC trusted publishing");
+ok(publishWorkflow.includes("pnpm install --frozen-lockfile"), "publish workflow installs the ZIP runtime dependency from the lockfile");
 ok(!publishWorkflow.includes("registry-url:"), "publish workflow relies on package publishConfig instead of token-backed registry setup");
 ok(publishWorkflow.includes("npm test"), "publish workflow runs the project tests");
 ok(publishWorkflow.includes("npm publish"), "publish workflow publishes the package after tests");

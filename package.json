@@ -1,6 +1,6 @@
 {
   "name": "@michengai/dsh-skills-manager",
-  "version": "0.1.24",
+  "version": "0.1.25",
   "description": "NPM-installable DSH Web plugin for safely loading and managing skills across DSH and common local Agents.",
   "license": "Apache-2.0",
   "repository": {
@@ -12,6 +12,7 @@
   },
   "homepage": "https://github.com/MichengAI/dsh-skills-manager#readme",
   "type": "module",
+  "packageManager": "pnpm@11.22.0",
   "main": "lib/index.js",
   "exports": {
     ".": "./lib/index.js",
