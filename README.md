@@ -34,17 +34,13 @@ Browse by source or search in **Settings → Skills**. External Agent sources ar
 
 ![Skills Manager source-first settings page](assets/screenshots/skills-manager-v2-preview.png)
 
-Shared Agent skills stay visible when the DSH-local group is empty:
+Open any skill to inspect its source path, diagnostics, Markdown body, and parsed frontmatter:
 
-![Shared Agent skills remain visible](assets/screenshots/skills-public.png)
+![Skill details and diagnostics](assets/screenshots/skill-detail.png)
 
-The compact upload dialog accepts `.zip`, a skill folder, a single `SKILL.md`, or drag-and-drop in one flow. It uses native browser pickers and never asks for an absolute path or opens a second chooser:
+Moving a DSH-local skill to Trash requires confirmation and remains recoverable until it is permanently deleted:
 
-![Upload plugin dialog](assets/screenshots/upload-plugin.png)
-
-Enabling a DSH-local skill restores its `/` command in the chat composer:
-
-![Chat slash command after enabling a local skill](assets/screenshots/slash-command.png)
+![Move a skill to Trash confirmation](assets/screenshots/delete-plugin.png)
 
 ## DSH product ecosystem
 
@@ -144,8 +140,6 @@ Open **Settings → Skills**, then use the panel as follows:
 | Create or import | Create in Settings, or import `.zip`, a folder containing `SKILL.md`, or one `SKILL.md`. | `$DSH_HOME/skills` |
 | Create from conversation | Let an Agent call `create_skill`; DSH asks for approval before writing. | `$DSH_HOME/skills` |
 | Delete and recover | Move to Trash, restore, or permanently delete in a second step. | DSH-local skills |
-
-![Delete plugin confirmation](assets/screenshots/delete-plugin.png)
 
 > Toggling a shared source never changes its files; only DSH-local skills can move to Trash.
 

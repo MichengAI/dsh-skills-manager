@@ -34,17 +34,13 @@
 
 ![按来源管理技能的设置页面](assets/screenshots/skills-manager-v2-preview.png)
 
-本地 DSH 技能为空时，公共 Agent 技能仍然可见：
+打开任意技能可查看来源路径、诊断结果、Markdown 正文与解析后的 frontmatter：
 
-![未安装本地技能时仍可查看公共 Agent 技能](assets/screenshots/skills-public.png)
+![技能正文与诊断详情](assets/screenshots/skill-detail.png)
 
-紧凑上传弹窗在同一个流程中支持 `.zip`、技能文件夹、单个 `SKILL.md` 与拖放。它只使用浏览器原生选择器，不要求绝对路径，也不会再打开第二个选择器：
+DSH 本地技能移入回收站前需要确认；永久删除前仍可恢复：
 
-![上传插件弹窗](assets/screenshots/upload-plugin.png)
-
-启用 DSH 本地技能后，聊天输入框会恢复对应的 `/` 命令：
-
-![启用本地技能后的斜杠命令](assets/screenshots/slash-command.png)
+![移到回收站确认框](assets/screenshots/delete-plugin.png)
 
 ## DSH 产品生态
 
@@ -144,8 +140,6 @@ dsh --profile web --dump-config
 | 创建或导入 | 在设置页创建，或导入 `.zip`、包含 `SKILL.md` 的文件夹、单个 `SKILL.md`。 | `$DSH_HOME\skills` |
 | 从对话创建 | 让 Agent 调用 `create_skill`；写入前由 DSH 审批界面确认。 | `$DSH_HOME\skills` |
 | 删除与恢复 | 删除先进入回收站；可恢复或永久二次删除。 | DSH 本地技能 |
-
-![删除插件确认框](assets/screenshots/delete-plugin.png)
 
 > 共享来源的启停不会修改源文件；只有 DSH 本地技能可以移入回收站。
 
