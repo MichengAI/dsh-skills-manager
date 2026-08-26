@@ -1,10 +1,11 @@
-// dsh-skills-manager core 单元测试（临时根，零第三方依赖）
+// dsh-skills-manager core 单元测试（临时根；ZIP 用例复用生产依赖 fflate）
 // 运行：node test/core-test.mjs
 
 import { mkdtemp, mkdir, writeFile, readFile, rm, stat, symlink, rename } from "node:fs/promises";
 import { createServer, request } from "node:http";
-import { join, sep } from "node:path";
+import { basename, dirname, join, sep } from "node:path";
 import { tmpdir } from "node:os";
+import { zipSync, strToU8 } from "fflate";
 
 import {
   toKebab,
@@ -19,6 +20,7 @@ import {
   restoreTrash,
   permanentlyDeleteTrash,
   importSkill,
+  importUploadedSkill,
   createSkill,
   skillDetail,
   listProviderCandidates,
@@ -163,10 +165,10 @@ ok(packageJson.peerDependencies["@deepseek-ai/dsh-tools"].includes("<0.2.0"), "t
 ok(!packageJson.peerDependencies["@deepseek-ai/dsh-client-ui-workspace"], "browser-native import no longer depends on the workspace directory picker");
 ok(clientSource.includes("inflightRef"), "client guards mutations with a synchronous in-flight flag");
 ok(clientSource.includes('if (inflightRef.current) return Promise.reject'), "post rejects a second in-flight mutation synchronously");
-ok(clientSource.includes('function submitImport()') && clientSource.includes('post("/import", { source: form.source }'), "import uses the shared guarded mutation path");
+ok(clientSource.includes('function submitImport()') && clientSource.includes('post("/upload", payload'), "upload import uses the shared guarded mutation path");
 ok(clientSource.includes('function submitCreate()') && clientSource.includes('post("/create", form'), "create uses the shared guarded mutation path");
-ok(clientSource.includes('callApi("/browse"'), "folder picker browses in-app through the plugin API");
-ok(clientSource.includes('className: "dssm-modal-browser"'), "folder picker uses a foreground DSH-styled modal");
+ok(clientSource.includes('webkitdirectory: ""'), "folder import uses the browser-native folder picker");
+ok(!clientSource.includes('className: "dssm-modal-browser"'), "folder selection does not chain into a second custom picker");
 ok(!clientSource.includes("ctx.workspaces.pickDirectory"), "folder picker never launches the Node-hosted workspace chooser");
 const publishWorkflow = await readFile(new URL("../.github/workflows/publish.yml", import.meta.url), "utf8");
 ok(publishWorkflow.includes("id-token: write"), "publish workflow enables OIDC trusted publishing");
@@ -359,6 +361,31 @@ ok(!(await listTrash()).some((item) => item.id === deletedAgain.id), "permanent 
 const publicDelete = await deleteSkill(agentsRoot, "public-skill");
 ok(publicDelete.ok === false, "deleteSkill rejects public Agent directory");
 
+// Windows 可能在 stage 内容刚写完时持续阻止目录 rename；最终发布应降级复制，不能把成功的搬运回滚掉。
+await makeSkill(dshRoot, "trash-publish-fallback", "---\nname: trash-publish-fallback\ndescription: Publish fallback.\n---\nbody");
+await writeFile(join(dshRoot, "trash-publish-fallback", "asset.txt"), "kept", "utf8");
+let trashPublishAttempts = 0;
+const fallbackDeleted = await deleteSkill(dshRoot, "trash-publish-fallback", null, {
+  renameOptions: {
+    maxAttempts: 2,
+    delayMs: 0,
+    async rename(source, destination) {
+      if (basename(source).startsWith(".stage-") && dirname(source) === dirname(destination)) {
+        trashPublishAttempts++;
+        const error = new Error("Windows scanner keeps the stage directory busy");
+        error.code = "EPERM";
+        throw error;
+      }
+      return rename(source, destination);
+    },
+  },
+});
+eq(trashPublishAttempts, 2, "deleteSkill exhausts the bounded final rename retries before fallback");
+ok(await resolveEntry(dshRoot, "trash-publish-fallback") === null, "trash publish fallback keeps the source removed");
+ok((await listTrash()).some((item) => item.id === fallbackDeleted.id), "trash publish fallback creates a visible trash item");
+await restoreTrash(fallbackDeleted.id);
+eq(await readFile(join(dshRoot, "trash-publish-fallback", "asset.txt"), "utf8"), "kept", "trash publish fallback preserves nested files through restore");
+
 // 删除发生二次故障时必须保留未恢复的 stage，不能清理唯一副本。
 const rollbackBundle = await makeSkill(dshRoot, "rollback-risk", "---\nname: rollback-risk\ndescription: Bundle.\n---\nbody");
 const rollbackFlat = join(dshRoot, "rollback-risk.md");
@@ -483,6 +510,45 @@ eq(imp.imported.length, 1, "import single dir");
 eq(imp.imported[0].name, "import-me", "import kebabifies name");
 const importedEntry = await resolveEntry(dshRoot, "import-me");
 ok(importedEntry !== null, "imported entry resolvable");
+
+// 浏览器上传：同一个入口接收单个 SKILL.md、完整文件夹与 ZIP，不依赖本机绝对路径。
+const uploadedSingle = await importUploadedSkill({
+  name: "SKILL.md",
+  entries: [{ path: "SKILL.md", data: Buffer.from("---\nname: uploaded-single\ndescription: Uploaded.\n---\nbody", "utf8").toString("base64") }],
+}, null);
+eq(uploadedSingle.imported.length, 1, "uploaded SKILL.md imports through staged content");
+ok(await readFile(join(dshRoot, "uploaded-single", "SKILL.md"), "utf8").then((text) => text.includes("Uploaded.")), "uploaded SKILL.md keeps its content");
+
+const uploadedFolder = await importUploadedSkill({
+  name: "uploaded-folder",
+  entries: [
+    { path: "uploaded-folder/SKILL.md", data: Buffer.from("---\nname: uploaded-folder\ndescription: Folder.\n---\nbody", "utf8").toString("base64") },
+    { path: "uploaded-folder/scripts/run.js", data: Buffer.from("console.log('ok')\n", "utf8").toString("base64") },
+  ],
+}, null);
+eq(uploadedFolder.imported.length, 1, "uploaded folder imports as one skill");
+eq(await readFile(join(dshRoot, "uploaded-folder", "scripts", "run.js"), "utf8"), "console.log('ok')\n", "uploaded folder keeps nested resources");
+
+const zipBytes = zipSync({
+  "uploaded-zip/SKILL.md": strToU8("---\nname: uploaded-zip\ndescription: Zip.\n---\nbody"),
+  "uploaded-zip/references/info.md": strToU8("reference"),
+});
+const uploadedZip = await importUploadedSkill({ name: "uploaded-zip.zip", zip: Buffer.from(zipBytes).toString("base64") }, null);
+eq(uploadedZip.imported.length, 1, "uploaded ZIP imports as one skill");
+eq(await readFile(join(dshRoot, "uploaded-zip", "references", "info.md"), "utf8"), "reference", "uploaded ZIP keeps nested resources");
+
+const traversalUpload = await importUploadedSkill({
+  name: "unsafe-folder",
+  entries: [{ path: "../escaped.txt", data: Buffer.from("escape").toString("base64") }],
+}, null);
+eq(traversalUpload.code, "error.upload.path", "uploaded folder rejects traversal paths");
+let escapedUploadExists = true;
+try { await stat(join(process.env.DSH_HOME, "escaped.txt")); } catch { escapedUploadExists = false; }
+ok(!escapedUploadExists, "rejected uploaded traversal never writes outside staging");
+
+const traversalZip = zipSync({ "../escaped-zip.txt": strToU8("escape") });
+const unsafeZip = await importUploadedSkill({ name: "unsafe.zip", zip: Buffer.from(traversalZip).toString("base64") }, null);
+eq(unsafeZip.code, "error.upload.path", "uploaded ZIP rejects traversal paths");
 
 // 已安装目录不能作为导入来源，否则覆盖会先删除来源再复制。
 const selfImport = await importSkill(dshRoot, null, { dryRun: true });
@@ -737,6 +803,14 @@ try {
 
   const localhostHostResponse = await requestJson(api + "/enable", "POST", { ...secureHeaders, host: "localhost:" + address.port }, JSON.stringify({ name: "http-skill" }));
   eq(localhostHostResponse.status, 200, "mutating route accepts localhost Host headers");
+
+  const uploadResponse = await requestJson(api + "/upload", "POST", secureHeaders, JSON.stringify({
+    name: "SKILL.md",
+    entries: [{ path: "SKILL.md", data: Buffer.from("---\nname: http-upload\ndescription: HTTP upload.\n---\nbody").toString("base64") }],
+  }));
+  eq(uploadResponse.status, 200, "upload route accepts browser-read skill content");
+  eq(uploadResponse.payload.data.imported[0].name, "http-upload", "upload route returns the imported skill");
+  ok((await resolveEntry(dshRoot, "http-upload")) !== null, "upload route persists the skill through the normal import path");
 
   const csrfResponse = await fetch(api + "/disable", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: "http-skill" }) });
   eq(csrfResponse.status, 403, "mutating route rejects requests without the client marker");

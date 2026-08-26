@@ -26,7 +26,7 @@
 - Inspect Markdown bodies, frontmatter, load state, duplicate shadowing, and format diagnostics in a source-first UI.
 - Create a local DSH skill from Settings or conversation; conversational writes require user approval.
 - Move DSH-local skills to recoverable Trash, then restore or permanently delete them.
-- Continue importing directories containing `SKILL.md` safely into `$DSH_HOME/skills`.
+- Import `.zip` archives, skill folders, or a single `SKILL.md` safely into `$DSH_HOME/skills`.
 
 ## Screenshots
 
@@ -38,7 +38,7 @@ Shared Agent skills stay visible when the DSH-local group is empty:
 
 ![Shared Agent skills remain visible](assets/screenshots/skills-public.png)
 
-The compact upload dialog accepts a plugin `SKILL.md`, a plugin directory, or drag-and-drop. Its in-app folder browser stays in the foreground and never launches a Node-hosted chooser:
+The compact upload dialog accepts `.zip`, a skill folder, a single `SKILL.md`, or drag-and-drop in one flow. It uses native browser pickers and never asks for an absolute path or opens a second chooser:
 
 ![Upload plugin dialog](assets/screenshots/upload-plugin.png)
 
@@ -141,7 +141,7 @@ Open **Settings → Skills**, then use the panel as follows:
 | Search or filter | Narrow by source, name, or description. | All sources |
 | Inspect details | Review body, frontmatter, path, format diagnostics, and duplicate shadowing. | All sources |
 | Enable or disable | DSH skills update their own invocation policy; external skills update manager-local state only. | All sources |
-| Create or import | Create in Settings, or import a file/folder containing `SKILL.md`. | `$DSH_HOME/skills` |
+| Create or import | Create in Settings, or import `.zip`, a folder containing `SKILL.md`, or one `SKILL.md`. | `$DSH_HOME/skills` |
 | Create from conversation | Let an Agent call `create_skill`; DSH asks for approval before writing. | `$DSH_HOME/skills` |
 | Delete and recover | Move to Trash, restore, or permanently delete in a second step. | DSH-local skills |
 

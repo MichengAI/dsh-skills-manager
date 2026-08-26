@@ -26,7 +26,7 @@
 - 按来源折叠、搜索和筛选，并查看技能正文、frontmatter、加载状态、重名遮蔽与格式诊断。
 - 在设置页或对话中创建 DSH 本地技能；对话工具在写入前请求用户确认。
 - DSH 本地技能删除后先进入回收站，支持恢复和二次永久删除。
-- 继续支持把包含 `SKILL.md` 的目录安全导入 `$DSH_HOME\skills`。
+- 支持把 `.zip`、包含 `SKILL.md` 的技能文件夹或单个 `SKILL.md` 安全导入 `$DSH_HOME\skills`。
 
 ## 界面预览
 
@@ -38,7 +38,7 @@
 
 ![未安装本地技能时仍可查看公共 Agent 技能](assets/screenshots/skills-public.png)
 
-紧凑上传弹窗支持选择 `SKILL.md`、选择插件目录，或直接拖放文件。内置目录浏览器始终保持在前台，不再启动 Node 宿主选择框：
+紧凑上传弹窗在同一个流程中支持 `.zip`、技能文件夹、单个 `SKILL.md` 与拖放。它只使用浏览器原生选择器，不要求绝对路径，也不会再打开第二个选择器：
 
 ![上传插件弹窗](assets/screenshots/upload-plugin.png)
 
@@ -141,7 +141,7 @@ dsh --profile web --dump-config
 | 搜索或筛选 | 按来源、名称或简介收窄列表。 | 全部来源 |
 | 查看详情与诊断 | 查看正文、frontmatter、源文件路径、格式问题和重名遮蔽。 | 全部来源 |
 | 启用或停用 | DSH 技能更新自身调用策略；外部技能只更新 manager 本地状态。 | 全部来源 |
-| 创建或导入 | 在设置页创建，或导入包含 `SKILL.md` 的文件/目录。 | `$DSH_HOME\skills` |
+| 创建或导入 | 在设置页创建，或导入 `.zip`、包含 `SKILL.md` 的文件夹、单个 `SKILL.md`。 | `$DSH_HOME\skills` |
 | 从对话创建 | 让 Agent 调用 `create_skill`；写入前由 DSH 审批界面确认。 | `$DSH_HOME\skills` |
 | 删除与恢复 | 删除先进入回收站；可恢复或永久二次删除。 | DSH 本地技能 |
 

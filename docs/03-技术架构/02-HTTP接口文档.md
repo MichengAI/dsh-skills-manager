@@ -16,6 +16,7 @@
 - 协议码 `error.proto.*`：HTTP 层校验失败——非法 Host 403（`error.proto.forbiddenHost`）、缺少请求标记 403（`error.proto.forbidden`）、content-type 415、方法不允许 405、未知操作 404、请求体过大 413、非法 JSON 400。
 - 覆盖导入回滚失败返回 `error.import.rollbackFailed`，`params.path` 为备份路径，`params.error` 为原始原因。
 - 移到回收站的回滚失败返回 `error.trash.rollbackFailed`；未恢复内容保留在 `params.path` 指向的 stage，服务端不会再清理唯一副本。
+- Windows 若在最终 stage 改名阶段持续返回 `EPERM` / `EACCES` / `EBUSY`，服务端会保留 stage 作为回滚源，复制完整条目后最后写入 `metadata.json`；调用方仍收到普通成功结果。
 - 已存在但不可读或结构非法的 `state.json` 触发 `warning.state.invalid`，所有外部来源按停用处理；启停写入返回 `error.state.invalid`，避免覆盖原策略。
 - 导入成功但旧备份未删除时，`imported[].warnings[]` 带 `warning.backupUncleaned`；前端按当前语言展示。
 - 系统异常（如 ENOENT）不携带 `code`，保留原始 `error` 文本。
@@ -35,8 +36,9 @@
 | POST | `/trash-delete` | 永久删除回收站条目。 |
 | POST | `/detail` | 读取技能正文、frontmatter 与诊断。 |
 | POST | `/create` | 在 DSH 技能目录创建技能。 |
-| POST | `/browse` | 为前台目录选择器列出一个本机目录层级。 |
-| POST | `/import` | 预检或导入本机插件路径。 |
+| POST | `/upload` | 上传 ZIP、技能文件夹内容或单个 SKILL.md，并安全暂存后导入。 |
+| POST | `/browse` | 兼容旧客户端：为目录选择器列出一个本机目录层级。 |
+| POST | `/import` | 兼容旧客户端：预检或导入本机插件路径。 |
 
 `/enable` 与 `/disable` 请求体为 `{ "name": "foo-bar", "root": "dsh" }`。DSH 技能通过原子改写 invocation policy 启停；外部根技能只写管理器 `state.json`，不修改来源文件。损坏状态下拒绝外部启停写入。
 
@@ -50,6 +52,8 @@
 
 `/create` 请求体为 `{ "name": "foo-bar", "description": "简介", "body": "正文" }`；只在 DSH 根创建 bundle 形态技能。
 
-`/browse` 请求体为 `{ "path": "C:\\path\\to\\folder" }`；省略 `path` 时从宿主用户主目录开始。返回当前绝对路径、面包屑和真实子目录列表；Dirent 过滤后再次使用 `lstat` 拒绝符号链接或 junction，最多返回 500 项。它是只读 POST，但仍要求 JSON 与 `x-dsh-skills-manager: 1`，用于避免调用会弹出 Node 宿主窗口的 `workspaces.pickDirectory()`。
+`/upload` 请求体有两种形态：普通文件/文件夹使用 `{ "name": "来源名称", "entries": [{ "path": "相对路径", "data": "Base64" }] }`；ZIP 使用 `{ "name": "demo.zip", "zip": "Base64" }`。请求体最多 16 MiB，ZIP 压缩数据最多 10 MiB，单文件最多 5 MiB，解压/上传总量最多 25 MiB、最多 500 个条目、路径深度最多 64 层。服务端拒绝绝对路径、`..`、Windows 设备名、重复路径和非法 Base64；所有归档条目只写成普通文件，不创建符号链接。暂存目录位于 `$DSH_HOME/skills-manager/uploads`，成功或失败后都会清理，再由既有原子导入流程复制到 `$DSH_HOME/skills`。
 
-`/import` 请求体为 `{ "source": "C:\\path\\to\\SKILL.md", "conflict": "skip", "dryRun": false }`。当 `source` 为 `SKILL.md` 时，服务端导入其父目录；`conflict` 仅支持 `skip`（默认）与 `overwrite`；`dryRun: true` 只返回冲突预检结果。`source` 可以是用户选定的任意本机技能路径，不限制在 `$DSH_HOME` 内；服务端拒绝符号链接、过深目录，以及与目标技能目录重叠的来源。
+`/browse` 请求体为 `{ "path": "C:\\path\\to\\folder" }`；省略 `path` 时从宿主用户主目录开始。该接口仅为旧客户端兼容保留，新界面不再调用。
+
+`/import` 请求体为 `{ "source": "C:\\path\\to\\SKILL.md", "conflict": "skip", "dryRun": false }`。该接口仅为旧客户端兼容保留；新界面使用 `/upload`，不向浏览器暴露或传递本机绝对路径。

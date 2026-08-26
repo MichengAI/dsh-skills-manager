@@ -1,69 +1,48 @@
-# Design QA — Skills Manager Source-first Library
+# I033 Design QA — 单次技能上传
 
-- source visual truth path: `C:\Users\YUJIYU\.codex\generated_images\01a03df7-d846-72d2-a982-53e70a093a9c\exec-45622f09-82f2-4a1c-b2f7-3350aad6b7ab.png`
-- implementation URL: `http://127.0.0.1:4173/`
-- implementation screenshot path: `D:\Repository\deepseek-harness-plugin\dsh-skills-manager\assets\screenshots\skills-manager-v2-preview.png`
-- full-view comparison: `C:\Users\YUJIYU\.codex\visualizations\2026\08\26\01a03df7-d846-72d2-a982-53e70a093a9c\skills-manager-v2-comparison.png`
-- focused comparison: `C:\Users\YUJIYU\.codex\visualizations\2026\08\26\01a03df7-d846-72d2-a982-53e70a093a9c\skills-manager-v2-focus-comparison.png`
-- responsive evidence: `C:\Users\YUJIYU\.codex\visualizations\2026\08\26\01a03df7-d846-72d2-a982-53e70a093a9c\skills-manager-v2-responsive.png`
-- viewport: `1726 x 911` CSS px; responsive check at `800 x 900`
-- source pixels: `1726 x 911`
-- implementation pixels: `1726 x 911`
-- device scale / normalization: `1x`; no density normalization required
-- state: Chinese dark-theme Settings, Codex source expanded, four Codex rows visible
+日期：2026-08-27
 
-## Findings
+## 对照输入
 
-No actionable P0/P1/P2 differences remain.
+- 千问参考：`C:\Users\YUJIYU\AppData\Local\Temp\codex-clipboard-b09ce913-b08a-4b65-bb27-8ac33e28196f.png`
+- 豆包参考：`C:\Users\YUJIYU\AppData\Local\Temp\codex-clipboard-73fd5318-2e65-4d9a-b72f-011af2078e03.png`
+- 用户颜色反馈：`C:\Users\YUJIYU\AppData\Local\Temp\codex-clipboard-f035c534-7e0d-42d0-8cd9-011503e618eb.png`
+- DSH 实装截图：`docs/07-迭代归档/2026/I033-单次技能上传重构/assets/upload-dialog-qa.png`
+- 同屏对比：`docs/07-迭代归档/2026/I033-单次技能上传重构/assets/design-comparison.png`
 
-- Fonts and typography: the implementation uses the host/system font stack and matches the reference hierarchy, weights, compact labels, and single-line truncation. Chinese text is slightly sharper than the generated reference, which is expected for live browser text.
-- Spacing and layout rhythm: the final settings frame is `1020 x 730`, with a `178px` settings rail and an `820px` maximum content region. Header, summary, filters, source cards, table rows, radii, and vertical rhythm align with the focused reference comparison.
-- Colors and visual tokens: implementation uses existing DSH `--dsw-*` tokens for backgrounds, borders, labels, primary controls, success, error, hover, and elevation. The dark neutral balance and green/orange state colors match the source.
-- Image quality and asset fidelity: the target contains no raster content assets. Standard host navigation iconography was not re-created with handcrafted SVG/CSS assets; the functional plugin surface uses text labels and native controls instead.
-- Copy and content: selected design copy is retained, while the implementation adds Gemini/OpenCode sources and real diagnostic/detail behavior requested by the user.
-- Responsiveness: at `800 x 900`, document `scrollWidth` equals `innerWidth` (`800px`), so there is no horizontal overflow; the content section measures `718px` and the mobile/table fallback remains usable.
-- Accessibility and interaction states: source headers expose `aria-expanded`; source/skill toggles use `role=switch` and `aria-checked`; dialogs are modal, Escape-dismissible, backdrop-dismissible, and focus-trapped; buttons and fields have visible focus states.
+## 验证环境
 
-## Interaction verification
+- 本地 DSH Web：`http://127.0.0.1:3080/`
+- 路径：设置 → 技能 → 导入
+- 状态：未选择；另对单个 `SKILL.md` 的已选择、安装成功状态完成交互验证。
 
-- Created a skill through the create dialog using realistic data.
-- Disabled and re-enabled the Codex source.
-- Opened a skill detail dialog and verified body/diagnostics content.
-- Filtered to `unit-test-generator` through search.
-- Opened Trash and verified Restore is available.
-- Checked browser console after the final fixes: no new errors or warnings.
+## 对照结论
 
-## Comparison history
+| 检查项 | 结果 |
+|---|---|
+| 单弹窗完成上传选择，不串联第二个选择器 | 通过 |
+| 上传区明确支持 ZIP、文件夹、SKILL.md | 通过 |
+| 文件要求与主操作层级清晰 | 通过 |
+| 选择后显示类型、名称、数量、大小和移除动作 | 通过 |
+| 禁用/进行中/成功反馈状态成立 | 通过 |
+| 沿用 DSH 深色背景、边框、圆角、按钮和焦点样式 | 通过 |
+| 文件/文件夹选择使用中性标签色，不再误用成功绿色 | 通过 |
+| 弹窗居中、无遮挡、无裁切 | 通过 |
+| 未使用临时图标、emoji、手绘 SVG 或伪造品牌资产 | 通过 |
 
-### Iteration 1 — blocked
+## 缺陷分级
 
-- P1: source toggle buttons were nested inside a source-header button, producing invalid interactive DOM and a React `validateDOMNesting` warning.
-- P2: the preview frame was too wide/tall and exposed six Codex rows, changing the source design's information density.
-- P2: the implementation added a fourth summary metric and a source note row, shifting the table down and diverging from the selected three-metric layout.
+- P0：0
+- P1：0
+- P2：0
+- P3：0
 
-Fixes:
+## 交互验证
 
-- Split each source header into a non-interactive wrapper, a dedicated expand button, and a sibling source switch.
-- Set the Settings frame to `1020 x 730` and the plugin content maximum to `820px`.
-- Restored the three-column summary, removed the extra source note from the expanded table, and aligned table headings with the source.
-- Used four visible Codex examples in the visual fixture while preserving the displayed source count of nine.
-
-### Iteration 2 — passed
-
-- Post-fix full and focused comparisons show aligned frame proportions, hierarchy, density, table structure, colors, and copy.
-- Browser console contained no new warnings or errors.
-- No actionable P0/P1/P2 mismatches remain.
-
-## Follow-up polish
-
-- P3: the generated reference includes decorative source/overflow icons. The production plugin intentionally avoids inventing or handcrafting these assets until the host exposes a stable icon component/library.
-- P3: Gemini and OpenCode are additional requested functional sources, so Trash may sit below the fold when every source is shown; filtering or collapsing sources keeps it immediately reachable.
-
-## Implementation checklist
-
-- [x] Match selected source-first layout and DSH dark design tokens.
-- [x] Verify create, source toggle, detail, search, and Trash flows.
-- [x] Verify responsive width and browser console.
-- [x] Resolve P1/P2 findings and recapture evidence.
+- 原生文件选择一次完成，未出现 Node 窗口或第二个自定义选择器。
+- 选择测试 `SKILL.md` 后显示 `MD / SKILL.md / 1 个文件 / 88 B`，安装按钮启用。
+- 点击安装后显示“导入完成：dssm-upload-qa”，技能总数与 DSH 分组即时刷新；测试条目随后已清理。
+- ESC、取消和关闭按钮均只关闭当前导入弹窗，设置页保持打开。
+- 选择文件夹/选择文件的实机计算色为 `rgb(207, 211, 214)`，与 DSH 次级标签一致；hover 提升为主标签色。
 
 final result: passed
