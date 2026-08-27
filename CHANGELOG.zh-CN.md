@@ -4,6 +4,14 @@
 
 以下记录最近发布的五个版本。
 
+## 0.1.26 — 2026-08-27
+
+- 修复浏览器上传文件夹时，原始内容仍在 25 MiB 总量限制内，却因 Base64 JSON 超过旧 16 MiB 请求体上限而失败的问题。
+- 在浏览器读取内容前检查既有的 ZIP 10 MiB、单文件 5 MiB、总量 25 MiB 和 500 个条目限制，超限时直接显示具体原因。
+- 将大字符串 Base64 正则校验改为栈安全校验，避免数 MiB 文件耗尽 JavaScript 调用栈。
+
+发布包：[`@michengai/dsh-skills-manager@0.1.26`](https://www.npmjs.com/package/@michengai/dsh-skills-manager/v/0.1.26)。
+
 ## 0.1.25 — 2026-08-27
 
 - 新增公共 Agent、Codex、Claude、Gemini 与 OpenCode 技能源加载；启停策略仅写入管理器状态，不修改外部源文件。
@@ -31,10 +39,3 @@
 - 批量收集导入候选项时不再吞掉符号链接拒绝错误。
 
 发布标签：[`v0.1.22`](https://github.com/MichengAI/dsh-skills-manager/tree/v0.1.22)。
-
-## 0.1.21 — 2026-08-17
-
-- 导入 dry-run 阶段执行与正式导入一致的符号链接和目录深度检查。
-- 统一 dry-run 清理、删除处理和 HEAD 请求行为。
-
-发布标签：[`v0.1.21`](https://github.com/MichengAI/dsh-skills-manager/tree/v0.1.21)。

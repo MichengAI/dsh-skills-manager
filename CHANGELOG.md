@@ -4,6 +4,14 @@
 
 The five most recent published versions are listed below.
 
+## 0.1.26 — 2026-08-27
+
+- Fixed browser folder imports that exceeded the former 16 MiB Base64 JSON request ceiling while still fitting within the documented 25 MiB decoded-content limit.
+- Added client-side checks for the existing 10 MiB ZIP, 5 MiB per-file, 25 MiB total, and 500-entry upload limits so oversized selections fail with a specific message before being read.
+- Replaced the large-string Base64 validation regex with stack-safe validation to prevent multi-MiB files from exhausting the JavaScript call stack.
+
+Published package: [`@michengai/dsh-skills-manager@0.1.26`](https://www.npmjs.com/package/@michengai/dsh-skills-manager/v/0.1.26).
+
 ## 0.1.25 — 2026-08-27
 
 - Added provider-backed loading for public Agents, Codex, Claude, Gemini, and OpenCode while keeping external source files read-only and persisting toggles in manager state.
@@ -31,10 +39,3 @@ Release tag: [`v0.1.23`](https://github.com/MichengAI/dsh-skills-manager/tree/v0
 - Preserved symlink-rejection errors while collecting batch import candidates.
 
 Release tag: [`v0.1.22`](https://github.com/MichengAI/dsh-skills-manager/tree/v0.1.22).
-
-## 0.1.21 — 2026-08-17
-
-- Applied the same symlink and depth checks during import dry runs.
-- Aligned dry-run cleanup, deletion handling, and HEAD behavior.
-
-Release tag: [`v0.1.21`](https://github.com/MichengAI/dsh-skills-manager/tree/v0.1.21).

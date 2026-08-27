@@ -157,7 +157,7 @@ ok(clientSource.includes('className: "dssm-select-trigger"'), "category filter u
 ok(clientSource.includes('.dssm-select-menu{'), "custom select menu uses design tokens instead of native chrome");
 ok(!/h\(\s*"select"/.test(clientSource), "category filter does not use a native select");
 const packageJson = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
-eq(packageJson.version, "0.1.25", "release contract tracks the package version");
+eq(packageJson.version, "0.1.26", "release contract tracks the package version");
 ok(packageJson.peerDependencies["@deepseek-ai/dsh-client-runtime"], "package declares the client runtime peer");
 ok(packageJson.peerDependencies["@deepseek-ai/dsh-client-ui-slots"], "package declares the settings slots peer");
 ok(packageJson.peerDependencies["@deepseek-ai/dsh-host-webserver"].includes("<0.2.0"), "host-webserver peer has an upper bound");
@@ -520,6 +520,8 @@ const uploadedSingle = await importUploadedSkill({
 }, null);
 eq(uploadedSingle.imported.length, 1, "uploaded SKILL.md imports through staged content");
 ok(await readFile(join(dshRoot, "uploaded-single", "SKILL.md"), "utf8").then((text) => text.includes("Uploaded.")), "uploaded SKILL.md keeps its content");
+eq((await importUploadedSkill({ name: "SKILL.md", entries: [{ path: "SKILL.md", data: "%%%=" }] }, null)).code, "error.upload.encoding", "uploaded content rejects non-Base64 characters");
+eq((await importUploadedSkill({ name: "SKILL.md", entries: [{ path: "SKILL.md", data: "A===" }] }, null)).code, "error.upload.encoding", "uploaded content rejects invalid Base64 padding");
 
 const uploadedFolder = await importUploadedSkill({
   name: "uploaded-folder",
@@ -813,6 +815,20 @@ try {
   eq(uploadResponse.status, 200, "upload route accepts browser-read skill content");
   eq(uploadResponse.payload.data.imported[0].name, "http-upload", "upload route returns the imported skill");
   ok((await resolveEntry(dshRoot, "http-upload")) !== null, "upload route persists the skill through the normal import path");
+
+  const largeUploadEntries = [{
+    path: "http-large-upload/SKILL.md",
+    data: Buffer.from("---\nname: http-large-upload\ndescription: Large HTTP upload.\n---\nbody").toString("base64"),
+  }].concat([1, 2, 3].map((index) => ({
+    path: `http-large-upload/assets/part-${index}.bin`,
+    data: Buffer.alloc(4 << 20, index).toString("base64"),
+  })));
+  const largeUploadBody = JSON.stringify({ name: "http-large-upload", entries: largeUploadEntries });
+  ok(Buffer.byteLength(largeUploadBody) > (16 << 20), "large upload regression exceeds the former 16 MiB request limit");
+  const largeUploadResponse = await requestJson(api + "/upload", "POST", secureHeaders, largeUploadBody);
+  eq(largeUploadResponse.status, 200, "upload route accepts a folder above the former Base64 JSON body ceiling");
+  eq(largeUploadResponse.payload.data.imported[0].name, "http-large-upload", "large browser upload reaches the normal import path");
+  ok((await resolveEntry(dshRoot, "http-large-upload")) !== null, "large browser upload persists the skill");
 
   const csrfResponse = await fetch(api + "/disable", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: "http-skill" }) });
   eq(csrfResponse.status, 403, "mutating route rejects requests without the client marker");
