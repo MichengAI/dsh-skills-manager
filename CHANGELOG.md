@@ -4,6 +4,14 @@
 
 The five most recent published versions are listed below.
 
+## 0.1.27 — 2026-08-27
+
+- Expanded browser upload limits to 32 MiB for ZIP archives and individual files, 64 MiB decoded total, and 1,000 entries, with a matching 88 MiB Base64 JSON request ceiling.
+- Kept upload feedback visible inside the import dialog instead of rendering errors behind the active modal, and cleared stale selections and messages when reopening or closing it.
+- Verified the reporter-provided cross-platform fnOS `trim-cli` Skill archive through the complete isolated import path.
+
+Published package: [`@michengai/dsh-skills-manager@0.1.27`](https://www.npmjs.com/package/@michengai/dsh-skills-manager/v/0.1.27).
+
 ## 0.1.26 — 2026-08-27
 
 - Fixed browser folder imports that exceeded the former 16 MiB Base64 JSON request ceiling while still fitting within the documented 25 MiB decoded-content limit.
@@ -33,9 +41,3 @@ Published package: [`@michengai/dsh-skills-manager@0.1.24`](https://www.npmjs.co
 - Stopped silently dropping a chained import after a clean dry run.
 
 Release tag: [`v0.1.23`](https://github.com/MichengAI/dsh-skills-manager/tree/v0.1.23).
-
-## 0.1.22 — 2026-08-17
-
-- Preserved symlink-rejection errors while collecting batch import candidates.
-
-Release tag: [`v0.1.22`](https://github.com/MichengAI/dsh-skills-manager/tree/v0.1.22).

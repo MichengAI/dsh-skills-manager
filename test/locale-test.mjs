@@ -148,11 +148,12 @@ eq(inspectUploadSelection([{ name: "README.md", size: 1 }]).error.code, "select.
 eq(inspectUploadSelection([{ name: "SKILL.md", size: 10 }]).kind, "skill", "single SKILL.md is accepted without an absolute path");
 eq(inspectUploadSelection([{ name: "demo.zip", size: 10 }]).kind, "zip", "ZIP archive is accepted");
 eq(inspectUploadSelection([{ name: "SKILL.md", webkitRelativePath: "demo/SKILL.md", size: 10 }, { name: "run.js", webkitRelativePath: "demo/scripts/run.js", size: 10 }]).kind, "folder", "native folder selection is accepted as one upload");
-eq(inspectUploadSelection([{ name: "SKILL.md", size: (5 << 20) + 1 }]).error.code, "error.upload.tooLarge", "single SKILL.md is rejected before exceeding the per-entry limit");
-eq(inspectUploadSelection([{ name: "demo.zip", size: (10 << 20) + 1 }]).error.code, "error.upload.archiveTooLarge", "ZIP archives are rejected before exceeding the archive limit");
-eq(inspectUploadSelection([{ name: "SKILL.md", webkitRelativePath: "demo/SKILL.md", size: 10 }, { name: "asset.bin", webkitRelativePath: "demo/asset.bin", size: (5 << 20) + 1 }]).error.code, "error.upload.tooLarge", "folder selection rejects an oversized entry before reading file contents");
-eq(inspectUploadSelection([{ name: "SKILL.md", webkitRelativePath: "demo/SKILL.md", size: 10 }].concat(Array.from({ length: 6 }, (_, index) => ({ name: `asset-${index}.bin`, webkitRelativePath: `demo/asset-${index}.bin`, size: 4.5 * (1 << 20) })))).error.params.limit, 25 << 20, "folder selection rejects decoded totals above 25 MiB");
-eq(inspectUploadSelection([{ name: "SKILL.md", webkitRelativePath: "demo/SKILL.md", size: 10 }].concat(Array.from({ length: 500 }, (_, index) => ({ name: `asset-${index}.txt`, webkitRelativePath: `demo/asset-${index}.txt`, size: 1 })))).error.code, "error.upload.tooMany", "folder selection rejects more than 500 entries");
+eq(inspectUploadSelection([{ name: "fnos.zip", size: 11 << 20 }]).kind, "zip", "ZIP archives above the former 10 MiB limit are accepted");
+eq(inspectUploadSelection([{ name: "SKILL.md", size: (32 << 20) + 1 }]).error.code, "error.upload.tooLarge", "single SKILL.md is rejected before exceeding the per-entry limit");
+eq(inspectUploadSelection([{ name: "demo.zip", size: (32 << 20) + 1 }]).error.code, "error.upload.archiveTooLarge", "ZIP archives are rejected before exceeding the archive limit");
+eq(inspectUploadSelection([{ name: "SKILL.md", webkitRelativePath: "demo/SKILL.md", size: 10 }, { name: "asset.bin", webkitRelativePath: "demo/asset.bin", size: (32 << 20) + 1 }]).error.code, "error.upload.tooLarge", "folder selection rejects an oversized entry before reading file contents");
+eq(inspectUploadSelection([{ name: "SKILL.md", webkitRelativePath: "demo/SKILL.md", size: 10 }].concat(Array.from({ length: 3 }, (_, index) => ({ name: `asset-${index}.bin`, webkitRelativePath: `demo/asset-${index}.bin`, size: 24 * (1 << 20) })))).error.params.limit, 64 << 20, "folder selection rejects decoded totals above 64 MiB");
+eq(inspectUploadSelection([{ name: "SKILL.md", webkitRelativePath: "demo/SKILL.md", size: 10 }].concat(Array.from({ length: 1000 }, (_, index) => ({ name: `asset-${index}.txt`, webkitRelativePath: `demo/asset-${index}.txt`, size: 1 })))).error.code, "error.upload.tooMany", "folder selection rejects more than 1000 entries");
 let focused = "";
 const firstButton = { focus: function () { focused = "first"; } };
 const lastButton = { focus: function () { focused = "last"; } };
@@ -239,6 +240,9 @@ ok(source.includes('type: "file"') && source.includes('accept: ".zip,.md"'), "im
 ok(source.includes("webkitdirectory"), "import dialog exposes a native folder picker");
 ok(source.includes("pickerOpenRef.current"), "native picker has a synchronous multi-click guard");
 ok(source.includes('post("/upload"'), "selected content is uploaded instead of sending an absolute path");
+ok(source.includes('result && modal !== "import"'), "upload feedback is not left behind the active import modal");
+ok(source.includes('role: "alert" }, result.text'), "import modal renders upload feedback where it remains visible");
+ok(source.includes('setResult(null); setUpload(null); setModal("import")'), "opening import clears stale upload feedback and selection");
 ok(!source.includes('setModal("browse")'), "native selection never chains into a second directory browser");
 ok(!source.includes('callApi("/browse"'), "client no longer uses the in-app absolute-path browser");
 ok(source.includes('repairable ? h("button"') && source.includes('t("btn.repair.enable")'), "invalid local invocation policy exposes Repair & enable instead of a disabled switch");

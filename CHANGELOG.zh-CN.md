@@ -4,6 +4,14 @@
 
 以下记录最近发布的五个版本。
 
+## 0.1.27 — 2026-08-27
+
+- 将浏览器上传限制提高到 ZIP 32 MiB、单文件 32 MiB、解压后总量 64 MiB 和 1000 个条目，并同步把 Base64 JSON 请求体上限提高到 88 MiB。
+- 上传反馈改为显示在导入弹窗内部，不再被当前弹窗遮挡；重新打开或关闭弹窗时会清理过期的选择和提示。
+- 使用反馈者提供的跨平台 fnOS `trim-cli` Skill 压缩包完成隔离环境全链路导入验证。
+
+发布包：[`@michengai/dsh-skills-manager@0.1.27`](https://www.npmjs.com/package/@michengai/dsh-skills-manager/v/0.1.27)。
+
 ## 0.1.26 — 2026-08-27
 
 - 修复浏览器上传文件夹时，原始内容仍在 25 MiB 总量限制内，却因 Base64 JSON 超过旧 16 MiB 请求体上限而失败的问题。
@@ -33,9 +41,3 @@
 - 修复 dry-run 成功后链式导入被静默丢弃的问题。
 
 发布标签：[`v0.1.23`](https://github.com/MichengAI/dsh-skills-manager/tree/v0.1.23)。
-
-## 0.1.22 — 2026-08-17
-
-- 批量收集导入候选项时不再吞掉符号链接拒绝错误。
-
-发布标签：[`v0.1.22`](https://github.com/MichengAI/dsh-skills-manager/tree/v0.1.22)。

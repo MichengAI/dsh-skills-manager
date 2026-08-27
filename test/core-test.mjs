@@ -157,7 +157,7 @@ ok(clientSource.includes('className: "dssm-select-trigger"'), "category filter u
 ok(clientSource.includes('.dssm-select-menu{'), "custom select menu uses design tokens instead of native chrome");
 ok(!/h\(\s*"select"/.test(clientSource), "category filter does not use a native select");
 const packageJson = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
-eq(packageJson.version, "0.1.26", "release contract tracks the package version");
+eq(packageJson.version, "0.1.27", "release contract tracks the package version");
 ok(packageJson.peerDependencies["@deepseek-ai/dsh-client-runtime"], "package declares the client runtime peer");
 ok(packageJson.peerDependencies["@deepseek-ai/dsh-client-ui-slots"], "package declares the settings slots peer");
 ok(packageJson.peerDependencies["@deepseek-ai/dsh-host-webserver"].includes("<0.2.0"), "host-webserver peer has an upper bound");
@@ -553,6 +553,8 @@ ok(!escapedUploadExists, "rejected uploaded traversal never writes outside stagi
 const traversalZip = zipSync({ "../escaped-zip.txt": strToU8("escape") });
 const unsafeZip = await importUploadedSkill({ name: "unsafe.zip", zip: Buffer.from(traversalZip).toString("base64") }, null);
 eq(unsafeZip.code, "error.upload.path", "uploaded ZIP rejects traversal paths");
+const formerOversizedArchive = await importUploadedSkill({ name: "eleven-mib.zip", zip: Buffer.alloc(11 << 20).toString("base64") }, null);
+eq(formerOversizedArchive.code, "error.upload.zipInvalid", "an 11 MiB archive passes the former 10 MiB size ceiling before ZIP validation");
 
 // 已安装目录不能作为导入来源，否则覆盖会先删除来源再复制。
 const selfImport = await importSkill(dshRoot, null, { dryRun: true });
@@ -819,14 +821,14 @@ try {
   const largeUploadEntries = [{
     path: "http-large-upload/SKILL.md",
     data: Buffer.from("---\nname: http-large-upload\ndescription: Large HTTP upload.\n---\nbody").toString("base64"),
-  }].concat([1, 2, 3].map((index) => ({
+  }].concat([7, 10, 10].map((mib, index) => ({
     path: `http-large-upload/assets/part-${index}.bin`,
-    data: Buffer.alloc(4 << 20, index).toString("base64"),
+    data: Buffer.alloc(mib << 20, index + 1).toString("base64"),
   })));
   const largeUploadBody = JSON.stringify({ name: "http-large-upload", entries: largeUploadEntries });
-  ok(Buffer.byteLength(largeUploadBody) > (16 << 20), "large upload regression exceeds the former 16 MiB request limit");
+  ok(Buffer.byteLength(largeUploadBody) > (36 << 20), "large upload regression exceeds the former 36 MiB request limit");
   const largeUploadResponse = await requestJson(api + "/upload", "POST", secureHeaders, largeUploadBody);
-  eq(largeUploadResponse.status, 200, "upload route accepts a folder above the former Base64 JSON body ceiling");
+  eq(largeUploadResponse.status, 200, "upload route accepts a 27 MiB folder above the former total and Base64 JSON ceilings");
   eq(largeUploadResponse.payload.data.imported[0].name, "http-large-upload", "large browser upload reaches the normal import path");
   ok((await resolveEntry(dshRoot, "http-large-upload")) !== null, "large browser upload persists the skill");
 
