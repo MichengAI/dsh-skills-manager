@@ -5,8 +5,9 @@
 ## 通用约定
 
 - 前缀：`/api/dsh-skills-manager`
-- 仅本机 loopback 面板调用。全部接口先校验 `Host` 为 `localhost` / `127.0.0.1` / `[::1]`。
-- 本接口信任 loopback 来源；不要把宿主 `webServer` 绑到非本机地址。Host 校验只防浏览器（含 DNS rebinding），不能代替网络隔离。
+- 全部接口先校验请求 authority：允许 loopback（`localhost`、`[::1]`、IPv4 `127/8`），以及 DSH Web runtime 从 LAN 绑定和 `--trusted-host` 得出的规范 `host[:port]`。
+- 不带端口的受信条目匹配同主机任意端口，带端口的条目只精确匹配该 authority；未知、非规范或异源 Host、显式 cross-site 请求均返回 403。
+- Host 信任栅栏用于防浏览器 DNS rebinding，不能代替身份认证、反向代理访问控制或网络隔离。
 - 响应：成功为 `{ "ok": true, "data": {} }`；失败为 `{ "ok": false, "error": "原因", "code": "错误码", "params": { "参数": "值" } }`。业务与协议错误均携带 `code`；`params` 为词典占位符参数；导入失败时带 `failed` 明细数组。
 - `POST` 使用 `application/json`。
 

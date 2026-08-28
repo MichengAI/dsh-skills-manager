@@ -4,6 +4,14 @@
 
 The five most recent published versions are listed below.
 
+## 0.1.30 — 2026-08-28
+
+- Fixed reverse-proxy domains and LAN IPs already trusted by DSH Web through `--trusted-host` still being rejected by Skills Manager's own loopback-only Host fence.
+- Reused `webRuntime.trustedHosts` with DSH-compatible authority semantics: port-less entries match any port, explicit ports match exactly, and unknown Hosts, non-canonical authorities, foreign Origins, and explicit cross-site requests remain blocked.
+- Added isolated real-DSH startup verification and regression coverage for domains, LAN IPs, ports, Origins, cross-site requests, and mutation markers.
+
+Published package: [`@michengai/dsh-skills-manager@0.1.30`](https://www.npmjs.com/package/@michengai/dsh-skills-manager/v/0.1.30).
+
 ## 0.1.29 — 2026-08-28
 
 - Restored the standard DSH README header navigation: the Changelog link now sits between the language switch and the Apache-2.0 license link.
@@ -31,12 +39,3 @@ Published package: [`@michengai/dsh-skills-manager@0.1.27`](https://www.npmjs.co
 - Replaced the large-string Base64 validation regex with stack-safe validation to prevent multi-MiB files from exhausting the JavaScript call stack.
 
 Published package: [`@michengai/dsh-skills-manager@0.1.26`](https://www.npmjs.com/package/@michengai/dsh-skills-manager/v/0.1.26).
-
-## 0.1.25 — 2026-08-27
-
-- Added provider-backed loading for public Agents, Codex, Claude, Gemini, and OpenCode while keeping external source files read-only and persisting toggles in manager state.
-- Added Markdown details, diagnostics, conversational creation, recoverable Trash, and second-stage permanent deletion.
-- Replaced chained importing with one upload dialog for `.zip`, skill folders, and a single `SKILL.md`, with path, size, count, and archive safety limits.
-- Fixed corrupted-state overwrite, trash rollback data loss, Windows `EPERM` publication failures, and the missing Repair-and-enable payload field.
-
-Published package: [`@michengai/dsh-skills-manager@0.1.25`](https://www.npmjs.com/package/@michengai/dsh-skills-manager/v/0.1.25).

@@ -4,6 +4,14 @@
 
 以下记录最近发布的五个版本。
 
+## 0.1.30 — 2026-08-28
+
+- 修复 DSH Web 已通过 `--trusted-host` 信任的反向代理域名或局域网 IP，仍被 Skills Manager 自身 loopback-only Host 校验拒绝的问题。
+- 复用 `webRuntime.trustedHosts`，按 DSH 的 authority 语义支持无端口任意端口匹配和带端口精确匹配，同时继续拒绝未知 Host、非规范 authority、异源 Origin 与显式 cross-site 请求。
+- 补充真实 DSH 隔离启动验证以及域名、LAN IP、端口、Origin、跨站请求和写接口标记的回归测试。
+
+发布包：[`@michengai/dsh-skills-manager@0.1.30`](https://www.npmjs.com/package/@michengai/dsh-skills-manager/v/0.1.30)。
+
 ## 0.1.29 — 2026-08-28
 
 - 恢复 DSH 系列 README 的标准头部导航：更新日志入口位于语言切换与 Apache-2.0 许可证链接之间。
@@ -31,12 +39,3 @@
 - 将大字符串 Base64 正则校验改为栈安全校验，避免数 MiB 文件耗尽 JavaScript 调用栈。
 
 发布包：[`@michengai/dsh-skills-manager@0.1.26`](https://www.npmjs.com/package/@michengai/dsh-skills-manager/v/0.1.26)。
-
-## 0.1.25 — 2026-08-27
-
-- 新增公共 Agent、Codex、Claude、Gemini 与 OpenCode 技能源加载；启停策略仅写入管理器状态，不修改外部源文件。
-- 新增正文详情、格式诊断、对话创建、可恢复回收站及二次永久删除。
-- 导入改为单弹窗流程，统一支持 `.zip`、技能文件夹和单个 `SKILL.md`，并补充路径、大小、数量与归档安全边界。
-- 修复损坏状态文件覆盖、回收站回滚丢失、Windows `EPERM` 发布失败和「修复并启用」字段缺失等问题。
-
-发布包：[`@michengai/dsh-skills-manager@0.1.25`](https://www.npmjs.com/package/@michengai/dsh-skills-manager/v/0.1.25)。

@@ -157,7 +157,7 @@ ok(clientSource.includes('className: "dssm-select-trigger"'), "category filter u
 ok(clientSource.includes('.dssm-select-menu{'), "custom select menu uses design tokens instead of native chrome");
 ok(!/h\(\s*"select"/.test(clientSource), "category filter does not use a native select");
 const packageJson = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
-eq(packageJson.version, "0.1.29", "release contract tracks the package version");
+eq(packageJson.version, "0.1.30", "release contract tracks the package version");
 ok(packageJson.peerDependencies["@deepseek-ai/dsh-client-runtime"], "package declares the client runtime peer");
 ok(packageJson.peerDependencies["@deepseek-ai/dsh-client-ui-slots"], "package declares the settings slots peer");
 ok(packageJson.peerDependencies["@deepseek-ai/dsh-host-webserver"].includes("<0.2.0"), "host-webserver peer has an upper bound");
@@ -754,6 +754,7 @@ const emitted = [];
 let registeredTool = null;
 applyHost({
   webServer: { register(value) { route = value; return function () {}; } },
+  webRuntime: { trustedHosts: ["dsh.ere.lan", "dsh.fixed.lan:8443", "192.168.50.10", "attacker.example/path"] },
   skills: { registerProvider(register) { register({ invalidate() { invalidated++; } }); return function () {}; } },
   tools: { register(definition) { registeredTool = definition; return function () {}; } },
   effect(register) { return register(); },
@@ -796,16 +797,50 @@ try {
   eq(headDisable.headers.get("content-length"), String(Buffer.byteLength(JSON.stringify({ ok: false, code: "error.proto.method", error: "method not allowed: HEAD" })), "utf8"), "HEAD 405 content-length matches the POST 405 payload shape");
 
   const evilStateResponse = await requestJson(api + "/state", "GET", { host: "evil.example" });
-  eq(evilStateResponse.status, 403, "state route rejects non-loopback Host headers");
-  eq(evilStateResponse.payload.code, "error.proto.forbiddenHost", "non-loopback Host on GET carries the forbiddenHost code");
+  eq(evilStateResponse.status, 403, "state route rejects untrusted non-loopback Host headers");
+  eq(evilStateResponse.payload.code, "error.proto.forbiddenHost", "untrusted Host on GET carries the forbiddenHost code");
 
   const localhostStateResponse = await requestJson(api + "/state", "GET", { host: "localhost:" + address.port });
   eq(localhostStateResponse.status, 200, "state route accepts localhost Host headers");
   ok(localhostStateResponse.payload.ok === true, "loopback GET /state still returns the snapshot");
 
+  const loopbackRangeResponse = await requestJson(api + "/state", "GET", { host: "127.23.45.67:" + address.port });
+  eq(loopbackRangeResponse.status, 200, "state route accepts the full IPv4 127/8 loopback range like the DSH trust fence");
+
+  const trustedDomainResponse = await requestJson(api + "/state", "GET", { host: "dsh.ere.lan" });
+  eq(trustedDomainResponse.status, 200, "state route inherits a port-less DSH trusted host");
+  const trustedDomainPortResponse = await requestJson(api + "/state", "GET", { host: "DSH.ERE.LAN:9443" });
+  eq(trustedDomainPortResponse.status, 200, "port-less trusted hosts match any port and Host comparison is case-insensitive");
+
+  const trustedExactPortResponse = await requestJson(api + "/state", "GET", { host: "dsh.fixed.lan:8443" });
+  eq(trustedExactPortResponse.status, 200, "trusted host entries with a port match that exact authority");
+  const rejectedOtherPortResponse = await requestJson(api + "/state", "GET", { host: "dsh.fixed.lan:9443" });
+  eq(rejectedOtherPortResponse.status, 403, "trusted host entries with a port reject other ports");
+
+  const trustedLanResponse = await requestJson(api + "/state", "GET", { host: "192.168.50.10:" + address.port });
+  eq(trustedLanResponse.status, 200, "state route inherits LAN IP authorities derived by DSH Web runtime");
+  const malformedRequestHostResponse = await requestJson(api + "/state", "GET", { host: "dsh.ere.lan/path" });
+  eq(malformedRequestHostResponse.status, 403, "non-canonical request Host values never normalize into a trusted authority");
+  const malformedTrustedEntryResponse = await requestJson(api + "/state", "GET", { host: "attacker.example" });
+  eq(malformedTrustedEntryResponse.status, 403, "non-canonical trusted host entries never broaden access");
+
+  const sameOriginResponse = await requestJson(api + "/state", "GET", { host: "dsh.ere.lan", origin: "https://dsh.ere.lan" });
+  eq(sameOriginResponse.status, 200, "same-origin requests through a trusted host are accepted");
+  const foreignOriginResponse = await requestJson(api + "/state", "GET", { host: "dsh.ere.lan", origin: "https://evil.example" });
+  eq(foreignOriginResponse.status, 403, "foreign Origin requests through a trusted host are rejected");
+  const crossSiteResponse = await requestJson(api + "/state", "GET", { host: "dsh.ere.lan", "sec-fetch-site": "cross-site" });
+  eq(crossSiteResponse.status, 403, "explicit cross-site browser requests through a trusted host are rejected");
+
   const evilHostResponse = await requestJson(api + "/disable", "POST", { ...secureHeaders, host: "evil.example" }, JSON.stringify({ name: "http-skill" }));
   eq(evilHostResponse.status, 403, "mutating route rejects non-loopback Host headers");
-  eq(evilHostResponse.payload.code, "error.proto.forbiddenHost", "non-loopback Host carries the forbiddenHost code");
+  eq(evilHostResponse.payload.code, "error.proto.forbiddenHost", "untrusted Host carries the forbiddenHost code");
+
+  const trustedHostResponse = await requestJson(api + "/disable", "POST", { ...secureHeaders, host: "dsh.ere.lan", origin: "https://dsh.ere.lan" }, JSON.stringify({ name: "http-skill" }));
+  eq(trustedHostResponse.status, 200, "mutating routes accept a same-origin DSH trusted host");
+
+  const trustedMissingMarkerResponse = await requestJson(api + "/enable", "POST", { "content-type": "application/json", host: "dsh.ere.lan" }, JSON.stringify({ name: "http-skill" }));
+  eq(trustedMissingMarkerResponse.status, 403, "trusted hosts do not bypass the mutation client marker");
+  eq(trustedMissingMarkerResponse.payload.code, "error.proto.forbidden", "trusted mutation without a marker keeps the forbidden request code");
 
   const localhostHostResponse = await requestJson(api + "/enable", "POST", { ...secureHeaders, host: "localhost:" + address.port }, JSON.stringify({ name: "http-skill" }));
   eq(localhostHostResponse.status, 200, "mutating route accepts localhost Host headers");

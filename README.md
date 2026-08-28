@@ -156,9 +156,9 @@ Escape closes only the frontmost upload or confirmation dialog and leaves Settin
 
 - Enable, disable, and delete accept only one ordinary skill-name path segment.
 - Replacements copy to a temporary sibling path first and keep the original until that succeeds.
-- All endpoints, including GET `/state`, accept only loopback `Host` values (`localhost`, `127.0.0.1`, `[::1]`).
-- Write endpoints also require JSON and the DSH client request marker, so cross-site browser requests cannot trigger local file operations.
-- Import accepts the local path the user selected. The HTTP API trusts loopback callers only; do not expose the host web server beyond this machine.
+- Every endpoint, including GET `/state`, accepts only a loopback `Host` or a canonical `host[:port]` that the DSH Web runtime already trusts through its LAN bind and `--trusted-host`; unknown hosts still receive 403.
+- Browser requests must also carry a same-origin `Origin` when present and must not be marked cross-site; write endpoints continue to require JSON and the DSH client request marker.
+- Import accepts the local path selected by the user. The Host trust fence prevents DNS rebinding but is not authentication; reverse-proxy and LAN deployments still need authentication, a VPN, or network access controls.
 
 ## Secondary development
 

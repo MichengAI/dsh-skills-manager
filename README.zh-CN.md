@@ -156,9 +156,9 @@ dsh --profile web --dump-config
 
 - 启用、停用和删除只接受单个普通技能名称，目录穿越名称会被拒绝。
 - 覆盖前先复制到同目录临时路径；复制成功前不会改动现有技能。
-- 全部接口（含 GET `/state`）只接受 loopback `Host`（`localhost`、`127.0.0.1`、`[::1]`）。
-- 写入接口还要求 JSON 与 DSH 客户端请求标记，跨站浏览器请求不能触发本地文件操作。
-- 导入接受用户选定的本机路径。HTTP 接口只信任 loopback 来源，不要把宿主 webServer 暴露到非本机地址。
+- 全部接口（含 GET `/state`）只接受 loopback `Host`，或 DSH Web runtime 已通过 LAN 绑定和 `--trusted-host` 明确信任的 `host[:port]`；未知 Host 继续返回 403。
+- 浏览器请求还必须满足同源 `Origin` 且不能标记为 cross-site；写入接口继续要求 JSON 与 DSH 客户端请求标记。
+- 导入接受用户选定的本机路径。Host 信任栅栏用于防 DNS rebinding，不是身份认证；通过反向代理或局域网提供服务时，仍应配置认证、VPN 或网络访问控制。
 
 ## 二次开发
 
