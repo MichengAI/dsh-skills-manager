@@ -8,7 +8,7 @@
 
   **在 DeepSeek Harness 中统一加载并安全管理本机 Agent Skills**
 
-  [English](README.md) · [Apache-2.0](LICENSE)
+  [English](README.md) · [更新日志](CHANGELOG.zh-CN.md) · [Apache-2.0](LICENSE)
 
   [![许可证：Apache-2.0](https://img.shields.io/badge/许可证-Apache--2.0-blue.svg)](LICENSE)
   [![npm package](https://img.shields.io/npm/v/%40michengai%2Fdsh-skills-manager.svg?label=npm%20package)](https://www.npmjs.com/package/@michengai/dsh-skills-manager)
@@ -19,9 +19,6 @@
 
 > DSH Skills Manager 是社区维护的 DeepSeek Harness（DSH）插件，并非 DeepSeek AI 官方产品。
 
-## 更新日志
-
-最近五个发布版本见 [CHANGELOG.zh-CN.md](CHANGELOG.zh-CN.md)。
 
 ## 功能概览
 

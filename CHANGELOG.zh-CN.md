@@ -4,6 +4,12 @@
 
 以下记录最近发布的五个版本。
 
+## 0.1.29 — 2026-08-28
+
+- 恢复 DSH 系列 README 的标准头部导航：更新日志入口位于语言切换与 Apache-2.0 许可证链接之间。
+
+发布包：[`@michengai/dsh-skills-manager@0.1.29`](https://www.npmjs.com/package/@michengai/dsh-skills-manager/v/0.1.29)。
+
 ## 0.1.28 — 2026-08-28
 
 - 将 README 中的更新日志入口前移到页面顶部，打开项目即可看到发布历史。
@@ -34,10 +40,3 @@
 - 修复损坏状态文件覆盖、回收站回滚丢失、Windows `EPERM` 发布失败和「修复并启用」字段缺失等问题。
 
 发布包：[`@michengai/dsh-skills-manager@0.1.25`](https://www.npmjs.com/package/@michengai/dsh-skills-manager/v/0.1.25)。
-
-## 0.1.24 — 2026-08-23
-
-- 新增中英文更新日志，展示最近五个发布版本。
-- 在中英文 README 中加入更新日志入口，并将日志纳入 npm 包。
-
-发布包：[`@michengai/dsh-skills-manager@0.1.24`](https://www.npmjs.com/package/@michengai/dsh-skills-manager/v/0.1.24)。

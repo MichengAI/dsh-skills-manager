@@ -4,6 +4,12 @@
 
 The five most recent published versions are listed below.
 
+## 0.1.29 — 2026-08-28
+
+- Restored the standard DSH README header navigation: the Changelog link now sits between the language switch and the Apache-2.0 license link.
+
+Published package: [`@michengai/dsh-skills-manager@0.1.29`](https://www.npmjs.com/package/@michengai/dsh-skills-manager/v/0.1.29).
+
 ## 0.1.28 — 2026-08-28
 
 - Moved the release-history entry point to the top of the README so package updates are immediately discoverable.
@@ -34,10 +40,3 @@ Published package: [`@michengai/dsh-skills-manager@0.1.26`](https://www.npmjs.co
 - Fixed corrupted-state overwrite, trash rollback data loss, Windows `EPERM` publication failures, and the missing Repair-and-enable payload field.
 
 Published package: [`@michengai/dsh-skills-manager@0.1.25`](https://www.npmjs.com/package/@michengai/dsh-skills-manager/v/0.1.25).
-
-## 0.1.24 — 2026-08-23
-
-- Added bilingual changelogs covering the five most recent releases.
-- Linked the release history from both README editions and included it in the npm package.
-
-Published package: [`@michengai/dsh-skills-manager@0.1.24`](https://www.npmjs.com/package/@michengai/dsh-skills-manager/v/0.1.24).

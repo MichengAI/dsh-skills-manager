@@ -8,7 +8,7 @@
 
   **Load and safely manage skills from DSH and common local Agents**
 
-  [简体中文](README.zh-CN.md) · [Apache-2.0](LICENSE)
+  [简体中文](README.zh-CN.md) · [Changelog](CHANGELOG.md) · [Apache-2.0](LICENSE)
 
   [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
   [![npm package](https://img.shields.io/npm/v/%40michengai%2Fdsh-skills-manager.svg?label=npm%20package)](https://www.npmjs.com/package/@michengai/dsh-skills-manager)
@@ -19,9 +19,6 @@
 
 > DSH Skills Manager is a community-maintained DeepSeek Harness (DSH) plugin, not an official DeepSeek AI product.
 
-## Changelog
-
-See [CHANGELOG.md](CHANGELOG.md) for the five most recent releases.
 
 ## Features
 
