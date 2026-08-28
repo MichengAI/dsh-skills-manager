@@ -4,6 +4,12 @@
 
 以下记录最近发布的五个版本。
 
+## 0.1.28 — 2026-08-28
+
+- 将 README 中的更新日志入口前移到页面顶部，打开项目即可看到发布历史。
+
+发布包：[`@michengai/dsh-skills-manager@0.1.28`](https://www.npmjs.com/package/@michengai/dsh-skills-manager/v/0.1.28)。
+
 ## 0.1.27 — 2026-08-27
 
 - 将浏览器上传限制提高到 ZIP 32 MiB、单文件 32 MiB、解压后总量 64 MiB 和 1000 个条目，并同步把 Base64 JSON 请求体上限提高到 88 MiB。
@@ -35,9 +41,3 @@
 - 在中英文 README 中加入更新日志入口，并将日志纳入 npm 包。
 
 发布包：[`@michengai/dsh-skills-manager@0.1.24`](https://www.npmjs.com/package/@michengai/dsh-skills-manager/v/0.1.24)。
-
-## 0.1.23 — 2026-08-17
-
-- 修复 dry-run 成功后链式导入被静默丢弃的问题。
-
-发布标签：[`v0.1.23`](https://github.com/MichengAI/dsh-skills-manager/tree/v0.1.23)。

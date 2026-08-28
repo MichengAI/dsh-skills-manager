@@ -4,6 +4,12 @@
 
 The five most recent published versions are listed below.
 
+## 0.1.28 — 2026-08-28
+
+- Moved the release-history entry point to the top of the README so package updates are immediately discoverable.
+
+Published package: [`@michengai/dsh-skills-manager@0.1.28`](https://www.npmjs.com/package/@michengai/dsh-skills-manager/v/0.1.28).
+
 ## 0.1.27 — 2026-08-27
 
 - Expanded browser upload limits to 32 MiB for ZIP archives and individual files, 64 MiB decoded total, and 1,000 entries, with a matching 88 MiB Base64 JSON request ceiling.
@@ -35,9 +41,3 @@ Published package: [`@michengai/dsh-skills-manager@0.1.25`](https://www.npmjs.co
 - Linked the release history from both README editions and included it in the npm package.
 
 Published package: [`@michengai/dsh-skills-manager@0.1.24`](https://www.npmjs.com/package/@michengai/dsh-skills-manager/v/0.1.24).
-
-## 0.1.23 — 2026-08-17
-
-- Stopped silently dropping a chained import after a clean dry run.
-
-Release tag: [`v0.1.23`](https://github.com/MichengAI/dsh-skills-manager/tree/v0.1.23).

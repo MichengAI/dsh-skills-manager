@@ -19,6 +19,10 @@
 
 > DSH Skills Manager is a community-maintained DeepSeek Harness (DSH) plugin, not an official DeepSeek AI product.
 
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for the five most recent releases.
+
 ## Features
 
 - Discover and load user-level skills from `.agents`, Codex, Claude, Gemini, and OpenCode into DSH.
@@ -196,7 +200,3 @@ npm run pack:check
 Project status, usage boundaries, architecture, and iteration records begin at the [documentation entry point](docs/00-交接入口/00-阅读导航.md). The detailed operational guide is `docs\02-产品与业务\01-使用说明.md`.
 
 Licensed under [Apache License 2.0](LICENSE).
-
-## Changelog
-
-See [CHANGELOG.md](CHANGELOG.md) for the five most recent releases.
