@@ -14,6 +14,7 @@ The five most recent published versions are listed below.
 - Trash now records the original user or project source, displays it in Settings, and restores project entries only after resolving the same opaque root from a currently active Session workspace.
 - Added enable/disable controls for project `.dsh/skills`; they update the Skill's invocation-policy fields while leaving Session-scoped catalog ownership with DSH's official provider.
 - Fixed project Trash and restore failing with `EXDEV` when the project and `$DSH_HOME` are on different volumes by using a guarded copy-then-hide fallback.
+- Hid empty project roots from the main source list while preserving them as Create Skill destinations, and removed the unsupported project source-wide toggle without affecting per-Skill enable/disable.
 
 ## 0.1.30 — 2026-08-28
 

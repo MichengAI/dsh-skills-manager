@@ -163,6 +163,7 @@ Escape closes only the frontmost upload or confirmation dialog and leaves Settin
 - Project Trash entries retain their original opaque source identity. Restore is allowed only while that original project is still represented by an active Session workspace; the client cannot nominate a replacement path.
 - Project writes reject linked `.dsh` or `.dsh/skills` directories so a repository cannot redirect creation, deletion, or restore outside its own project root.
 - Project rows say **Discovered**, not **Loaded**: only DSH's Session-scoped catalog can establish model visibility. Use Refresh after IDE, Git, or shell changes; the official provider remains responsible for model-catalog watching and invalidation.
+- Empty project roots stay out of the main source list to reduce noise, but remain selectable in Create Skill so the first project Skill can still be created. Project DSH supports per-Skill toggles only, not a source-wide switch.
 - Replacements copy to a temporary sibling path first and keep the original until that succeeds.
 - Every endpoint, including GET `/state`, accepts only a loopback `Host` or a canonical `host[:port]` that the DSH Web runtime already trusts through its LAN bind and `--trusted-host`; unknown hosts still receive 403.
 - Browser requests must also carry a same-origin `Origin` when present and must not be marked cross-site; write endpoints continue to require JSON and the DSH client request marker.

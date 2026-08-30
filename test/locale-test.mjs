@@ -100,9 +100,11 @@ ok(typeof summarizeImportResult === "function", "factory exports import-result s
 const normalizeSkillQuery = bundle.normalizeSkillQuery;
 const matchSkillQuery = bundle.matchSkillQuery;
 const filterSkills = bundle.filterSkills;
+const visibleSkillRoots = bundle.visibleSkillRoots;
 ok(typeof normalizeSkillQuery === "function", "factory exports normalizeSkillQuery");
 ok(typeof matchSkillQuery === "function", "factory exports matchSkillQuery");
 ok(typeof filterSkills === "function", "factory exports filterSkills");
+ok(typeof visibleSkillRoots === "function", "factory exports project-root presentation filtering");
 eq(normalizeSkillQuery("  UI  "), "ui", "normalizeSkillQuery trims and lowercases");
 eq(normalizeSkillQuery("   "), "", "normalizeSkillQuery treats whitespace-only as empty");
 const sampleSkills = [
@@ -121,6 +123,11 @@ eq(filterSkills(sampleSkills, { query: "illustration" }).map(function (item) { r
 eq(filterSkills(sampleSkills, { rootKey: "dsh" }).map(function (item) { return item.name; }).join(","), "travel-plan-viz", "filterSkills narrows by root category");
 eq(filterSkills(sampleSkills, { rootKey: "dsh", query: "photo" }).length, 0, "category and query are combined");
 eq(filterSkills(sampleSkills, { query: "SINGLE" }).map(function (item) { return item.name; }).join(","), "photo-revival", "filterSkills matches kind");
+eq(visibleSkillRoots([
+  { key: "project-empty", scope: "project", skills: [] },
+  { key: "project-used", scope: "project", skills: [{ name: "demo" }] },
+  { key: "codex", scope: "user", skills: [] },
+]).map(function (root) { return root.key; }).join(","), "project-used,codex", "main source list hides only empty project roots and keeps empty user sources");
 
 const parseApiResponse = bundle.parseApiResponse;
 ok(typeof parseApiResponse === "function", "factory exports API response parsing for regression tests");
@@ -266,6 +273,9 @@ ok(source.includes('setResult(null); setUpload(null); setModal("import")'), "ope
 ok(source.includes('onClick: function () { refresh(false); }'), "settings exposes an explicit refresh action for project file changes");
 ok(source.includes('h(SourceSelect, { value: form.root, options: createOptions'), "create dialog lets the user choose a writable user or project DSH root");
 ok(source.includes('t("trash.source", { source: trashRootLabel(item) })'), "Trash identifies the original user or project source before restore");
+ok(source.includes('createRoots = allRoots.filter'), "empty project roots remain available as first-Skill create destinations");
+ok(source.includes('root.scope !== "project" && root.key !== "dsh"'), "project roots never expose the unsupported source-level toggle");
+ok(source.includes('value: activeSource, options: options'), "a selected project source that becomes empty falls back to All Sources");
 ok(!source.includes('setModal("browse")'), "native selection never chains into a second directory browser");
 ok(!source.includes('callApi("/browse"'), "client no longer uses the in-app absolute-path browser");
 ok(source.includes('repairable ? h("button"') && source.includes('t("btn.repair.enable")'), "invalid local invocation policy exposes Repair & enable instead of a disabled switch");

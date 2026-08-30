@@ -163,6 +163,7 @@ dsh --profile web --dump-config
 - 项目回收站条目保存原始不透明来源身份。仅当原项目仍由活动 Session 工作区提供时才允许恢复；客户端不能指定替代路径。
 - 项目写入会拒绝链接形式的 `.dsh` 或 `.dsh/skills` 目录，避免仓库把创建、删除或恢复重定向到项目根之外。
 - 项目条目标记为“已发现”而不是“已加载”：只有 DSH 的 Session 作用域目录才能证明模型可见性。IDE、Git 或 shell 改动后可点击“刷新”；模型目录 watcher 与 invalidation 仍由官方 provider 负责。
+- 没有 Skill 的项目根不会出现在主来源列表中，但仍保留在“创建技能”的目标选择中，确保可以创建第一个项目 Skill。项目 DSH 只提供逐 Skill 启停，不提供整个项目来源总开关。
 - 覆盖前先复制到同目录临时路径；复制成功前不会改动现有技能。
 - 全部接口（含 GET `/state`）只接受 loopback `Host`，或 DSH Web runtime 已通过 LAN 绑定和 `--trusted-host` 明确信任的 `host[:port]`；未知 Host 继续返回 403。
 - 浏览器请求还必须满足同源 `Origin` 且不能标记为 cross-site；写入接口继续要求 JSON 与 DSH 客户端请求标记。
