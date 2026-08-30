@@ -23,11 +23,11 @@
 ## Features
 
 - Discover and load user-level skills from `.agents`, Codex, Claude, Gemini, and OpenCode into DSH.
-- Discover project-level `.dsh/skills` and `.agents/skills` from active Session workspaces, grouped by project and kept read-only in the manager UI.
+- Discover project-level `.dsh/skills` and `.agents/skills` from active Session workspaces, grouped by project; project DSH skills can be created, moved to Trash, and restored while project Agent skills stay read-only.
 - Persist external source and skill toggles under `$DSH_HOME/skills-manager/state.json` without rewriting shared source files.
 - Inspect Markdown bodies, frontmatter, load state, duplicate shadowing, and format diagnostics in a source-first UI.
-- Create a local DSH skill from Settings or conversation; conversational writes require user approval.
-- Move DSH-local skills to recoverable Trash, then restore or permanently delete them.
+- Create a user- or project-level DSH skill from Settings; conversational creation remains user-level and requires approval.
+- Move user- and project-level DSH skills to recoverable Trash, then restore them to the original source or permanently delete them.
 - Import `.zip` archives, skill folders, or a single `SKILL.md` safely into `$DSH_HOME/skills`.
 
 ## Screenshots
@@ -138,11 +138,11 @@ Open **Settings → Skills**, then use the panel as follows:
 | Search or filter | Narrow by source, name, or description. | All sources |
 | Inspect details | Review body, frontmatter, path, format diagnostics, and duplicate shadowing. | All sources |
 | Enable or disable | User DSH skills update their own invocation policy; external user skills update manager-local state only. | User-level sources |
-| Create or import | Create in Settings, or import `.zip`, a folder containing `SKILL.md`, or one `SKILL.md`. | `$DSH_HOME/skills` |
+| Create or import | Choose a user or active project DSH destination when creating in Settings; imports remain user-level. | `$DSH_HOME/skills`, active `<project>/.dsh/skills` for creation |
 | Create from conversation | Let an Agent call `create_skill`; DSH asks for approval before writing. | `$DSH_HOME/skills` |
-| Delete and recover | Move to Trash, restore, or permanently delete in a second step. | DSH-local skills |
+| Delete and recover | Move to Trash, restore to the original source, or permanently delete in a second step. | User and active-project DSH skills |
 
-> Toggling a shared source never changes its files; only DSH-local skills can move to Trash.
+> Toggling a shared source never changes its files; only user or project DSH skills can move to Trash.
 
 Escape closes only the frontmost upload or confirmation dialog and leaves Settings open.
 
@@ -153,11 +153,14 @@ Escape closes only the frontmost upload or confirmation dialog and leaves Settin
 | `$DSH_HOME\skills` | Yes | Updates local invocation policy | Yes | Moves to Trash |
 | `$DSH_AGENTS_HOME\skills` | Yes | Manager state only | No | No |
 | `~/.codex/skills`, `~/.claude/skills`, `~/.gemini/skills`, `~/.config/opencode/skills` | Yes | Manager state only | No | No |
-| `<project>/.dsh/skills`, `<project>/.agents/skills` | Yes, for active Session workspaces | No; managed by DSH's scoped filesystem provider | No | No |
+| `<project>/.dsh/skills` | Yes, for active Session workspaces | No; managed by DSH's scoped filesystem provider | Create in Settings | Moves to Trash and restores to the original project |
+| `<project>/.agents/skills` | Yes, for active Session workspaces | No; managed by DSH's scoped filesystem provider | No | No |
 
 - Enable, disable, and delete accept only one ordinary skill-name path segment.
 - Project roots are derived only from active Session `cwd` values; client requests carry an opaque source key and cannot nominate an arbitrary workspace path.
-- Project sources follow DSH's nearest-`.git` root convention and rank order (`project-dsh` 100 before `project-agents` 200). The manager re-scans for each state/detail request but does not register a duplicate project provider or mutate project files.
+- Project sources follow DSH's nearest-`.git` root convention and rank order (`project-dsh` 100 before `project-agents` 200). The manager re-scans for each state/detail request and does not register a duplicate project provider; writes are limited to create/Trash/restore under the active project's `.dsh/skills` root.
+- Project Trash entries retain their original opaque source identity. Restore is allowed only while that original project is still represented by an active Session workspace; the client cannot nominate a replacement path.
+- Project writes reject linked `.dsh` or `.dsh/skills` directories so a repository cannot redirect creation, deletion, or restore outside its own project root.
 - Project rows say **Discovered**, not **Loaded**: only DSH's Session-scoped catalog can establish model visibility. Use Refresh after IDE, Git, or shell changes; the official provider remains responsible for model-catalog watching and invalidation.
 - Replacements copy to a temporary sibling path first and keep the original until that succeeds.
 - Every endpoint, including GET `/state`, accepts only a loopback `Host` or a canonical `host[:port]` that the DSH Web runtime already trusts through its LAN bind and `--trusted-host`; unknown hosts still receive 403.

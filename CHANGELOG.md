@@ -10,6 +10,8 @@ The five most recent published versions are listed below.
 - Kept project files under DSH's scoped filesystem provider instead of registering a duplicate provider or reusing user-global toggle state.
 - Labeled project entries as discovered rather than loaded, exposed workspace-specific rank/path evidence and a manual Refresh action, and warned when an active workspace is not readable from the host.
 - Added regression coverage for nearest-git-root resolution, duplicate Session workspaces, same-name priority within one project, same-name isolation across projects, live modification/removal, stale source identities, and linked bundles outside the project skill root.
+- Added Settings creation and recoverable Trash deletion for active project `.dsh/skills`, reusing the global whole-bundle rollback/publish flow while keeping project `.agents/skills` read-only.
+- Trash now records the original user or project source, displays it in Settings, and restores project entries only after resolving the same opaque root from a currently active Session workspace.
 
 ## 0.1.30 — 2026-08-28
 

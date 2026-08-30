@@ -179,6 +179,7 @@ ok(DICT.zh["root.projectDsh"] && DICT.en["root.projectAgents"], "project DSH and
 ok(DICT.zh["status.project"] && DICT.en["status.project"], "project-scope status is localized in both languages");
 ok(DICT.zh["status.discovered"] && DICT.en["status.discovered"], "project discovery does not reuse the stronger loaded-status copy");
 eq(mockT("status.rank", { rank: 100 }), "Rank 100", "project source priority is visible in the localized UI");
+ok(DICT.zh["create.target"] && DICT.en["trash.source"], "project create targets and Trash source labels are localized in both languages");
 
 eq(summarizeImportResult(mockT, { imported: [{ name: "alpha" }], skipped: [] }).text, "Import complete: alpha", "successful import names the imported skill");
 eq(summarizeImportResult(mockT, { imported: [], skipped: [{ name: "alpha" }] }).text, "No skills were imported; existing skills were skipped: alpha", "all-skipped import is never reported as completed");
@@ -231,6 +232,16 @@ eq(
   "translateError translates move-to-trash rollback preservation"
 );
 eq(
+  translateError(mockT, { code: "error.trash.projectUnavailable", params: { path: "C:\\project" }, error: "原项目不活动" }),
+  "The original project is not an active workspace, so this skill cannot be restored: C:\\project",
+  "translateError explains that project restore requires an active workspace"
+);
+eq(
+  translateError(mockT, { code: "error.root.unsafe", params: { path: "C:\\project\\.dsh\\skills" }, error: "不安全目录" }),
+  "The project skill directory is unsafe, so the write was refused: C:\\project\\.dsh\\skills",
+  "translateError explains linked project-root write rejection"
+);
+eq(
   translateError(mockT, { code: "error.state.invalid", params: { path: "C:\\state.json" }, error: "状态不可读" }),
   "The manager state file could not be read, so overwriting it was refused: C:\\state.json",
   "translateError translates invalid-state write refusal"
@@ -253,6 +264,8 @@ ok(source.includes('result && modal !== "import"'), "upload feedback is not left
 ok(source.includes('role: "alert" }, result.text'), "import modal renders upload feedback where it remains visible");
 ok(source.includes('setResult(null); setUpload(null); setModal("import")'), "opening import clears stale upload feedback and selection");
 ok(source.includes('onClick: function () { refresh(false); }'), "settings exposes an explicit refresh action for project file changes");
+ok(source.includes('h(SourceSelect, { value: form.root, options: createOptions'), "create dialog lets the user choose a writable user or project DSH root");
+ok(source.includes('t("trash.source", { source: trashRootLabel(item) })'), "Trash identifies the original user or project source before restore");
 ok(!source.includes('setModal("browse")'), "native selection never chains into a second directory browser");
 ok(!source.includes('callApi("/browse"'), "client no longer uses the in-app absolute-path browser");
 ok(source.includes('repairable ? h("button"') && source.includes('t("btn.repair.enable")'), "invalid local invocation policy exposes Repair & enable instead of a disabled switch");

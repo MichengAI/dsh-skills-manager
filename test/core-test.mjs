@@ -793,7 +793,9 @@ try {
   const stateResponse = await fetch(api + "/state");
   eq(stateResponse.status, 200, "state route returns 200");
   const statePayload = await stateResponse.json();
+  const httpProjectDshRoot = statePayload.data.roots.find((root) => root.kind === "project-dsh" && root.projectRoot === routeProject);
   const httpProjectRoot = statePayload.data.roots.find((root) => root.kind === "project-agents" && root.projectRoot === routeProject);
+  ok(httpProjectDshRoot && httpProjectDshRoot.mutable === true, "state route exposes an active Session project DSH root as writable even before its directory exists");
   ok(httpProjectRoot && httpProjectRoot.toggleable === false, "state route exposes the active Session project Agent root as read-only");
   ok(httpProjectRoot.skills.some((skill) => skill.name === "route-project-skill"), "state route lists project-scoped skills from the Session cwd");
   const projectDetailResponse = await requestJson(api + "/detail", "POST", secureHeaders, JSON.stringify({ root: httpProjectRoot.key, name: "route-project-skill" }));
@@ -802,6 +804,23 @@ try {
   const projectToggleResponse = await requestJson(api + "/disable", "POST", secureHeaders, JSON.stringify({ root: httpProjectRoot.key, name: "route-project-skill" }));
   eq(projectToggleResponse.status, 400, "project skills remain read-only in the first project-support phase");
   eq(projectToggleResponse.payload.code, "error.root.readonly", "project toggle refusal uses the normal readonly error contract");
+  const projectCreateResponse = await requestJson(api + "/create", "POST", secureHeaders, JSON.stringify({ root: httpProjectDshRoot.key, name: "Route Project Created", description: "Created through the project route.", body: "Project route creation body." }));
+  eq(projectCreateResponse.status, 200, "create route accepts an active Session project DSH root identity");
+  eq(projectCreateResponse.payload.data.root, httpProjectDshRoot.key, "project create returns the resolved project root identity");
+  ok((await resolveEntry(join(routeProject, ".dsh", "skills"), "route-project-created")) !== null, "project create persists under the active project's .dsh/skills root");
+  const projectDeleteResponse = await requestJson(api + "/delete", "POST", secureHeaders, JSON.stringify({ root: httpProjectDshRoot.key, name: "route-project-created" }));
+  eq(projectDeleteResponse.status, 200, "delete route moves a project DSH skill to the shared Trash");
+  eq(projectDeleteResponse.payload.data.root.scope, "project", "project Trash metadata retains the original scope");
+  ok((await resolveEntry(join(routeProject, ".dsh", "skills"), "route-project-created")) === null, "project delete removes the live project entry");
+  const projectRestoreResponse = await requestJson(api + "/trash-restore", "POST", secureHeaders, JSON.stringify({ id: projectDeleteResponse.payload.data.id }));
+  eq(projectRestoreResponse.status, 200, "Trash restore returns a project Skill to its active project");
+  ok((await resolveEntry(join(routeProject, ".dsh", "skills"), "route-project-created")) !== null, "project restore recreates the original project entry");
+  const projectAgentDeleteResponse = await requestJson(api + "/delete", "POST", secureHeaders, JSON.stringify({ root: httpProjectRoot.key, name: "route-project-skill" }));
+  eq(projectAgentDeleteResponse.status, 400, "delete route keeps project .agents/skills read-only");
+  eq(projectAgentDeleteResponse.payload.code, "error.root.readonly", "project Agent deletion uses the readonly error contract");
+  const staleProjectCreateResponse = await requestJson(api + "/create", "POST", secureHeaders, JSON.stringify({ root: "project-dsh:stale", name: "Must Not Fall Back", description: "Must be rejected.", body: "Denied." }));
+  eq(staleProjectCreateResponse.status, 400, "create route rejects a stale or forged project root identity");
+  ok((await resolveEntry(dshRoot, "must-not-fall-back")) === null, "rejected project creation never falls back to the user DSH root");
   const headState = await fetch(api + "/state", { method: "HEAD" });
   eq(headState.status, 200, "HEAD /state returns 200");
   eq(await headState.text(), "", "HEAD /state has an empty body");
@@ -967,11 +986,26 @@ await makeSkill(join(secondProject, ".agents", "skills"), "project-priority", "-
 const resolvedProjectRoots = await projectRoots([routeProjectNested, routeProject, secondProject, "relative/path"]);
 eq(resolvedProjectRoots.length, 4, "projectRoots deduplicates Sessions by nearest git root and ignores non-absolute cwd values");
 eq(new Set(resolvedProjectRoots.map((root) => root.key)).size, 4, "project source keys stay unique across workspaces and source kinds");
+const writableProjectDefinition = resolvedProjectRoots.find((root) => root.kind === "project-dsh" && root.projectRoot === routeProject);
+const readonlyProjectDefinition = resolvedProjectRoots.find((root) => root.kind === "project-agents" && root.projectRoot === routeProject);
+ok(writableProjectDefinition.mutable === true && writableProjectDefinition.toggleable === false, "project DSH roots allow create/delete without taking over invocation toggles");
+const directProjectCreated = await createSkill({ name: "Direct Project Created", description: "Direct project create.", body: "Direct project body." }, null, { root: writableProjectDefinition });
+eq(directProjectCreated.root, writableProjectDefinition.key, "createSkill accepts a validated active project DSH definition");
+ok((await resolveEntry(writableProjectDefinition.path, "direct-project-created")) !== null, "direct project creation writes to .dsh/skills");
+eq((await createSkill({ name: "Denied Project Agent", description: "Denied.", body: "Denied." }, null, { root: readonlyProjectDefinition })).code, "error.root.readonly", "createSkill rejects project .agents/skills");
+eq((await createSkill({ name: "Forged Root", description: "Denied.", body: "Denied." }, null, { root: { key: "dsh", path: join(tmp, "forged"), mutable: true } })).code, "error.root.readonly", "createSkill rejects a forged mutable DSH root object");
+const directProjectDeleted = await deleteSkill(writableProjectDefinition, "direct-project-created");
+eq(directProjectDeleted.root.key, writableProjectDefinition.key, "deleteSkill stores the original project root identity in Trash");
+eq((await restoreTrash(directProjectDeleted.id, null, { projectCwds: [] })).code, "error.trash.projectUnavailable", "project restore waits until the original project is an active Session workspace");
+const directProjectRestored = await restoreTrash(directProjectDeleted.id, null, { projectCwds: [routeProjectNested] });
+eq(directProjectRestored.root.key, writableProjectDefinition.key, "project restore resolves the original root from current active Session cwd values");
+ok((await resolveEntry(writableProjectDefinition.path, "direct-project-created")) !== null, "project restore returns the complete bundle to its original root");
+eq((await deleteSkill(readonlyProjectDefinition, "project-priority")).code, "error.root.readonly", "deleteSkill keeps project .agents/skills read-only");
 const projectSnap = await state({ projectCwds: [routeProjectNested, secondProject] });
 const firstDshProject = projectSnap.roots.find((root) => root.kind === "project-dsh" && root.projectRoot === routeProject);
 const firstAgentsProject = projectSnap.roots.find((root) => root.kind === "project-agents" && root.projectRoot === routeProject);
 const secondAgentsProject = projectSnap.roots.find((root) => root.kind === "project-agents" && root.projectRoot === secondProject);
-ok(firstDshProject && firstDshProject.scope === "project" && firstDshProject.toggleable === false, "project DSH roots are visible and read-only");
+ok(firstDshProject && firstDshProject.scope === "project" && firstDshProject.mutable === true && firstDshProject.toggleable === false, "project DSH roots are visible and allow create/delete while invocation toggles remain provider-owned");
 eq(firstDshProject.rank, 100, "project state exposes the official project-dsh rank");
 eq(firstAgentsProject.rank, 200, "project state exposes the official project-agents rank");
 ok(firstAgentsProject.skills.find((skill) => skill.name === "project-priority").shadowedBy.root === firstDshProject.key, "project DSH rank 100 shadows project Agent rank 200 within one workspace");
@@ -993,6 +1027,19 @@ if (await tryLink(outsideProjectSkill, join(routeProject, ".agents", "skills", "
   ok(!linkedProjectSnap.roots.find((root) => root.key === firstAgentsProject.key).skills.some((skill) => skill.name === "linked-project"), "project discovery does not follow a linked bundle outside the active project skill root");
 } else {
   ok(true, "project linked-bundle containment test skipped because this environment cannot create links");
+}
+const unsafeProject = join(tmp, "unsafe-project");
+const unsafeProjectTarget = join(tmp, "unsafe-project-target");
+await mkdir(join(unsafeProject, ".git"), { recursive: true });
+await mkdir(join(unsafeProject, ".dsh"), { recursive: true });
+await makeSkill(unsafeProjectTarget, "outside-project-write", "---\nname: outside-project-write\ndescription: Must stay outside.\n---\nOutside");
+if (await tryLink(unsafeProjectTarget, join(unsafeProject, ".dsh", "skills"), projectLinkType)) {
+  const unsafeDefinition = (await projectRoots([unsafeProject])).find((root) => root.kind === "project-dsh");
+  eq((await createSkill({ name: "Escaped Create", description: "Must not escape.", body: "Denied." }, null, { root: unsafeDefinition })).code, "error.root.unsafe", "project create refuses a linked .dsh/skills root");
+  eq((await deleteSkill(unsafeDefinition, "outside-project-write")).code, "error.root.unsafe", "project delete refuses a linked .dsh/skills root");
+  ok((await resolveEntry(unsafeProjectTarget, "outside-project-write")) !== null, "unsafe project mutations leave the linked external target unchanged");
+} else {
+  ok(true, "project mutation root-link test skipped because this environment cannot create links");
 }
 const unavailableProjectSnap = await state({ projectCwds: [join(tmp, "missing-workspace")] });
 eq(unavailableProjectSnap.warnings.find((warning) => warning.code === "warning.project.unavailable").params.path, join(tmp, "missing-workspace"), "unreadable active workspaces produce an observable project-discovery warning");
