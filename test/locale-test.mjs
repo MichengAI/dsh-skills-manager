@@ -171,6 +171,15 @@ function mockT(key, params) {
   return template.replace(/\{(\w+)\}/g, (m, name) => (name in params ? String(params[name]) : m));
 }
 
+const rootDisplayName = bundle.rootDisplayName;
+ok(typeof rootDisplayName === "function", "factory exports project-aware source labels");
+eq(rootDisplayName(mockT, { key: "project-agents:abc", kind: "project-agents", localeKey: "projectAgents", label: "Project Agent", projectName: "demo" }), "Project Agent · demo", "project source labels include the workspace name without translating the dynamic key");
+eq(rootDisplayName(mockT, { key: "codex", label: "Codex" }), "Codex", "fixed user source labels remain unchanged");
+ok(DICT.zh["root.projectDsh"] && DICT.en["root.projectAgents"], "project DSH and Agent sources are localized in both languages");
+ok(DICT.zh["status.project"] && DICT.en["status.project"], "project-scope status is localized in both languages");
+ok(DICT.zh["status.discovered"] && DICT.en["status.discovered"], "project discovery does not reuse the stronger loaded-status copy");
+eq(mockT("status.rank", { rank: 100 }), "Rank 100", "project source priority is visible in the localized UI");
+
 eq(summarizeImportResult(mockT, { imported: [{ name: "alpha" }], skipped: [] }).text, "Import complete: alpha", "successful import names the imported skill");
 eq(summarizeImportResult(mockT, { imported: [], skipped: [{ name: "alpha" }] }).text, "No skills were imported; existing skills were skipped: alpha", "all-skipped import is never reported as completed");
 ok(summarizeImportResult(mockT, { imported: [], skipped: [{ name: "alpha" }] }).ok === false, "all-skipped import is rendered as a warning/error state");
@@ -191,7 +200,7 @@ eq(
 );
 eq(
   translateError(mockT, { code: "error.root.readonly", params: { action: "toggle" }, error: "公共 Agent 技能目录不允许启用或停用" }),
-  "The shared Agent skills directory does not allow enabling or disabling",
+  "This source does not allow enabling or disabling",
   "translateError maps the action param through the action.* dictionary"
 );
 eq(translateError(mockT, new Error("boom")), "boom", "translateError handles Error objects");
@@ -243,6 +252,7 @@ ok(source.includes('post("/upload"'), "selected content is uploaded instead of s
 ok(source.includes('result && modal !== "import"'), "upload feedback is not left behind the active import modal");
 ok(source.includes('role: "alert" }, result.text'), "import modal renders upload feedback where it remains visible");
 ok(source.includes('setResult(null); setUpload(null); setModal("import")'), "opening import clears stale upload feedback and selection");
+ok(source.includes('onClick: function () { refresh(false); }'), "settings exposes an explicit refresh action for project file changes");
 ok(!source.includes('setModal("browse")'), "native selection never chains into a second directory browser");
 ok(!source.includes('callApi("/browse"'), "client no longer uses the in-app absolute-path browser");
 ok(source.includes('repairable ? h("button"') && source.includes('t("btn.repair.enable")'), "invalid local invocation policy exposes Repair & enable instead of a disabled switch");

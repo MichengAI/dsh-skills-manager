@@ -23,6 +23,7 @@
 ## 功能概览
 
 - 自动发现并把 `.agents`、Codex、Claude、Gemini 和 OpenCode 的用户级技能真正加载进 DSH。
+- 从活动 Session 工作区发现项目级 `.dsh/skills` 与 `.agents/skills`，按项目分组展示，并在管理器界面中保持只读。
 - 外部来源启停只写入 `$DSH_HOME\skills-manager\state.json`，绝不改写共享源文件。
 - 按来源折叠、搜索和筛选，并查看技能正文、frontmatter、加载状态、重名遮蔽与格式诊断。
 - 在设置页或对话中创建 DSH 本地技能；对话工具在写入前请求用户确认。
@@ -136,7 +137,7 @@ dsh --profile web --dump-config
 | --- | --- | --- |
 | 搜索或筛选 | 按来源、名称或简介收窄列表。 | 全部来源 |
 | 查看详情与诊断 | 查看正文、frontmatter、源文件路径、格式问题和重名遮蔽。 | 全部来源 |
-| 启用或停用 | DSH 技能更新自身调用策略；外部技能只更新 manager 本地状态。 | 全部来源 |
+| 启用或停用 | 用户级 DSH 技能更新自身调用策略；外部用户技能只更新 manager 本地状态。 | 用户级来源 |
 | 创建或导入 | 在设置页创建，或导入 `.zip`、包含 `SKILL.md` 的文件夹、单个 `SKILL.md`。 | `$DSH_HOME\skills` |
 | 从对话创建 | 让 Agent 调用 `create_skill`；写入前由 DSH 审批界面确认。 | `$DSH_HOME\skills` |
 | 删除与恢复 | 删除先进入回收站；可恢复或永久二次删除。 | DSH 本地技能 |
@@ -152,8 +153,12 @@ dsh --profile web --dump-config
 | `$DSH_HOME\skills` | 支持 | 改写本地调用策略 | 支持 | 进入回收站 |
 | `$DSH_AGENTS_HOME\skills` | 支持 | 仅写 manager 状态 | 不支持 | 不支持 |
 | `~/.codex/skills`、`~/.claude/skills`、`~/.gemini/skills`、`~/.config/opencode/skills` | 支持 | 仅写 manager 状态 | 不支持 | 不支持 |
+| `<project>/.dsh/skills`、`<project>/.agents/skills` | 支持活动 Session 工作区 | 不支持；由 DSH 作用域 filesystem provider 管理 | 不支持 | 不支持 |
 
 - 启用、停用和删除只接受单个普通技能名称，目录穿越名称会被拒绝。
+- 项目根只从活动 Session 的 `cwd` 推导；客户端只提交不透明来源 key，不能指定任意工作区路径。
+- 项目来源遵循 DSH 最近 `.git` 项目根和固定优先级（`project-dsh` 100、`project-agents` 200）。管理器每次读取状态或详情时重新扫描，但不重复注册项目 provider，也不改写项目文件。
+- 项目条目标记为“已发现”而不是“已加载”：只有 DSH 的 Session 作用域目录才能证明模型可见性。IDE、Git 或 shell 改动后可点击“刷新”；模型目录 watcher 与 invalidation 仍由官方 provider 负责。
 - 覆盖前先复制到同目录临时路径；复制成功前不会改动现有技能。
 - 全部接口（含 GET `/state`）只接受 loopback `Host`，或 DSH Web runtime 已通过 LAN 绑定和 `--trusted-host` 明确信任的 `host[:port]`；未知 Host 继续返回 403。
 - 浏览器请求还必须满足同源 `Origin` 且不能标记为 cross-site；写入接口继续要求 JSON 与 DSH 客户端请求标记。

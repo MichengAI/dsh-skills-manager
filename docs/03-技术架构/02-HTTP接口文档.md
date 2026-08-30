@@ -1,6 +1,6 @@
 # HTTP 接口文档
 
-更新时间：2026-08-27（Asia/Shanghai）
+更新时间：2026-08-30（Asia/Shanghai）
 
 ## 通用约定
 
@@ -26,7 +26,7 @@
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| GET | `/state` | 获取 DSH、公共 Agent、Codex、Claude、Gemini、OpenCode 与回收站状态快照；技能项包含 `hasFrontmatter`、`invocationPolicyValid` 与 `loadable` 诊断字段。 |
+| GET | `/state` | 获取活动 Session 项目 DSH/Agent、用户 DSH、公共 Agent、Codex、Claude、Gemini、OpenCode 与回收站状态快照；技能项包含 `hasFrontmatter`、`invocationPolicyValid` 与 `loadable` 诊断字段。 |
 | HEAD | `/state` | 返回与 GET 相同的状态码及响应头，不发送实体。 |
 | POST | `/enable` | 启用指定技能。 |
 | POST | `/disable` | 停用指定技能。 |
@@ -41,7 +41,7 @@
 | POST | `/browse` | 兼容旧客户端：为目录选择器列出一个本机目录层级。 |
 | POST | `/import` | 兼容旧客户端：预检或导入本机插件路径。 |
 
-`/enable` 与 `/disable` 请求体为 `{ "name": "foo-bar", "root": "dsh" }`。DSH 技能通过原子改写 invocation policy 启停；外部根技能只写管理器 `state.json`，不修改来源文件。损坏状态下拒绝外部启停写入。
+`/enable` 与 `/disable` 请求体为 `{ "name": "foo-bar", "root": "dsh" }`。用户 DSH 技能通过原子改写 invocation policy 启停；外部用户根技能只写管理器 `state.json`，不修改来源文件。动态项目来源不可启停，返回 `error.root.readonly`。损坏状态下拒绝外部启停写入。
 
 `/source-enable` 与 `/source-disable` 请求体为 `{ "root": "agents" }`；只接受可切换的外部来源。
 
@@ -49,11 +49,11 @@
 
 `/trash-restore` 与 `/trash-delete` 请求体为 `{ "id": "回收站条目ID" }`。恢复遇到同名技能时拒绝覆盖；永久删除不可恢复。
 
-`/detail` 请求体为 `{ "name": "foo-bar", "root": "dsh" }`，返回正文、frontmatter、诊断与来源只读状态。
+`/detail` 请求体为 `{ "name": "foo-bar", "root": "dsh" }`，返回正文、frontmatter、诊断与来源只读状态。项目来源使用 `/state` 返回的 `project-dsh:<id>` 或 `project-agents:<id>` 不透明 key；服务端会根据当前活动 Session 重新解析，不能由请求指定 cwd。
 
 `/create` 请求体为 `{ "name": "foo-bar", "description": "简介", "body": "正文" }`；只在 DSH 根创建 bundle 形态技能。
 
-`/upload` 请求体有两种形态：普通文件/文件夹使用 `{ "name": "来源名称", "entries": [{ "path": "相对路径", "data": "Base64" }] }`；ZIP 使用 `{ "name": "demo.zip", "zip": "Base64" }`。请求体最多 16 MiB，ZIP 压缩数据最多 10 MiB，单文件最多 5 MiB，解压/上传总量最多 25 MiB、最多 500 个条目、路径深度最多 64 层。服务端拒绝绝对路径、`..`、Windows 设备名、重复路径和非法 Base64；所有归档条目只写成普通文件，不创建符号链接。暂存目录位于 `$DSH_HOME/skills-manager/uploads`，成功或失败后都会清理，再由既有原子导入流程复制到 `$DSH_HOME/skills`。
+`/upload` 请求体有两种形态：普通文件/文件夹使用 `{ "name": "来源名称", "entries": [{ "path": "相对路径", "data": "Base64" }] }`；ZIP 使用 `{ "name": "demo.zip", "zip": "Base64" }`。Base64 JSON 请求体最多 88 MiB，ZIP 压缩数据最多 32 MiB，单文件最多 32 MiB，解压/上传总量最多 64 MiB、最多 1000 个条目、路径深度最多 64 层。服务端拒绝绝对路径、`..`、Windows 设备名、重复路径和非法 Base64；所有归档条目只写成普通文件，不创建符号链接。暂存目录位于 `$DSH_HOME/skills-manager/uploads`，成功或失败后都会清理，再由既有原子导入流程复制到 `$DSH_HOME/skills`。
 
 `/browse` 请求体为 `{ "path": "C:\\path\\to\\folder" }`；省略 `path` 时从宿主用户主目录开始。该接口仅为旧客户端兼容保留，新界面不再调用。
 

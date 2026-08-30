@@ -30,11 +30,12 @@ import {
   resolveEntry,
   entryPath,
   userRoots,
+  projectRoots,
   browseDirectories,
   managerStatePath,
   readManagerState,
 } from "../lib/core.js";
-import { apply as applyHost, notifyChatCatalog, registerAgentSkillProviders } from "../lib/index.js";
+import { activeSessionCwds, apply as applyHost, inject as hostInject, notifyChatCatalog, registerAgentSkillProviders } from "../lib/index.js";
 
 let passed = 0;
 let failed = 0;
@@ -748,6 +749,11 @@ eq(batch.imported.length, 2, "import batch dir");
 // ── HTTP 路由 ──
 await makeSkill(dshRoot, "http-skill", "---\nname: http-skill\n---\nbody");
 const concurrentImportSource = await makeSkill(tmp, "concurrent-import", "---\nname: concurrent-import\n---\nbody");
+const routeProject = join(tmp, "route-project");
+const routeProjectNested = join(routeProject, "packages", "app");
+await mkdir(join(routeProject, ".git"), { recursive: true });
+await mkdir(routeProjectNested, { recursive: true });
+await makeSkill(join(routeProject, ".agents", "skills"), "route-project-skill", "---\nname: route-project-skill\ndescription: Project route skill.\n---\nProject route body");
 let route;
 let invalidated = 0;
 const emitted = [];
@@ -764,7 +770,7 @@ applyHost({
       return {
         list() {
           return [
-            { id: "sess-live", header: { id: "sess-live", agentPreset: "cordis" } },
+            { id: "sess-live", header: { id: "sess-live", agentPreset: "cordis", cwd: routeProjectNested } },
             { id: "sess-blank", header: { id: "sess-blank" } },
           ];
         },
@@ -786,6 +792,16 @@ const secureHeaders = { "content-type": "application/json", "x-dsh-skills-manage
 try {
   const stateResponse = await fetch(api + "/state");
   eq(stateResponse.status, 200, "state route returns 200");
+  const statePayload = await stateResponse.json();
+  const httpProjectRoot = statePayload.data.roots.find((root) => root.kind === "project-agents" && root.projectRoot === routeProject);
+  ok(httpProjectRoot && httpProjectRoot.toggleable === false, "state route exposes the active Session project Agent root as read-only");
+  ok(httpProjectRoot.skills.some((skill) => skill.name === "route-project-skill"), "state route lists project-scoped skills from the Session cwd");
+  const projectDetailResponse = await requestJson(api + "/detail", "POST", secureHeaders, JSON.stringify({ root: httpProjectRoot.key, name: "route-project-skill" }));
+  eq(projectDetailResponse.status, 200, "detail route accepts a live project root identity");
+  eq(projectDetailResponse.payload.data.body, "Project route body", "project detail returns the current project skill body");
+  const projectToggleResponse = await requestJson(api + "/disable", "POST", secureHeaders, JSON.stringify({ root: httpProjectRoot.key, name: "route-project-skill" }));
+  eq(projectToggleResponse.status, 400, "project skills remain read-only in the first project-support phase");
+  eq(projectToggleResponse.payload.code, "error.root.readonly", "project toggle refusal uses the normal readonly error contract");
   const headState = await fetch(api + "/state", { method: "HEAD" });
   eq(headState.status, 200, "HEAD /state returns 200");
   eq(await headState.text(), "", "HEAD /state has an empty body");
@@ -939,6 +955,47 @@ ok(invalidPolicySnap.loadable === false, "state keeps invalid invocation policy 
 const agentsSnap = snap.roots.find((r) => r.key === "agents");
 ok(agentsSnap.mutable === false, "public Agent root disallows destructive actions");
 ok(agentsSnap.skills.some((s) => s.name === "public-skill"), "state lists public Agent skill");
+ok(hostInject.includes("sessions"), "host declares the Session service used for project workspace discovery");
+eq(activeSessionCwds({ sessions: { list: () => [{ header: { cwd: routeProjectNested } }, { header: { cwd: routeProjectNested } }, { header: {} }] } }).length, 1, "activeSessionCwds deduplicates valid workspace paths");
+
+// ── 项目级 Skill：按 workspace 隔离、遵循官方优先级、每次请求重新发现 ──
+const secondProject = join(tmp, "second-project");
+await mkdir(join(secondProject, ".git"), { recursive: true });
+await makeSkill(join(routeProject, ".dsh", "skills"), "project-priority", "---\nname: project-priority\ndescription: Project DSH winner.\n---\nDSH winner");
+await makeSkill(join(routeProject, ".agents", "skills"), "project-priority", "---\nname: project-priority\ndescription: Project Agent loser.\n---\nAgent loser");
+await makeSkill(join(secondProject, ".agents", "skills"), "project-priority", "---\nname: project-priority\ndescription: Independent workspace winner.\n---\nSecond project");
+const resolvedProjectRoots = await projectRoots([routeProjectNested, routeProject, secondProject, "relative/path"]);
+eq(resolvedProjectRoots.length, 4, "projectRoots deduplicates Sessions by nearest git root and ignores non-absolute cwd values");
+eq(new Set(resolvedProjectRoots.map((root) => root.key)).size, 4, "project source keys stay unique across workspaces and source kinds");
+const projectSnap = await state({ projectCwds: [routeProjectNested, secondProject] });
+const firstDshProject = projectSnap.roots.find((root) => root.kind === "project-dsh" && root.projectRoot === routeProject);
+const firstAgentsProject = projectSnap.roots.find((root) => root.kind === "project-agents" && root.projectRoot === routeProject);
+const secondAgentsProject = projectSnap.roots.find((root) => root.kind === "project-agents" && root.projectRoot === secondProject);
+ok(firstDshProject && firstDshProject.scope === "project" && firstDshProject.toggleable === false, "project DSH roots are visible and read-only");
+eq(firstDshProject.rank, 100, "project state exposes the official project-dsh rank");
+eq(firstAgentsProject.rank, 200, "project state exposes the official project-agents rank");
+ok(firstAgentsProject.skills.find((skill) => skill.name === "project-priority").shadowedBy.root === firstDshProject.key, "project DSH rank 100 shadows project Agent rank 200 within one workspace");
+ok(firstDshProject.skills.find((skill) => skill.name === "project-priority").discovered === true && firstDshProject.skills.find((skill) => skill.name === "project-priority").loaded === undefined, "the higher-priority project skill is marked discovered without claiming model-catalog loading");
+ok(secondAgentsProject.skills.find((skill) => skill.name === "project-priority").discovered === true, "same-named skills in another workspace remain independently discovered");
+eq(projectSnap.summary.loaded, snap.summary.loaded, "project discovery does not inflate the manager's confirmed loaded count");
+const projectDetail = await skillDetail(firstDshProject.key, "project-priority", { projectCwds: [routeProjectNested] });
+eq(projectDetail.body, "DSH winner", "skillDetail resolves only live Session-derived project root identities");
+eq((await skillDetail(firstDshProject.key, "project-priority", { projectCwds: [secondProject] })).code, "error.root.unknown", "stale project identities cannot read a workspace no longer present in active Sessions");
+await writeFile(join(routeProject, ".dsh", "skills", "project-priority", "SKILL.md"), "---\nname: project-priority\ndescription: Refreshed.\n---\nFresh body", "utf8");
+eq((await skillDetail(firstDshProject.key, "project-priority", { projectCwds: [routeProjectNested] })).body, "Fresh body", "project detail re-reads modified files instead of caching bodies");
+await rm(join(routeProject, ".dsh", "skills", "project-priority"), { recursive: true, force: true });
+const removedProjectSnap = await state({ projectCwds: [routeProjectNested] });
+ok(!removedProjectSnap.roots.find((root) => root.key === firstDshProject.key).skills.some((skill) => skill.name === "project-priority"), "a removed project skill disappears on the next state snapshot");
+const outsideProjectSkill = await makeSkill(join(tmp, "outside-project-skills"), "linked-project", "---\nname: linked-project\ndescription: Outside project link.\n---\nOutside");
+const projectLinkType = process.platform === "win32" ? "junction" : undefined;
+if (await tryLink(outsideProjectSkill, join(routeProject, ".agents", "skills", "linked-project"), projectLinkType)) {
+  const linkedProjectSnap = await state({ projectCwds: [routeProjectNested] });
+  ok(!linkedProjectSnap.roots.find((root) => root.key === firstAgentsProject.key).skills.some((skill) => skill.name === "linked-project"), "project discovery does not follow a linked bundle outside the active project skill root");
+} else {
+  ok(true, "project linked-bundle containment test skipped because this environment cannot create links");
+}
+const unavailableProjectSnap = await state({ projectCwds: [join(tmp, "missing-workspace")] });
+eq(unavailableProjectSnap.warnings.find((warning) => warning.code === "warning.project.unavailable").params.path, join(tmp, "missing-workspace"), "unreadable active workspaces produce an observable project-discovery warning");
 ok(registeredTool && registeredTool.name === "create_skill", "host registers the conversational create_skill tool");
 
 // 清理

@@ -4,6 +4,13 @@
 
 The five most recent published versions are listed below.
 
+## Unreleased
+
+- Added read-only project Skill discovery for active Session workspaces, covering project-root `.dsh/skills` and `.agents/skills` with stable workspace-specific identities and official rank order.
+- Kept project files under DSH's scoped filesystem provider instead of registering a duplicate provider or reusing user-global toggle state.
+- Labeled project entries as discovered rather than loaded, exposed workspace-specific rank/path evidence and a manual Refresh action, and warned when an active workspace is not readable from the host.
+- Added regression coverage for nearest-git-root resolution, duplicate Session workspaces, same-name priority within one project, same-name isolation across projects, live modification/removal, stale source identities, and linked bundles outside the project skill root.
+
 ## 0.1.30 — 2026-08-28
 
 - Fixed reverse-proxy domains and LAN IPs already trusted by DSH Web through `--trusted-host` still being rejected by Skills Manager's own loopback-only Host fence.

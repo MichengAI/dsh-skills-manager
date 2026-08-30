@@ -4,6 +4,13 @@
 
 以下记录最近发布的五个版本。
 
+## 未发布
+
+- 新增活动 Session 工作区的项目 Skill 只读发现，覆盖项目根 `.dsh/skills` 与 `.agents/skills`，使用稳定的 workspace 专属身份并遵循官方优先级。
+- 项目文件继续由 DSH 作用域 filesystem provider 管理，不重复注册 provider，也不复用用户级全局启停状态。
+- 项目条目标记为“已发现”而不是“已加载”，展示 workspace 专属优先级/路径证据和手动刷新入口，并在宿主无法读取活动工作区时给出警告。
+- 补充最近 Git 根、Session 工作区去重、单项目同名优先级、跨项目同名隔离、实时修改/删除、过期来源身份以及项目 Skill 根外链接目录等回归测试。
+
 ## 0.1.30 — 2026-08-28
 
 - 修复 DSH Web 已通过 `--trusted-host` 信任的反向代理域名或局域网 IP，仍被 Skills Manager 自身 loopback-only Host 校验拒绝的问题。
