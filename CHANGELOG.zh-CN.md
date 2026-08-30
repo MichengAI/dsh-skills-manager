@@ -6,7 +6,9 @@
 
 ## 未发布
 
-- 新增活动 Session 工作区的项目 Skill 只读发现，覆盖项目根 `.dsh/skills` 与 `.agents/skills`，使用稳定的 workspace 专属身份并遵循官方优先级。
+## 0.1.31 — 2026-08-30
+
+- 新增活动 Session 工作区的项目 Skill 发现，覆盖项目根 `.dsh/skills` 与 `.agents/skills`，使用稳定的 workspace 专属身份并遵循官方优先级。
 - 项目文件继续由 DSH 作用域 filesystem provider 管理，不重复注册 provider，也不复用用户级全局启停状态。
 - 项目条目标记为“已发现”而不是“已加载”，展示 workspace 专属优先级/路径证据和手动刷新入口，并在宿主无法读取活动工作区时给出警告。
 - 补充最近 Git 根、Session 工作区去重、单项目同名优先级、跨项目同名隔离、实时修改/删除、过期来源身份以及项目 Skill 根外链接目录等回归测试。
@@ -15,6 +17,10 @@
 - 新增项目 `.dsh/skills` 启停控件：只改写 Skill 自身调用策略字段，Session 作用域目录加载仍由 DSH 官方 provider 负责。
 - 修复项目与 `$DSH_HOME` 位于不同磁盘时，移入回收站和恢复因 `EXDEV` 失败的问题，新增受保护的“复制后原子隐藏”降级流程。
 - 主来源列表不再显示空项目根，但“创建技能”仍可选择它们；同时移除不受支持的项目来源总开关，不影响逐 Skill 启停。
+- 修复可写项目发现会回落到无 Git 的 Session cwd、进而可能与用户级技能根重合的问题；项目来源现在必须找到真实 `.git` 祖先，与任一用户技能根重叠时直接隐藏并拒绝写入。
+- 列表和详情不再跟随技能根本身的链接，包括项目 `.dsh`/`.agents` 容器及 Windows reparse point，同时保留既有的 bundle 子链接边界检查。
+
+发布包：[`@michengai/dsh-skills-manager@0.1.31`](https://www.npmjs.com/package/@michengai/dsh-skills-manager/v/0.1.31)。
 
 ## 0.1.30 — 2026-08-28
 
@@ -43,11 +49,3 @@
 - 使用反馈者提供的跨平台 fnOS `trim-cli` Skill 压缩包完成隔离环境全链路导入验证。
 
 发布包：[`@michengai/dsh-skills-manager@0.1.27`](https://www.npmjs.com/package/@michengai/dsh-skills-manager/v/0.1.27)。
-
-## 0.1.26 — 2026-08-27
-
-- 修复浏览器上传文件夹时，原始内容仍在 25 MiB 总量限制内，却因 Base64 JSON 超过旧 16 MiB 请求体上限而失败的问题。
-- 在浏览器读取内容前检查既有的 ZIP 10 MiB、单文件 5 MiB、总量 25 MiB 和 500 个条目限制，超限时直接显示具体原因。
-- 将大字符串 Base64 正则校验改为栈安全校验，避免数 MiB 文件耗尽 JavaScript 调用栈。
-
-发布包：[`@michengai/dsh-skills-manager@0.1.26`](https://www.npmjs.com/package/@michengai/dsh-skills-manager/v/0.1.26)。

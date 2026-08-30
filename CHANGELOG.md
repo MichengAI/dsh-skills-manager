@@ -6,7 +6,9 @@ The five most recent published versions are listed below.
 
 ## Unreleased
 
-- Added read-only project Skill discovery for active Session workspaces, covering project-root `.dsh/skills` and `.agents/skills` with stable workspace-specific identities and official rank order.
+## 0.1.31 — 2026-08-30
+
+- Added project Skill discovery for active Session workspaces, covering project-root `.dsh/skills` and `.agents/skills` with stable workspace-specific identities and official rank order.
 - Kept project files under DSH's scoped filesystem provider instead of registering a duplicate provider or reusing user-global toggle state.
 - Labeled project entries as discovered rather than loaded, exposed workspace-specific rank/path evidence and a manual Refresh action, and warned when an active workspace is not readable from the host.
 - Added regression coverage for nearest-git-root resolution, duplicate Session workspaces, same-name priority within one project, same-name isolation across projects, live modification/removal, stale source identities, and linked bundles outside the project skill root.
@@ -15,6 +17,10 @@ The five most recent published versions are listed below.
 - Added enable/disable controls for project `.dsh/skills`; they update the Skill's invocation-policy fields while leaving Session-scoped catalog ownership with DSH's official provider.
 - Fixed project Trash and restore failing with `EXDEV` when the project and `$DSH_HOME` are on different volumes by using a guarded copy-then-hide fallback.
 - Hid empty project roots from the main source list while preserving them as Create Skill destinations, and removed the unsupported project source-wide toggle without affecting per-Skill enable/disable.
+- Fixed writable project discovery falling back to a non-Git Session cwd and potentially aliasing user-level Skill roots; project sources now require a real `.git` ancestor and are hidden and rejected when they overlap any user Skill root.
+- Stopped list and detail scans from following linked Skill roots, including project `.dsh`/`.agents` containers and Windows reparse points, while retaining the existing linked-bundle containment guard.
+
+Published package: [`@michengai/dsh-skills-manager@0.1.31`](https://www.npmjs.com/package/@michengai/dsh-skills-manager/v/0.1.31).
 
 ## 0.1.30 — 2026-08-28
 
@@ -43,11 +49,3 @@ Published package: [`@michengai/dsh-skills-manager@0.1.28`](https://www.npmjs.co
 - Verified the reporter-provided cross-platform fnOS `trim-cli` Skill archive through the complete isolated import path.
 
 Published package: [`@michengai/dsh-skills-manager@0.1.27`](https://www.npmjs.com/package/@michengai/dsh-skills-manager/v/0.1.27).
-
-## 0.1.26 — 2026-08-27
-
-- Fixed browser folder imports that exceeded the former 16 MiB Base64 JSON request ceiling while still fitting within the documented 25 MiB decoded-content limit.
-- Added client-side checks for the existing 10 MiB ZIP, 5 MiB per-file, 25 MiB total, and 500-entry upload limits so oversized selections fail with a specific message before being read.
-- Replaced the large-string Base64 validation regex with stack-safe validation to prevent multi-MiB files from exhausting the JavaScript call stack.
-
-Published package: [`@michengai/dsh-skills-manager@0.1.26`](https://www.npmjs.com/package/@michengai/dsh-skills-manager/v/0.1.26).

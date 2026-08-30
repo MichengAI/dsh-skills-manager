@@ -32,26 +32,28 @@
 | POST | `/disable` | 停用指定技能。 |
 | POST | `/source-enable` | 启用一个外部技能来源。 |
 | POST | `/source-disable` | 停用一个外部技能来源。 |
-| POST | `/delete` | 把 DSH 技能移到管理器回收站。 |
+| POST | `/delete` | 把用户或活动项目 DSH 技能移到管理器回收站。 |
 | POST | `/trash-restore` | 从回收站恢复技能。 |
 | POST | `/trash-delete` | 永久删除回收站条目。 |
 | POST | `/detail` | 读取技能正文、frontmatter 与诊断。 |
-| POST | `/create` | 在 DSH 技能目录创建技能。 |
+| POST | `/create` | 在用户或活动项目 DSH 技能目录创建技能。 |
 | POST | `/upload` | 上传 ZIP、技能文件夹内容或单个 SKILL.md，并安全暂存后导入。 |
 | POST | `/browse` | 兼容旧客户端：为目录选择器列出一个本机目录层级。 |
 | POST | `/import` | 兼容旧客户端：预检或导入本机插件路径。 |
 
-`/enable` 与 `/disable` 请求体为 `{ "name": "foo-bar", "root": "dsh" }`。用户 DSH 技能通过原子改写 invocation policy 启停；外部用户根技能只写管理器 `state.json`，不修改来源文件。动态项目来源不可启停，返回 `error.root.readonly`。损坏状态下拒绝外部启停写入。
+`/enable` 与 `/disable` 请求体为 `{ "name": "foo-bar", "root": "dsh" }`。用户 DSH 和 `project-dsh:<id>` 技能通过原子改写各自 `SKILL.md` 的 invocation policy 启停；外部用户根技能只写管理器 `state.json`，不修改来源文件。`project-agents:<id>` 不可启停。损坏状态下拒绝外部用户来源的策略写入。
 
 `/source-enable` 与 `/source-disable` 请求体为 `{ "root": "agents" }`；只接受可切换的外部来源。
 
-`/delete` 请求体为 `{ "name": "foo-bar", "root": "dsh" }`；只接受 DSH 根目录。失败回滚不完整时保留 stage 并返回 `error.trash.rollbackFailed`。
+`/delete` 请求体为 `{ "name": "foo-bar", "root": "dsh" }`；接受用户 DSH 或 `/state` 当前返回的 `project-dsh:<id>`。失败回滚不完整时保留 stage 并返回 `error.trash.rollbackFailed`。
 
-`/trash-restore` 与 `/trash-delete` 请求体为 `{ "id": "回收站条目ID" }`。恢复遇到同名技能时拒绝覆盖；永久删除不可恢复。
+`/trash-restore` 与 `/trash-delete` 请求体为 `{ "id": "回收站条目ID" }`。恢复遇到同名技能时拒绝覆盖；项目条目恢复还要求原项目仍处于活动 Session，并重新校验项目根安全边界。永久删除不可恢复。
 
 `/detail` 请求体为 `{ "name": "foo-bar", "root": "dsh" }`，返回正文、frontmatter、诊断与来源只读状态。项目来源使用 `/state` 返回的 `project-dsh:<id>` 或 `project-agents:<id>` 不透明 key；服务端会根据当前活动 Session 重新解析，不能由请求指定 cwd。
 
-`/create` 请求体为 `{ "name": "foo-bar", "description": "简介", "body": "正文" }`；只在 DSH 根创建 bundle 形态技能。
+`/create` 请求体为 `{ "root": "dsh", "name": "foo-bar", "description": "简介", "body": "正文" }`；`root` 可为用户 DSH 或 `/state` 当前返回的 `project-dsh:<id>`，创建 bundle 形态技能并拒绝同名覆盖。省略 `root` 时使用用户 DSH。
+
+动态项目 key 只能由当前活动 Session 重新推导；无 `.git` 的 cwd 不生成项目来源。项目来源与任一用户技能根重叠、容器或技能根为符号链接/reparse point 时，不会出现在 `/state`，相关写入也会被拒绝。
 
 `/upload` 请求体有两种形态：普通文件/文件夹使用 `{ "name": "来源名称", "entries": [{ "path": "相对路径", "data": "Base64" }] }`；ZIP 使用 `{ "name": "demo.zip", "zip": "Base64" }`。Base64 JSON 请求体最多 88 MiB，ZIP 压缩数据最多 32 MiB，单文件最多 32 MiB，解压/上传总量最多 64 MiB、最多 1000 个条目、路径深度最多 64 层。服务端拒绝绝对路径、`..`、Windows 设备名、重复路径和非法 Base64；所有归档条目只写成普通文件，不创建符号链接。暂存目录位于 `$DSH_HOME/skills-manager/uploads`，成功或失败后都会清理，再由既有原子导入流程复制到 `$DSH_HOME/skills`。
 

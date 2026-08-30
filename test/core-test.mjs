@@ -1022,6 +1022,9 @@ ok(hostInject.includes("sessions"), "host declares the Session service used for 
 eq(activeSessionCwds({ sessions: { list: () => [{ header: { cwd: routeProjectNested } }, { header: { cwd: routeProjectNested } }, { header: {} }] } }).length, 1, "activeSessionCwds deduplicates valid workspace paths");
 
 // ── 项目级 Skill：按 workspace 隔离、遵循官方优先级、每次请求重新发现 ──
+const noGitWorkspace = join(tmp, "no-git-workspace");
+await mkdir(noGitWorkspace, { recursive: true });
+eq((await projectRoots([noGitWorkspace])).length, 0, "projectRoots does not treat a readable cwd without a .git ancestor as a project");
 const secondProject = join(tmp, "second-project");
 await mkdir(join(secondProject, ".git"), { recursive: true });
 await makeSkill(join(routeProject, ".dsh", "skills"), "project-priority", "---\nname: project-priority\ndescription: Project DSH winner.\n---\nDSH winner");
@@ -1077,14 +1080,35 @@ const unsafeProjectTarget = join(tmp, "unsafe-project-target");
 await mkdir(join(unsafeProject, ".git"), { recursive: true });
 await mkdir(join(unsafeProject, ".dsh"), { recursive: true });
 await makeSkill(unsafeProjectTarget, "outside-project-write", "---\nname: outside-project-write\ndescription: Must stay outside.\n---\nOutside");
+const unsafeDefinition = (await projectRoots([unsafeProject])).find((root) => root.kind === "project-dsh");
 if (await tryLink(unsafeProjectTarget, join(unsafeProject, ".dsh", "skills"), projectLinkType)) {
-  const unsafeDefinition = (await projectRoots([unsafeProject])).find((root) => root.kind === "project-dsh");
+  ok(!(await projectRoots([unsafeProject])).some((root) => root.kind === "project-dsh"), "project discovery hides a linked .dsh/skills root");
+  ok(!(await state({ projectCwds: [unsafeProject] })).roots.some((root) => root.kind === "project-dsh" && root.projectRoot === unsafeProject), "state does not expose a linked project DSH root");
+  eq((await scanEntries(join(unsafeProject, ".dsh", "skills"))).entries.length, 0, "scanEntries does not follow a linked skill root");
+  eq(await resolveEntry(join(unsafeProject, ".dsh", "skills"), "outside-project-write"), null, "resolveEntry does not follow a linked skill root");
+  eq((await skillDetail(unsafeDefinition.key, "outside-project-write", { projectCwds: [unsafeProject] })).code, "error.root.unknown", "project detail cannot read through a linked skill root");
   eq((await createSkill({ name: "Escaped Create", description: "Must not escape.", body: "Denied." }, null, { root: unsafeDefinition })).code, "error.root.unsafe", "project create refuses a linked .dsh/skills root");
   eq((await setSkillEnabled(unsafeDefinition, "outside-project-write", false)).code, "error.root.unsafe", "project toggle refuses a linked .dsh/skills root");
   eq((await deleteSkill(unsafeDefinition, "outside-project-write")).code, "error.root.unsafe", "project delete refuses a linked .dsh/skills root");
   ok((await resolveEntry(unsafeProjectTarget, "outside-project-write")) !== null, "unsafe project mutations leave the linked external target unchanged");
 } else {
   ok(true, "project mutation root-link test skipped because this environment cannot create links");
+}
+const overlapProject = join(tmp, "overlap-project");
+await mkdir(join(overlapProject, ".git"), { recursive: true });
+const overlapDefinition = (await projectRoots([overlapProject])).find((root) => root.kind === "project-dsh");
+const originalDshHome = process.env.DSH_HOME;
+const originalAgentsHome = process.env.DSH_AGENTS_HOME;
+process.env.DSH_HOME = join(overlapProject, ".dsh");
+process.env.DSH_AGENTS_HOME = join(overlapProject, ".agents");
+try {
+  const overlapRoots = await projectRoots([overlapProject]);
+  eq(overlapRoots.length, 0, "project discovery hides project roots that overlap user DSH and Agent roots");
+  eq((await state({ projectCwds: [overlapProject] })).roots.filter((root) => root.scope === "project").length, 0, "state exposes only the user roots when a dotfiles project overlaps them");
+  eq((await createSkill({ name: "Overlap Write", description: "Must not write.", body: "Denied." }, null, { root: overlapDefinition })).code, "error.root.unsafe", "write validation rejects a previously resolved project root after it overlaps the user DSH root");
+} finally {
+  process.env.DSH_HOME = originalDshHome;
+  process.env.DSH_AGENTS_HOME = originalAgentsHome;
 }
 const unavailableProjectSnap = await state({ projectCwds: [join(tmp, "missing-workspace")] });
 eq(unavailableProjectSnap.warnings.find((warning) => warning.code === "warning.project.unavailable").params.path, join(tmp, "missing-workspace"), "unreadable active workspaces produce an observable project-discovery warning");
