@@ -12,6 +12,8 @@ The five most recent published versions are listed below.
 - Added regression coverage for nearest-git-root resolution, duplicate Session workspaces, same-name priority within one project, same-name isolation across projects, live modification/removal, stale source identities, and linked bundles outside the project skill root.
 - Added Settings creation and recoverable Trash deletion for active project `.dsh/skills`, reusing the global whole-bundle rollback/publish flow while keeping project `.agents/skills` read-only.
 - Trash now records the original user or project source, displays it in Settings, and restores project entries only after resolving the same opaque root from a currently active Session workspace.
+- Added enable/disable controls for project `.dsh/skills`; they update the Skill's invocation-policy fields while leaving Session-scoped catalog ownership with DSH's official provider.
+- Fixed project Trash and restore failing with `EXDEV` when the project and `$DSH_HOME` are on different volumes by using a guarded copy-then-hide fallback.
 
 ## 0.1.30 — 2026-08-28
 

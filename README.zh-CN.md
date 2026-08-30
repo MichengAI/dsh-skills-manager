@@ -23,7 +23,7 @@
 ## 功能概览
 
 - 自动发现并把 `.agents`、Codex、Claude、Gemini 和 OpenCode 的用户级技能真正加载进 DSH。
-- 从活动 Session 工作区发现项目级 `.dsh/skills` 与 `.agents/skills` 并按项目分组；项目 DSH Skill 可创建、移入回收站和恢复，项目 Agent Skill 保持只读。
+- 从活动 Session 工作区发现项目级 `.dsh/skills` 与 `.agents/skills` 并按项目分组；项目 DSH Skill 可启停、创建、移入回收站和恢复，项目 Agent Skill 保持只读。
 - 外部来源启停只写入 `$DSH_HOME\skills-manager\state.json`，绝不改写共享源文件。
 - 按来源折叠、搜索和筛选，并查看技能正文、frontmatter、加载状态、重名遮蔽与格式诊断。
 - 在设置页创建用户级或项目级 DSH Skill；对话创建仍为用户级，并在写入前请求确认。
@@ -137,7 +137,7 @@ dsh --profile web --dump-config
 | --- | --- | --- |
 | 搜索或筛选 | 按来源、名称或简介收窄列表。 | 全部来源 |
 | 查看详情与诊断 | 查看正文、frontmatter、源文件路径、格式问题和重名遮蔽。 | 全部来源 |
-| 启用或停用 | 用户级 DSH 技能更新自身调用策略；外部用户技能只更新 manager 本地状态。 | 用户级来源 |
+| 启用或停用 | 用户级与项目级 DSH Skill 更新自身调用策略；外部用户技能只更新 manager 本地状态。 | 用户级来源与活动项目 DSH Skill |
 | 创建或导入 | 在设置页创建时选择用户 DSH 或活动项目 DSH；导入仍为用户级。 | `$DSH_HOME\skills`，创建可选活动 `<project>/.dsh/skills` |
 | 从对话创建 | 让 Agent 调用 `create_skill`；写入前由 DSH 审批界面确认。 | `$DSH_HOME\skills` |
 | 删除与恢复 | 删除先进入回收站；可恢复到原来源或永久二次删除。 | 用户级与活动项目级 DSH Skill |
@@ -153,12 +153,13 @@ dsh --profile web --dump-config
 | `$DSH_HOME\skills` | 支持 | 改写本地调用策略 | 支持 | 进入回收站 |
 | `$DSH_AGENTS_HOME\skills` | 支持 | 仅写 manager 状态 | 不支持 | 不支持 |
 | `~/.codex/skills`、`~/.claude/skills`、`~/.gemini/skills`、`~/.config/opencode/skills` | 支持 | 仅写 manager 状态 | 不支持 | 不支持 |
-| `<project>/.dsh/skills` | 支持活动 Session 工作区 | 不支持；由 DSH 作用域 filesystem provider 管理 | 设置页支持创建 | 进入回收站并恢复到原项目 |
+| `<project>/.dsh/skills` | 支持活动 Session 工作区 | 改写 Skill 调用策略；仍由 DSH 作用域 provider 负责加载 | 设置页支持创建 | 进入回收站并恢复到原项目 |
 | `<project>/.agents/skills` | 支持活动 Session 工作区 | 不支持；由 DSH 作用域 filesystem provider 管理 | 不支持 | 不支持 |
 
 - 启用、停用和删除只接受单个普通技能名称，目录穿越名称会被拒绝。
 - 项目根只从活动 Session 的 `cwd` 推导；客户端只提交不透明来源 key，不能指定任意工作区路径。
-- 项目来源遵循 DSH 最近 `.git` 项目根和固定优先级（`project-dsh` 100、`project-agents` 200）。管理器每次读取状态或详情时重新扫描且不重复注册项目 provider；写入仅限活动项目 `.dsh/skills` 下的创建、回收与恢复。
+- 项目来源遵循 DSH 最近 `.git` 项目根和固定优先级（`project-dsh` 100、`project-agents` 200）。管理器每次读取状态或详情时重新扫描且不重复注册项目 provider；写入仅限活动项目 `.dsh/skills` 下的调用策略启停、创建、回收与恢复。
+- 当项目与 `$DSH_HOME` 位于不同磁盘时，回收站会降级为“复制后在源盘原子隐藏”；恢复使用反向的同一安全流程。
 - 项目回收站条目保存原始不透明来源身份。仅当原项目仍由活动 Session 工作区提供时才允许恢复；客户端不能指定替代路径。
 - 项目写入会拒绝链接形式的 `.dsh` 或 `.dsh/skills` 目录，避免仓库把创建、删除或恢复重定向到项目根之外。
 - 项目条目标记为“已发现”而不是“已加载”：只有 DSH 的 Session 作用域目录才能证明模型可见性。IDE、Git 或 shell 改动后可点击“刷新”；模型目录 watcher 与 invalidation 仍由官方 provider 负责。

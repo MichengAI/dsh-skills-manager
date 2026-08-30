@@ -389,6 +389,44 @@ ok((await listTrash()).some((item) => item.id === fallbackDeleted.id), "trash pu
 await restoreTrash(fallbackDeleted.id);
 eq(await readFile(join(dshRoot, "trash-publish-fallback", "asset.txt"), "utf8"), "kept", "trash publish fallback preserves nested files through restore");
 
+// 项目根与 manager Trash 可能位于不同盘符；EXDEV 时复制后在源盘原子隐藏，恢复同样降级。
+const crossDeviceBundle = await makeSkill(dshRoot, "cross-device-trash", "---\nname: cross-device-trash\ndescription: Cross-device fallback.\n---\nbody");
+await writeFile(join(crossDeviceBundle, "asset.txt"), "cross-device-kept", "utf8");
+let crossDeviceDeleteFallbacks = 0;
+const crossDeviceDeleted = await deleteSkill(dshRoot, "cross-device-trash", null, {
+  renameOptions: {
+    maxAttempts: 1,
+    async rename(source, destination) {
+      if (source === crossDeviceBundle && destination.includes(`${sep}.stage-`)) {
+        crossDeviceDeleteFallbacks++;
+        const error = new Error("simulated cross-device delete");
+        error.code = "EXDEV";
+        throw error;
+      }
+      return rename(source, destination);
+    },
+  },
+});
+eq(crossDeviceDeleteFallbacks, 1, "deleteSkill falls back exactly once after EXDEV");
+ok(await resolveEntry(dshRoot, "cross-device-trash") === null, "cross-device delete hides the source entry");
+let crossDeviceRestoreFallbacks = 0;
+await restoreTrash(crossDeviceDeleted.id, null, {
+  renameOptions: {
+    maxAttempts: 1,
+    async rename(source, destination) {
+      if (basename(source) === "cross-device-trash" && destination === crossDeviceBundle) {
+        crossDeviceRestoreFallbacks++;
+        const error = new Error("simulated cross-device restore");
+        error.code = "EXDEV";
+        throw error;
+      }
+      return rename(source, destination);
+    },
+  },
+});
+eq(crossDeviceRestoreFallbacks, 1, "restoreTrash falls back exactly once after EXDEV");
+eq(await readFile(join(crossDeviceBundle, "asset.txt"), "utf8"), "cross-device-kept", "cross-device restore preserves the complete bundle");
+
 // 删除发生二次故障时必须保留未恢复的 stage，不能清理唯一副本。
 const rollbackBundle = await makeSkill(dshRoot, "rollback-risk", "---\nname: rollback-risk\ndescription: Bundle.\n---\nbody");
 const rollbackFlat = join(dshRoot, "rollback-risk.md");
@@ -808,6 +846,12 @@ try {
   eq(projectCreateResponse.status, 200, "create route accepts an active Session project DSH root identity");
   eq(projectCreateResponse.payload.data.root, httpProjectDshRoot.key, "project create returns the resolved project root identity");
   ok((await resolveEntry(join(routeProject, ".dsh", "skills"), "route-project-created")) !== null, "project create persists under the active project's .dsh/skills root");
+  const projectDisableResponse = await requestJson(api + "/disable", "POST", secureHeaders, JSON.stringify({ root: httpProjectDshRoot.key, name: "route-project-created" }));
+  eq(projectDisableResponse.status, 200, "disable route accepts an active project DSH root");
+  ok((await readFile(join(routeProject, ".dsh", "skills", "route-project-created", "SKILL.md"), "utf8")).includes("disable-model-invocation: true"), "project disable updates the project's own invocation policy");
+  const projectEnableResponse = await requestJson(api + "/enable", "POST", secureHeaders, JSON.stringify({ root: httpProjectDshRoot.key, name: "route-project-created" }));
+  eq(projectEnableResponse.status, 200, "enable route restores an active project DSH skill");
+  ok(!(await readFile(join(routeProject, ".dsh", "skills", "route-project-created", "SKILL.md"), "utf8")).includes("disable-model-invocation: true"), "project enable removes the project invocation override");
   const projectDeleteResponse = await requestJson(api + "/delete", "POST", secureHeaders, JSON.stringify({ root: httpProjectDshRoot.key, name: "route-project-created" }));
   eq(projectDeleteResponse.status, 200, "delete route moves a project DSH skill to the shared Trash");
   eq(projectDeleteResponse.payload.data.root.scope, "project", "project Trash metadata retains the original scope");
@@ -988,7 +1032,7 @@ eq(resolvedProjectRoots.length, 4, "projectRoots deduplicates Sessions by neares
 eq(new Set(resolvedProjectRoots.map((root) => root.key)).size, 4, "project source keys stay unique across workspaces and source kinds");
 const writableProjectDefinition = resolvedProjectRoots.find((root) => root.kind === "project-dsh" && root.projectRoot === routeProject);
 const readonlyProjectDefinition = resolvedProjectRoots.find((root) => root.kind === "project-agents" && root.projectRoot === routeProject);
-ok(writableProjectDefinition.mutable === true && writableProjectDefinition.toggleable === false, "project DSH roots allow create/delete without taking over invocation toggles");
+ok(writableProjectDefinition.mutable === true && writableProjectDefinition.toggleable === true, "project DSH roots allow create/delete and file-backed invocation toggles");
 const directProjectCreated = await createSkill({ name: "Direct Project Created", description: "Direct project create.", body: "Direct project body." }, null, { root: writableProjectDefinition });
 eq(directProjectCreated.root, writableProjectDefinition.key, "createSkill accepts a validated active project DSH definition");
 ok((await resolveEntry(writableProjectDefinition.path, "direct-project-created")) !== null, "direct project creation writes to .dsh/skills");
@@ -1005,7 +1049,7 @@ const projectSnap = await state({ projectCwds: [routeProjectNested, secondProjec
 const firstDshProject = projectSnap.roots.find((root) => root.kind === "project-dsh" && root.projectRoot === routeProject);
 const firstAgentsProject = projectSnap.roots.find((root) => root.kind === "project-agents" && root.projectRoot === routeProject);
 const secondAgentsProject = projectSnap.roots.find((root) => root.kind === "project-agents" && root.projectRoot === secondProject);
-ok(firstDshProject && firstDshProject.scope === "project" && firstDshProject.mutable === true && firstDshProject.toggleable === false, "project DSH roots are visible and allow create/delete while invocation toggles remain provider-owned");
+ok(firstDshProject && firstDshProject.scope === "project" && firstDshProject.mutable === true && firstDshProject.toggleable === true, "project DSH roots expose create/delete plus invocation-policy toggles");
 eq(firstDshProject.rank, 100, "project state exposes the official project-dsh rank");
 eq(firstAgentsProject.rank, 200, "project state exposes the official project-agents rank");
 ok(firstAgentsProject.skills.find((skill) => skill.name === "project-priority").shadowedBy.root === firstDshProject.key, "project DSH rank 100 shadows project Agent rank 200 within one workspace");
@@ -1036,6 +1080,7 @@ await makeSkill(unsafeProjectTarget, "outside-project-write", "---\nname: outsid
 if (await tryLink(unsafeProjectTarget, join(unsafeProject, ".dsh", "skills"), projectLinkType)) {
   const unsafeDefinition = (await projectRoots([unsafeProject])).find((root) => root.kind === "project-dsh");
   eq((await createSkill({ name: "Escaped Create", description: "Must not escape.", body: "Denied." }, null, { root: unsafeDefinition })).code, "error.root.unsafe", "project create refuses a linked .dsh/skills root");
+  eq((await setSkillEnabled(unsafeDefinition, "outside-project-write", false)).code, "error.root.unsafe", "project toggle refuses a linked .dsh/skills root");
   eq((await deleteSkill(unsafeDefinition, "outside-project-write")).code, "error.root.unsafe", "project delete refuses a linked .dsh/skills root");
   ok((await resolveEntry(unsafeProjectTarget, "outside-project-write")) !== null, "unsafe project mutations leave the linked external target unchanged");
 } else {
