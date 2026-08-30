@@ -1,6 +1,6 @@
 # HTTP 接口文档
 
-更新时间：2026-08-30（Asia/Shanghai）
+更新时间：2026-08-31（Asia/Shanghai）
 
 ## 通用约定
 
@@ -18,7 +18,7 @@
 - 覆盖导入回滚失败返回 `error.import.rollbackFailed`，`params.path` 为备份路径，`params.error` 为原始原因。
 - 移到回收站的回滚失败返回 `error.trash.rollbackFailed`；未恢复内容保留在 `params.path` 指向的 stage，服务端不会再清理唯一副本。
 - Windows 若在最终 stage 改名阶段持续返回 `EPERM` / `EACCES` / `EBUSY`，服务端会保留 stage 作为回滚源，复制完整条目后最后写入 `metadata.json`；调用方仍收到普通成功结果。
-- 已存在但不可读或结构非法的 `state.json` 触发 `warning.state.invalid`，所有外部来源按停用处理；启停写入返回 `error.state.invalid`，避免覆盖原策略。
+- 已存在但不可读或结构非法的 `state.json` 触发 `warning.state.invalid`，所有来源按停用处理；启停写入返回 `error.state.invalid`，避免覆盖原策略。
 - 导入成功但旧备份未删除时，`imported[].warnings[]` 带 `warning.backupUncleaned`；前端按当前语言展示。
 - 系统异常（如 ENOENT）不携带 `code`，保留原始 `error` 文本。
 
@@ -26,7 +26,7 @@
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| GET | `/state` | 获取活动 Session 项目 DSH/Agent、用户 DSH、公共 Agent、Codex、Claude、Gemini、OpenCode 与回收站状态快照；技能项包含 `hasFrontmatter`、`invocationPolicyValid` 与 `loadable` 诊断字段。 |
+| GET | `/state` | 获取活动 Session 项目 DSH/Agent、用户 DSH、公共 Agent、Codex、Claude、Gemini、OpenCode 与回收站状态快照；技能项包含最终 `enabled`、兼容字段 `managerEnabled`、三态 `managerOverride`、`effectiveModelInvocable`、`effectiveUserInvocable`、`hasFrontmatter`、`invocationPolicyValid` 与 `loadable`，摘要使用 `summary.enabled` 而非含糊的 `summary.loaded`。 |
 | HEAD | `/state` | 返回与 GET 相同的状态码及响应头，不发送实体。 |
 | POST | `/enable` | 启用指定技能。 |
 | POST | `/disable` | 停用指定技能。 |
@@ -41,7 +41,7 @@
 | POST | `/browse` | 兼容旧客户端：为目录选择器列出一个本机目录层级。 |
 | POST | `/import` | 兼容旧客户端：预检或导入本机插件路径。 |
 
-`/enable` 与 `/disable` 请求体为 `{ "name": "foo-bar", "root": "dsh" }`。用户 DSH 和 `project-dsh:<id>` 技能通过原子改写各自 `SKILL.md` 的 invocation policy 启停；外部用户根技能只写管理器 `state.json`，不修改来源文件。`project-agents:<id>` 不可启停。损坏状态下拒绝外部用户来源的策略写入。
+`/enable` 与 `/disable` 请求体为 `{ "name": "foo-bar", "root": "dsh" }`。所有来源都只写管理器 `state.json`，不修改来源文件；显式启用记录在 `enabledSkills`，显式停用记录在 `disabledSkills`，二者互斥。用户 DSH 使用 rank 399 策略候选，项目 DSH/Agent 按不透明项目 key 隔离并使用 workspace 作用域 rank 99/199 候选。损坏状态下拒绝全部策略写入并安全停用所有来源。
 
 `/source-enable` 与 `/source-disable` 请求体为 `{ "root": "agents" }`；只接受可切换的外部来源。
 

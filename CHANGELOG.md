@@ -6,6 +6,13 @@ The five most recent published versions are listed below.
 
 ## Unreleased
 
+## 0.1.32 — 2026-08-31
+
+- Unified every per-Skill enable/disable action—user DSH, shared Agents, Codex, Claude, Gemini, OpenCode, project DSH, and project Agents—under manager-local tri-state policy; toggles never rewrite a source Skill file.
+- Added explicit enable overrides for source-disabled or invalid invocation fields, enforced by user DSH rank 399 and project rank 99/199 policy candidates; legacy state files migrate without losing existing disabled entries.
+- Replaced ambiguous **Loaded/Discovered** UI and API counters with **Enabled/Disabled** invocation-policy terminology; this no longer implies that a Skill body has already been fetched into a Session.
+- Expanded i18n contract tests to cover every literal client key, every host error/warning/diagnostic code, placeholder parity, and removal of legacy loading terminology in both languages.
+
 ## 0.1.31 — 2026-08-30
 
 - Added project Skill discovery for active Session workspaces, covering project-root `.dsh/skills` and `.agents/skills` with stable workspace-specific identities and official rank order.

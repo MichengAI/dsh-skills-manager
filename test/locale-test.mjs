@@ -79,10 +79,21 @@ const hostSources = await Promise.all([
 ]);
 const hostCodes = new Set();
 for (const hostSource of hostSources) {
-  for (const match of hostSource.matchAll(/["']((?:error|warning)\.[A-Za-z]+(?:\.[A-Za-z]+)*)["']/g)) hostCodes.add(match[1]);
+  for (const match of hostSource.matchAll(/["']((?:error|warning|diagnostic)\.[A-Za-z]+(?:\.[A-Za-z]+)*)["']/g)) hostCodes.add(match[1]);
 }
 for (const code of hostCodes) {
   ok(code in DICT.zh && code in DICT.en, "host error code exists in both dictionaries: " + code);
+}
+
+const literalTranslationKeys = new Set();
+for (const match of source.matchAll(/\bt\(\s*["']([A-Za-z][A-Za-z0-9]*(?:\.[A-Za-z0-9]+)*)["']/g)) literalTranslationKeys.add(match[1]);
+for (const key of literalTranslationKeys) {
+  ok(key in DICT.zh && key in DICT.en, "literal client translation key exists in both dictionaries: " + key);
+}
+for (const locale of ["zh", "en"]) {
+  for (const [key, value] of Object.entries(DICT[locale])) {
+    ok(!/(?:已加载|已发现|\bLoaded\b|\bDiscovered\b)/.test(value), `${locale} translation avoids legacy loading terminology: ${key}`);
+  }
 }
 
 // ── translateError 纯函数测试（模拟宿主 translate 行为：{name} 占位符，miss 返回 key 本身）──
@@ -93,6 +104,18 @@ ok(typeof isSkillEnabled === "function", "factory exports the shared enabled-sta
 ok(isSkillEnabled({ invocationPolicyValid: true, modelInvocable: true, userInvocable: true }), "valid model and user invocation is enabled");
 ok(!isSkillEnabled({ invocationPolicyValid: true, modelInvocable: true, userInvocable: false }), "user-disabled skill is not enabled");
 ok(!isSkillEnabled({ invocationPolicyValid: false, modelInvocable: true, userInvocable: true }), "invalid invocation policy is not enabled");
+ok(isSkillEnabled({ enabled: true, invocationPolicyValid: false, modelInvocable: false, userInvocable: false }), "explicit manager policy is authoritative over source invocation fields");
+const countKey = bundle.countKey;
+ok(typeof countKey === "function", "factory exports locale plural-key selection");
+eq(countKey("summary.group", 1), "summary.group.one", "singular count selects the one form");
+eq(countKey("summary.group", 0), "summary.group.other", "zero count selects the other form");
+eq(countKey("summary.group", 2), "summary.group.other", "plural count selects the other form");
+for (const base of ["summary.total", "summary.enabled", "summary.disabled", "summary.issues", "summary.group", "upload.selected", "trash.count"]) {
+  ok(countKey(base, 1) in DICT.zh && countKey(base, 1) in DICT.en, `singular translation exists for ${base}`);
+  ok(countKey(base, 2) in DICT.zh && countKey(base, 2) in DICT.en, `plural translation exists for ${base}`);
+}
+eq(DICT.en[countKey("summary.group", 1)], "{count} skill", "English singular source count is grammatical");
+eq(DICT.en[countKey("upload.selected", 1)], "{count} file · {size}", "English singular upload count is grammatical");
 const summarizeImportResult = bundle.summarizeImportResult;
 ok(typeof summarizeImportResult === "function", "factory exports import-result summarization");
 
@@ -184,7 +207,9 @@ eq(rootDisplayName(mockT, { key: "project-agents:abc", kind: "project-agents", l
 eq(rootDisplayName(mockT, { key: "codex", label: "Codex" }), "Codex", "fixed user source labels remain unchanged");
 ok(DICT.zh["root.projectDsh"] && DICT.en["root.projectAgents"], "project DSH and Agent sources are localized in both languages");
 ok(DICT.zh["status.project"] && DICT.en["status.project"], "project-scope status is localized in both languages");
-ok(DICT.zh["status.discovered"] && DICT.en["status.discovered"], "project discovery does not reuse the stronger loaded-status copy");
+eq(DICT.zh["status.enabled"], "已启用", "Chinese status describes invocation policy without claiming body loading");
+eq(DICT.en["status.enabled"], "Enabled", "English status describes invocation policy without claiming body loading");
+ok(DICT.zh["summary.enabled.one"] && DICT.en["summary.enabled.other"], "enabled summary terminology is localized in both languages");
 eq(mockT("status.rank", { rank: 100 }), "Rank 100", "project source priority is visible in the localized UI");
 ok(DICT.zh["create.target"] && DICT.en["trash.source"], "project create targets and Trash source labels are localized in both languages");
 
@@ -275,10 +300,13 @@ ok(source.includes('h(SourceSelect, { value: form.root, options: createOptions')
 ok(source.includes('t("trash.source", { source: trashRootLabel(item) })'), "Trash identifies the original user or project source before restore");
 ok(source.includes('createRoots = allRoots.filter'), "empty project roots remain available as first-Skill create destinations");
 ok(source.includes('root.scope !== "project" && root.key !== "dsh"'), "project roots never expose the unsupported source-level toggle");
+ok(!source.includes('"status.discovered"'), "project rows no longer use the ambiguous Discovered status");
+ok(!source.includes('"summary.loaded"'), "summary no longer claims that enabled Skill bodies are loaded");
+ok(!source.includes("dssm-loaded"), "internal status styling also uses enabled terminology");
 ok(source.includes('value: activeSource, options: options'), "a selected project source that becomes empty falls back to All Sources");
 ok(!source.includes('setModal("browse")'), "native selection never chains into a second directory browser");
 ok(!source.includes('callApi("/browse"'), "client no longer uses the in-app absolute-path browser");
-ok(source.includes('repairable ? h("button"') && source.includes('t("btn.repair.enable")'), "invalid local invocation policy exposes Repair & enable instead of a disabled switch");
+ok(!source.includes('btn.repair.enable') && !source.includes("repairable"), "toggle UI never offers a source-rewriting repair action");
 ok(source.includes("(data.warnings || []).map"), "state-level warnings are rendered in the settings page");
 ok(source.includes("dssm-warning"), "warning feedback has a distinct visual state");
 ok(source.includes("@container(max-width:780px)"), "skill rows respond to the settings content width rather than only the viewport");
