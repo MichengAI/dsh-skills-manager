@@ -22,7 +22,7 @@
 
 ## 功能概览
 
-- 自动发现并把 `.agents`、Codex、Claude、Gemini 和 OpenCode 的用户级技能真正加载进 DSH。
+- 自动发现并把 `.agents`、CC Switch、Codex、Claude、Gemini 和 OpenCode 的用户级技能真正加载进 DSH。
 - 从活动 Session 工作区发现项目级 `.dsh/skills` 与 `.agents/skills` 并按项目分组；所有有效 Skill 都可通过不改源文件的本地策略启停。
 - 所有逐 Skill 启停都只写入 `$DSH_HOME\skills-manager\state.json`，绝不改写任何来源 Skill 文件。
 - 按来源折叠、搜索和筛选，并查看技能正文、frontmatter、调用状态、重名遮蔽与格式诊断。
@@ -152,6 +152,7 @@ dsh --profile web --dump-config
 | --- | --- | --- | --- | --- |
 | `$DSH_HOME\skills` | 支持 | 仅写 manager 状态 | 支持 | 进入回收站 |
 | `$DSH_AGENTS_HOME\skills` | 支持 | 仅写 manager 状态 | 不支持 | 不支持 |
+| `~\.cc-switch\skills` | 支持，默认开启 | 仅写 manager 状态 | 不支持 | 不支持 |
 | `~/.codex/skills`、`~/.claude/skills`、`~/.gemini/skills`、`~/.config/opencode/skills` | 支持 | 仅写 manager 状态 | 不支持 | 不支持 |
 | `<project>/.dsh/skills` | 支持活动 Session 工作区 | 仅写 manager 状态 | 设置页支持创建 | 进入回收站并恢复到原项目 |
 | `<project>/.agents/skills` | 支持活动 Session 工作区 | 仅写 manager 状态 | 不支持 | 不支持 |
@@ -162,6 +163,7 @@ dsh --profile web --dump-config
 - 当项目与 `$DSH_HOME` 位于不同磁盘时，回收站会降级为“复制后在源盘原子隐藏”；恢复使用反向的同一安全流程。
 - 项目回收站条目保存原始不透明来源身份。仅当原项目仍由活动 Session 工作区提供时才允许恢复；客户端不能指定替代路径。
 - 项目写入会拒绝链接形式的 `.dsh` 或 `.dsh/skills` 目录，避免仓库把创建、删除或恢复重定向到项目根之外。
+- 用户级只读来源允许顶层技能目录链接，但真实目标必须是另一个已知只读 Skills 根的普通直接子目录；同一真实技能按来源优先级只展示和加载一次。可写 DSH、项目来源、技能根链接和任意外部目标仍被拒绝。
 - 列表和摘要统一使用“已启用/已停用”，不再使用“已加载”：这里描述的是调用策略，完整 Skill 正文仍由 DSH 按需加载。IDE、Git 或 shell 改动后可点击“刷新”；项目 catalog 的 watcher 与 invalidation 仍由官方 provider 负责。
 - 没有 Skill 的项目根不会出现在主来源列表中，但仍保留在“创建技能”的目标选择中，确保可以创建第一个项目 Skill。项目 DSH 只提供逐 Skill 启停，不提供整个项目来源总开关。
 - 覆盖前先复制到同目录临时路径；复制成功前不会改动现有技能。

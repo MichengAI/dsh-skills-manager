@@ -6,6 +6,10 @@
 
 ## 未发布
 
+- 新增默认开启的只读 `CC Switch` 来源，固定读取 `~\.cc-switch\skills`，支持来源级与逐 Skill 本地启停；旧状态文件自动补齐新来源，不会因缺少新键失败关闭。
+- 用户级只读来源支持指向已知只读 Skills 根直接子目录的顶层技能链接；Provider 在加载时复验真实目标，并按真实路径去重 CC Switch 分发到 Codex、Claude 等目录的副本。
+- 可写 DSH、项目来源、技能根链接、隐藏或非法目标以及任意根外目标继续拒绝，导入符号链接边界不变。
+
 ## 0.1.32 — 2026-08-31
 
 - 将用户 DSH、公共 Agent、Codex、Claude、Gemini、OpenCode、项目 DSH 与项目 Agent 的逐 Skill 启停全部统一为 manager 本地三态策略；启停不再改写任何来源 Skill 文件。

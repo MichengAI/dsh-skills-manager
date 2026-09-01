@@ -78,6 +78,9 @@ async function makeSkill(root, name, content) {
 }
 
 const tmp = await mkdtemp(join(tmpdir(), "dssm-test-"));
+const testUserHome = join(tmp, "home");
+process.env.HOME = testUserHome;
+process.env.USERPROFILE = testUserHome;
 process.env.DSH_HOME = join(tmp, "dsh");
 process.env.DSH_AGENTS_HOME = join(tmp, "agents");
 process.env.DSH_CODEX_HOME = join(tmp, "codex");
@@ -86,10 +89,17 @@ process.env.DSH_GEMINI_HOME = join(tmp, "gemini");
 process.env.DSH_OPENCODE_HOME = join(tmp, "opencode");
 const dshRoot = join(process.env.DSH_HOME, "skills");
 const agentsRoot = join(process.env.DSH_AGENTS_HOME, "skills");
+const ccswitchRoot = join(testUserHome, ".cc-switch", "skills");
 const codexRoot = join(process.env.DSH_CODEX_HOME, "skills");
 await mkdir(dshRoot, { recursive: true });
 await mkdir(agentsRoot, { recursive: true });
+await mkdir(ccswitchRoot, { recursive: true });
 await mkdir(codexRoot, { recursive: true });
+
+const ccswitchDefinition = userRoots().find((root) => root.key === "ccswitch");
+ok(ccswitchDefinition && ccswitchDefinition.path === ccswitchRoot, "userRoots exposes the fixed CC Switch Skills storage");
+ok(ccswitchDefinition && ccswitchDefinition.mutable === false && ccswitchDefinition.toggleable === true, "CC Switch source is read-only and locally toggleable");
+eq(ccswitchDefinition && ccswitchDefinition.rank, 510, "CC Switch source ranks after shared Agents and before app-specific roots");
 
 // Linux 同样必须拒绝 Windows 保留设备名；Windows 无法创建这类来源，故仅在可创建的系统上做端到端断言。
 if (process.platform !== "win32") {
@@ -154,6 +164,7 @@ ok(clientSource.includes('.dssm-modal-actions{display:flex;justify-content:flex-
 ok(clientSource.includes('placeholder: t("search.placeholder")'), "settings panel registers a skill search input");
 ok(clientSource.includes('className: "dssm-control dssm-search"'), "search field follows the source-first filter layout");
 ok(clientSource.includes('className: "dssm-sources"'), "settings panel renders source-first skill groups");
+ok(clientSource.includes('"root.ccswitch": "CC Switch"'), "settings panel localizes the CC Switch source in both dictionaries");
 ok(clientSource.includes('className: "dssm-select-trigger"'), "category filter uses the styled custom select");
 ok(clientSource.includes('.dssm-select-menu{'), "custom select menu uses design tokens instead of native chrome");
 ok(!/h\(\s*"select"/.test(clientSource), "category filter does not use a native select");
@@ -330,6 +341,82 @@ ok(codexCandidate && codexCandidate.invocation.modelInvocable === true, "Codex s
 eq(codexCandidate.rank, 520, "Codex provider rank stays below native DSH and public Agents");
 const loadedCodex = await getProviderSkill(codexCandidate);
 eq(loadedCodex.content, "Codex review body", "provider loads the external skill body");
+
+// CC Switch 以固定 SSOT 保存技能，并把顶层技能目录链接到各 Agent 来源。
+const ccswitchSkill = await makeSkill(ccswitchRoot, "ccswitch-shared", "---\nname: ccswitch-shared\ndescription: Shared by CC Switch.\n---\nCC Switch body");
+const linkedCcSwitchSkill = join(codexRoot, "ccswitch-shared");
+const readonlyOutsideRoot = join(tmp, "readonly-link-outside");
+const readonlyOutsideSkill = await makeSkill(readonlyOutsideRoot, "outside-linked", "---\nname: outside-linked\ndescription: Outside trusted roots.\n---\nOutside body");
+const providerLinkType = process.platform === "win32" ? "junction" : undefined;
+if (await tryLink(ccswitchSkill, linkedCcSwitchSkill, providerLinkType)) {
+  const linkedCodexEntry = (await scanEntries(codexRoot)).entries.find((entry) => entry.name === "ccswitch-shared");
+  ok(linkedCodexEntry && linkedCodexEntry.linked === true, "user read-only roots discover a trusted top-level linked Skill bundle");
+  ok(await resolveEntry(codexRoot, "ccswitch-shared") !== null, "resolveEntry resolves a trusted top-level linked Skill bundle");
+
+  const ccswitchState = await state();
+  const ccswitchView = ccswitchState.roots.find((root) => root.key === "ccswitch");
+  const codexView = ccswitchState.roots.find((root) => root.key === "codex");
+  ok(ccswitchView && ccswitchView.enabled === true && ccswitchView.skills.some((skill) => skill.name === "ccswitch-shared"), "CC Switch source is enabled by default and owns its SSOT Skill");
+  ok(codexView && !codexView.skills.some((skill) => skill.name === "ccswitch-shared"), "state deduplicates a CC Switch Skill distributed into Codex by real path");
+
+  const ccswitchCandidates = (await listProviderCandidates()).filter((item) => item.name === "ccswitch-shared");
+  eq(ccswitchCandidates.length, 1, "provider deduplicates a CC Switch Skill distributed to another Agent root");
+  eq(ccswitchCandidates[0] && ccswitchCandidates[0].source, "agent-ccswitch", "provider keeps the direct CC Switch source as the canonical candidate");
+  const loadedCcSwitch = ccswitchCandidates[0] ? await getProviderSkill(ccswitchCandidates[0]) : undefined;
+  eq(loadedCcSwitch && loadedCcSwitch.content, "CC Switch body", "provider loads the canonical CC Switch Skill body");
+
+  await setSourceEnabled("ccswitch", false);
+  const disabledCcSwitch = (await listProviderCandidates()).find((item) => item.source === "agent-ccswitch" && item.name === "ccswitch-shared");
+  ok(disabledCcSwitch && disabledCcSwitch.invocation.modelInvocable === false && disabledCcSwitch.invocation.userInvocable === false, "CC Switch source supports manager-local source disable");
+  await setSourceEnabled("ccswitch", true);
+
+  const linkedCandidate = {
+    name: linkedCodexEntry.declaredName,
+    description: linkedCodexEntry.description,
+    invocation: { modelInvocable: true, userInvocable: true },
+    provider: "dsh-skills-manager-external",
+    source: "agent-codex",
+    locator: { rootKey: "codex", entryName: linkedCodexEntry.name, path: linkedCodexEntry.docPath, realEntryPath: linkedCodexEntry.realEntryPath, realDocPath: linkedCodexEntry.realDocPath },
+    resourceBase: { kind: "directory", path: linkedCodexEntry.realEntryPath },
+    path: linkedCodexEntry.docPath,
+    metadata: {},
+  };
+  eq((await getProviderSkill(linkedCandidate)).content, "CC Switch body", "provider accepts an unchanged trusted linked candidate");
+  const replacementSkill = await makeSkill(ccswitchRoot, "ccswitch-replacement", "---\nname: ccswitch-shared\ndescription: Retargeted CC Switch Skill.\n---\nRetargeted body");
+  await rm(linkedCcSwitchSkill, { recursive: true, force: true });
+  await symlink(replacementSkill, linkedCcSwitchSkill, providerLinkType);
+  eq(await getProviderSkill(linkedCandidate), undefined, "provider rejects a trusted link retargeted after candidate discovery");
+  await rm(linkedCcSwitchSkill, { recursive: true, force: true });
+  await symlink(ccswitchSkill, linkedCcSwitchSkill, providerLinkType);
+  await rm(replacementSkill, { recursive: true, force: true });
+} else {
+  ok(true, "trusted user-source link tests skipped because this environment cannot create directory links");
+}
+const writableTrustedLink = join(dshRoot, "ccswitch-linked-dsh");
+if (await tryLink(ccswitchSkill, writableTrustedLink, providerLinkType)) {
+  eq(await resolveEntry(dshRoot, "ccswitch-linked-dsh"), null, "writable DSH roots still reject trusted linked bundles");
+  await rm(writableTrustedLink, { recursive: true, force: true });
+} else {
+  ok(true, "writable-root trusted link test skipped because this environment cannot create directory links");
+}
+const sameRootReadonlyLink = join(codexRoot, "code-review-alias");
+if (await tryLink(join(codexRoot, "code-review"), sameRootReadonlyLink, providerLinkType)) {
+  ok(!(await scanEntries(codexRoot)).entries.some((entry) => entry.name === "code-review-alias"), "user read-only roots reject linked aliases targeting the same Skills root");
+  await rm(sameRootReadonlyLink, { recursive: true, force: true });
+} else {
+  ok(true, "same-root read-only link test skipped because this environment cannot create directory links");
+}
+if (await tryLink(readonlyOutsideSkill, join(codexRoot, "outside-linked"), providerLinkType)) {
+  ok(!(await scanEntries(codexRoot)).entries.some((entry) => entry.name === "outside-linked"), "user read-only roots reject linked bundles outside known Skills roots");
+} else {
+  ok(true, "outside-target link test skipped because this environment cannot create directory links");
+}
+const hiddenCcSwitchSkill = await makeSkill(ccswitchRoot, ".hidden-ccswitch", "---\nname: hidden-ccswitch\ndescription: Hidden target.\n---\nHidden body");
+if (await tryLink(hiddenCcSwitchSkill, join(codexRoot, "hidden-via-link"), providerLinkType)) {
+  ok(!(await scanEntries(codexRoot)).entries.some((entry) => entry.name === "hidden-via-link"), "trusted links cannot expose a hidden target excluded by normal entry-name rules");
+} else {
+  ok(true, "hidden-target link test skipped because this environment cannot create directory links");
+}
 await setSkillEnabled(codexRoot, "code-review", false);
 providerCandidates = await listProviderCandidates();
 ok(providerCandidates.find((item) => item.name === "code-review").invocation.modelInvocable === false, "external skill disable keeps a disabled winning candidate");
@@ -344,9 +431,12 @@ const validManagerState = await readFile(managerStatePath(), "utf8");
 const legacyManagerState = JSON.parse(validManagerState);
 delete legacyManagerState.enabledSkills;
 delete legacyManagerState.disabledSkills.dsh;
+delete legacyManagerState.sources.ccswitch;
+delete legacyManagerState.disabledSkills.ccswitch;
 await writeFile(managerStatePath(), JSON.stringify(legacyManagerState), "utf8");
 const migratedLegacyState = await readManagerState();
 ok(migratedLegacyState.writable === true && Array.isArray(migratedLegacyState.state.enabledSkills.dsh), "legacy state without enabledSkills or a DSH policy list is normalized compatibly");
+ok(migratedLegacyState.state.sources.ccswitch === true && Array.isArray(migratedLegacyState.state.disabledSkills.ccswitch), "legacy state gains a default-enabled CC Switch source without failing closed");
 const conflictingManagerState = JSON.parse(validManagerState);
 conflictingManagerState.disabledSkills.dsh = ["good-skill"];
 conflictingManagerState.enabledSkills.dsh = ["good-skill"];
@@ -1067,7 +1157,8 @@ ok(!emitted.some((event) => event[0] === "agent-preset/selected" && event[1] ===
 
 // ── 状态快照 ──
 const snap = await state();
-eq(snap.roots.length, 6, "state returns DSH and common Agent roots");
+eq(snap.roots.length, 7, "state returns DSH, CC Switch, and common Agent roots");
+ok(snap.roots.some((root) => root.key === "ccswitch"), "state includes the CC Switch source");
 const dshSnap = snap.roots.find((r) => r.key === "dsh");
 ok(dshSnap.mutable === true, "DSH root allows destructive actions");
 ok(dshSnap.skills.some((s) => s.name === "import-me"), "state lists imported skill");

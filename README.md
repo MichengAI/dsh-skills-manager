@@ -22,7 +22,7 @@
 
 ## Features
 
-- Discover and load user-level skills from `.agents`, Codex, Claude, Gemini, and OpenCode into DSH.
+- Discover and load user-level skills from `.agents`, CC Switch, Codex, Claude, Gemini, and OpenCode into DSH.
 - Discover project-level `.dsh/skills` and `.agents/skills` from active Session workspaces, grouped by project; every valid Skill can be enabled or disabled through non-mutating local policy.
 - Persist every per-Skill toggle under `$DSH_HOME/skills-manager/state.json` without rewriting any source Skill file.
 - Inspect Markdown bodies, frontmatter, invocation state, duplicate shadowing, and format diagnostics in a source-first UI.
@@ -152,6 +152,7 @@ Escape closes only the frontmost upload or confirmation dialog and leaves Settin
 | --- | --- | --- | --- | --- |
 | `$DSH_HOME\skills` | Yes | Manager state only | Yes | Moves to Trash |
 | `$DSH_AGENTS_HOME\skills` | Yes | Manager state only | No | No |
+| `~\.cc-switch\skills` | Yes, enabled by default | Manager state only | No | No |
 | `~/.codex/skills`, `~/.claude/skills`, `~/.gemini/skills`, `~/.config/opencode/skills` | Yes | Manager state only | No | No |
 | `<project>/.dsh/skills` | Yes, for active Session workspaces | Manager state only | Create in Settings | Moves to Trash and restores to the original project |
 | `<project>/.agents/skills` | Yes, for active Session workspaces | Manager state only | No | No |
@@ -162,6 +163,7 @@ Escape closes only the frontmost upload or confirmation dialog and leaves Settin
 - Trash falls back to copy-then-hide when a project and `$DSH_HOME` are on different volumes; restore uses the same guarded cross-volume path in reverse.
 - Project Trash entries retain their original opaque source identity. Restore is allowed only while that original project is still represented by an active Session workspace; the client cannot nominate a replacement path.
 - Project writes reject linked `.dsh` or `.dsh/skills` directories so a repository cannot redirect creation, deletion, or restore outside its own project root.
+- User-level read-only sources accept top-level linked Skill bundles only when the real target is an ordinary direct child of another known read-only Skills root. The same real Skill is displayed and loaded once according to source rank; writable DSH roots, project roots, linked roots, and arbitrary external targets remain rejected.
 - Rows and summaries say **Enabled/Disabled**, not **Loaded**: these labels describe invocation policy, while full Skill bodies are loaded on demand by DSH. Use Refresh after IDE, Git, or shell changes; the official provider remains responsible for project catalog watching and invalidation.
 - Empty project roots stay out of the main source list to reduce noise, but remain selectable in Create Skill so the first project Skill can still be created. Project DSH supports per-Skill toggles only, not a source-wide switch.
 - Replacements copy to a temporary sibling path first and keep the original until that succeeds.
