@@ -6,9 +6,13 @@
 
 ## 未发布
 
+## 0.1.33 — 2026-09-02
+
 - 新增默认开启的只读 `CC Switch` 来源，固定读取 `~\.cc-switch\skills`，支持来源级与逐 Skill 本地启停；旧状态文件自动补齐新来源，不会因缺少新键失败关闭。
 - 用户级只读来源支持指向已知只读 Skills 根直接子目录的顶层技能链接；Provider 在加载时复验真实目标，并按真实路径去重 CC Switch 分发到 Codex、Claude 等目录的副本。
 - 可写 DSH、项目来源、技能根链接、隐藏或非法目标以及任意根外目标继续拒绝，导入符号链接边界不变。
+
+发布包：[`@michengai/dsh-skills-manager@0.1.33`](https://www.npmjs.com/package/@michengai/dsh-skills-manager/v/0.1.33)。
 
 ## 0.1.32 — 2026-08-31
 

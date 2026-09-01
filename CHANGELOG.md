@@ -6,9 +6,13 @@ The five most recent published versions are listed below.
 
 ## Unreleased
 
+## 0.1.33 — 2026-09-02
+
 - Added an enabled-by-default, read-only `CC Switch` source at `~\.cc-switch\skills` with source-wide and per-Skill local policy toggles. Legacy state files gain the new source without failing closed.
 - Allowed top-level linked Skill bundles in user-level read-only sources only when they target a direct child of another known read-only Skills root. Provider loading revalidates the real target and deduplicates CC Switch deployments by real path.
 - Kept writable DSH roots, project sources, linked roots, hidden or invalid targets, arbitrary external targets, and import symlinks rejected.
+
+Published package: [`@michengai/dsh-skills-manager@0.1.33`](https://www.npmjs.com/package/@michengai/dsh-skills-manager/v/0.1.33).
 
 ## 0.1.32 — 2026-08-31
 
