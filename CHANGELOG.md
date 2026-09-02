@@ -6,9 +6,15 @@ The five most recent published versions are listed below.
 
 ## Unreleased
 
+## 0.1.34 — 2026-09-02
+
 - Made direct Skill entries the canonical owner when the same real bundle is also exposed through Agent distribution links. The canonical provider candidate inherits the strongest distribution rank, so disabling CC Switch cannot fall back to a linked public-Agent copy.
 - Required discovered real bundle and document paths for both user and project Provider candidates, revalidated both paths at load time, and aligned policy toggles with real-document reads.
 - Scanned user roots concurrently and reused one resolved set of trusted read-only roots per scan without caching external filesystem state across requests.
+- Preserved a per-Skill disable while its current distribution entry changes ownership to a canonical source. A canonical source's explicit policy still takes precedence over inherited distribution-link policies.
+- Made detail visibility reproduce the same user-root deduplication as state snapshots from the requested entry's physical owner, avoiding unrelated Skill document reads; entry resolution, detail reads, and Provider reads fail closed when files disappear during a filesystem race.
+
+Published package: [`@michengai/dsh-skills-manager@0.1.34`](https://www.npmjs.com/package/@michengai/dsh-skills-manager/v/0.1.34).
 
 ## 0.1.33 — 2026-09-02
 

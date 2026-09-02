@@ -169,7 +169,7 @@ ok(clientSource.includes('className: "dssm-select-trigger"'), "category filter u
 ok(clientSource.includes('.dssm-select-menu{'), "custom select menu uses design tokens instead of native chrome");
 ok(!/h\(\s*"select"/.test(clientSource), "category filter does not use a native select");
 const packageJson = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
-eq(packageJson.version, "0.1.33", "release contract tracks the package version");
+eq(packageJson.version, "0.1.34", "release contract tracks the package version");
 ok(packageJson.peerDependencies["@deepseek-ai/dsh-client-runtime"], "package declares the client runtime peer");
 ok(packageJson.peerDependencies["@deepseek-ai/dsh-client-ui-slots"], "package declares the settings slots peer");
 ok(packageJson.peerDependencies["@deepseek-ai/dsh-host-webserver"].includes("<0.2.0"), "host-webserver peer has an upper bound");
@@ -358,6 +358,8 @@ if (await tryLink(ccswitchSkill, linkedCcSwitchSkill, providerLinkType)) {
   const codexView = ccswitchState.roots.find((root) => root.key === "codex");
   ok(ccswitchView && ccswitchView.enabled === true && ccswitchView.skills.some((skill) => skill.name === "ccswitch-shared"), "CC Switch source is enabled by default and owns its SSOT Skill");
   ok(codexView && !codexView.skills.some((skill) => skill.name === "ccswitch-shared"), "state deduplicates a CC Switch Skill distributed into Codex by real path");
+  eq((await skillDetail("codex", "ccswitch-shared")).code, "error.skill.notFound", "detail hides a Codex distribution link that state deduplicates away");
+  eq((await skillDetail("ccswitch", "ccswitch-shared")).body, "CC Switch body", "detail keeps the direct CC Switch SSOT visible without scanning unrelated skill documents");
 
   const ccswitchCandidates = (await listProviderCandidates()).filter((item) => item.name === "ccswitch-shared");
   eq(ccswitchCandidates.length, 1, "provider deduplicates a CC Switch Skill distributed to another Agent root");
@@ -415,14 +417,18 @@ if (await tryLink(join(codexRoot, "code-review"), sameRootReadonlyLink, provider
 } else {
   ok(true, "same-root read-only link test skipped because this environment cannot create directory links");
 }
-if (await tryLink(readonlyOutsideSkill, join(codexRoot, "outside-linked"), providerLinkType)) {
+const outsideLinkedSkill = join(codexRoot, "outside-linked");
+if (await tryLink(readonlyOutsideSkill, outsideLinkedSkill, providerLinkType)) {
   ok(!(await scanEntries(codexRoot)).entries.some((entry) => entry.name === "outside-linked"), "user read-only roots reject linked bundles outside known Skills roots");
+  await rm(outsideLinkedSkill, { recursive: true, force: true });
 } else {
   ok(true, "outside-target link test skipped because this environment cannot create directory links");
 }
 const hiddenCcSwitchSkill = await makeSkill(ccswitchRoot, ".hidden-ccswitch", "---\nname: hidden-ccswitch\ndescription: Hidden target.\n---\nHidden body");
-if (await tryLink(hiddenCcSwitchSkill, join(codexRoot, "hidden-via-link"), providerLinkType)) {
+const hiddenCcSwitchLink = join(codexRoot, "hidden-via-link");
+if (await tryLink(hiddenCcSwitchSkill, hiddenCcSwitchLink, providerLinkType)) {
   ok(!(await scanEntries(codexRoot)).entries.some((entry) => entry.name === "hidden-via-link"), "trusted links cannot expose a hidden target excluded by normal entry-name rules");
+  await rm(hiddenCcSwitchLink, { recursive: true, force: true });
 } else {
   ok(true, "hidden-target link test skipped because this environment cannot create directory links");
 }
@@ -447,6 +453,23 @@ if (await tryLink(ccswitchAgentSkill, linkedAgentSkill, providerLinkType)) {
   ok(true, "public Agent distribution-link ownership test skipped because this environment cannot create directory links");
 }
 await rm(ccswitchAgentSkill, { recursive: true, force: true });
+const ccswitchPolicyMigrationSkill = await makeSkill(ccswitchRoot, "policy-migration", "---\nname: policy-migration\ndescription: Canonical CC Switch Skill.\n---\nCC Switch canonical body");
+const codexPolicyMigrationSkill = await makeSkill(codexRoot, "policy-migration", "---\nname: policy-migration\ndescription: Original Codex Skill.\n---\nCodex original body");
+await setSkillEnabled(codexRoot, "policy-migration", false);
+await rm(codexPolicyMigrationSkill, { recursive: true, force: true });
+const codexPolicyMigrationLink = join(codexRoot, "policy-migration");
+if (await tryLink(ccswitchPolicyMigrationSkill, codexPolicyMigrationLink, providerLinkType)) {
+  const migratedPolicyCandidates = (await listProviderCandidates()).filter((item) => item.name === "policy-migration");
+  eq(migratedPolicyCandidates.length, 1, "a replaced Codex entry remains one canonical candidate after becoming a CC Switch distribution link");
+  ok(migratedPolicyCandidates[0] && migratedPolicyCandidates[0].source === "agent-ccswitch" && migratedPolicyCandidates[0].invocation.modelInvocable === false && migratedPolicyCandidates[0].invocation.userInvocable === false, "a Codex disable remains effective after the entry becomes a CC Switch distribution link");
+  await setSkillEnabled(ccswitchRoot, "policy-migration", true);
+  const explicitlyEnabledMigration = (await listProviderCandidates()).find((item) => item.name === "policy-migration");
+  ok(explicitlyEnabledMigration && explicitlyEnabledMigration.invocation.modelInvocable === true && explicitlyEnabledMigration.invocation.userInvocable === true, "an explicit canonical CC Switch enable overrides an inherited distribution-link disable");
+  await rm(codexPolicyMigrationLink, { recursive: true, force: true });
+} else {
+  ok(true, "cross-source policy migration test skipped because this environment cannot create directory links");
+}
+await rm(ccswitchPolicyMigrationSkill, { recursive: true, force: true });
 await setSkillEnabled(codexRoot, "code-review", false);
 providerCandidates = await listProviderCandidates();
 ok(providerCandidates.find((item) => item.name === "code-review").invocation.modelInvocable === false, "external skill disable keeps a disabled winning candidate");
