@@ -6,6 +6,14 @@ The five most recent published versions are listed below.
 
 ## Unreleased
 
+## 0.1.35 - 2026-09-03
+
+- Aligned Settings header actions with the archive plugin: a GitHub project link and an Issues feedback link, with matching icons, accessible labels, responsive layout, and localized copy.
+- Updated the DSH compatibility contract to `>=0.1.0-rc.5 <0.2.0`, added the runtime injection peers used by the plugin, and tested development against DSH `0.1.2-alpha.5`.
+- Allowed the publish workflow to install the intentionally pinned DSH alpha dependencies without pnpm's release-age policy blocking the release validation.
+
+Published package: [`@michengai/dsh-skills-manager@0.1.35`](https://www.npmjs.com/package/@michengai/dsh-skills-manager/v/0.1.35).
+
 ## 0.1.34 — 2026-09-02
 
 - Made direct Skill entries the canonical owner when the same real bundle is also exposed through Agent distribution links. The canonical provider candidate inherits the strongest distribution rank, so disabling CC Switch cannot fall back to a linked public-Agent copy.

@@ -20,6 +20,6 @@ jobs:
           node-version: "24"
           package-manager-cache: false
       - run: corepack enable
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile --config.minimumReleaseAge=0 --config.auto-install-peers=false
       - run: npm test
       - run: npm publish

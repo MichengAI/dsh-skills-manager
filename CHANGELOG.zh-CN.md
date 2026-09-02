@@ -6,6 +6,14 @@
 
 ## 未发布
 
+## 0.1.35 - 2026-09-03
+
+- 设置页标题操作与归档插件统一：新增 GitHub 项目链接和 Issues 问题反馈链接，图标、无障碍标签、响应式布局及中英文文案保持一致。
+- DSH 兼容范围统一为 `>=0.1.0-rc.5 <0.2.0`，补齐插件运行时使用的注入 peer，并以 DSH `0.1.2-alpha.5` 作为开发测试版本。
+- 发布工作流安装有意固定的 DSH alpha 依赖时，显式关闭 pnpm 最小发布时间策略，避免发布校验被该策略阻断。
+
+发布包：[`@michengai/dsh-skills-manager@0.1.35`](https://www.npmjs.com/package/@michengai/dsh-skills-manager/v/0.1.35)。
+
 ## 0.1.34 — 2026-09-02
 
 - 同一真实 Skill 同时存在直接条目和 Agent 分发链接时，改为由直接条目归属；规范候选继承所有分发入口中的最强 rank，停用 CC Switch 后不会回流到公共 Agent 链接副本。
