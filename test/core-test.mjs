@@ -366,8 +366,10 @@ if (await tryLink(ccswitchSkill, linkedCcSwitchSkill, providerLinkType)) {
   eq(loadedCcSwitch && loadedCcSwitch.content, "CC Switch body", "provider loads the canonical CC Switch Skill body");
 
   await setSourceEnabled("ccswitch", false);
-  const disabledCcSwitch = (await listProviderCandidates()).find((item) => item.source === "agent-ccswitch" && item.name === "ccswitch-shared");
+  const disabledCcSwitchCandidates = (await listProviderCandidates()).filter((item) => item.name === "ccswitch-shared");
+  const disabledCcSwitch = disabledCcSwitchCandidates.find((item) => item.source === "agent-ccswitch");
   ok(disabledCcSwitch && disabledCcSwitch.invocation.modelInvocable === false && disabledCcSwitch.invocation.userInvocable === false, "CC Switch source supports manager-local source disable");
+  eq(disabledCcSwitchCandidates.length, 1, "disabling CC Switch does not restore its Codex distribution link as another candidate");
   await setSourceEnabled("ccswitch", true);
 
   const linkedCandidate = {
@@ -382,6 +384,12 @@ if (await tryLink(ccswitchSkill, linkedCcSwitchSkill, providerLinkType)) {
     metadata: {},
   };
   eq((await getProviderSkill(linkedCandidate)).content, "CC Switch body", "provider accepts an unchanged trusted linked candidate");
+  const missingRealEntryLocator = { ...linkedCandidate, locator: { ...linkedCandidate.locator } };
+  delete missingRealEntryLocator.locator.realEntryPath;
+  eq(await getProviderSkill(missingRealEntryLocator), undefined, "provider rejects a user candidate missing its discovered real bundle path");
+  const missingRealDocLocator = { ...linkedCandidate, locator: { ...linkedCandidate.locator } };
+  delete missingRealDocLocator.locator.realDocPath;
+  eq(await getProviderSkill(missingRealDocLocator), undefined, "provider rejects a user candidate missing its discovered real document path");
   const replacementSkill = await makeSkill(ccswitchRoot, "ccswitch-replacement", "---\nname: ccswitch-shared\ndescription: Retargeted CC Switch Skill.\n---\nRetargeted body");
   await rm(linkedCcSwitchSkill, { recursive: true, force: true });
   await symlink(replacementSkill, linkedCcSwitchSkill, providerLinkType);
@@ -395,6 +403,7 @@ if (await tryLink(ccswitchSkill, linkedCcSwitchSkill, providerLinkType)) {
 const writableTrustedLink = join(dshRoot, "ccswitch-linked-dsh");
 if (await tryLink(ccswitchSkill, writableTrustedLink, providerLinkType)) {
   eq(await resolveEntry(dshRoot, "ccswitch-linked-dsh"), null, "writable DSH roots still reject trusted linked bundles");
+  ok(!(await scanEntries(dshRoot)).entries.some((entry) => entry.name === "ccswitch-linked-dsh"), "writable DSH scans also hide trusted linked bundles");
   await rm(writableTrustedLink, { recursive: true, force: true });
 } else {
   ok(true, "writable-root trusted link test skipped because this environment cannot create directory links");
@@ -417,6 +426,27 @@ if (await tryLink(hiddenCcSwitchSkill, join(codexRoot, "hidden-via-link"), provi
 } else {
   ok(true, "hidden-target link test skipped because this environment cannot create directory links");
 }
+const ccswitchAgentSkill = await makeSkill(ccswitchRoot, "ccswitch-agent-owned", "---\nname: ccswitch-agent-owned\ndescription: Direct CC Switch SSOT with a public Agent distribution link.\n---\nCC Switch Agent body");
+const linkedAgentSkill = join(agentsRoot, "ccswitch-agent-owned");
+if (await tryLink(ccswitchAgentSkill, linkedAgentSkill, providerLinkType)) {
+  const linkedAgentState = await state();
+  const linkedAgentCcSwitchView = linkedAgentState.roots.find((root) => root.key === "ccswitch");
+  const linkedAgentPublicView = linkedAgentState.roots.find((root) => root.key === "agents");
+  ok(linkedAgentCcSwitchView && linkedAgentCcSwitchView.skills.some((skill) => skill.name === "ccswitch-agent-owned"), "a direct CC Switch SSOT keeps ownership when public Agents links to it");
+  ok(linkedAgentPublicView && !linkedAgentPublicView.skills.some((skill) => skill.name === "ccswitch-agent-owned"), "state hides the public Agent distribution link owned by CC Switch");
+  let linkedAgentCandidates = (await listProviderCandidates()).filter((item) => item.name === "ccswitch-agent-owned");
+  eq(linkedAgentCandidates.length, 1, "provider emits one candidate for a CC Switch Skill distributed to public Agents");
+  eq(linkedAgentCandidates[0] && linkedAgentCandidates[0].source, "agent-ccswitch", "provider attributes the public Agent distribution link to the direct CC Switch SSOT");
+  eq(linkedAgentCandidates[0] && linkedAgentCandidates[0].rank, 450, "the direct CC Switch candidate inherits the strongest distribution entry rank");
+  await setSourceEnabled("ccswitch", false);
+  linkedAgentCandidates = (await listProviderCandidates()).filter((item) => item.name === "ccswitch-agent-owned");
+  ok(linkedAgentCandidates.length === 1 && linkedAgentCandidates[0].source === "agent-ccswitch" && linkedAgentCandidates[0].invocation.modelInvocable === false && linkedAgentCandidates[0].invocation.userInvocable === false, "disabling CC Switch keeps a disabled canonical blocker instead of falling back to public Agents");
+  await setSourceEnabled("ccswitch", true);
+  await rm(linkedAgentSkill, { recursive: true, force: true });
+} else {
+  ok(true, "public Agent distribution-link ownership test skipped because this environment cannot create directory links");
+}
+await rm(ccswitchAgentSkill, { recursive: true, force: true });
 await setSkillEnabled(codexRoot, "code-review", false);
 providerCandidates = await listProviderCandidates();
 ok(providerCandidates.find((item) => item.name === "code-review").invocation.modelInvocable === false, "external skill disable keeps a disabled winning candidate");
@@ -969,7 +999,11 @@ try {
   let projectPolicyCandidates = await listProviderCandidates({ cwd: routeProjectNested });
   const projectPolicyBlocker = projectPolicyCandidates.find((item) => item.source === "project-agents" && item.name === "route-project-skill");
   ok(projectPolicyBlocker && projectPolicyBlocker.rank === 199 && projectPolicyBlocker.invocation.modelInvocable === false, "disabled project Agent skill contributes a policy blocker ahead of the official rank 200 candidate");
+  ok(projectPolicyBlocker && typeof projectPolicyBlocker.locator.realEntryPath === "string" && typeof projectPolicyBlocker.locator.realDocPath === "string", "project policy candidates retain their discovered real bundle and document paths");
   eq((await getProviderSkill(projectPolicyBlocker, { cwd: routeProjectNested })).content, "Project route body", "project policy blocker resolves only inside its current workspace");
+  const projectCandidateWithoutRealPath = { ...projectPolicyBlocker, locator: { ...projectPolicyBlocker.locator } };
+  delete projectCandidateWithoutRealPath.locator.realDocPath;
+  eq(await getProviderSkill(projectCandidateWithoutRealPath, { cwd: routeProjectNested }), undefined, "provider rejects a project candidate missing a discovered real path");
   eq(await getProviderSkill(projectPolicyBlocker, { cwd: join(tmp, "missing-workspace") }), undefined, "project policy blocker cannot load through an unrelated workspace");
   const projectAgentEnableResponse = await requestJson(api + "/enable", "POST", secureHeaders, JSON.stringify({ root: httpProjectRoot.key, name: "route-project-skill" }));
   eq(projectAgentEnableResponse.status, 200, "project Agent skills support manager-local enable");
@@ -1227,6 +1261,14 @@ if (await tryLink(outsideProjectSkill, join(routeProject, ".agents", "skills", "
   ok(!linkedProjectSnap.roots.find((root) => root.key === firstAgentsProject.key).skills.some((skill) => skill.name === "linked-project"), "project discovery does not follow a linked bundle outside the active project skill root");
 } else {
   ok(true, "project linked-bundle containment test skipped because this environment cannot create links");
+}
+const linkedCcSwitchProjectSkill = join(routeProject, ".agents", "skills", "linked-ccswitch-project");
+if (await tryLink(ccswitchSkill, linkedCcSwitchProjectSkill, projectLinkType)) {
+  const linkedCcSwitchProjectSnap = await state({ projectCwds: [routeProjectNested] });
+  ok(!linkedCcSwitchProjectSnap.roots.find((root) => root.key === firstAgentsProject.key).skills.some((skill) => skill.name === "linked-ccswitch-project"), "project Agent roots reject links even when they target a trusted CC Switch child");
+  await rm(linkedCcSwitchProjectSkill, { recursive: true, force: true });
+} else {
+  ok(true, "project trusted-target link test skipped because this environment cannot create directory links");
 }
 const unsafeProject = join(tmp, "unsafe-project");
 const unsafeProjectTarget = join(tmp, "unsafe-project-target");

@@ -6,6 +6,10 @@ The five most recent published versions are listed below.
 
 ## Unreleased
 
+- Made direct Skill entries the canonical owner when the same real bundle is also exposed through Agent distribution links. The canonical provider candidate inherits the strongest distribution rank, so disabling CC Switch cannot fall back to a linked public-Agent copy.
+- Required discovered real bundle and document paths for both user and project Provider candidates, revalidated both paths at load time, and aligned policy toggles with real-document reads.
+- Scanned user roots concurrently and reused one resolved set of trusted read-only roots per scan without caching external filesystem state across requests.
+
 ## 0.1.33 — 2026-09-02
 
 - Added an enabled-by-default, read-only `CC Switch` source at `~\.cc-switch\skills` with source-wide and per-Skill local policy toggles. Legacy state files gain the new source without failing closed.
