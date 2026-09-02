@@ -34,6 +34,20 @@ function sameSet(a, b, msg) {
 }
 
 const source = await readFile(new URL("../lib/client.js", import.meta.url), "utf8");
+const manifest = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
+const DSH_PEER_RANGE = ">=0.1.0-rc.5 <0.2.0";
+const DSH_DEV_VERSION = "0.1.2-alpha.5";
+const DSH_DEV_DEPENDENCIES = manifest.devDependencies || {};
+const DSH_ALPHA_DEV_DEPENDENCIES = [
+  "@deepseek-ai/dsh-client-locale",
+  "@deepseek-ai/dsh-client-ui-primitives",
+  "@deepseek-ai/dsh-client-ui-slots",
+  "@deepseek-ai/dsh-host-webserver",
+  "@deepseek-ai/dsh-session",
+  "@deepseek-ai/dsh-skill",
+  "@deepseek-ai/dsh-tools",
+  "@deepseek-ai/dsh-web-app",
+];
 
 // 模拟宿主 AMD 加载器：执行 bundle，捕获 load 定义，再调用 factory 读取导出。
 let loaded = null;
@@ -47,6 +61,7 @@ ok(loaded !== null && typeof loaded.factory === "function", "client bundle regis
 
 const bundle = loaded.factory((id) => {
   if (id === "react") return { createElement: function () {} };
+  if (id === "@deepseek-ai/dsh-client-ui-primitives") return { IconListPenOutline16: function () {} };
   throw new Error("unexpected require: " + id);
 });
 
@@ -90,6 +105,41 @@ for (const match of source.matchAll(/\bt\(\s*["']([A-Za-z][A-Za-z0-9]*(?:\.[A-Za
 for (const key of literalTranslationKeys) {
   ok(key in DICT.zh && key in DICT.en, "literal client translation key exists in both dictionaries: " + key);
 }
+
+// 设置标题右侧与归档插件一致：项目主页和问题反馈均需使用各自对应的图标与链接。
+ok(/className: "dssm-title-row"/.test(source), "settings title uses a dedicated title row for external actions");
+ok(/className: "dssm-feedback-links"/.test(source), "settings title groups the project and feedback links together");
+ok(/require\("@deepseek-ai\/dsh-client-ui-primitives"\)/.test(source), "feedback link loads the host primitive icon module");
+ok(/IconListPenOutline16/.test(source), "feedback link uses the archive plugin feedback icon");
+ok(/function GithubMark16\(\)/.test(source), "project link defines the archive plugin GitHub brand icon");
+ok(/fill: "currentColor"/.test(source), "project link GitHub icon follows the active theme color");
+ok(/className: "dssm-feedback-link"/.test(source), "settings title renders a semantically named feedback link");
+ok(/href: "https:\/\/github\.com\/MichengAI\/dsh-skills-manager", target: "_blank", rel: "noreferrer", "aria-label": t\("link\.project"\)/.test(source), "project link points to the Skills Manager repository");
+ok(/href: "https:\/\/github\.com\/MichengAI\/dsh-skills-manager\/issues"/.test(source), "feedback link points to the Skills Manager issue tracker");
+ok(/target: "_blank", rel: "noreferrer", "aria-label": t\("link\.feedback"\)/.test(source), "feedback link opens safely with a localized accessible name");
+ok(/\.dssm-feedback-link:focus-visible\{outline:2px solid var\(--dsw-alias-state-success-primary\);outline-offset:2px\}/.test(source), "feedback link has a visible keyboard focus style");
+eq(DICT.zh["link.project"], "GitHub", "Chinese project link copy matches the archive plugin");
+eq(DICT.en["link.project"], "GitHub", "English project link copy matches the archive plugin");
+eq(DICT.zh["link.feedback"], "问题反馈", "Chinese feedback link copy is concise and actionable");
+eq(DICT.en["link.feedback"], "Issues", "English feedback link copy matches the issue tracker destination");
+for (const dependency of [
+  "@deepseek-ai/dsh-client-locale",
+  "@deepseek-ai/dsh-client-runtime",
+  "@deepseek-ai/dsh-client-ui-primitives",
+  "@deepseek-ai/dsh-client-ui-slots",
+  "@deepseek-ai/dsh-host-webserver",
+  "@deepseek-ai/dsh-session",
+  "@deepseek-ai/dsh-skill",
+  "@deepseek-ai/dsh-tools",
+  "@deepseek-ai/dsh-web-app",
+]) {
+  eq(manifest.peerDependencies[dependency], DSH_PEER_RANGE, `${dependency} uses the unified DSH compatibility range`);
+}
+for (const dependency of DSH_ALPHA_DEV_DEPENDENCIES) {
+  eq(DSH_DEV_DEPENDENCIES[dependency], DSH_DEV_VERSION, `${dependency} is pinned to the current DSH development version`);
+}
+ok(/@media\(max-width:720px\)\{\.dssm-title-row\{flex-wrap:wrap\}/.test(source), "feedback title row wraps at the archive plugin breakpoint");
+
 for (const locale of ["zh", "en"]) {
   for (const [key, value] of Object.entries(DICT[locale])) {
     ok(!/(?:已加载|已发现|\bLoaded\b|\bDiscovered\b)/.test(value), `${locale} translation avoids legacy loading terminology: ${key}`);
