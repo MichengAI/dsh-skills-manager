@@ -73,6 +73,7 @@ export function userRoots() {
     { key: "claude", path: join(process.env.DSH_CLAUDE_HOME || join(homedir(), ".claude"), "skills"), label: "Claude", mutable: false, toggleable: true, native: false, rank: 530 },
     { key: "gemini", path: join(process.env.DSH_GEMINI_HOME || join(homedir(), ".gemini"), "skills"), label: "Gemini", mutable: false, toggleable: true, native: false, rank: 540 },
     { key: "opencode", path: join(process.env.DSH_OPENCODE_HOME || join(homedir(), ".config", "opencode"), "skills"), label: "OpenCode", mutable: false, toggleable: true, native: false, rank: 550 },
+    { key: "cursor", path: join(process.env.DSH_CURSOR_HOME || join(homedir(), ".cursor"), "skills"), label: "Cursor", mutable: false, toggleable: true, native: false, rank: 560 },
   ];
 }
 
@@ -793,12 +794,15 @@ function validManagerStateDocument(value) {
   return true;
 }
 
-/** 仅对可识别的 version 1 状态补齐 CC Switch 键，其余结构仍交由严格校验失败关闭。 */
+/** 仅对可识别的 version 1 状态补齐新增只读来源键，其余结构仍交由严格校验失败关闭。 */
 function migrateManagerStateDocument(value) {
   if (!value || typeof value !== "object" || Array.isArray(value) || value.version !== 1) return value;
   if (value.sources && typeof value.sources === "object" && !Array.isArray(value.sources) && value.sources.ccswitch === undefined) value.sources.ccswitch = true;
   if (value.disabledSkills && typeof value.disabledSkills === "object" && !Array.isArray(value.disabledSkills) && value.disabledSkills.ccswitch === undefined) value.disabledSkills.ccswitch = [];
   if (value.enabledSkills && typeof value.enabledSkills === "object" && !Array.isArray(value.enabledSkills) && value.enabledSkills.ccswitch === undefined) value.enabledSkills.ccswitch = [];
+  if (value.sources && typeof value.sources === "object" && !Array.isArray(value.sources) && value.sources.cursor === undefined) value.sources.cursor = true;
+  if (value.disabledSkills && typeof value.disabledSkills === "object" && !Array.isArray(value.disabledSkills) && value.disabledSkills.cursor === undefined) value.disabledSkills.cursor = [];
+  if (value.enabledSkills && typeof value.enabledSkills === "object" && !Array.isArray(value.enabledSkills) && value.enabledSkills.cursor === undefined) value.enabledSkills.cursor = [];
   return value;
 }
 

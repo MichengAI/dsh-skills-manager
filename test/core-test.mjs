@@ -87,19 +87,26 @@ process.env.DSH_CODEX_HOME = join(tmp, "codex");
 process.env.DSH_CLAUDE_HOME = join(tmp, "claude");
 process.env.DSH_GEMINI_HOME = join(tmp, "gemini");
 process.env.DSH_OPENCODE_HOME = join(tmp, "opencode");
+process.env.DSH_CURSOR_HOME = join(tmp, "cursor");
 const dshRoot = join(process.env.DSH_HOME, "skills");
 const agentsRoot = join(process.env.DSH_AGENTS_HOME, "skills");
 const ccswitchRoot = join(testUserHome, ".cc-switch", "skills");
 const codexRoot = join(process.env.DSH_CODEX_HOME, "skills");
+const cursorRoot = join(process.env.DSH_CURSOR_HOME, "skills");
 await mkdir(dshRoot, { recursive: true });
 await mkdir(agentsRoot, { recursive: true });
 await mkdir(ccswitchRoot, { recursive: true });
 await mkdir(codexRoot, { recursive: true });
+await mkdir(cursorRoot, { recursive: true });
 
 const ccswitchDefinition = userRoots().find((root) => root.key === "ccswitch");
 ok(ccswitchDefinition && ccswitchDefinition.path === ccswitchRoot, "userRoots exposes the fixed CC Switch Skills storage");
 ok(ccswitchDefinition && ccswitchDefinition.mutable === false && ccswitchDefinition.toggleable === true, "CC Switch source is read-only and locally toggleable");
 eq(ccswitchDefinition && ccswitchDefinition.rank, 510, "CC Switch source ranks after shared Agents and before app-specific roots");
+const cursorDefinition = userRoots().find((root) => root.key === "cursor");
+ok(cursorDefinition && cursorDefinition.path === cursorRoot, "userRoots exposes the configurable Cursor Skills storage");
+ok(cursorDefinition && cursorDefinition.mutable === false && cursorDefinition.toggleable === true, "Cursor source is read-only and locally toggleable");
+eq(cursorDefinition && cursorDefinition.rank, 560, "Cursor source ranks after the existing app-specific roots");
 
 // Linux 同样必须拒绝 Windows 保留设备名；Windows 无法创建这类来源，故仅在可创建的系统上做端到端断言。
 if (process.platform !== "win32") {
@@ -164,12 +171,12 @@ ok(clientSource.includes('.dssm-modal-actions{display:flex;justify-content:flex-
 ok(clientSource.includes('placeholder: t("search.placeholder")'), "settings panel registers a skill search input");
 ok(clientSource.includes('className: "dssm-control dssm-search"'), "search field follows the source-first filter layout");
 ok(clientSource.includes('className: "dssm-sources"'), "settings panel renders source-first skill groups");
-ok(clientSource.includes('"root.ccswitch": "CC Switch"'), "settings panel localizes the CC Switch source in both dictionaries");
+ok(clientSource.includes('"root.ccswitch": "CC Switch"') && clientSource.includes('"root.cursor": "Cursor"'), "settings panel localizes the CC Switch and Cursor sources in both dictionaries");
 ok(clientSource.includes('className: "dssm-select-trigger"'), "category filter uses the styled custom select");
 ok(clientSource.includes('.dssm-select-menu{'), "custom select menu uses design tokens instead of native chrome");
 ok(!/h\(\s*"select"/.test(clientSource), "category filter does not use a native select");
 const packageJson = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
-eq(packageJson.version, "0.1.37", "release contract tracks the package version");
+eq(packageJson.version, "0.1.38", "release contract tracks the package version");
 ok(packageJson.peerDependencies["@deepseek-ai/dsh-client-runtime"], "package declares the client runtime peer");
 ok(packageJson.peerDependencies["@deepseek-ai/dsh-client-ui-slots"], "package declares the settings slots peer");
 ok(packageJson.peerDependencies["@deepseek-ai/dsh-host-webserver"].includes("<0.2.0"), "host-webserver peer has an upper bound");
@@ -345,6 +352,20 @@ eq(codexCandidate.rank, 520, "Codex provider rank stays below native DSH and pub
 const loadedCodex = await getProviderSkill(codexCandidate);
 eq(loadedCodex.content, "Codex review body", "provider loads the external skill body");
 
+await makeSkill(cursorRoot, "cursor-review", "---\nname: cursor-review\ndescription: Review code in Cursor.\n---\nCursor review body");
+const cursorCandidate = (await listProviderCandidates()).find((item) => item.source === "agent-cursor" && item.name === "cursor-review");
+ok(cursorCandidate && cursorCandidate.invocation.modelInvocable === true, "Cursor skill is exposed to the DSH provider");
+eq(cursorCandidate && cursorCandidate.rank, 560, "Cursor provider rank follows the existing external sources");
+await setSkillEnabled(cursorRoot, "cursor-review", false);
+const disabledCursorCandidate = (await listProviderCandidates()).find((item) => item.source === "agent-cursor" && item.name === "cursor-review");
+ok(disabledCursorCandidate && disabledCursorCandidate.invocation.modelInvocable === false, "Cursor skill supports manager-local disable");
+ok(!(await readFile(join(cursorRoot, "cursor-review", "SKILL.md"), "utf8")).includes("disable-model-invocation"), "Cursor skill policy never modifies the source file");
+await setSkillEnabled(cursorRoot, "cursor-review", true);
+await setSourceEnabled("cursor", false);
+const disabledCursorSource = (await listProviderCandidates()).find((item) => item.source === "agent-cursor" && item.name === "cursor-review");
+ok(disabledCursorSource && disabledCursorSource.invocation.userInvocable === false, "Cursor source supports manager-local source disable");
+await setSourceEnabled("cursor", true);
+
 // CC Switch 以固定 SSOT 保存技能，并把顶层技能目录链接到各 Agent 来源。
 const ccswitchSkill = await makeSkill(ccswitchRoot, "ccswitch-shared", "---\nname: ccswitch-shared\ndescription: Shared by CC Switch.\n---\nCC Switch body");
 const linkedCcSwitchSkill = join(codexRoot, "ccswitch-shared");
@@ -485,6 +506,9 @@ await setSourceEnabled("codex", true);
 // 已存在但损坏的状态文件必须 fail-closed，且任何后续启停不得覆盖原文件。
 const validManagerState = await readFile(managerStatePath(), "utf8");
 const legacyManagerState = JSON.parse(validManagerState);
+delete legacyManagerState.enabledSkills.cursor;
+delete legacyManagerState.sources.cursor;
+delete legacyManagerState.disabledSkills.cursor;
 delete legacyManagerState.enabledSkills;
 delete legacyManagerState.disabledSkills.dsh;
 delete legacyManagerState.sources.ccswitch;
@@ -493,6 +517,7 @@ await writeFile(managerStatePath(), JSON.stringify(legacyManagerState), "utf8");
 const migratedLegacyState = await readManagerState();
 ok(migratedLegacyState.writable === true && Array.isArray(migratedLegacyState.state.enabledSkills.dsh), "legacy state without enabledSkills or a DSH policy list is normalized compatibly");
 ok(migratedLegacyState.state.sources.ccswitch === true && Array.isArray(migratedLegacyState.state.disabledSkills.ccswitch), "legacy state gains a default-enabled CC Switch source without failing closed");
+ok(migratedLegacyState.state.sources.cursor === true && Array.isArray(migratedLegacyState.state.disabledSkills.cursor) && Array.isArray(migratedLegacyState.state.enabledSkills.cursor), "legacy state gains a default-enabled Cursor source without failing closed");
 const conflictingManagerState = JSON.parse(validManagerState);
 conflictingManagerState.disabledSkills.dsh = ["good-skill"];
 conflictingManagerState.enabledSkills.dsh = ["good-skill"];
@@ -1217,8 +1242,9 @@ ok(!emitted.some((event) => event[0] === "agent-preset/selected" && event[1] ===
 
 // ── 状态快照 ──
 const snap = await state();
-eq(snap.roots.length, 7, "state returns DSH, CC Switch, and common Agent roots");
+eq(snap.roots.length, 8, "state returns DSH, CC Switch, Cursor, and common Agent roots");
 ok(snap.roots.some((root) => root.key === "ccswitch"), "state includes the CC Switch source");
+ok(snap.roots.some((root) => root.key === "cursor" && root.skills.some((skill) => skill.name === "cursor-review")), "state includes the Cursor source and its Skills");
 const dshSnap = snap.roots.find((r) => r.key === "dsh");
 ok(dshSnap.mutable === true, "DSH root allows destructive actions");
 ok(dshSnap.skills.some((s) => s.name === "import-me"), "state lists imported skill");
@@ -1343,6 +1369,7 @@ delete process.env.DSH_CODEX_HOME;
 delete process.env.DSH_CLAUDE_HOME;
 delete process.env.DSH_GEMINI_HOME;
 delete process.env.DSH_OPENCODE_HOME;
+delete process.env.DSH_CURSOR_HOME;
 
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

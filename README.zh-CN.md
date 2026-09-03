@@ -22,7 +22,7 @@
 
 ## 功能概览
 
-- 自动发现并把 `.agents`、CC Switch、Codex、Claude、Gemini 和 OpenCode 的用户级技能真正加载进 DSH。
+- 自动发现并把 `.agents`、CC Switch、Codex、Claude、Gemini、OpenCode 和 Cursor 的用户级技能真正加载进 DSH。
 - 从活动 Session 工作区发现项目级 `.dsh/skills` 与 `.agents/skills` 并按项目分组；所有有效 Skill 都可通过不改源文件的本地策略启停。
 - 所有逐 Skill 启停都只写入 `$DSH_HOME\skills-manager\state.json`，绝不改写任何来源 Skill 文件。
 - 按来源折叠、搜索和筛选，并查看技能正文、frontmatter、调用状态、重名遮蔽与格式诊断。
@@ -153,6 +153,7 @@ dsh --profile web --dump-config
 | `$DSH_HOME\skills` | 支持 | 仅写 manager 状态 | 支持 | 进入回收站 |
 | `$DSH_AGENTS_HOME\skills` | 支持 | 仅写 manager 状态 | 不支持 | 不支持 |
 | `~\.cc-switch\skills` | 支持，默认开启 | 仅写 manager 状态 | 不支持 | 不支持 |
+| `%USERPROFILE%\.cursor\skills`（或 `$DSH_CURSOR_HOME\skills`） | 支持 | 仅写 manager 状态 | 不支持 | 不支持 |
 | `~/.codex/skills`、`~/.claude/skills`、`~/.gemini/skills`、`~/.config/opencode/skills` | 支持 | 仅写 manager 状态 | 不支持 | 不支持 |
 | `<project>/.dsh/skills` | 支持活动 Session 工作区 | 仅写 manager 状态 | 设置页支持创建 | 进入回收站并恢复到原项目 |
 | `<project>/.agents/skills` | 支持活动 Session 工作区 | 仅写 manager 状态 | 不支持 | 不支持 |

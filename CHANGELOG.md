@@ -6,11 +6,13 @@ The five most recent published versions are listed below.
 
 ## Unreleased
 
+## 0.1.38 - 2026-09-03
+
+- Added Cursor as a read-only, locally toggleable Skill source at `%USERPROFILE%\.cursor\skills`, with `DSH_CURSOR_HOME` override and state-file migration.
+
 ## 0.1.37 - 2026-09-03
 
-- Updated the direct DSH development dependencies from `0.1.2-alpha.5` to `0.1.2-rc.1` without changing the published peer-dependency contract.
-- Rebased the dependency-version regression assertion on RC.1 and verified the complete package gate.
-- Verified plugin registration, the Skill provider, SessionStore access, and the HTTP state endpoint against the real RC.1 Cordis host services.
+- Added compatibility with DeepSeek Harness `0.1.2-rc.1`.
 
 ## 0.1.36 - 2026-09-03
 

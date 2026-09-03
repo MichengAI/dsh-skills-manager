@@ -22,7 +22,7 @@
 
 ## Features
 
-- Discover and load user-level skills from `.agents`, CC Switch, Codex, Claude, Gemini, and OpenCode into DSH.
+- Discover and load user-level skills from `.agents`, CC Switch, Codex, Claude, Gemini, OpenCode, and Cursor into DSH.
 - Discover project-level `.dsh/skills` and `.agents/skills` from active Session workspaces, grouped by project; every valid Skill can be enabled or disabled through non-mutating local policy.
 - Persist every per-Skill toggle under `$DSH_HOME/skills-manager/state.json` without rewriting any source Skill file.
 - Inspect Markdown bodies, frontmatter, invocation state, duplicate shadowing, and format diagnostics in a source-first UI.
@@ -153,6 +153,7 @@ Escape closes only the frontmost upload or confirmation dialog and leaves Settin
 | `$DSH_HOME\skills` | Yes | Manager state only | Yes | Moves to Trash |
 | `$DSH_AGENTS_HOME\skills` | Yes | Manager state only | No | No |
 | `~\.cc-switch\skills` | Yes, enabled by default | Manager state only | No | No |
+| `%USERPROFILE%\.cursor\skills` (or `$DSH_CURSOR_HOME\skills`) | Yes | Manager state only | No | No |
 | `~/.codex/skills`, `~/.claude/skills`, `~/.gemini/skills`, `~/.config/opencode/skills` | Yes | Manager state only | No | No |
 | `<project>/.dsh/skills` | Yes, for active Session workspaces | Manager state only | Create in Settings | Moves to Trash and restores to the original project |
 | `<project>/.agents/skills` | Yes, for active Session workspaces | Manager state only | No | No |

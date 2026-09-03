@@ -6,11 +6,13 @@
 
 ## 未发布
 
+## 0.1.38 - 2026-09-03
+
+- 新增 Cursor 用户级只读技能来源，默认读取 `%USERPROFILE%\.cursor\skills`，支持 `DSH_CURSOR_HOME` 覆盖，并兼容迁移既有状态文件。
+
 ## 0.1.37 - 2026-09-03
 
-- 将直接 DSH 开发依赖从 `0.1.2-alpha.5` 升级至 `0.1.2-rc.1`，不改动已发布的 peer 依赖兼容范围。
-- 将依赖版本回归断言同步到 RC.1，并完成完整发布门禁验证。
-- 使用真实 RC.1 Cordis 宿主服务验证插件注册、Skill Provider、SessionStore 访问和 HTTP 状态接口。
+- 支持 DeepSeek Harness `0.1.2-rc.1`。
 
 ## 0.1.36 - 2026-09-03
 
