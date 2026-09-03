@@ -36,7 +36,7 @@ function sameSet(a, b, msg) {
 const source = await readFile(new URL("../lib/client.js", import.meta.url), "utf8");
 const manifest = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
 const DSH_PEER_RANGE = ">=0.1.0-rc.5 <0.2.0";
-const DSH_DEV_VERSION = "0.1.2-alpha.5";
+const DSH_DEV_VERSION = "0.1.2-rc.1";
 const DSH_DEV_DEPENDENCIES = manifest.devDependencies || {};
 const DSH_ALPHA_DEV_DEPENDENCIES = [
   "@deepseek-ai/dsh-client-locale",

@@ -6,6 +6,12 @@ The five most recent published versions are listed below.
 
 ## Unreleased
 
+## 0.1.37 - 2026-09-03
+
+- Updated the direct DSH development dependencies from `0.1.2-alpha.5` to `0.1.2-rc.1` without changing the published peer-dependency contract.
+- Rebased the dependency-version regression assertion on RC.1 and verified the complete package gate.
+- Verified plugin registration, the Skill provider, SessionStore access, and the HTTP state endpoint against the real RC.1 Cordis host services.
+
 ## 0.1.36 - 2026-09-03
 
 - Separated maintained runtime source under `src` from generated `lib` package artifacts, with a reproducible Host and AMD-client build.
