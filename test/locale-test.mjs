@@ -109,7 +109,7 @@ for (const key of literalTranslationKeys) {
 // 设置标题右侧与归档插件一致：项目主页和问题反馈均需使用各自对应的图标与链接。
 ok(/className: "dssm-title-row"/.test(source), "settings title uses a dedicated title row for external actions");
 ok(/className: "dssm-feedback-links"/.test(source), "settings title groups the project and feedback links together");
-ok(/require\("@deepseek-ai\/dsh-client-ui-primitives"\)/.test(source), "feedback link loads the host primitive icon module");
+ok(/require\w*\(["']@deepseek-ai\/dsh-client-ui-primitives["']\)/.test(source), "feedback link loads the host primitive icon module");
 ok(/IconListPenOutline16/.test(source), "feedback link uses the archive plugin feedback icon");
 ok(/function GithubMark16\(\)/.test(source), "project link defines the archive plugin GitHub brand icon");
 ok(/fill: "currentColor"/.test(source), "project link GitHub icon follows the active theme color");
@@ -344,8 +344,8 @@ ok(source.includes("pickerOpenRef.current"), "native picker has a synchronous mu
 ok(source.includes('post("/upload"'), "selected content is uploaded instead of sending an absolute path");
 ok(source.includes('result && modal !== "import"'), "upload feedback is not left behind the active import modal");
 ok(source.includes('role: "alert" }, result.text'), "import modal renders upload feedback where it remains visible");
-ok(source.includes('setResult(null); setUpload(null); setModal("import")'), "opening import clears stale upload feedback and selection");
-ok(source.includes('onClick: function () { refresh(false); }'), "settings exposes an explicit refresh action for project file changes");
+ok(/setResult\(null\);\s*setUpload\(null\);\s*setModal\("import"\)/.test(source), "opening import clears stale upload feedback and selection");
+ok(/onClick:\s*function\s*\(\)\s*\{\s*refresh\(false\);/.test(source), "settings exposes an explicit refresh action for project file changes");
 ok(source.includes('h(SourceSelect, { value: form.root, options: createOptions'), "create dialog lets the user choose a writable user or project DSH root");
 ok(source.includes('t("trash.source", { source: trashRootLabel(item) })'), "Trash identifies the original user or project source before restore");
 ok(source.includes('createRoots = allRoots.filter'), "empty project roots remain available as first-Skill create destinations");
@@ -353,7 +353,7 @@ ok(source.includes('root.scope !== "project" && root.key !== "dsh"'), "project r
 ok(!source.includes('"status.discovered"'), "project rows no longer use the ambiguous Discovered status");
 ok(!source.includes('"summary.loaded"'), "summary no longer claims that enabled Skill bodies are loaded");
 ok(!source.includes("dssm-loaded"), "internal status styling also uses enabled terminology");
-ok(source.includes('value: activeSource, options: options'), "a selected project source that becomes empty falls back to All Sources");
+ok(/h\(SourceSelect,\s*\{\s*value:\s*activeSource,\s*options(?:\s*:\s*options)?/.test(source), "a selected project source that becomes empty falls back to All Sources");
 ok(!source.includes('setModal("browse")'), "native selection never chains into a second directory browser");
 ok(!source.includes('callApi("/browse"'), "client no longer uses the in-app absolute-path browser");
 ok(!source.includes('btn.repair.enable') && !source.includes("repairable"), "toggle UI never offers a source-rewriting repair action");

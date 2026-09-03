@@ -187,7 +187,7 @@ const publishWorkflow = await readFile(new URL("../.github/workflows/publish.yml
 ok(publishWorkflow.includes("id-token: write"), "publish workflow enables OIDC trusted publishing");
 ok(publishWorkflow.includes("pnpm install --frozen-lockfile"), "publish workflow installs the ZIP runtime dependency from the lockfile");
 ok(!publishWorkflow.includes("registry-url:"), "publish workflow relies on package publishConfig instead of token-backed registry setup");
-ok(publishWorkflow.includes("npm test"), "publish workflow runs the project tests");
+ok(publishWorkflow.includes("npm run verify"), "publish workflow runs the build, test, package, and generated-output checks");
 ok(publishWorkflow.includes("npm publish"), "publish workflow publishes the package after tests");
 
 // ── 命名规整 ──

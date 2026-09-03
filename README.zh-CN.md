@@ -173,10 +173,12 @@ dsh --profile web --dump-config
 
 ## 二次开发
 
-当前仓库未提供 `src` 源目录，`lib` 是直接维护的运行源码；这是当前仓库的实现方式，不是新插件的推荐布局。新插件建议使用 `src` 开发并构建到 `lib`：
+运行源码维护在 `src`，`lib` 是由 `npm run build` 生成并随 npm 包发布的产物。请修改 `src`，不要直接修改 `lib`：
 
-- [lib\index.js](lib/index.js)：Host 服务与本地技能文件操作入口。
-- [lib\client.js](lib/client.js)：设置页、上传和确认交互。
+- [src\core.js](src/core.js)：文件操作、权限和导入边界核心。
+- [src\index.js](src/index.js)：Host 服务与本地技能文件操作入口。
+- [src\client.js](src/client.js)：设置页、上传和确认交互。
+- [scripts\build.mjs](scripts/build.mjs)：生成 Host 与浏览器端 `lib` 产物。
 - `test\core-test.mjs`：文件操作、权限和导入边界测试。
 - `test\locale-test.mjs`：界面词条测试。
 
@@ -186,7 +188,7 @@ dsh --profile web --dump-config
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $OutputEncoding = [System.Text.Encoding]::UTF8
 npm test
-npm run pack:check
+npm run verify
 dsh plugin --profile web add .
 ```
 
@@ -198,7 +200,7 @@ dsh plugin --profile web add .
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $OutputEncoding = [System.Text.Encoding]::UTF8
 npm test
-npm run pack:check
+npm run verify
 ```
 
 `prepublishOnly` 会在发布前自动执行核心测试。
