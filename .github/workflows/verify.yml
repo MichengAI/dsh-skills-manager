@@ -1,0 +1,23 @@
+name: 验证
+
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          package-manager-cache: false
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile --config.minimumReleaseAge=0 --config.auto-install-peers=false --config.strictDepBuilds=false
+      - run: npm run verify

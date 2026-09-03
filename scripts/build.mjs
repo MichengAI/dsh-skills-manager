@@ -30,7 +30,6 @@ try {
     format: "esm",
     platform: "node",
     target: "node20",
-    sourcemap: true,
   });
 
   await build({
@@ -40,7 +39,6 @@ try {
     format: "iife",
     platform: "browser",
     target: "es2022",
-    sourcemap: true,
   });
 
   if (process.env.DSH_SKILLS_MANAGER_TEST_FAIL_BEFORE_PUBLISH === "1") {

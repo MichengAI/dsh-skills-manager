@@ -203,7 +203,7 @@ npm test
 npm run verify
 ```
 
-`prepublishOnly` runs the core tests before publishing.
+`prepublishOnly` runs the complete `verify` gate before publishing: build, tests, package inspection, and generated-artifact synchronization.
 
 ## Documentation and license
 

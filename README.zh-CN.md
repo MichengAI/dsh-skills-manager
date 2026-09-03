@@ -203,7 +203,7 @@ npm test
 npm run verify
 ```
 
-`prepublishOnly` 会在发布前自动执行核心测试。
+`prepublishOnly` 会在发布前自动执行完整 `verify` 门禁：构建、测试、发布包检查和生成产物同步检查。
 
 ## 项目文档与许可证
 

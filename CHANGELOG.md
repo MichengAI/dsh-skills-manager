@@ -6,6 +6,13 @@ The five most recent published versions are listed below.
 
 ## Unreleased
 
+## 0.1.36 - 2026-09-03
+
+- Separated maintained runtime source under `src` from generated `lib` package artifacts, with a reproducible Host and AMD-client build.
+- Made artifact publication atomic: failed builds preserve the previous `lib` output, and release verification rejects stale or untracked generated files.
+- Removed source maps from generated and published artifacts to avoid duplicating complete source files in the npm package.
+- Added a pull-request and main-branch verification workflow that runs the complete release gate before merge.
+
 ## 0.1.35 - 2026-09-03
 
 - Aligned Settings header actions with the archive plugin: a GitHub project link and an Issues feedback link, with matching icons, accessible labels, responsive layout, and localized copy.

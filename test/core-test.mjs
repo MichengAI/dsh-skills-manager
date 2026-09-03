@@ -169,7 +169,7 @@ ok(clientSource.includes('className: "dssm-select-trigger"'), "category filter u
 ok(clientSource.includes('.dssm-select-menu{'), "custom select menu uses design tokens instead of native chrome");
 ok(!/h\(\s*"select"/.test(clientSource), "category filter does not use a native select");
 const packageJson = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
-eq(packageJson.version, "0.1.35", "release contract tracks the package version");
+eq(packageJson.version, "0.1.36", "release contract tracks the package version");
 ok(packageJson.peerDependencies["@deepseek-ai/dsh-client-runtime"], "package declares the client runtime peer");
 ok(packageJson.peerDependencies["@deepseek-ai/dsh-client-ui-slots"], "package declares the settings slots peer");
 ok(packageJson.peerDependencies["@deepseek-ai/dsh-host-webserver"].includes("<0.2.0"), "host-webserver peer has an upper bound");
@@ -189,6 +189,9 @@ ok(publishWorkflow.includes("pnpm install --frozen-lockfile"), "publish workflow
 ok(!publishWorkflow.includes("registry-url:"), "publish workflow relies on package publishConfig instead of token-backed registry setup");
 ok(publishWorkflow.includes("npm run verify"), "publish workflow runs the build, test, package, and generated-output checks");
 ok(publishWorkflow.includes("npm publish"), "publish workflow publishes the package after tests");
+const verificationWorkflow = await readFile(new URL("../.github/workflows/verify.yml", import.meta.url), "utf8").catch(() => "");
+ok(verificationWorkflow.includes("pull_request:"), "verification workflow runs for pull requests");
+ok(verificationWorkflow.includes("npm run verify"), "verification workflow enforces generated-output checks before merge");
 
 // ── 命名规整 ──
 eq(toKebab("FooBar"), "foo-bar", "toKebab camelCase");

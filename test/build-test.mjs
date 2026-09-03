@@ -29,12 +29,21 @@ for (const path of ["../src/core.js", "../src/index.js", "../src/client.js"]) {
   }
 }
 
-for (const path of ["../lib/core.js", "../lib/index.js", "../lib/client.js", "../lib/core.js.map", "../lib/index.js.map", "../lib/client.js.map"]) {
+for (const path of ["../lib/core.js", "../lib/index.js", "../lib/client.js"]) {
   try {
     await access(new URL(path, import.meta.url), constants.R_OK);
     await ok(true, `${path} exists as generated output`);
   } catch {
     await ok(false, `${path} exists as generated output`);
+  }
+}
+
+for (const path of ["../lib/core.js.map", "../lib/index.js.map", "../lib/client.js.map"]) {
+  try {
+    await access(new URL(path, import.meta.url), constants.F_OK);
+    await ok(false, `${path} is excluded from generated output`);
+  } catch {
+    await ok(true, `${path} is excluded from generated output`);
   }
 }
 
