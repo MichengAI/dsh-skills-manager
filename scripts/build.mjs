@@ -1,29 +1,71 @@
 // 统一从 src 生成可发布的 lib，避免运行产物成为手工维护入口。
+// 先在同级暂存目录完成两端构建，成功后再替换，避免失败时破坏可安装产物。
 
-import { rm } from "node:fs/promises";
+import { access, rename, rm } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { resolve, join } from "node:path";
 import { build } from "esbuild";
 
-await rm("lib", { recursive: true, force: true });
+const outputDirectory = resolve("lib");
+const stagingDirectory = resolve(`.dsh-skills-manager-build-${randomUUID()}`);
+const backupDirectory = resolve(`.dsh-skills-manager-build-backup-${randomUUID()}`);
+let previousOutputMoved = false;
+let published = false;
 
-await build({
-  entryPoints: ["src/core.js", "src/index.js"],
-  outdir: "lib",
-  outbase: "src",
-  bundle: false,
-  format: "esm",
-  platform: "node",
-  target: "node20",
-  sourcemap: true,
-});
+async function exists(path) {
+  try {
+    await access(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
-await build({
-  entryPoints: ["src/client.js"],
-  outfile: "lib/client.js",
-  bundle: false,
-  format: "iife",
-  platform: "browser",
-  target: "es2022",
-  sourcemap: true,
-});
+try {
+  await build({
+    entryPoints: ["src/core.js", "src/index.js"],
+    outdir: stagingDirectory,
+    outbase: "src",
+    bundle: false,
+    format: "esm",
+    platform: "node",
+    target: "node20",
+    sourcemap: true,
+  });
+
+  await build({
+    entryPoints: ["src/client.js"],
+    outfile: join(stagingDirectory, "client.js"),
+    bundle: false,
+    format: "iife",
+    platform: "browser",
+    target: "es2022",
+    sourcemap: true,
+  });
+
+  if (process.env.DSH_SKILLS_MANAGER_TEST_FAIL_BEFORE_PUBLISH === "1") {
+    throw new Error("测试：在发布构建产物前中断");
+  }
+
+  if (await exists(outputDirectory)) {
+    await rename(outputDirectory, backupDirectory);
+    previousOutputMoved = true;
+  }
+
+  try {
+    await rename(stagingDirectory, outputDirectory);
+    published = true;
+  } catch (error) {
+    if (previousOutputMoved) await rename(backupDirectory, outputDirectory);
+    throw error;
+  }
+
+  if (published && previousOutputMoved) await rm(backupDirectory, { recursive: true, force: true });
+} finally {
+  await rm(stagingDirectory, { recursive: true, force: true });
+  if (published && previousOutputMoved && (await exists(backupDirectory))) {
+    await rm(backupDirectory, { recursive: true, force: true });
+  }
+}
 
 console.log("[dsh-skills-manager] 已从 src 生成 Host 与客户端发布产物");
