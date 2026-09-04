@@ -14,6 +14,62 @@ function getFunction(value, key) {
   return typeof property === "function" ? property : null;
 }
 
+const probeAbort = Symbol("probe-abort");
+const probeReceiver = new Proxy(Object.create(null), {
+  defineProperty() {
+    throw probeAbort;
+  },
+  deleteProperty() {
+    throw probeAbort;
+  },
+  get() {
+    throw probeAbort;
+  },
+  getOwnPropertyDescriptor() {
+    throw probeAbort;
+  },
+  has() {
+    throw probeAbort;
+  },
+  ownKeys() {
+    throw probeAbort;
+  },
+  set() {
+    throw probeAbort;
+  },
+});
+
+function isNativeCallable(value) {
+  try {
+    return /\[native code\]/.test(Function.prototype.toString.call(value));
+  } catch {
+    return true;
+  }
+}
+
+function probeHostMethod(owner, key) {
+  const method = getFunction(owner, key);
+  if (method == null) return false;
+
+  // Source functions are only checked for their callable face. Executing a
+  // real DSH service method during plugin registration could perform work.
+  // Function#toString exposes callable Proxies as native-looking functions;
+  // invoke only that path so an apply trap that throws is not accepted.
+  if (!isNativeCallable(method)) return true;
+  if (key === "setTimeout" && method === globalThis.setTimeout) return true;
+
+  try {
+    const args = key === "setTimeout" ? [() => {}, 0] : [];
+    const result = Reflect.apply(method, probeReceiver, args);
+    if (key === "setTimeout" && result != null && typeof globalThis.clearTimeout === "function") {
+      globalThis.clearTimeout(result);
+    }
+    return true;
+  } catch (error) {
+    return error === probeAbort;
+  }
+}
+
 export function probeClientContracts(ctx) {
   const source = ctx ?? {};
   const failures = [];
@@ -47,13 +103,13 @@ export function probeHostContracts(ctx) {
   const failures = [];
   const apiProxy = readProperty(source, "apiProxy");
   const apiSessions = readProperty(apiProxy, "sessions");
-  if (getFunction(apiSessions, "create") == null) failures.push("apiProxy.sessions:create");
-  if (getFunction(apiSessions, "prompt") == null) failures.push("apiProxy.sessions:prompt");
+  if (!probeHostMethod(apiSessions, "create")) failures.push("apiProxy.sessions:create");
+  if (!probeHostMethod(apiSessions, "prompt")) failures.push("apiProxy.sessions:prompt");
   const sessionQuery = readProperty(source, "sessionQuery");
-  if (getFunction(sessionQuery, "listSessions") == null) failures.push("sessionQuery:listSessions");
+  if (!probeHostMethod(sessionQuery, "listSessions")) failures.push("sessionQuery:listSessions");
   const storage = readProperty(source, "storage");
   const backend = readProperty(storage, "backend");
-  if (getFunction(backend, "get") == null) failures.push("storage.backend:get");
-  if (getFunction(source, "setTimeout") == null) failures.push("timer:setTimeout");
+  if (!probeHostMethod(backend, "get")) failures.push("storage.backend:get");
+  if (!probeHostMethod(source, "setTimeout")) failures.push("timer:setTimeout");
   return { ok: failures.length === 0, failures };
 }

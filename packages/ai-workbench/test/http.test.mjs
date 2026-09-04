@@ -102,6 +102,52 @@ test("origin fence accepts recognized same-site Fetch Metadata values", () => {
   }
 });
 
+test("origin fence accepts an explicit local Origin matching the Host", () => {
+  for (const [host, origin] of [
+    ["localhost", "http://localhost"],
+    ["localhost:3080", "http://localhost:3080"],
+    ["127.0.0.1:3080", "https://127.0.0.1:3080"],
+    ["[::1]:3080", "http://[::1]:3080"],
+  ]) {
+    assert.equal(validateOrigin({ headers: { host, origin } }), null, `${host} <- ${origin}`);
+  }
+});
+
+test("origin fence rejects foreign, malformed, and mismatched explicit Origins", () => {
+  for (const headers of [
+    { host: "localhost", origin: "https://evil.example" },
+    { host: "localhost", origin: "http://127.0.0.1" },
+    { host: "localhost:3080", origin: "http://localhost:3081" },
+    { host: "localhost", origin: "not-an-origin" },
+    { host: "localhost", origin: "http://localhost/path" },
+    { host: "localhost", origin: "http://user@localhost" },
+    { host: "localhost", origin: "http://localhost:bad" },
+    { host: "localhost", origin: "http://localhost:00080" },
+    { host: "localhost", origin: undefined },
+  ]) {
+    assert.equal(validateOrigin({ headers })?.statusCode, 403, JSON.stringify(headers));
+  }
+});
+
+test("origin fence fails closed when the explicit Origin getter throws", () => {
+  let reads = 0;
+  const headers = {
+    host: "localhost",
+    get origin() {
+      reads += 1;
+      throw new Error("origin getter secret");
+    },
+  };
+
+  assert.equal(validateOrigin({ headers })?.statusCode, 403);
+  assert.equal(reads, 1);
+});
+
+test("origin fence preserves host-only behavior when Origin is absent", () => {
+  assert.equal(validateOrigin({ headers: { host: "localhost:3080" } }), null);
+  assert.equal(validateOrigin({ headers: { host: "localhost:3080", "sec-fetch-site": "cross-site" } })?.statusCode, 403);
+});
+
 test("http API prefix is exported for host registration", () => {
   assert.equal(http.API_PREFIX, "/api/dsh-ai-workbench");
 });

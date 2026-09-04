@@ -240,3 +240,77 @@ test("host probe fails closed when context and nested service reads throw", () =
     ],
   });
 });
+
+test("host probe rejects callable proxies whose apply trap throws", () => {
+  const throwingCallable = (name) => new Proxy(() => undefined, {
+    apply() {
+      throw new Error(`${name} apply trap`);
+    },
+  });
+
+  const result = probeHostContracts({
+    apiProxy: {
+      sessions: {
+        create: throwingCallable("create"),
+        prompt: throwingCallable("prompt"),
+      },
+    },
+    sessionQuery: { listSessions: throwingCallable("listSessions") },
+    storage: { backend: { get: throwingCallable("get") } },
+    setTimeout: throwingCallable("setTimeout"),
+  });
+
+  assert.deepEqual(result, {
+    ok: false,
+    failures: [
+      "apiProxy.sessions:create",
+      "apiProxy.sessions:prompt",
+      "sessionQuery:listSessions",
+      "storage.backend:get",
+      "timer:setTimeout",
+    ],
+  });
+});
+
+test("host probe accepts callable proxies whose safe probe call returns", () => {
+  const calls = [];
+  const safeCallable = (name) => new Proxy(() => {
+    calls.push(name);
+  }, {
+    apply(target, thisArg, args) {
+      return Reflect.apply(target, thisArg, args);
+    },
+  });
+
+  const result = probeHostContracts({
+    apiProxy: {
+      sessions: {
+        create: safeCallable("create"),
+        prompt: safeCallable("prompt"),
+      },
+    },
+    sessionQuery: { listSessions: safeCallable("listSessions") },
+    storage: { backend: { get: safeCallable("get") } },
+    setTimeout: safeCallable("setTimeout"),
+  });
+
+  assert.deepEqual(result, { ok: true, failures: [] });
+  assert.deepEqual(calls, ["create", "prompt", "listSessions", "get", "setTimeout"]);
+});
+
+test("host probe does not invoke real host methods while checking their callable faces", () => {
+  let businessActions = 0;
+  const hostMethod = () => {
+    businessActions += 1;
+  };
+
+  const result = probeHostContracts({
+    apiProxy: { sessions: { create: hostMethod, prompt: hostMethod } },
+    sessionQuery: { listSessions: hostMethod },
+    storage: { backend: { get: hostMethod } },
+    setTimeout: hostMethod,
+  });
+
+  assert.deepEqual(result, { ok: true, failures: [] });
+  assert.equal(businessActions, 0);
+});

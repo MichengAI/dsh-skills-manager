@@ -25,6 +25,39 @@ function validLoopbackHost(host) {
   return match[1].toLowerCase() === "localhost" || match[1] === "[::1]" || validIpv4(match[1]);
 }
 
+function canonicalLoopbackHost(host) {
+  try {
+    return new URL(`http://${host}`).host.toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
+function validLocalOrigin(origin, host) {
+  if (typeof origin !== "string" || origin.length === 0 || /\s/.test(origin)) return false;
+
+  const authorityMatch = /^(?:http|https):\/\/([^/?#]*)$/i.exec(origin);
+  if (authorityMatch == null || !validLoopbackHost(authorityMatch[1].toLowerCase())) return false;
+
+  let parsed;
+  try {
+    parsed = new URL(origin);
+  } catch {
+    return false;
+  }
+
+  if (
+    !["http:", "https:"].includes(parsed.protocol)
+    || parsed.username !== ""
+    || parsed.password !== ""
+    || parsed.pathname !== "/"
+    || parsed.search !== ""
+    || parsed.hash !== ""
+  ) return false;
+
+  return parsed.host.toLowerCase() === canonicalLoopbackHost(host);
+}
+
 export function validateOrigin(req) {
   try {
     const headers = req != null && typeof req === "object" && req.headers != null && typeof req.headers === "object" ? req.headers : null;
@@ -36,6 +69,9 @@ export function validateOrigin(req) {
       || (hasFetchSite && typeof fetchSite !== "string")
       || (hasFetchSite && !ALLOWED_FETCH_SITES.has(fetchSite.toLowerCase()))
     ) return forbiddenOrigin();
+    const hasOrigin = headers !== null && Reflect.has(headers, "origin");
+    const origin = hasOrigin ? headers.origin : undefined;
+    if (hasOrigin && !validLocalOrigin(origin, host)) return forbiddenOrigin();
   } catch {
     return forbiddenOrigin();
   }
