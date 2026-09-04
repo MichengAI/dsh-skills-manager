@@ -1,0 +1,3 @@
+- insert:
+    - id: ai-workbench
+      name: '@michengai/dsh-ai-workbench'

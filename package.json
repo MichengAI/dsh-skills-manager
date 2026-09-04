@@ -44,7 +44,10 @@
     "test": "npm run build && node test/build-test.mjs && node test/core-test.mjs && node test/locale-test.mjs",
     "verify": "npm test && npm run pack:check && node scripts/check-generated.mjs",
     "pack:check": "npm pack --dry-run --json",
-    "prepublishOnly": "npm run verify"
+    "prepublishOnly": "npm run verify",
+    "workbench:build": "pnpm --dir packages/ai-workbench run build",
+    "workbench:test": "pnpm --dir packages/ai-workbench test",
+    "verify:all": "npm run verify && npm run workbench:test"
   },
   "publishConfig": {
     "registry": "https://registry.npmjs.org/",

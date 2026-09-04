@@ -40,6 +40,12 @@ importers:
         specifier: 0.25.0
         version: 0.25.0
 
+  packages/ai-workbench:
+    devDependencies:
+      esbuild:
+        specifier: 0.25.0
+        version: 0.25.0
+
 packages:
 
   '@deepseek-ai/cosmokit@1.8.3':
