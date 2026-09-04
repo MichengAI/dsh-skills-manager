@@ -37,6 +37,8 @@ try {
     entryPoints: [
       join(packageRoot, "src/index.js"),
       join(packageRoot, "src/shared/compatibility.js"),
+      join(packageRoot, "src/host/http.js"),
+      join(packageRoot, "src/host/diagnostics.js"),
     ],
     outdir: stagingLib,
     bundle: false,
