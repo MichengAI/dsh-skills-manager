@@ -3,3 +3,4 @@ docs/
 *.log
 *.tgz
 .DS_Store
+.superpowers/
