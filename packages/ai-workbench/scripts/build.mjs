@@ -34,7 +34,10 @@ async function publish() {
 try {
   await mkdir(stagingLib, { recursive: true });
   await build({
-    entryPoints: [join(packageRoot, "src/index.js")],
+    entryPoints: [
+      join(packageRoot, "src/index.js"),
+      join(packageRoot, "src/shared/compatibility.js"),
+    ],
     outdir: stagingLib,
     bundle: false,
     format: "esm",
