@@ -1,18 +1,78 @@
+export const API_PREFIX = "/api/dsh-ai-workbench";
+
+function forbiddenOrigin() {
+  return { statusCode: 403, body: { ok: false, code: "forbidden-origin", error: "forbidden origin" } };
+}
+
+function validPort(port) {
+  if (!/^\d{1,5}$/.test(port)) return false;
+  const value = Number(port);
+  return value >= 1 && value <= 65535;
+}
+
+function validIpv4(host) {
+  const octets = host.split(".");
+  return octets.length === 4
+    && octets[0] === "127"
+    && octets.every((octet) => /^(?:0|[1-9]\d{0,2})$/.test(octet) && Number(octet) <= 255);
+}
+
+function validLoopbackHost(host) {
+  const match = /^(localhost|\[::1\]|127(?:\.\d{1,3}){3})(?::(\d+))?$/i.exec(host);
+  if (!match) return false;
+  if (match[2] !== undefined && !validPort(match[2])) return false;
+  return match[1].toLowerCase() === "localhost" || match[1] === "[::1]" || validIpv4(match[1]);
+}
+
 export function validateOrigin(req) {
-  const host = String(req.headers?.host || "").toLowerCase();
-  const loopback = host === "localhost" || host.startsWith("localhost:") || host === "[::1]" || host.startsWith("[::1]:") || /^127(?:\.\d{1,3}){3}(?::\d+)?$/.test(host);
-  if (!loopback || req.headers?.["sec-fetch-site"] === "cross-site") {
-    return { statusCode: 403, body: { ok: false, code: "forbidden-origin", error: "forbidden origin" } };
+  try {
+    const headers = req != null && typeof req === "object" && req.headers != null && typeof req.headers === "object" ? req.headers : null;
+    const host = typeof headers?.host === "string" ? headers.host.toLowerCase() : "";
+    const crossSite = typeof headers?.["sec-fetch-site"] === "string" && headers["sec-fetch-site"].toLowerCase() === "cross-site";
+    if (!validLoopbackHost(host) || crossSite) return forbiddenOrigin();
+  } catch {
+    return forbiddenOrigin();
   }
   return null;
 }
 
+function badRequest() {
+  return { statusCode: 400, body: { ok: false, code: "bad-request", error: "bad request" } };
+}
+
+function internalError() {
+  return { statusCode: 500, body: { ok: false, code: "internal-error", error: "internal server error" } };
+}
+
 export async function routeRequest(req, services) {
+  if (
+    req == null
+    || typeof req !== "object"
+    || typeof req.url !== "string"
+    || req.url.length === 0
+    || /[\u0000-\u0020]/.test(req.url)
+    || /%(?![0-9a-f]{2})/i.test(req.url)
+  ) {
+    return badRequest();
+  }
+
+  let path;
+  try {
+    path = new URL(req.url, "http://localhost").pathname.replace(/\/+$/, "");
+  } catch {
+    return badRequest();
+  }
+
   const denied = validateOrigin(req);
   if (denied) return denied;
-  const path = new URL(req.url, "http://localhost").pathname.replace(/\/+$/, "");
-  if (req.method === "GET" && path === "/api/dsh-ai-workbench/diagnostics") {
-    return { statusCode: 200, body: { ok: true, data: services.diagnostics() } };
+
+  if (req.method === "GET" && path === `${API_PREFIX}/diagnostics`) {
+    if (services == null || typeof services.diagnostics !== "function") return internalError();
+    try {
+      return { statusCode: 200, body: { ok: true, data: await services.diagnostics() } };
+    } catch {
+      return internalError();
+    }
   }
   return { statusCode: 404, body: { ok: false, code: "not-found", error: "not found" } };
 }
