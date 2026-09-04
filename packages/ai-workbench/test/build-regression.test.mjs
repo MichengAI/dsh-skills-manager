@@ -56,7 +56,11 @@ test("root-invoked build publishes atomically without touching root lib", async 
   assert.equal(build.status, 0, `${build.stdout}\n${build.stderr}`);
 
   const workbenchFiles = await snapshotTree(workbenchLib);
-  assert.deepEqual(workbenchFiles.map(([path]) => path).sort(), ["client.js", "index.js"]);
+  assert.deepEqual(workbenchFiles.map(([path]) => path).sort(), [
+    "client.js",
+    "index.js",
+    "shared/compatibility.js",
+  ]);
   assert.deepEqual(await snapshotTree(rootLib), rootLibBefore);
 
   const publishedBeforeFailure = workbenchFiles;
