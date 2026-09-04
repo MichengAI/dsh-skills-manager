@@ -3,16 +3,25 @@ function hasFunction(value, key) {
 }
 
 export function probeClientContracts(ctx) {
+  const source = ctx ?? {};
   const failures = [];
   for (const slot of ["root", "sidebar", "conversation", "details", "shell.overlay"]) {
-    if (!hasFunction(ctx.slots, "spec") || ctx.slots.spec(slot) == null) failures.push(`slot:${slot}`);
+    if (!hasFunction(source.slots, "spec")) {
+      failures.push(`slot:${slot}`);
+      continue;
+    }
+    try {
+      if (source.slots.spec(slot) == null) failures.push(`slot:${slot}`);
+    } catch {
+      failures.push(`slot:${slot}`);
+    }
   }
-  if (!hasFunction(ctx.slots, "register")) failures.push("slots:register");
+  if (!hasFunction(source.slots, "register")) failures.push("slots:register");
   for (const method of ["toggleSidebar", "openDetails", "closeDetails", "attachPanels"]) {
-    if (!hasFunction(ctx.layout, method)) failures.push(`layout:${method}`);
+    if (!hasFunction(source.layout, method)) failures.push(`layout:${method}`);
   }
   for (const method of ["open", "binding", "subscribe"]) {
-    if (!hasFunction(ctx.sessions, method)) failures.push(`sessions:${method}`);
+    if (!hasFunction(source.sessions, method)) failures.push(`sessions:${method}`);
   }
   return { ok: failures.length === 0, failures };
 }

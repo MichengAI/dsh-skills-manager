@@ -21,6 +21,56 @@ test("client probe reports missing contracts without throwing", () => {
   assert.ok(result.failures.includes("layout:attachPanels"));
 });
 
+test("client probe fails closed when the context is missing", () => {
+  const result = probeClientContracts(null);
+  assert.deepEqual(result, {
+    ok: false,
+    failures: [
+      "slot:root",
+      "slot:sidebar",
+      "slot:conversation",
+      "slot:details",
+      "slot:shell.overlay",
+      "slots:register",
+      "layout:toggleSidebar",
+      "layout:openDetails",
+      "layout:closeDetails",
+      "layout:attachPanels",
+      "sessions:open",
+      "sessions:binding",
+      "sessions:subscribe",
+    ],
+  });
+});
+
+test("client probe fails closed when a slot spec throws", () => {
+  const result = probeClientContracts({
+    slots: {
+      spec() {
+        throw new Error("boom");
+      },
+    },
+  });
+  assert.deepEqual(result, {
+    ok: false,
+    failures: [
+      "slot:root",
+      "slot:sidebar",
+      "slot:conversation",
+      "slot:details",
+      "slot:shell.overlay",
+      "slots:register",
+      "layout:toggleSidebar",
+      "layout:openDetails",
+      "layout:closeDetails",
+      "layout:attachPanels",
+      "sessions:open",
+      "sessions:binding",
+      "sessions:subscribe",
+    ],
+  });
+});
+
 test("host probe requires the gateway, query, storage, and timer faces", () => {
   const result = probeHostContracts({
     apiProxy: { sessions: { create() {}, prompt() {} } },
