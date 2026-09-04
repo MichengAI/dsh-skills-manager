@@ -80,3 +80,17 @@ test("host probe requires the gateway, query, storage, and timer faces", () => {
   });
   assert.equal(result.ok, true);
 });
+
+test("host probe fails closed when the context is missing", () => {
+  const result = probeHostContracts(null);
+  assert.deepEqual(result, {
+    ok: false,
+    failures: [
+      "apiProxy.sessions:create",
+      "apiProxy.sessions:prompt",
+      "sessionQuery:listSessions",
+      "storage.backend:get",
+      "timer:setTimeout",
+    ],
+  });
+});

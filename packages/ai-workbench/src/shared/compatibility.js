@@ -27,11 +27,12 @@ export function probeClientContracts(ctx) {
 }
 
 export function probeHostContracts(ctx) {
+  const source = ctx ?? {};
   const failures = [];
-  if (!hasFunction(ctx.apiProxy?.sessions, "create")) failures.push("apiProxy.sessions:create");
-  if (!hasFunction(ctx.apiProxy?.sessions, "prompt")) failures.push("apiProxy.sessions:prompt");
-  if (!hasFunction(ctx.sessionQuery, "listSessions")) failures.push("sessionQuery:listSessions");
-  if (!hasFunction(ctx.storage?.backend, "get")) failures.push("storage.backend:get");
-  if (!hasFunction(ctx, "setTimeout")) failures.push("timer:setTimeout");
+  if (!hasFunction(source.apiProxy?.sessions, "create")) failures.push("apiProxy.sessions:create");
+  if (!hasFunction(source.apiProxy?.sessions, "prompt")) failures.push("apiProxy.sessions:prompt");
+  if (!hasFunction(source.sessionQuery, "listSessions")) failures.push("sessionQuery:listSessions");
+  if (!hasFunction(source.storage?.backend, "get")) failures.push("storage.backend:get");
+  if (!hasFunction(source, "setTimeout")) failures.push("timer:setTimeout");
   return { ok: failures.length === 0, failures };
 }
