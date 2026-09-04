@@ -26,6 +26,7 @@
   },
   "scripts": {
     "build": "node scripts/build.mjs",
+    "prepack": "npm run build",
     "test": "npm run build && node --test test/*.test.mjs",
     "pack:check": "npm pack --dry-run --json",
     "verify": "npm test && npm run pack:check"

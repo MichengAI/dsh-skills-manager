@@ -47,6 +47,61 @@ test("origin fence rejects missing, malformed, and cross-site origins", () => {
   }
 });
 
+test("origin fence rejects non-string and unknown Fetch Metadata values", () => {
+  for (const fetchSite of [
+    undefined,
+    null,
+    42,
+    ["same-origin"],
+    "same-origin, cross-site",
+    "future-value",
+  ]) {
+    const headers = { host: "localhost" };
+    Object.defineProperty(headers, "sec-fetch-site", { value: fetchSite, enumerable: true });
+    assert.equal(validateOrigin({ headers })?.statusCode, 403, String(fetchSite));
+  }
+});
+
+test("origin fence reads sec-fetch-site exactly once", () => {
+  let reads = 0;
+  const headers = {
+    host: "localhost",
+    get "sec-fetch-site"() {
+      reads += 1;
+      return reads === 1 ? "same-origin" : "cross-site";
+    },
+  };
+
+  assert.equal(validateOrigin({ headers }), null);
+  assert.equal(reads, 1);
+});
+
+test("origin fence fails closed for an exception from the sec-fetch-site getter", () => {
+  let reads = 0;
+  const headers = {
+    host: "localhost",
+    get "sec-fetch-site"() {
+      reads += 1;
+      throw new Error("sec-fetch-site getter secret");
+    },
+  };
+
+  assert.equal(validateOrigin({ headers })?.statusCode, 403);
+  assert.equal(reads, 1);
+});
+
+test("origin fence rejects non-canonical ports with leading zeroes", () => {
+  for (const host of ["localhost:00001", "127.0.0.1:03080", "[::1]:065535"]) {
+    assert.equal(validateOrigin({ headers: { host } })?.statusCode, 403, host);
+  }
+});
+
+test("origin fence accepts recognized same-site Fetch Metadata values", () => {
+  for (const fetchSite of ["same-origin", "same-site", "none", "SAME-ORIGIN"]) {
+    assert.equal(validateOrigin({ headers: { host: "localhost", "sec-fetch-site": fetchSite } }), null, fetchSite);
+  }
+});
+
 test("http API prefix is exported for host registration", () => {
   assert.equal(http.API_PREFIX, "/api/dsh-ai-workbench");
 });

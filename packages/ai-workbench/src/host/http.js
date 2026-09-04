@@ -1,13 +1,14 @@
 export const API_PREFIX = "/api/dsh-ai-workbench";
+const ALLOWED_FETCH_SITES = new Set(["same-origin", "same-site", "none"]);
 
 function forbiddenOrigin() {
   return { statusCode: 403, body: { ok: false, code: "forbidden-origin", error: "forbidden origin" } };
 }
 
 function validPort(port) {
-  if (!/^\d{1,5}$/.test(port)) return false;
+  if (!/^[1-9]\d{0,4}$/.test(port)) return false;
   const value = Number(port);
-  return value >= 1 && value <= 65535;
+  return value <= 65535;
 }
 
 function validIpv4(host) {
@@ -28,8 +29,13 @@ export function validateOrigin(req) {
   try {
     const headers = req != null && typeof req === "object" && req.headers != null && typeof req.headers === "object" ? req.headers : null;
     const host = typeof headers?.host === "string" ? headers.host.toLowerCase() : "";
-    const crossSite = typeof headers?.["sec-fetch-site"] === "string" && headers["sec-fetch-site"].toLowerCase() === "cross-site";
-    if (!validLoopbackHost(host) || crossSite) return forbiddenOrigin();
+    const hasFetchSite = headers !== null && Reflect.has(headers, "sec-fetch-site");
+    const fetchSite = hasFetchSite ? headers["sec-fetch-site"] : undefined;
+    if (
+      !validLoopbackHost(host)
+      || (hasFetchSite && typeof fetchSite !== "string")
+      || (hasFetchSite && !ALLOWED_FETCH_SITES.has(fetchSite.toLowerCase()))
+    ) return forbiddenOrigin();
   } catch {
     return forbiddenOrigin();
   }
