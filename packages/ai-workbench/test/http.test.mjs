@@ -69,6 +69,39 @@ test("routeRequest returns a structured 400 for null, undefined, and invalid req
   }
 });
 
+test("routeRequest resolves structured errors for throwing request and service proxies", async () => {
+  const throwingUrl = new Proxy(request(), {
+    get(target, property, receiver) {
+      if (property === "url") throw new Error("url getter secret");
+      return Reflect.get(target, property, receiver);
+    },
+  });
+  const throwingMethod = new Proxy(request(), {
+    get(target, property, receiver) {
+      if (property === "method") throw new Error("method getter secret");
+      return Reflect.get(target, property, receiver);
+    },
+  });
+  const throwingDiagnostics = new Proxy({}, {
+    get() {
+      throw new Error("diagnostics getter secret");
+    },
+  });
+
+  for (const [name, req, services, statusCode, code] of [
+    ["url getter", throwingUrl, { diagnostics: () => ({}) }, 400, "bad-request"],
+    ["method getter", throwingMethod, { diagnostics: () => ({}) }, 400, "bad-request"],
+    ["diagnostics getter", request(), throwingDiagnostics, 500, "internal-error"],
+  ]) {
+    const [outcome] = await Promise.allSettled([routeRequest(req, services)]);
+    assert.equal(outcome.status, "fulfilled", name);
+    assert.deepEqual(outcome.value, {
+      statusCode,
+      body: { ok: false, code, error: statusCode === 400 ? "bad request" : "internal server error" },
+    }, name);
+  }
+});
+
 test("routeRequest returns 500 when diagnostics are missing or throw", async () => {
   for (const services of [
     {},

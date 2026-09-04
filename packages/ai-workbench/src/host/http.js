@@ -45,34 +45,44 @@ function internalError() {
 }
 
 export async function routeRequest(req, services) {
-  if (
-    req == null
-    || typeof req !== "object"
-    || typeof req.url !== "string"
-    || req.url.length === 0
-    || /[\u0000-\u0020]/.test(req.url)
-    || /%(?![0-9a-f]{2})/i.test(req.url)
-  ) {
+  let url;
+  let method;
+  let headers;
+  try {
+    if (req == null || typeof req !== "object") return badRequest();
+    url = req.url;
+    method = req.method;
+    headers = req.headers;
+    if (
+      typeof url !== "string"
+      || url.length === 0
+      || /[\u0000-\u0020]/.test(url)
+      || /%(?![0-9a-f]{2})/i.test(url)
+    ) {
+      return badRequest();
+    }
+  } catch {
     return badRequest();
   }
 
   let path;
   try {
-    path = new URL(req.url, "http://localhost").pathname.replace(/\/+$/, "");
+    path = new URL(url, "http://localhost").pathname.replace(/\/+$/, "");
   } catch {
     return badRequest();
   }
 
-  const denied = validateOrigin(req);
+  const denied = validateOrigin({ headers });
   if (denied) return denied;
 
-  if (req.method === "GET" && path === `${API_PREFIX}/diagnostics`) {
-    if (services == null || typeof services.diagnostics !== "function") return internalError();
-    try {
-      return { statusCode: 200, body: { ok: true, data: await services.diagnostics() } };
-    } catch {
-      return internalError();
+  try {
+    if (method === "GET" && path === `${API_PREFIX}/diagnostics`) {
+      const diagnostics = services == null ? undefined : services.diagnostics;
+      if (typeof diagnostics !== "function") return internalError();
+      return { statusCode: 200, body: { ok: true, data: await Reflect.apply(diagnostics, services, []) } };
     }
+  } catch {
+    return internalError();
   }
   return { statusCode: 404, body: { ok: false, code: "not-found", error: "not found" } };
 }
