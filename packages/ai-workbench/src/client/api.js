@@ -2,8 +2,12 @@ export const BASE = "/api/dsh-ai-workbench";
 
 const MODES = new Set(["work", "chat"]);
 
+function clientError(message, code) {
+  return Object.assign(new Error(message), { code, status: 400 });
+}
+
 function assertMode(mode) {
-  if (!MODES.has(mode)) throw new Error("invalid mode");
+  if (!MODES.has(mode)) throw clientError("invalid mode", "invalid-mode");
   return mode;
 }
 
@@ -14,7 +18,20 @@ function assertPath(path) {
     || path.startsWith("//")
     || path.includes("\\")
     || path.includes("://")
-  ) throw new Error("invalid request path");
+  ) throw clientError("invalid request path", "invalid-request-path");
+
+  const pathname = path.split(/[?#]/, 1)[0];
+  for (const segment of pathname.split("/")) {
+    let decodedSegment;
+    try {
+      decodedSegment = decodeURIComponent(segment);
+    } catch {
+      throw clientError("invalid request path", "invalid-request-path");
+    }
+    if (segment === "." || segment === ".." || decodedSegment === "." || decodedSegment === "..") {
+      throw clientError("invalid request path", "invalid-request-path");
+    }
+  }
   return path;
 }
 

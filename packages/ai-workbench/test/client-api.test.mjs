@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { workbenchApi } from "../lib/client/api.js";
+import { request, workbenchApi } from "../lib/client/api.js";
 
 function jsonResponse(payload, options = {}) {
   return {
@@ -60,6 +60,46 @@ test("API returns response data and rejects invalid modes before fetching", asyn
   }
 
   assert.equal(calls, 1);
+});
+
+test("API mode validation errors include invalid-mode and HTTP status metadata", () => {
+  const expected = (error) => error instanceof Error
+    && error.code === "invalid-mode"
+    && error.status === 400;
+
+  assert.throws(() => workbenchApi.bootstrap("admin"), expected);
+  assert.throws(() => workbenchApi.saveDraft("work/../chat", { text: "", attachments: [] }), expected);
+});
+
+test("API rejects every dot path segment with invalid-request-path and HTTP status metadata", async () => {
+  const originalFetch = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = async () => {
+    calls++;
+    throw new Error("fetch must not be called for an invalid path");
+  };
+
+  const expected = (error) => error instanceof Error
+    && error.code === "invalid-request-path"
+    && error.status === 400;
+  const invalidPaths = [
+    "/bootstrap/../settings",
+    "/./bootstrap",
+    "/bootstrap/./settings",
+    "/bootstrap/work/../settings",
+    "/bootstrap/%2e%2e/settings",
+    "/%2E/bootstrap",
+  ];
+
+  try {
+    for (const path of invalidPaths) {
+      await assert.rejects(() => request(path), expected);
+    }
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+
+  assert.equal(calls, 0);
 });
 
 test("API errors include the server code and HTTP status", async () => {
