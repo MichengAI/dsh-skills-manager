@@ -6,6 +6,11 @@ The five most recent published versions are listed below.
 
 ## Unreleased
 
+## 0.1.39 - 2026-09-05
+
+- 修复禁用的外部同名技能遮蔽已启用 DSH 技能的问题，统一管理页与运行时的赢家选择。
+- 冲突时为用户和项目级原生赢家提供作用域候选，保留禁用阻断、工作区隔离及来源文件不变性。
+
 ## 0.1.38 - 2026-09-03
 
 - Added Cursor as a read-only, locally toggleable Skill source at `%USERPROFILE%\.cursor\skills`, with `DSH_CURSOR_HOME` override and state-file migration.
