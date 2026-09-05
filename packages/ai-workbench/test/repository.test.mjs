@@ -197,3 +197,38 @@ test("close waits for queued writes before closing the unit", async () => {
     ["close"],
   ]);
 });
+
+test("close is idempotent, waits for queued writes, and rejects the close race", async () => {
+  const calls = [];
+  let releaseWrite;
+  const pendingWrite = new Promise((resolve) => { releaseWrite = resolve; });
+  const unit = memoryUnit({}, {
+    calls,
+    beforePut: async (_table, _key, value) => {
+      calls.push(["write-started", value.text]);
+      await pendingWrite;
+      calls.push(["write-finished", value.text]);
+    },
+  });
+  const repo = await createRepository(unit);
+  const write = repo.putDraft("work", { text: "已有写入", attachments: [] });
+  await new Promise((resolve) => setImmediate(resolve));
+
+  const closing = repo.close();
+  assert.equal(repo.close(), closing);
+  const latePut = repo.putDraft("chat", { text: "太晚", attachments: [] });
+  const lateDelete = repo.deleteNotification("n1");
+  await assert.rejects(latePut, (error) => error.code === "ERR_WORKBENCH_REPOSITORY_CLOSED");
+  await assert.rejects(lateDelete, (error) => error.code === "ERR_WORKBENCH_REPOSITORY_CLOSED");
+  assert.equal(calls.some(([name]) => name === "close"), false);
+
+  releaseWrite();
+  await Promise.all([write, closing]);
+  assert.deepEqual(calls.filter(([name]) => ["write-started", "write-finished", "close"].includes(name)), [
+    ["write-started", "已有写入"],
+    ["write-finished", "已有写入"],
+    ["close"],
+  ]);
+  assert.equal(calls.some(([name, table, key]) => name === "putRecord" && table === "drafts" && key === "chat"), false);
+  assert.equal(calls.some(([name]) => name === "deleteRecord"), false);
+});

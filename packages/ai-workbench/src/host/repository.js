@@ -36,6 +36,19 @@ export async function createRepository(unit) {
     TABLES.map((name) => [name, new Map(Object.entries(loadedTables[name] || {}))]),
   );
   let writes = Promise.resolve();
+  let closing = false;
+  let closed = false;
+  let closePromise;
+
+  function repositoryClosedError() {
+    return Object.assign(new Error("workbench repository is closed or closing"), {
+      code: "ERR_WORKBENCH_REPOSITORY_CLOSED",
+    });
+  }
+
+  function assertWritable() {
+    if (closing || closed) throw repositoryClosedError();
+  }
 
   function enqueue(operation) {
     const next = writes.then(operation, operation);
@@ -49,6 +62,7 @@ export async function createRepository(unit) {
   }
 
   async function put(table, key, value) {
+    assertWritable();
     const saved = structuredClone(value);
     return enqueue(async () => {
       await unit.putRecord(table, key, structuredClone(saved));
@@ -57,7 +71,8 @@ export async function createRepository(unit) {
     });
   }
 
-  function remove(table, key) {
+  async function remove(table, key) {
+    assertWritable();
     return enqueue(async () => {
       await unit.deleteRecord(table, key);
       tables[table].delete(key);
@@ -89,6 +104,14 @@ export async function createRepository(unit) {
     listNotifications: () => list("notifications"),
     putNotification: (record) => put("notifications", record.id, record),
     deleteNotification: (id) => remove("notifications", id),
-    close: () => writes.then(() => unit.close()),
+    close: () => {
+      if (closePromise) return closePromise;
+      closing = true;
+      closePromise = writes.then(async () => {
+        await unit.close();
+        closed = true;
+      });
+      return closePromise;
+    },
   };
 }

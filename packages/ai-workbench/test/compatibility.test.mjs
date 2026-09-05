@@ -387,3 +387,33 @@ test("plugin registration does not invoke host business methods", async () => {
   assert.equal(typeof disposer, "function");
   await disposer();
 });
+
+test("plugin closes an opened unit when repository initialization fails", async () => {
+  const events = [];
+  let releaseClose;
+  const pendingClose = new Promise((resolve) => { releaseClose = resolve; });
+  const unit = {
+    async loadAll() {
+      events.push("loadAll");
+      throw new Error("load failed");
+    },
+    async close() {
+      events.push("close-start");
+      await pendingClose;
+      events.push("close-end");
+    },
+  };
+
+  const applying = applyPlugin({
+    apiProxy: { sessions: { create() {}, prompt() {} } },
+    sessionQuery: { listSessions() {} },
+    storage: { backend: { get: () => ({ kv: { open: () => unit } }) } },
+    setTimeout() {},
+    webServer: { register() { events.push("register"); } },
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(events, ["loadAll", "close-start"]);
+  releaseClose();
+  await assert.rejects(applying, /load failed/);
+  assert.deepEqual(events, ["loadAll", "close-start", "close-end"]);
+});

@@ -9,7 +9,13 @@ const inject = ["webServer", "webRuntime", "apiProxy", "sessionQuery", "storage"
 async function apply(ctx) {
   const diagnostics = createDiagnostics(probeHostContracts(ctx));
   const unit = await openWorkbenchUnit(ctx.storage);
-  const repository = await createRepository(unit);
+  let repository;
+  try {
+    repository = await createRepository(unit);
+  } catch (error) {
+    await unit.close();
+    throw error;
+  }
   let unregister;
   try {
     unregister = ctx.webServer.register({
