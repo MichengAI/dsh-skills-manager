@@ -79,11 +79,38 @@ test("appends only final transcripts and reports microphone permission errors", 
   assert.deepEqual(errors, ["未获得麦克风权限"]);
 });
 
+test("reports idle and cleans up recognition when recognition errors", () => {
+  const { browser, instances } = recognitionBrowser({ preferred: true });
+  const speech = createSpeechInput(browser);
+  const states = [];
+
+  speech.start({ onText() {}, onState: (state) => states.push(state), onError() {} });
+  instances[0].onerror({ error: "network" });
+  speech.stop();
+
+  assert.deepEqual(states, ["idle"]);
+  assert.equal(instances[0].stopped, 0);
+});
+
+test("cleans up recognition when recognition ends", () => {
+  const { browser, instances } = recognitionBrowser({ preferred: true });
+  const speech = createSpeechInput(browser);
+  const states = [];
+
+  speech.start({ onText() {}, onState: (state) => states.push(state), onError() {} });
+  instances[0].onend();
+  speech.stop();
+
+  assert.deepEqual(states, ["idle"]);
+  assert.equal(instances[0].stopped, 0);
+});
+
 test("stops the active recognition instance", () => {
   const { browser, instances } = recognitionBrowser({ preferred: true });
   const speech = createSpeechInput(browser);
 
   speech.start({ onText() {}, onState() {}, onError() {} });
+  speech.stop();
   speech.stop();
 
   assert.equal(instances[0].stopped, 1);

@@ -57,7 +57,11 @@ export function workspaceItemsFromFeed(feed) {
       : null;
   return items.flatMap((item) => {
     if (!item || typeof item.path !== "string") return [];
-    const id = typeof item.id === "string" && item.id ? item.id : feedWorkspaceId;
+    const id = typeof item.workspaceId === "string" && item.workspaceId
+      ? item.workspaceId
+      : typeof item.id === "string" && item.id
+        ? item.id
+        : feedWorkspaceId;
     if (!id) return [];
     return [{
       id,

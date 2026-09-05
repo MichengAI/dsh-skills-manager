@@ -47,3 +47,9 @@ test("workspace adapter reads the runtime top-level items and workspace id", () 
     items: [{ path: "/tmp/runtime", title: "运行时工作空间" }],
   }), [{ id: "runtime-workspace", title: "运行时工作空间", path: "/tmp/runtime" }]);
 });
+
+test("workspace adapter reads the real workspace row id from top-level items", () => {
+  assert.deepEqual(workspaceItemsFromFeed({
+    items: [{ workspaceId: "w1", title: "教学", path: "/x" }],
+  }), [{ id: "w1", title: "教学", path: "/x" }]);
+});
