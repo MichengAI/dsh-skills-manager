@@ -280,3 +280,205 @@ test("sendJson writes status, JSON headers, and response body", () => {
   assert.equal(calls.headers["content-length"], Buffer.byteLength(expectedBody));
   assert.equal(calls.body, expectedBody);
 });
+
+function workbenchRequest(overrides = {}) {
+  return {
+    method: "GET",
+    url: "/api/dsh-ai-workbench/bootstrap?mode=work",
+    headers: { host: "localhost" },
+    ...overrides,
+  };
+}
+
+function jsonMutationRequest(url, body, overrides = {}) {
+  const { headers: headerOverrides = {}, ...requestOverrides } = overrides;
+  return workbenchRequest({
+    method: "PUT",
+    url,
+    headers: {
+      host: "localhost",
+      "x-dsh-workbench-action": "1",
+      "content-type": "application/json",
+      ...headerOverrides,
+    },
+    body,
+    ...requestOverrides,
+  });
+}
+
+function modeServices(overrides = {}) {
+  const writes = [];
+  const repository = {
+    getSettings: async () => ({ schemaVersion: 1, brandName: "正方 AI 工作台", theme: "light", defaultMode: "work", lastMode: "work", localDisplayName: "本地用户", voiceEnabled: true }),
+    getDraft: async (mode) => ({ mode, text: `${mode}-draft`, attachments: [], workspaceId: null, capabilityIds: [], execution: null }),
+    putDraft: async (mode, draft) => { writes.push(["draft", mode, draft]); return { ...draft, mode, updatedAt: "2026-09-05T00:00:00.000Z" }; },
+    putSettings: async (settings) => { writes.push(["settings", settings]); return settings; },
+    getSessionMeta: async () => null,
+    putSessionMeta: async (...args) => { writes.push(["session", ...args]); },
+    ...overrides.repository,
+  };
+  const sessionQuery = {
+    listSessions: async () => [],
+    readTitleSnapshots: async () => [],
+    ...overrides.sessionQuery,
+  };
+  return { diagnostics: () => ({}), repository, sessionQuery, writes, ...overrides };
+}
+
+test("bootstrap returns settings, the selected draft, and mode-filtered history", async () => {
+  const services = modeServices({
+    modeService: { listHistory: async (mode) => [{ sessionId: `${mode}-1`, mode }] },
+  });
+  const result = await routeRequest(workbenchRequest(), services);
+  assert.equal(result.statusCode, 200);
+  assert.deepEqual(result.body.data, {
+    settings: await services.repository.getSettings(),
+    draft: await services.repository.getDraft("work"),
+    history: [{ sessionId: "work-1", mode: "work" }],
+  });
+});
+
+test("bootstrap supports Chat and rejects a missing or unknown mode", async () => {
+  const services = modeServices({ modeService: { listHistory: async () => [] } });
+  const chat = await routeRequest(workbenchRequest({ url: "/api/dsh-ai-workbench/bootstrap?mode=chat" }), services);
+  assert.equal(chat.statusCode, 200);
+  assert.equal(chat.body.data.draft.mode, "chat");
+  for (const url of ["/api/dsh-ai-workbench/bootstrap", "/api/dsh-ai-workbench/bootstrap?mode=admin"]) {
+    const result = await routeRequest(workbenchRequest({ url }), services);
+    assert.equal(result.statusCode, 400, url);
+    assert.equal(result.body.code, "invalid-mode", url);
+  }
+});
+
+test("draft endpoints save independent Work and Chat drafts", async () => {
+  const services = modeServices();
+  const work = await routeRequest(jsonMutationRequest("/api/dsh-ai-workbench/drafts/work", JSON.stringify({
+    text: "整理材料",
+    workspaceId: "w1",
+    capabilityIds: ["docs"],
+    attachments: [],
+    execution: { modelPolicy: "auto", intensity: "deep" },
+  })), services);
+  const chat = await routeRequest(jsonMutationRequest("/api/dsh-ai-workbench/drafts/chat", Buffer.from(JSON.stringify({
+    text: "解释制度",
+    workspaceId: "forged",
+    capabilityIds: ["shell"],
+    execution: { modelPolicy: "manual", provider: "x", model: "y" },
+    attachments: [],
+  }))), services);
+
+  assert.equal(work.statusCode, 200);
+  assert.equal(work.body.data.workspaceId, "w1");
+  assert.equal(chat.statusCode, 200);
+  assert.equal(chat.body.data.workspaceId, null);
+  assert.deepEqual(chat.body.data.capabilityIds, []);
+  assert.equal(chat.body.data.execution, null);
+  assert.deepEqual(services.writes.map(([kind, mode]) => [kind, mode]), [["draft", "work"], ["draft", "chat"]]);
+});
+
+test("settings endpoint validates, saves, and returns settings", async () => {
+  const services = modeServices();
+  const result = await routeRequest(jsonMutationRequest("/api/dsh-ai-workbench/settings", JSON.stringify({
+    defaultMode: "chat",
+    lastMode: "chat",
+    localDisplayName: "老师",
+    voiceEnabled: false,
+  })), services);
+  assert.equal(result.statusCode, 200);
+  assert.equal(result.body.data.defaultMode, "chat");
+  assert.equal(result.body.data.voiceEnabled, false);
+  assert.equal(services.writes[0][0], "settings");
+});
+
+test("mutation endpoints require the action header and JSON content type", async () => {
+  const services = modeServices();
+  const noAction = await routeRequest(jsonMutationRequest(
+    "/api/dsh-ai-workbench/drafts/work",
+    JSON.stringify({ text: "x", attachments: [] }),
+    { headers: { "x-dsh-workbench-action": undefined } },
+  ), services);
+  assert.equal(noAction.statusCode, 403);
+  assert.equal(noAction.body.code, "action-required");
+  const noJson = await routeRequest(jsonMutationRequest(
+    "/api/dsh-ai-workbench/drafts/work",
+    JSON.stringify({ text: "x", attachments: [] }),
+    { headers: { "content-type": "text/plain" } },
+  ), services);
+  assert.equal(noJson.statusCode, 415);
+  assert.equal(noJson.body.code, "content-type-required");
+});
+
+test("draft mutation routes are exact and do not match nested paths", async () => {
+  const result = await routeRequest(jsonMutationRequest(
+    "/api/dsh-ai-workbench/drafts/work/extra",
+    JSON.stringify({ text: "x", attachments: [] }),
+  ), modeServices());
+  assert.equal(result.statusCode, 404);
+  assert.equal(result.body.code, "not-found");
+});
+
+test("mutation endpoints reject malformed JSON and payloads over 1 MiB", async () => {
+  const services = modeServices();
+  const malformed = await routeRequest(jsonMutationRequest("/api/dsh-ai-workbench/drafts/work", "{"), services);
+  assert.equal(malformed.statusCode, 400);
+  assert.equal(malformed.body.code, "invalid-json");
+
+  const oversized = await routeRequest(jsonMutationRequest(
+    "/api/dsh-ai-workbench/drafts/work",
+    Buffer.alloc((1 << 20) + 1, 0x61),
+  ), services);
+  assert.equal(oversized.statusCode, 413);
+  assert.equal(oversized.body.code, "payload-too-large");
+});
+
+test("body reader accepts an IncomingMessage-style async iterable", async () => {
+  const services = modeServices();
+  const chunks = [
+    Buffer.from('{"text":"异步读取","attachments":['),
+    Buffer.from("]}"),
+  ];
+  const req = workbenchRequest({
+    method: "PUT",
+    url: "/api/dsh-ai-workbench/drafts/chat",
+    headers: { host: "localhost", "x-dsh-workbench-action": "1", "content-type": "application/json" },
+    async *[Symbol.asyncIterator]() {
+      yield* chunks;
+    },
+  });
+  const result = await routeRequest(req, services);
+  assert.equal(result.statusCode, 200);
+  assert.equal(result.body.data.text, "异步读取");
+});
+
+test("invalid drafts return 400 and history does not reclassify sessions", async () => {
+  const services = modeServices({
+    modeService: undefined,
+    sessionQuery: {
+      listSessions: async () => [{ header: { id: "s1", createdAt: "2026-09-05T00:00:00.000Z" } }],
+      readTitleSnapshots: async () => [],
+    },
+  });
+  const invalidDraft = await routeRequest(jsonMutationRequest(
+    "/api/dsh-ai-workbench/drafts/work",
+    JSON.stringify({ text: "x", attachments: [{ mediaType: "text/plain", data: "aGVsbG8=" }] }),
+  ), services);
+  assert.equal(invalidDraft.statusCode, 400);
+  assert.equal(invalidDraft.body.code, "invalid-attachment");
+
+  const bootstrap = await routeRequest(workbenchRequest(), services);
+  assert.equal(bootstrap.statusCode, 200);
+  assert.equal(bootstrap.body.data.history[0].origin, "migration");
+  assert.equal(bootstrap.body.data.history[0].imported, true);
+  assert.equal(services.writes.some(([kind]) => kind === "session"), false);
+});
+
+test("service failures return a generic 500 without a stack", async () => {
+  const result = await routeRequest(workbenchRequest(), modeServices({
+    modeService: { listHistory: async () => { throw new Error("secret stack detail"); } },
+  }));
+  assert.deepEqual(result, {
+    statusCode: 500,
+    body: { ok: false, code: "internal-error", error: "internal server error" },
+  });
+  assert.equal(JSON.stringify(result).includes("secret stack detail"), false);
+});

@@ -74,6 +74,7 @@ export function probeHostContracts(ctx) {
   if (!probeHostMethod(apiSessions, "prompt")) failures.push("apiProxy.sessions:prompt");
   const sessionQuery = readProperty(source, "sessionQuery");
   if (!probeHostMethod(sessionQuery, "listSessions")) failures.push("sessionQuery:listSessions");
+  if (!probeHostMethod(sessionQuery, "readTitleSnapshots")) failures.push("sessionQuery:readTitleSnapshots");
   const storage = readProperty(source, "storage");
   const backend = readProperty(storage, "backend");
   if (!probeHostMethod(backend, "get")) failures.push("storage.backend:get");

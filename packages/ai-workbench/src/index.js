@@ -1,6 +1,7 @@
 import { probeHostContracts } from "./shared/compatibility.js";
 import { createDiagnostics } from "./host/diagnostics.js";
 import { API_PREFIX, routeRequest, sendJson } from "./host/http.js";
+import { createModeService } from "./host/mode-service.js";
 import { createRepository, openWorkbenchUnit } from "./host/repository.js";
 
 const name = "ai-workbench";
@@ -16,6 +17,7 @@ async function apply(ctx) {
     await unit.close();
     throw error;
   }
+  const modeService = createModeService({ repository, sessionQuery: ctx.sessionQuery });
   let unregister;
   try {
     unregister = ctx.webServer.register({
@@ -23,6 +25,7 @@ async function apply(ctx) {
       path: API_PREFIX,
       handler: async (req, res) => sendJson(res, await routeRequest(req, {
         diagnostics,
+        modeService,
         repository,
         sessionQuery: ctx.sessionQuery,
       })),

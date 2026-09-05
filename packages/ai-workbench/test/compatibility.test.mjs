@@ -155,14 +155,25 @@ test("client probe fails closed when context and nested service reads throw", ()
   });
 });
 
-test("host probe requires the gateway, query, storage, and timer faces", () => {
+test("host probe requires the gateway, query, title query, storage, and timer faces", () => {
+  const result = probeHostContracts({
+    apiProxy: { sessions: { create() {}, prompt() {} } },
+    sessionQuery: { listSessions() {}, readTitleSnapshots() {} },
+    storage: { backend: { get() {} } },
+    setTimeout() {},
+  });
+  assert.equal(result.ok, true);
+});
+
+test("host probe rejects a session query without title snapshots", () => {
   const result = probeHostContracts({
     apiProxy: { sessions: { create() {}, prompt() {} } },
     sessionQuery: { listSessions() {} },
     storage: { backend: { get() {} } },
     setTimeout() {},
   });
-  assert.equal(result.ok, true);
+  assert.equal(result.ok, false);
+  assert.ok(result.failures.includes("sessionQuery:readTitleSnapshots"));
 });
 
 test("host probe fails closed when the context is missing", () => {
@@ -173,6 +184,7 @@ test("host probe fails closed when the context is missing", () => {
       "apiProxy.sessions:create",
       "apiProxy.sessions:prompt",
       "sessionQuery:listSessions",
+      "sessionQuery:readTitleSnapshots",
       "storage.backend:get",
       "timer:setTimeout",
     ],
@@ -186,6 +198,7 @@ test("host probe fails closed for an undefined context", () => {
       "apiProxy.sessions:create",
       "apiProxy.sessions:prompt",
       "sessionQuery:listSessions",
+      "sessionQuery:readTitleSnapshots",
       "storage.backend:get",
       "timer:setTimeout",
     ],
@@ -209,6 +222,7 @@ test("host probe fails closed when context and nested service reads throw", () =
       "apiProxy.sessions:create",
       "apiProxy.sessions:prompt",
       "sessionQuery:listSessions",
+      "sessionQuery:readTitleSnapshots",
       "storage.backend:get",
       "timer:setTimeout",
     ],
@@ -236,6 +250,7 @@ test("host probe fails closed when context and nested service reads throw", () =
       "apiProxy.sessions:create",
       "apiProxy.sessions:prompt",
       "sessionQuery:listSessions",
+      "sessionQuery:readTitleSnapshots",
       "storage.backend:get",
       "timer:setTimeout",
     ],
@@ -258,7 +273,10 @@ test("host probe rejects callable proxies whose apply trap throws", () => {
         prompt: throwingCallable("prompt"),
       },
     },
-    sessionQuery: { listSessions: throwingCallable("listSessions") },
+    sessionQuery: {
+      listSessions: throwingCallable("listSessions"),
+      readTitleSnapshots: throwingCallable("readTitleSnapshots"),
+    },
     storage: { backend: { get: throwingCallable("get") } },
     setTimeout: throwingCallable("setTimeout"),
   });
@@ -269,6 +287,7 @@ test("host probe rejects callable proxies whose apply trap throws", () => {
       "apiProxy.sessions:create",
       "apiProxy.sessions:prompt",
       "sessionQuery:listSessions",
+      "sessionQuery:readTitleSnapshots",
       "storage.backend:get",
       "timer:setTimeout",
     ],
@@ -293,7 +312,10 @@ test("host probe rejects callable proxies without invoking a successful apply tr
         prompt: safeCallable("prompt"),
       },
     },
-    sessionQuery: { listSessions: safeCallable("listSessions") },
+    sessionQuery: {
+      listSessions: safeCallable("listSessions"),
+      readTitleSnapshots: safeCallable("readTitleSnapshots"),
+    },
     storage: { backend: { get: safeCallable("get") } },
     setTimeout: safeCallable("setTimeout"),
   });
@@ -304,6 +326,7 @@ test("host probe rejects callable proxies without invoking a successful apply tr
       "apiProxy.sessions:create",
       "apiProxy.sessions:prompt",
       "sessionQuery:listSessions",
+      "sessionQuery:readTitleSnapshots",
       "storage.backend:get",
       "timer:setTimeout",
     ],
@@ -319,7 +342,7 @@ test("host probe does not invoke real host methods while checking their callable
 
   const result = probeHostContracts({
     apiProxy: { sessions: { create: hostMethod, prompt: hostMethod } },
-    sessionQuery: { listSessions: hostMethod },
+    sessionQuery: { listSessions: hostMethod, readTitleSnapshots: hostMethod },
     storage: { backend: { get: hostMethod } },
     setTimeout: hostMethod,
   });
@@ -337,7 +360,7 @@ test("host probe rejects bound host methods without invoking them", () => {
 
   const result = probeHostContracts({
     apiProxy: { sessions: { create: boundMethod, prompt: boundMethod } },
-    sessionQuery: { listSessions: boundMethod },
+    sessionQuery: { listSessions: boundMethod, readTitleSnapshots: boundMethod },
     storage: { backend: { get: boundMethod } },
     setTimeout: boundMethod,
   });
@@ -347,6 +370,7 @@ test("host probe rejects bound host methods without invoking them", () => {
     "apiProxy.sessions:create",
     "apiProxy.sessions:prompt",
     "sessionQuery:listSessions",
+    "sessionQuery:readTitleSnapshots",
     "storage.backend:get",
     "timer:setTimeout",
   ]);
@@ -369,7 +393,7 @@ test("plugin registration does not invoke host business methods", async () => {
 
   const disposer = await applyPlugin({
     apiProxy: { sessions: { create: hostMethod, prompt: hostMethod } },
-    sessionQuery: { listSessions: hostMethod },
+    sessionQuery: { listSessions: hostMethod, readTitleSnapshots: hostMethod },
     storage: { backend: { get: () => ({ kv: { open: () => unit } }) } },
     setTimeout: hostMethod,
     webServer: {
@@ -406,7 +430,7 @@ test("plugin closes an opened unit when repository initialization fails", async 
 
   const applying = applyPlugin({
     apiProxy: { sessions: { create() {}, prompt() {} } },
-    sessionQuery: { listSessions() {} },
+    sessionQuery: { listSessions() {}, readTitleSnapshots() {} },
     storage: { backend: { get: () => ({ kv: { open: () => unit } }) } },
     setTimeout() {},
     webServer: { register() { events.push("register"); } },

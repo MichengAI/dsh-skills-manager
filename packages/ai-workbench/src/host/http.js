@@ -1,5 +1,9 @@
+import { createModeService } from "./mode-service.js";
+import { assertMode, parseDraft, parseSettings } from "../shared/contracts.js";
+
 export const API_PREFIX = "/api/dsh-ai-workbench";
 const ALLOWED_FETCH_SITES = new Set(["same-origin", "same-site", "none"]);
+const MAX_JSON_BODY_BYTES = 1 << 20;
 
 function forbiddenOrigin() {
   return { statusCode: 403, body: { ok: false, code: "forbidden-origin", error: "forbidden origin" } };
@@ -91,6 +95,124 @@ function internalError() {
   return { statusCode: 500, body: { ok: false, code: "internal-error", error: "internal server error" } };
 }
 
+function typedError(message, statusCode, code) {
+  return Object.assign(new Error(message), { statusCode, code, public: true });
+}
+
+function contentType(headers) {
+  return String(headers?.["content-type"] || "").split(";", 1)[0].trim().toLowerCase();
+}
+
+function toBuffer(chunk) {
+  if (typeof chunk === "string") return Buffer.from(chunk, "utf8");
+  if (Buffer.isBuffer(chunk)) return chunk;
+  if (chunk instanceof Uint8Array) return Buffer.from(chunk);
+  throw typedError("invalid request body", 400, "invalid-json");
+}
+
+async function readJsonBody(req) {
+  let source;
+  try {
+    const hasBody = req && Object.prototype.hasOwnProperty.call(req, "body");
+    source = hasBody && req.body !== undefined ? req.body : req;
+  } catch {
+    throw typedError("invalid request body", 400, "invalid-json");
+  }
+
+  let raw;
+  if (source == null) {
+    raw = Buffer.alloc(0);
+  } else if (typeof source === "string" || Buffer.isBuffer(source) || source instanceof Uint8Array) {
+    raw = toBuffer(source);
+  } else if (typeof source[Symbol.asyncIterator] === "function") {
+    const chunks = [];
+    let size = 0;
+    for await (const chunk of source) {
+      const buffer = toBuffer(chunk);
+      size += buffer.length;
+      if (size > MAX_JSON_BODY_BYTES) throw typedError("payload too large", 413, "payload-too-large");
+      chunks.push(buffer);
+    }
+    raw = Buffer.concat(chunks, size);
+  } else {
+    throw typedError("invalid request body", 400, "invalid-json");
+  }
+
+  if (raw.length > MAX_JSON_BODY_BYTES) throw typedError("payload too large", 413, "payload-too-large");
+  if (raw.length === 0) return {};
+  try {
+    return JSON.parse(raw.toString("utf8"));
+  } catch {
+    throw typedError("malformed JSON", 400, "invalid-json");
+  }
+}
+
+function resultFromError(error) {
+  if (error?.public === true && Number.isInteger(error.statusCode) && typeof error.code === "string") {
+    return {
+      statusCode: error.statusCode,
+      body: { ok: false, code: error.code, error: String(error.message || "request failed") },
+    };
+  }
+  return internalError();
+}
+
+function success(data) {
+  return { statusCode: 200, body: { ok: true, data } };
+}
+
+function modeServiceFor(services) {
+  if (services?.modeService) return services.modeService;
+  if (services?.repository && services?.sessionQuery) {
+    return createModeService({ repository: services.repository, sessionQuery: services.sessionQuery });
+  }
+  return null;
+}
+
+async function handleBootstrap(parsed, services) {
+  const mode = assertMode(parsed.searchParams.get("mode"));
+  const repository = services?.repository;
+  const modeService = modeServiceFor(services);
+  if (
+    !repository
+    || typeof repository.getSettings !== "function"
+    || typeof repository.getDraft !== "function"
+    || !modeService
+    || typeof modeService.listHistory !== "function"
+  ) return internalError();
+  const [settings, draft, history] = await Promise.all([
+    repository.getSettings(),
+    repository.getDraft(mode),
+    modeService.listHistory(mode),
+  ]);
+  return success({ settings, draft, history });
+}
+
+async function handleMutation(req, path, services) {
+  const headers = req.headers;
+  if (headers?.["x-dsh-workbench-action"] !== "1") {
+    throw typedError("action header required", 403, "action-required");
+  }
+  if (contentType(headers) !== "application/json") {
+    throw typedError("content-type must be application/json", 415, "content-type-required");
+  }
+
+  const repository = services?.repository;
+  if (!repository) return internalError();
+  if (path === `${API_PREFIX}/settings`) {
+    if (typeof repository.putSettings !== "function") return internalError();
+    const settings = parseSettings(await readJsonBody(req));
+    return success(await repository.putSettings(settings));
+  }
+
+  const draftMode = path.slice(`${API_PREFIX}/drafts/`.length);
+  if (!new Set(["work", "chat"]).has(draftMode) || typeof repository.putDraft !== "function") {
+    return { statusCode: 404, body: { ok: false, code: "not-found", error: "not found" } };
+  }
+  const draft = parseDraft(await readJsonBody(req), draftMode);
+  return success(await repository.putDraft(draftMode, draft));
+}
+
 export async function routeRequest(req, services) {
   let url;
   let method;
@@ -114,9 +236,10 @@ export async function routeRequest(req, services) {
     return badRequest();
   }
 
+  let parsed;
   let path;
   try {
-    const parsed = new URL(url, "http://localhost");
+    parsed = new URL(url, "http://localhost");
     if (parsed.origin !== "http://localhost") return badRequest();
     path = parsed.pathname.replace(/\/+$/, "");
   } catch {
@@ -130,10 +253,21 @@ export async function routeRequest(req, services) {
     if (method === "GET" && path === `${API_PREFIX}/diagnostics`) {
       const diagnostics = services == null ? undefined : services.diagnostics;
       if (typeof diagnostics !== "function") return internalError();
-      return { statusCode: 200, body: { ok: true, data: await Reflect.apply(diagnostics, services, []) } };
+      return success(await Reflect.apply(diagnostics, services, []));
     }
-  } catch {
-    return internalError();
+    if (method === "GET" && path === `${API_PREFIX}/bootstrap`) return await handleBootstrap(parsed, services);
+    if (
+      method === "PUT"
+      && (
+        path === `${API_PREFIX}/settings`
+        || path === `${API_PREFIX}/drafts/work`
+        || path === `${API_PREFIX}/drafts/chat`
+      )
+    ) {
+      return await handleMutation(req, path, services);
+    }
+  } catch (error) {
+    return resultFromError(error);
   }
   return { statusCode: 404, body: { ok: false, code: "not-found", error: "not found" } };
 }
