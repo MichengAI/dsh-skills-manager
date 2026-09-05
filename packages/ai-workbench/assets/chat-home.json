@@ -1,0 +1,21 @@
+{
+  "guesses": [
+    { "id": "haircut", "label": "理发预约", "prompt": "学校理发服务如何预约？", "sortOrder": 1, "enabled": true },
+    { "id": "week-plan", "label": "一周安排", "prompt": "帮我梳理本周的校园日程安排。", "sortOrder": 2, "enabled": true },
+    { "id": "face-photo", "label": "人脸照片怎么换", "prompt": "校园人脸识别照片如何更换？", "sortOrder": 3, "enabled": true },
+    { "id": "staff-phone", "label": "教职工电话", "prompt": "如何查询校内教职工联系电话？", "sortOrder": 4, "enabled": true },
+    { "id": "campus-password", "label": "智慧校园密码怎么改", "prompt": "智慧校园账号密码如何修改？", "sortOrder": 5, "enabled": true }
+  ],
+  "popular": [
+    { "id": "popular-haircut", "label": "理发预约", "prompt": "学校理发服务如何预约？", "sortOrder": 1, "enabled": true },
+    { "id": "teacher-student", "label": "师生通", "prompt": "师生通服务如何使用？", "sortOrder": 2, "enabled": true },
+    { "id": "project-apply", "label": "项目申报", "prompt": "校内项目申报需要经过哪些步骤？", "sortOrder": 3, "enabled": true },
+    { "id": "class-adjust", "label": "调停课申请", "prompt": "调课或停课申请如何办理？", "sortOrder": 4, "enabled": true },
+    { "id": "seal-apply", "label": "用印申请", "prompt": "校内用印申请如何办理？", "sortOrder": 5, "enabled": true },
+    { "id": "popular-week", "label": "一周安排", "prompt": "帮我梳理本周的校园日程安排。", "sortOrder": 6, "enabled": true }
+  ],
+  "navigation": [
+    { "id": "portal", "title": "融合门户", "category": "服务导航", "url": "", "icon": "portal", "sortOrder": 1, "enabled": true },
+    { "id": "mail", "title": "校园邮箱", "category": "服务导航", "url": "", "icon": "mail", "sortOrder": 2, "enabled": true }
+  ]
+}
