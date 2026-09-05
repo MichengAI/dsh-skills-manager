@@ -15,3 +15,10 @@ test("layout adapter refuses a host without attachPanels", () => {
   const registration = createRootRegistration({ layout: {} }, () => ({}));
   assert.throws(() => registration.inject({}), /attachPanels/);
 });
+
+test("root registration exposes its official child slots", () => {
+  const registration = createRootRegistration({ layout: { attachPanels() {} } }, () => ({}));
+
+  assert.strictEqual(registration.children, ROOT_CHILDREN);
+  assert.deepEqual(Object.keys(registration.children), ["sidebar", "conversation", "details", "shell.overlay"]);
+});

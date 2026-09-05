@@ -44,6 +44,7 @@ export function createRootRegistration(ctx, defineStore) {
   return {
     name: "root",
     priority: 1,
+    children: ROOT_CHILDREN,
     store: () => createLayoutStore(defineStore),
     inject(actions) {
       if (typeof ctx.layout?.attachPanels !== "function") throw new Error("DSH layout.attachPanels is unavailable");

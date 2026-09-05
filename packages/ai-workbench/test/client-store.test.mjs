@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { initialState, reduceWorkbench } from "../lib/client/store.js";
+import * as store from "../lib/client/store.js";
+
+const { initialState, reduceWorkbench } = store;
 
 test("switching modes preserves separate drafts", () => {
   let state = reduceWorkbench(initialState(), { type: "draft/change", mode: "work", text: "汇总日报" });
@@ -74,6 +76,54 @@ test("draft replace deep clones the action draft payload", () => {
 
   state.drafts.work.attachments[0].name = "state 修改";
   assert.equal(draft.attachments[0].name, "外部文件修改");
+});
+
+test("bootstrap hydration is not marked as a user draft change", () => {
+  let state = reduceWorkbench(initialState(), {
+    type: "bootstrap/success",
+    mode: "work",
+    data: { draft: { text: "远端草稿", attachments: [] }, history: [] },
+  });
+
+  assert.equal(state.draftDirty.work, false);
+  state = reduceWorkbench(state, { type: "draft/change", mode: "work", text: "用户修改" });
+  assert.equal(state.draftDirty.work, true);
+  assert.equal(state.draftDirty.chat, false);
+});
+
+test("draft save scheduler debounces and keeps Work and Chat independent", async () => {
+  assert.equal(typeof store.createDraftSaveScheduler, "function");
+  const timers = [];
+  const saved = [];
+  const scheduler = store.createDraftSaveScheduler((mode, draft) => {
+    saved.push([mode, draft]);
+  }, {
+    setTimeoutFn(callback, delay) {
+      const timer = { callback, delay, cleared: false };
+      timers.push(timer);
+      return timer;
+    },
+    clearTimeoutFn(timer) {
+      timer.cleared = true;
+    },
+  });
+
+  scheduler.hydrate("work");
+  scheduler.hydrate("chat");
+  scheduler.schedule("work", { text: "第一版" });
+  scheduler.schedule("work", { text: "最终版" });
+  scheduler.schedule("chat", { text: "聊天草稿" });
+
+  assert.equal(timers.filter((timer) => !timer.cleared).length, 2);
+  assert.equal(timers[1].delay, 500);
+  timers[1].callback();
+  await Promise.resolve();
+  assert.deepEqual(saved, [["work", { text: "最终版" }]]);
+
+  timers[2].callback();
+  await Promise.resolve();
+  assert.deepEqual(saved, [["work", { text: "最终版" }], ["chat", { text: "聊天草稿" }]]);
+  scheduler.dispose();
 });
 
 test("bootstrap success deep clones draft and history action payloads", () => {

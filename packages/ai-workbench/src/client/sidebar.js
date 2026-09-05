@@ -91,7 +91,12 @@ export function createSidebar(React) {
         h("div", { className: "daw-user-footer" }, h("span", { className: "daw-user-avatar", "aria-hidden": "true" }, displayName.slice(0, 1)), h("span", null, displayName)),
         h("div", { className: "daw-official-settings" }, renderSlot?.("sidebar.settings", {})),
         h("div", { className: "daw-official-footer-actions" }, renderSlot?.("sidebar.footer.action", {})),
-        collapsed ? h("button", { type: "button", className: "daw-sidebar-toggle", onClick: toggleSidebar, "aria-label": "展开侧边栏" }, "›") : null,
+        h("button", {
+          type: "button",
+          className: "daw-sidebar-toggle",
+          onClick: toggleSidebar,
+          "aria-label": collapsed ? "展开侧边栏" : "收起侧边栏",
+        }, collapsed ? "›" : "‹"),
       ),
     );
   };

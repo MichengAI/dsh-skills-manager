@@ -62,6 +62,16 @@ test("loader factory uses the browser runtime client entry and registers Root", 
   assert.deepEqual(registrations.map(([registration]) => registration.name), ["sidebar", "root"]);
   assert.equal(typeof registrations[0][1], "function");
   assert.equal(typeof registrations[1][1], "function");
+  assert.deepEqual(registrations[0][0].children, {
+    "sidebar.settings": { kind: "single", scope: "root" },
+    "sidebar.footer.action": { kind: "list", scope: "root" },
+  });
+  assert.deepEqual(registrations[1][0].children, {
+    sidebar: { kind: "single", scope: "root" },
+    conversation: { kind: "single", scope: "session-maybe" },
+    details: { kind: "single", scope: "session" },
+    "shell.overlay": { kind: "list", scope: "root" },
+  });
 });
 
 test("workbench frame establishes the containing block for its overlay", () => {

@@ -1,7 +1,7 @@
 import { probeClientContracts } from "./shared/compatibility.js";
 import { workbenchApi } from "./client/api.js";
 import { createRootComponent, createRootRegistration } from "./client/root.js";
-import { initialState, reduceWorkbench } from "./client/store.js";
+import { createDraftSaveScheduler, initialState, reduceWorkbench } from "./client/store.js";
 import { SIDEBAR_CHILDREN, createSidebar } from "./client/sidebar.js";
 import { foundationCss, installStyles } from "./client/styles.js";
 
@@ -17,14 +17,22 @@ window.__ModuleLoader__.load({
     function WorkbenchProvider({ ctx, children }) {
       const [state, dispatch] = React.useReducer(reduceWorkbench, undefined, initialState);
       const [settings, setSettings] = React.useState(null);
-      const hydratedModes = React.useRef(new Set());
+      const draftScheduler = React.useRef(null);
+      const observedDrafts = React.useRef(state.drafts);
+
+      if (!draftScheduler.current) {
+        draftScheduler.current = createDraftSaveScheduler(workbenchApi.saveDraft, {
+          setTimeoutFn: (callback, delay) => window.setTimeout(callback, delay),
+          clearTimeoutFn: (timer) => window.clearTimeout(timer),
+        });
+      }
 
       React.useEffect(() => {
         let active = true;
         dispatch({ type: "bootstrap/start" });
         workbenchApi.bootstrap(state.mode).then((data) => {
           if (!active) return;
-          hydratedModes.current.add(state.mode);
+          draftScheduler.current.hydrate(state.mode);
           setSettings(data.settings);
           dispatch({ type: "bootstrap/success", mode: state.mode, data });
         }).catch((error) => {
@@ -34,16 +42,14 @@ window.__ModuleLoader__.load({
       }, [state.mode]);
 
       React.useEffect(() => {
-        if (!hydratedModes.current.has(state.mode)) return undefined;
-        const mode = state.mode;
-        const draft = state.drafts[mode];
-        const timer = window.setTimeout(() => {
-          workbenchApi.saveDraft(mode, draft).catch((error) => {
-            console.error("[dsh-ai-workbench] draft save failed", error);
-          });
-        }, 500);
-        return () => window.clearTimeout(timer);
-      }, [state.mode, state.drafts]);
+        for (const mode of ["work", "chat"]) {
+          if (state.drafts[mode] === observedDrafts.current[mode]) continue;
+          observedDrafts.current[mode] = state.drafts[mode];
+          if (state.draftDirty[mode]) draftScheduler.current.schedule(mode, state.drafts[mode]);
+        }
+      }, [state.drafts, state.draftDirty]);
+
+      React.useEffect(() => () => draftScheduler.current?.dispose(), []);
 
       return h(WorkbenchContext.Provider, { value: { state, dispatch, settings, sessions: ctx.sessions } }, children);
     }
@@ -61,7 +67,7 @@ window.__ModuleLoader__.load({
       ctx.effect(() => {
         // The official Sidebar already declares these child slots. Reuse that
         // declaration while shadowing only the Sidebar renderer itself.
-        const disposeSidebar = ctx.slots.register({ name: "sidebar", priority: 1 }, Sidebar);
+        const disposeSidebar = ctx.slots.register({ name: "sidebar", priority: 1, children: SIDEBAR_CHILDREN }, Sidebar);
         const disposeRoot = ctx.slots.register(registration, createRootComponent(React, { context: WorkbenchContext, provider: (props) => h(WorkbenchProvider, { ctx, ...props }) }));
         return () => { disposeRoot?.(); disposeSidebar?.(); };
       });
