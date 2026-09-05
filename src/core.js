@@ -1629,52 +1629,36 @@ export async function listProviderCandidates(options = {}) {
   const candidates = [];
   const user = userRoots();
   const userScans = await scanDeduplicatedUserRoots(user);
-  for (const root of user) {
-    const scanned = userScans.get(root.key);
-    for (const entry of scanned.entries) {
-      if (!entry.loadable) continue;
-      const policy = effectiveSkillPolicy(policyResult, root, entry);
-      const needsOverlay = root.key !== "dsh" || policy.override !== undefined || !entry.invocationPolicyValid || policyResult.writable === false;
-      if (!needsOverlay) continue;
-      candidates.push({
-        name: entry.declaredName,
-        description: entry.description,
-        invocation: { modelInvocable: policy.modelInvocable, userInvocable: policy.userInvocable },
-        provider: "dsh-skills-manager-external",
-        source: root.key === "dsh" ? "user-dsh" : `agent-${root.key}`,
-        rank: root.key === "dsh" ? USER_DSH_POLICY_RANK : entry.providerRank ?? root.rank,
-        locator: { rootKey: root.key, entryName: entry.name, path: entry.docPath, realEntryPath: entry.realEntryPath, realDocPath: entry.realDocPath },
-        resourceBase: { kind: "directory", path: entry.kind === "bundle" ? entry.realEntryPath : root.path },
-        path: entry.docPath,
-        metadata: { dshSkillsManager: { root: root.key, readOnly: !root.mutable, sourceReadOnly: !root.mutable, policyOnly: root.key === "dsh" } },
-      });
-    }
-  }
+  const items = user.flatMap((root) => userScans.get(root.key).entries.map((entry) => ({ root, entry })));
   const cwd = options && typeof options.cwd === "string" ? options.cwd : undefined;
   if (cwd) {
     const roots = await projectRoots([cwd]);
     for (const root of roots) {
       const scanned = await scanEntries(root.path);
-      for (const entry of scanned.entries) {
-        if (!entry.loadable) continue;
-        const policy = effectiveSkillPolicy(policyResult, root, entry);
-        const needsOverlay = policy.override !== undefined || !entry.invocationPolicyValid || policyResult.writable === false;
-        // 没有本地覆盖时继续由 DSH 官方作用域 provider 负责加载。
-        if (!needsOverlay) continue;
-        candidates.push({
-          name: entry.declaredName,
-          description: entry.description,
-          invocation: { modelInvocable: policy.modelInvocable, userInvocable: policy.userInvocable },
-          provider: "dsh-skills-manager-external",
-          source: root.kind,
-          rank: root.rank - 1,
-          locator: { rootKey: root.key, entryName: entry.name, path: entry.docPath, realEntryPath: entry.realEntryPath, realDocPath: entry.realDocPath },
-          resourceBase: { kind: "directory", path: entry.kind === "bundle" ? entry.realEntryPath : root.path },
-          path: entry.docPath,
-          metadata: { dshSkillsManager: { root: root.key, readOnly: !root.mutable, sourceReadOnly: !root.mutable, policyOnly: true } },
-        });
-      }
+      for (const entry of scanned.entries) items.push({ root, entry });
     }
+  }
+  for (const group of groupLoadableSkillsByName(items).values()) {
+    const { root, entry } = group[0];
+    const project = root.scope === "project";
+    const policyOnly = project || root.key === "dsh";
+    const policy = effectiveSkillPolicy(policyResult, root, entry);
+    // 近作用域先于 rank 决胜；冲突时必须提供真正的赢家，避免预设原生副本回流。
+    // 禁用状态不参与选赢家，禁用赢家仍需阻断低优先级副本。
+    const needsOverlay = !policyOnly || group.length > 1 || policy.override !== undefined || !entry.invocationPolicyValid || policyResult.writable === false;
+    if (!needsOverlay) continue;
+    candidates.push({
+      name: entry.declaredName,
+      description: entry.description,
+      invocation: { modelInvocable: policy.modelInvocable, userInvocable: policy.userInvocable },
+      provider: "dsh-skills-manager-external",
+      source: project ? root.kind : root.key === "dsh" ? "user-dsh" : `agent-${root.key}`,
+      rank: project ? root.rank - 1 : root.key === "dsh" ? USER_DSH_POLICY_RANK : entry.providerRank ?? root.rank,
+      locator: { rootKey: root.key, entryName: entry.name, path: entry.docPath, realEntryPath: entry.realEntryPath, realDocPath: entry.realDocPath },
+      resourceBase: { kind: "directory", path: entry.kind === "bundle" ? entry.realEntryPath : root.path },
+      path: entry.docPath,
+      metadata: { dshSkillsManager: { root: root.key, readOnly: !root.mutable, sourceReadOnly: !root.mutable, policyOnly } },
+    });
   }
   return candidates;
 }
@@ -1717,18 +1701,26 @@ function canonicalSkillName(item) {
   return item.entry.declaredName || item.entry.name;
 }
 
+/** 真实路径去重后按声明名分组；管理页与当前工作区 provider 共用来源优先级。 */
+function groupLoadableSkillsByName(items) {
+  const groups = new Map();
+  for (const item of [...items].sort((a, b) => a.root.rank - b.root.rank)) {
+    if (!item.entry.loadable) continue;
+    const name = canonicalSkillName(item);
+    const group = groups.get(name) || [];
+    group.push(item);
+    groups.set(name, group);
+  }
+  return groups;
+}
+
 function markWinners(items, options = {}) {
   const winners = new Map();
-  for (const item of [...items].sort((a, b) => a.root.rank - b.root.rank)) {
-    const canonicalName = canonicalSkillName(item);
-    if (!item.entry.loadable) continue;
-    if (!winners.has(canonicalName)) {
-      winners.set(canonicalName, item);
-    } else if (options.markShadowed !== false) {
-      item.view.shadowedBy = { root: winners.get(canonicalName).root.key, name: winners.get(canonicalName).entry.name };
+  for (const [canonicalName, [winner, ...shadowed]] of groupLoadableSkillsByName(items)) {
+    winners.set(canonicalName, winner);
+    if (options.markShadowed !== false) {
+      for (const item of shadowed) item.view.shadowedBy = { root: winner.root.key, name: winner.entry.name };
     }
-  }
-  for (const [canonicalName, winner] of winners) {
     if (options.markWinner !== false) winner.view.winner = true;
     winner.view.enabled = winner.policy.enabled;
     winner.view.canonicalName = canonicalName;

@@ -6,6 +6,7 @@ import { createServer, request } from "node:http";
 import { basename, dirname, join, sep } from "node:path";
 import { tmpdir } from "node:os";
 import { zipSync, strToU8 } from "fflate";
+import { SkillRegistry } from "@deepseek-ai/dsh-skill";
 
 import {
   toKebab,
@@ -1360,6 +1361,97 @@ try {
 const unavailableProjectSnap = await state({ projectCwds: [join(tmp, "missing-workspace")] });
 eq(unavailableProjectSnap.warnings.find((warning) => warning.code === "warning.project.unavailable").params.path, join(tmp, "missing-workspace"), "unreadable active workspaces produce an observable project-discovery warning");
 ok(registeredTool && registeredTool.name === "create_skill", "host registers the conversational create_skill tool");
+
+// 同名候选必须经过上游真实的层内排序与跨层合并，单测候选数量无法证明运行时来源正确。
+async function mergedSkillCandidate(name, globalCandidates, presetCandidates, managerCandidates) {
+  const rows = (candidates) => candidates.map((candidate, localOrder) => ({ candidate, providerOrder: 0, localOrder }));
+  const registry = {
+    layers: { global: rows(globalCandidates), chainLayers: () => [rows(presetCandidates), rows(managerCandidates)] },
+    ctx: { logger: { warn() {} } },
+    listLayerCandidates: async (entries) => ({ entries: [...entries], cacheable: true }),
+    collectLayer: SkillRegistry.prototype.collectLayer,
+  };
+  const result = await SkillRegistry.prototype.collectFresh.call(registry, {});
+  return result.entries.get(name)?.candidate;
+}
+
+const duplicateName = "issue-nine";
+const duplicateDoc = (body) => `---\nname: ${duplicateName}\ndescription: 同名技能回归。\n---\n${body}`;
+await makeSkill(dshRoot, "issue-nine-local", duplicateDoc("DSH 正文"));
+await makeSkill(codexRoot, "issue-nine-codex", duplicateDoc("Codex 正文"));
+const duplicatePolicyBefore = await readFile(managerStatePath(), "utf8");
+const nativeDshCandidate = { name: duplicateName, source: "user-dsh", rank: 400, invocation: { modelInvocable: true, userInvocable: true } };
+const nativeAgentsCandidate = { ...nativeDshCandidate, source: "user-agents", rank: 450 };
+try {
+  await setSourceEnabled("codex", false);
+  const codexOnlyCandidates = (await listProviderCandidates()).filter((candidate) => candidate.name === duplicateName);
+  const mergedCodexOnly = await mergedSkillCandidate(duplicateName, [nativeDshCandidate], [], codexOnlyCandidates);
+  eq(mergedCodexOnly?.source, "user-dsh", "议题最小场景：单个禁用 Codex 副本不能遮蔽默认启用的 DSH");
+  ok(mergedCodexOnly?.invocation.modelInvocable && mergedCodexOnly?.invocation.userInvocable, "议题最小场景：默认启用的 DSH 保持双通道可调用");
+  await makeSkill(agentsRoot, "issue-nine-agents", duplicateDoc("公共 Agent 正文"));
+  await setSourceEnabled("agents", false);
+  const duplicateState = await state();
+  const localWinner = duplicateState.roots.find((root) => root.key === "dsh").skills.find((skill) => skill.declaredName === duplicateName);
+  ok(localWinner.winner && localWinner.enabled, "禁用外部同名来源时管理页仍以 DSH 为启用赢家");
+  const duplicateCandidates = (await listProviderCandidates()).filter((candidate) => candidate.name === duplicateName);
+  eq(duplicateCandidates.length, 1, "不同目录名但声明名相同的用户条目只输出一个赢家");
+  eq(duplicateCandidates[0]?.source, "user-dsh", "没有显式启用记录的 DSH 冲突赢家也提供作用域候选");
+  const mergedDuplicate = await mergedSkillCandidate(duplicateName, [nativeDshCandidate], [nativeAgentsCandidate], duplicateCandidates);
+  eq(mergedDuplicate?.source, "user-dsh", "禁用外部副本及预设原生副本均不能遮蔽全局 DSH 赢家");
+  ok(mergedDuplicate?.invocation.modelInvocable && mergedDuplicate?.invocation.userInvocable, "DSH 冲突赢家同时进入模型目录和斜杠菜单");
+  eq((await getProviderSkill(mergedDuplicate))?.content, "DSH 正文", "运行时加载的是 DSH 赢家正文");
+  await setSourceEnabled("agents", true);
+  await setSourceEnabled("codex", true);
+  eq((await listProviderCandidates()).filter((candidate) => candidate.name === duplicateName)[0]?.source, "user-dsh", "启用低优先级来源也不能替换 DSH 赢家");
+  await setSkillEnabled(dshRoot, "issue-nine-local", false);
+  const disabledCandidates = (await listProviderCandidates()).filter((candidate) => candidate.name === duplicateName);
+  const mergedDisabled = await mergedSkillCandidate(duplicateName, [nativeDshCandidate], [nativeAgentsCandidate], disabledCandidates);
+  eq(mergedDisabled?.source, "user-dsh", "禁用 DSH 赢家后仍由它阻断较低优先级来源");
+  ok(mergedDisabled?.invocation.modelInvocable === false && mergedDisabled?.invocation.userInvocable === false, "禁用赢家不会回流到启用的外部副本");
+
+  const duplicateProject = join(tmp, "issue-nine-project");
+  await mkdir(join(duplicateProject, ".git"), { recursive: true });
+  await makeSkill(join(duplicateProject, ".dsh", "skills"), "project-copy", duplicateDoc("项目 DSH 正文"));
+  await makeSkill(join(duplicateProject, ".agents", "skills"), "project-agent-copy", duplicateDoc("项目 Agent 正文"));
+  const duplicateProjectRoots = await projectRoots([duplicateProject]);
+  const duplicateProjectDsh = duplicateProjectRoots.find((root) => root.kind === "project-dsh");
+  const duplicateProjectAgents = duplicateProjectRoots.find((root) => root.kind === "project-agents");
+  await setSkillEnabled(duplicateProjectAgents, "project-agent-copy", false);
+  const projectCandidates = (await listProviderCandidates({ cwd: duplicateProject })).filter((candidate) => candidate.name === duplicateName);
+  eq(projectCandidates.length, 1, "项目与用户同名条目按当前工作区只输出一个赢家");
+  const mergedProject = await mergedSkillCandidate(duplicateName, [nativeDshCandidate], [{ ...nativeDshCandidate, source: "project-dsh", rank: 100 }], projectCandidates);
+  eq(mergedProject?.source, "project-dsh", "禁用的用户 DSH 和项目 Agent 不能遮蔽启用的项目 DSH");
+  ok(mergedProject?.invocation.modelInvocable && mergedProject?.invocation.userInvocable, "项目原生赢家无显式覆盖也保持可调用");
+  eq((await getProviderSkill(mergedProject, { cwd: duplicateProject }))?.content, "项目 DSH 正文", "项目冲突加载正确工作区正文");
+  const projectWinnerState = (await state({ projectCwds: [duplicateProject] })).roots.find((root) => root.key === duplicateProjectDsh.key).skills.find((skill) => skill.declaredName === duplicateName);
+  ok(projectWinnerState.winner && projectWinnerState.enabled, "项目管理页与运行时赢家保持一致");
+  const outsideCandidates = (await listProviderCandidates({ cwd: noGitWorkspace })).filter((candidate) => candidate.name === duplicateName);
+  eq(outsideCandidates[0]?.source, "user-dsh", "其他工作区不继承项目同名赢家");
+  await makeSkill(join(secondProject, ".agents", "skills"), "independent-copy", duplicateDoc("另一项目正文"));
+  const independentCandidates = (await listProviderCandidates({ cwd: secondProject })).filter((candidate) => candidate.name === duplicateName);
+  eq(independentCandidates[0]?.source, "project-agents", "不同项目独立选择自己的项目 Agent 赢家");
+  eq((await getProviderSkill(independentCandidates[0], { cwd: secondProject }))?.content, "另一项目正文", "不同项目不会加载前一工作区的同名正文");
+  await setSkillEnabled(duplicateProjectDsh, "project-copy", false);
+  const disabledProjectCandidates = (await listProviderCandidates({ cwd: duplicateProject })).filter((candidate) => candidate.name === duplicateName);
+  eq(disabledProjectCandidates.length, 1, "禁用项目赢家后不输出低优先级同名副本");
+  ok(disabledProjectCandidates[0]?.invocation.modelInvocable === false && disabledProjectCandidates[0]?.invocation.userInvocable === false, "禁用项目赢家保持双通道阻断");
+  await makeSkill(dshRoot, "issue-nine-unique", "---\nname: issue-nine-unique\ndescription: 无冲突技能。\n---\n原生正文");
+  ok(!(await listProviderCandidates()).some((candidate) => candidate.name === "issue-nine-unique"), "无冲突且无策略覆盖的 DSH 技能仍由原生 provider 加载");
+  await makeSkill(duplicateProjectDsh.path, "issue-nine-unique-project", "---\nname: issue-nine-unique-project\ndescription: 无冲突项目技能。\n---\n原生项目正文");
+  ok(!(await listProviderCandidates({ cwd: duplicateProject })).some((candidate) => candidate.name === "issue-nine-unique-project"), "无冲突且无策略覆盖的项目技能仍由原生 provider 加载");
+  await makeSkill(agentsRoot, "issue-nine-external", "---\nname: issue-nine-external\ndescription: 外部赢家。\n---\n公共正文");
+  await makeSkill(codexRoot, "issue-nine-external", "---\nname: issue-nine-external\ndescription: 外部副本。\n---\nCodex 正文");
+  await setSourceEnabled("agents", false);
+  const externalCandidates = (await listProviderCandidates()).filter((candidate) => candidate.name === "issue-nine-external");
+  eq(externalCandidates.length, 1, "没有 DSH 副本时同样只保留外部同名赢家");
+  ok(externalCandidates[0]?.source === "agent-agents" && externalCandidates[0]?.invocation.modelInvocable === false && externalCandidates[0]?.invocation.userInvocable === false, "外部赢家来源停用后不回流到启用的 Codex 副本");
+  await makeSkill(dshRoot, "issue-nine-invalid", "---\nname: issue-nine-invalid\n---\n缺少简介");
+  await makeSkill(codexRoot, "issue-nine-invalid", "---\nname: issue-nine-invalid\ndescription: 有效副本。\n---\n有效正文");
+  eq((await listProviderCandidates()).find((candidate) => candidate.name === "issue-nine-invalid")?.source, "agent-codex", "结构无效的高优先级条目不参与同名赢家判定");
+  eq(await readFile(join(dshRoot, "issue-nine-local", "SKILL.md"), "utf8"), duplicateDoc("DSH 正文"), "冲突处理及启停不改写来源文件");
+} finally {
+  await writeFile(managerStatePath(), duplicatePolicyBefore, "utf8");
+}
 
 // 清理
 await rm(tmp, { recursive: true, force: true });
