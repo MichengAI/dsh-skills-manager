@@ -13,6 +13,8 @@ const requiredOutputs = [
   "lib/client.js",
   "lib/shared/capabilities.js",
   "lib/shared/capability-manifest.js",
+  "lib/shared/automation-contracts.js",
+  "lib/shared/schedule.js",
   "lib/shared/compatibility.js",
   "lib/host/http.js",
   "lib/host/capability-service.js",

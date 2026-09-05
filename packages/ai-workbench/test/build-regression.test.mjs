@@ -77,6 +77,8 @@ test("root-invoked build uses crash-recoverable transactional publish without to
       "client.js",
       "client/api.js",
       "client/brand.js",
+      "client/capability-library.js",
+      "client/capability-source.js",
       "client/chat-home.js",
       "client/dialog.js",
       "client/image-input.js",
@@ -96,11 +98,13 @@ test("root-invoked build uses crash-recoverable transactional publish without to
       "host/session-gateway.js",
       "index.js",
       "shared/auto-select.js",
+      "shared/automation-contracts.js",
       "shared/capabilities.js",
       "shared/capability-manifest.js",
       "shared/chat-config.js",
       "shared/compatibility.js",
       "shared/contracts.js",
+      "shared/schedule.js",
       "shared/work-templates.js",
     ]);
     assert.deepEqual(await snapshotTree(rootLib), rootLibBefore);
