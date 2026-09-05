@@ -211,6 +211,49 @@ async function handleCapabilityPreferences(services) {
   return success(await services.capabilityService.get());
 }
 
+function automationPath(path) {
+  const prefix = `${API_PREFIX}/automations`;
+  if (path === prefix) return [];
+  if (!path.startsWith(`${prefix}/`)) return null;
+  const parts = path.slice(prefix.length + 1).split("/");
+  if (parts.some((part) => !part)) return null;
+  try {
+    const decoded = parts.map((part) => decodeURIComponent(part));
+    return decoded.some((part) => part.includes("/") || part === "." || part === "..") ? null : decoded;
+  } catch {
+    return null;
+  }
+}
+
+async function handleAutomations(req, parsed, services) {
+  const service = services?.automationService;
+  if (!service) return internalError();
+  const parts = automationPath(parsed.pathname.replace(/\/+$/, ""));
+  if (parts == null) return null;
+  if (req.method === "GET" && parts.length === 0) {
+    return success(await service.list({
+      query: parsed.searchParams.get("query") || "",
+      status: parsed.searchParams.get("status") || "all",
+    }));
+  }
+  if (req.method === "GET" && parts.length === 1) {
+    const item = await service.get(parts[0]);
+    return item ? success(item) : { statusCode: 404, body: { ok: false, code: "automation-not-found", error: "automation not found" } };
+  }
+  if (req.method === "GET" && parts.length === 2 && parts[1] === "runs") return success(await service.listRuns(parts[0]));
+
+  if (req.headers?.["x-dsh-workbench-action"] !== "1") throw typedError("action header required", 403, "action-required");
+  if (contentType(req.headers) !== "application/json") throw typedError("content-type must be application/json", 415, "content-type-required");
+  if (req.method === "POST" && parts.length === 0) return { statusCode: 201, body: { ok: true, data: await service.create(await readJsonBody(req)) } };
+  if (req.method === "PUT" && parts.length === 1) return success(await service.update(parts[0], await readJsonBody(req)));
+  if (req.method === "DELETE" && parts.length === 1) return success(await service.remove(parts[0]));
+  if (req.method === "POST" && parts.length === 2 && parts[1] === "enabled") {
+    const body = await readJsonBody(req);
+    return success(await service.setEnabled(parts[0], body?.enabled === true));
+  }
+  return { statusCode: 404, body: { ok: false, code: "not-found", error: "not found" } };
+}
+
 function modeServiceFor(services) {
   if (services?.modeService) return services.modeService;
   if (services?.repository && services?.sessionQuery) {
@@ -313,6 +356,10 @@ export async function routeRequest(req, services) {
     if (method === "GET" && path === `${API_PREFIX}/bootstrap`) return await handleBootstrap(parsed, services);
     if (method === "GET" && path === `${API_PREFIX}/models`) return await handleModels(services);
     if (method === "GET" && path === `${API_PREFIX}/capability-preferences`) return await handleCapabilityPreferences(services);
+    if (path === `${API_PREFIX}/automations` || path.startsWith(`${API_PREFIX}/automations/`)) {
+      const result = await handleAutomations(req, parsed, services);
+      if (result) return result;
+    }
     if (method === "POST" && path === `${API_PREFIX}/sessions`) {
       return await handleSession(req, services);
     }

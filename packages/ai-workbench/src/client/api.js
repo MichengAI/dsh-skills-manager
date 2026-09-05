@@ -98,6 +98,13 @@ export const workbenchApi = {
     method: "PUT",
     body: JSON.stringify({ enabledIds }),
   }),
+  listAutomations: ({ query = "", status = "all" } = {}) => request(`/automations?query=${encodeURIComponent(query)}&status=${encodeURIComponent(status)}`),
+  getAutomation: (id) => request(`/automations/${encodeURIComponent(id)}`),
+  createAutomation: (input) => request("/automations", { method: "POST", body: JSON.stringify(input) }),
+  updateAutomation: (id, input) => request(`/automations/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(input) }),
+  deleteAutomation: (id) => request(`/automations/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  setAutomationEnabled: (id, enabled) => request(`/automations/${encodeURIComponent(id)}/enabled`, { method: "POST", body: JSON.stringify({ enabled }) }),
+  listAutomationRuns: (id) => request(`/automations/${encodeURIComponent(id)}/runs`),
   saveDraft: (mode, draft) => request(`/drafts/${assertMode(mode)}`, { method: "PUT", body: JSON.stringify(draft) }),
   saveSettings: (settings) => request("/settings", { method: "PUT", body: JSON.stringify(settings) }),
 };

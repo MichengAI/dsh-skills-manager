@@ -18,6 +18,7 @@ const requiredOutputs = [
   "lib/shared/compatibility.js",
   "lib/host/http.js",
   "lib/host/capability-service.js",
+  "lib/host/automation-service.js",
   "lib/client/root.js",
   "lib/client/styles.js",
 ];

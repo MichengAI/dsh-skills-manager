@@ -55,7 +55,7 @@ export function normalizeAutomation(value, { now = new Date().toISOString() } = 
   const workspaceRef = input.workspaceRef == null ? null : input.workspaceRef;
   if (input.type === "work" && (typeof workspaceRef !== "string" || !WORKSPACE_REF.test(workspaceRef))) throw invalid({ field: "workspaceRef" });
   if (input.type === "reminder" && workspaceRef !== null) throw invalid({ field: "workspaceRef" });
-  if (input.type === "reminder" && input.capabilitySelection != null) throw invalid({ field: "capabilitySelection" });
+  if (input.type === "reminder" && Array.isArray(input.capabilitySelection) && input.capabilitySelection.length > 0) throw invalid({ field: "capabilitySelection" });
   const status = input.status == null ? (input.enabled === false ? "paused" : "active") : input.status;
   if (!STATUSES.has(status)) throw invalid({ field: "status" });
   const timezone = typeof input.timezone === "string" && input.timezone ? input.timezone : Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
@@ -82,4 +82,3 @@ export function assertAutomationStatus(value) {
   if (!STATUSES.has(value)) throw invalid({ field: "status" });
   return value;
 }
-
