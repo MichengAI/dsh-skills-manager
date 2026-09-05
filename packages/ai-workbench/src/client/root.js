@@ -81,6 +81,7 @@ export function createRootComponent(React, options = {}) {
         state,
         renderSlot,
         useSessions,
+        workbench,
       })),
       h("aside", { className: "daw-details" }, renderSlot("details", {})),
       h("div", { className: "daw-overlay" },

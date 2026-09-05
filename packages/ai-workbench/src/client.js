@@ -51,7 +51,18 @@ window.__ModuleLoader__.load({
 
       React.useEffect(() => () => draftScheduler.current?.dispose(), []);
 
-      return h(WorkbenchContext.Provider, { value: { state, dispatch, settings, sessions: ctx.sessions } }, children);
+      return h(WorkbenchContext.Provider, {
+        value: {
+          state,
+          dispatch,
+          settings,
+          sessions: ctx.sessions,
+          ctx,
+          imageLimits: ctx.imageLimits,
+          capabilities: ctx.capabilities,
+          workspaceFeed: ctx.workspaceFeed,
+        },
+      }, children);
     }
 
     const h = React.createElement;
