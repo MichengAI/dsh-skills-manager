@@ -169,7 +169,8 @@ test("client probe fails closed when context and nested service reads throw", ()
 
 test("host probe requires the gateway, query, title query, storage, and timer faces", () => {
   const result = probeHostContracts({
-    apiProxy: { sessions: { create() {}, prompt() {} } },
+    apiProxy: { sessions: { create() {}, prompt() {}, models() {}, selectModel() {} }, llm: { models() {} } },
+    sessions: { get() {} },
     sessionQuery: { listSessions() {}, readTitleSnapshots() {} },
     storage: { backend: { get() {} } },
     setTimeout() {},
@@ -179,7 +180,8 @@ test("host probe requires the gateway, query, title query, storage, and timer fa
 
 test("host probe rejects a session query without title snapshots", () => {
   const result = probeHostContracts({
-    apiProxy: { sessions: { create() {}, prompt() {} } },
+    apiProxy: { sessions: { create() {}, prompt() {}, models() {}, selectModel() {} }, llm: { models() {} } },
+    sessions: { get() {} },
     sessionQuery: { listSessions() {} },
     storage: { backend: { get() {} } },
     setTimeout() {},
@@ -195,6 +197,10 @@ test("host probe fails closed when the context is missing", () => {
     failures: [
       "apiProxy.sessions:create",
       "apiProxy.sessions:prompt",
+      "apiProxy.sessions:models",
+      "apiProxy.sessions:selectModel",
+      "apiProxy.llm:models",
+      "sessions:get",
       "sessionQuery:listSessions",
       "sessionQuery:readTitleSnapshots",
       "storage.backend:get",
@@ -209,6 +215,10 @@ test("host probe fails closed for an undefined context", () => {
     failures: [
       "apiProxy.sessions:create",
       "apiProxy.sessions:prompt",
+      "apiProxy.sessions:models",
+      "apiProxy.sessions:selectModel",
+      "apiProxy.llm:models",
+      "sessions:get",
       "sessionQuery:listSessions",
       "sessionQuery:readTitleSnapshots",
       "storage.backend:get",
@@ -233,6 +243,10 @@ test("host probe fails closed when context and nested service reads throw", () =
     failures: [
       "apiProxy.sessions:create",
       "apiProxy.sessions:prompt",
+      "apiProxy.sessions:models",
+      "apiProxy.sessions:selectModel",
+      "apiProxy.llm:models",
+      "sessions:get",
       "sessionQuery:listSessions",
       "sessionQuery:readTitleSnapshots",
       "storage.backend:get",
@@ -261,6 +275,10 @@ test("host probe fails closed when context and nested service reads throw", () =
     failures: [
       "apiProxy.sessions:create",
       "apiProxy.sessions:prompt",
+      "apiProxy.sessions:models",
+      "apiProxy.sessions:selectModel",
+      "apiProxy.llm:models",
+      "sessions:get",
       "sessionQuery:listSessions",
       "sessionQuery:readTitleSnapshots",
       "storage.backend:get",
@@ -283,8 +301,12 @@ test("host probe rejects callable proxies whose apply trap throws", () => {
       sessions: {
         create: throwingCallable("create"),
         prompt: throwingCallable("prompt"),
+        models: throwingCallable("models"),
+        selectModel: throwingCallable("selectModel"),
       },
+      llm: { models: throwingCallable("llm.models") },
     },
+    sessions: { get: throwingCallable("sessions.get") },
     sessionQuery: {
       listSessions: throwingCallable("listSessions"),
       readTitleSnapshots: throwingCallable("readTitleSnapshots"),
@@ -298,6 +320,10 @@ test("host probe rejects callable proxies whose apply trap throws", () => {
     failures: [
       "apiProxy.sessions:create",
       "apiProxy.sessions:prompt",
+      "apiProxy.sessions:models",
+      "apiProxy.sessions:selectModel",
+      "apiProxy.llm:models",
+      "sessions:get",
       "sessionQuery:listSessions",
       "sessionQuery:readTitleSnapshots",
       "storage.backend:get",
@@ -322,8 +348,12 @@ test("host probe rejects callable proxies without invoking a successful apply tr
       sessions: {
         create: safeCallable("create"),
         prompt: safeCallable("prompt"),
+        models: safeCallable("models"),
+        selectModel: safeCallable("selectModel"),
       },
+      llm: { models: safeCallable("llm.models") },
     },
+    sessions: { get: safeCallable("sessions.get") },
     sessionQuery: {
       listSessions: safeCallable("listSessions"),
       readTitleSnapshots: safeCallable("readTitleSnapshots"),
@@ -337,6 +367,10 @@ test("host probe rejects callable proxies without invoking a successful apply tr
     failures: [
       "apiProxy.sessions:create",
       "apiProxy.sessions:prompt",
+      "apiProxy.sessions:models",
+      "apiProxy.sessions:selectModel",
+      "apiProxy.llm:models",
+      "sessions:get",
       "sessionQuery:listSessions",
       "sessionQuery:readTitleSnapshots",
       "storage.backend:get",
@@ -353,7 +387,8 @@ test("host probe does not invoke real host methods while checking their callable
   };
 
   const result = probeHostContracts({
-    apiProxy: { sessions: { create: hostMethod, prompt: hostMethod } },
+    apiProxy: { sessions: { create: hostMethod, prompt: hostMethod, models: hostMethod, selectModel: hostMethod }, llm: { models: hostMethod } },
+    sessions: { get: hostMethod },
     sessionQuery: { listSessions: hostMethod, readTitleSnapshots: hostMethod },
     storage: { backend: { get: hostMethod } },
     setTimeout: hostMethod,
@@ -371,7 +406,8 @@ test("host probe rejects bound host methods without invoking them", () => {
   const boundMethod = hostMethod.bind(null);
 
   const result = probeHostContracts({
-    apiProxy: { sessions: { create: boundMethod, prompt: boundMethod } },
+    apiProxy: { sessions: { create: boundMethod, prompt: boundMethod, models: boundMethod, selectModel: boundMethod }, llm: { models: boundMethod } },
+    sessions: { get: boundMethod },
     sessionQuery: { listSessions: boundMethod, readTitleSnapshots: boundMethod },
     storage: { backend: { get: boundMethod } },
     setTimeout: boundMethod,
@@ -381,6 +417,10 @@ test("host probe rejects bound host methods without invoking them", () => {
   assert.deepEqual(result.failures, [
     "apiProxy.sessions:create",
     "apiProxy.sessions:prompt",
+    "apiProxy.sessions:models",
+    "apiProxy.sessions:selectModel",
+    "apiProxy.llm:models",
+    "sessions:get",
     "sessionQuery:listSessions",
     "sessionQuery:readTitleSnapshots",
     "storage.backend:get",
@@ -404,7 +444,8 @@ test("plugin registration does not invoke host business methods", async () => {
   };
 
   const disposer = await applyPlugin({
-    apiProxy: { sessions: { create: hostMethod, prompt: hostMethod } },
+    apiProxy: { sessions: { create: hostMethod, prompt: hostMethod, models: hostMethod, selectModel: hostMethod }, llm: { models: hostMethod } },
+    sessions: { get: hostMethod },
     sessionQuery: { listSessions: hostMethod, readTitleSnapshots: hostMethod },
     storage: { backend: { get: () => ({ kv: { open: () => unit } }) } },
     setTimeout: hostMethod,
@@ -441,7 +482,8 @@ test("plugin closes an opened unit when repository initialization fails", async 
   };
 
   const applying = applyPlugin({
-    apiProxy: { sessions: { create() {}, prompt() {} } },
+    apiProxy: { sessions: { create() {}, prompt() {}, models() {}, selectModel() {} }, llm: { models() {} } },
+    sessions: { get() {} },
     sessionQuery: { listSessions() {}, readTitleSnapshots() {} },
     storage: { backend: { get: () => ({ kv: { open: () => unit } }) } },
     setTimeout() {},

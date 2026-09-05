@@ -6,11 +6,12 @@ function clientError(message, code) {
   return Object.assign(new Error(message), { code, status: 400 });
 }
 
-function responseError(message, code, status, cause) {
+function responseError(message, code, status, cause, sessionId) {
   return Object.assign(new Error(message), {
     code,
     status,
     ...(cause !== undefined ? { cause } : {}),
+    ...(typeof sessionId === "string" ? { sessionId } : {}),
   });
 }
 
@@ -71,8 +72,13 @@ export async function request(path, options = {}) {
 
   const hasData = Object.prototype.hasOwnProperty.call(payload, "data");
   if (!response.ok) {
-    if (payload.ok === false && typeof payload.code === "string") {
-      throw responseError(payload.error || "request failed", payload.code, response.status);
+    const structuredError = payload.ok === false && payload.error && typeof payload.error === "object"
+      ? payload.error
+      : payload;
+    if (payload.ok === false && typeof (structuredError.code || payload.code) === "string") {
+      const code = structuredError.code || payload.code;
+      const message = structuredError.message || (typeof payload.error === "string" ? payload.error : "request failed");
+      throw responseError(message, code, response.status, undefined, structuredError.sessionId);
     }
     throw responseError("invalid response", "invalid-response", response.status);
   }
@@ -85,6 +91,8 @@ export async function request(path, options = {}) {
 
 export const workbenchApi = {
   bootstrap: (mode) => request(`/bootstrap?mode=${encodeURIComponent(assertMode(mode))}`),
+  startSession: (input) => request("/sessions", { method: "POST", body: JSON.stringify(input) }),
+  listModels: () => request("/models"),
   saveDraft: (mode, draft) => request(`/drafts/${assertMode(mode)}`, { method: "PUT", body: JSON.stringify(draft) }),
   saveSettings: (settings) => request("/settings", { method: "PUT", body: JSON.stringify(settings) }),
 };

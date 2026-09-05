@@ -85,8 +85,13 @@ export function probeHostContracts(ctx) {
   const failures = [];
   const apiProxy = readProperty(source, "apiProxy");
   const apiSessions = readProperty(apiProxy, "sessions");
-  if (!probeHostMethod(apiSessions, "create")) failures.push("apiProxy.sessions:create");
-  if (!probeHostMethod(apiSessions, "prompt")) failures.push("apiProxy.sessions:prompt");
+  for (const method of ["create", "prompt", "models", "selectModel"]) {
+    if (!probeHostMethod(apiSessions, method)) failures.push(`apiProxy.sessions:${method}`);
+  }
+  const apiLlm = readProperty(apiProxy, "llm");
+  if (!probeHostMethod(apiLlm, "models")) failures.push("apiProxy.llm:models");
+  const sessions = readProperty(source, "sessions");
+  if (!probeHostMethod(sessions, "get")) failures.push("sessions:get");
   const sessionQuery = readProperty(source, "sessionQuery");
   if (!probeHostMethod(sessionQuery, "listSessions")) failures.push("sessionQuery:listSessions");
   if (!probeHostMethod(sessionQuery, "readTitleSnapshots")) failures.push("sessionQuery:readTitleSnapshots");

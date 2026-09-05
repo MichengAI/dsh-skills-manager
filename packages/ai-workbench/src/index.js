@@ -4,9 +4,10 @@ import { createDiagnostics } from "./host/diagnostics.js";
 import { API_PREFIX, routeRequest, sendJson } from "./host/http.js";
 import { createModeService } from "./host/mode-service.js";
 import { createRepository, openWorkbenchUnit } from "./host/repository.js";
+import { createSessionGateway } from "./host/session-gateway.js";
 
 const name = "ai-workbench";
-const inject = ["webServer", "webRuntime", "apiProxy", "sessionQuery", "storage", "agentPresets", "permissionPresets"];
+const inject = ["webServer", "webRuntime", "apiProxy", "sessionQuery", "sessions", "storage", "agentPresets", "permissionPresets"];
 
 async function apply(ctx) {
   const hostProbe = probeHostContracts(ctx);
@@ -30,6 +31,14 @@ async function apply(ctx) {
     throw error;
   }
   const modeService = createModeService({ repository, sessionQuery: ctx.sessionQuery });
+  const sessionGateway = hostProbe.ok
+    ? createSessionGateway({
+      apiProxy: ctx.apiProxy,
+      permissionPresets: ctx.permissionPresets,
+      repository,
+      sessions: ctx.sessions,
+    })
+    : null;
   let unregister;
   try {
     unregister = ctx.webServer.register({
@@ -41,6 +50,8 @@ async function apply(ctx) {
         modeService,
         repository,
         sessionQuery: ctx.sessionQuery,
+        apiProxy: ctx.apiProxy,
+        sessionGateway,
       })),
     });
   } catch (error) {

@@ -9,6 +9,10 @@ function contractError(message, code) {
   return Object.assign(new Error(message), { statusCode: 400, code, public: true });
 }
 
+function optionalString(value, maxLength = 255) {
+  return typeof value === "string" ? value.slice(0, maxLength) : null;
+}
+
 export function assertMode(value) {
   if (!MODES.has(value)) throw contractError("invalid mode", "invalid-mode");
   return value;
@@ -84,6 +88,56 @@ export function parseDraft(value, mode) {
       ? [...new Set(value.capabilityIds)].slice(0, 50)
       : [],
     execution,
+  };
+}
+
+export function parseSessionStart(value) {
+  if (!isRecord(value)) throw contractError("invalid session request", "invalid-session-request");
+  const mode = assertMode(value.mode);
+  const draft = parseDraft({ ...value, attachments: value.attachments ?? [] }, mode);
+  if (value.deepThinking !== undefined && typeof value.deepThinking !== "boolean") {
+    throw contractError("invalid deep thinking flag", "invalid-deep-thinking");
+  }
+  if (value.webSearch !== undefined && typeof value.webSearch !== "boolean") {
+    throw contractError("invalid web search flag", "invalid-web-search");
+  }
+  if (value.clientTimeZone !== undefined && value.clientTimeZone !== null && typeof value.clientTimeZone !== "string") {
+    throw contractError("invalid client time zone", "invalid-client-time-zone");
+  }
+  return {
+    ...draft,
+    deepThinking: value.deepThinking === true,
+    webSearch: value.webSearch === true,
+    clientTimeZone: optionalString(value.clientTimeZone, 100),
+  };
+}
+
+export function sanitizeModelCatalog(value) {
+  const groups = Array.isArray(value?.groups) ? value.groups : [];
+  return {
+    groups: groups.flatMap((group) => {
+      if (typeof group?.id !== "string") return [];
+      const models = Array.isArray(group.models) ? group.models.flatMap((model) => {
+        if (typeof model?.id !== "string") return [];
+        const result = {
+          id: model.id,
+          ...(typeof model.label === "string" ? { label: model.label } : {}),
+        };
+        const efforts = Array.isArray(model.reasoning?.efforts)
+          ? model.reasoning.efforts.flatMap((effort) => {
+            const id = typeof effort === "string" ? effort : effort?.id;
+            return typeof id === "string" ? [id] : [];
+          })
+          : [];
+        if (efforts.length > 0) result.reasoning = { efforts: [...new Set(efforts)] };
+        return [result];
+      }) : [];
+      return [{
+        id: group.id,
+        ...(typeof group.label === "string" ? { label: group.label } : {}),
+        models,
+      }];
+    }),
   };
 }
 

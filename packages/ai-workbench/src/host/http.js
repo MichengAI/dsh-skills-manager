@@ -1,5 +1,5 @@
 import { createModeService } from "./mode-service.js";
-import { assertMode, parseDraft, parseSettings } from "../shared/contracts.js";
+import { assertMode, parseDraft, parseSettings, sanitizeModelCatalog } from "../shared/contracts.js";
 
 export const API_PREFIX = "/api/dsh-ai-workbench";
 const ALLOWED_FETCH_SITES = new Set(["same-origin", "same-site", "none"]);
@@ -153,6 +153,16 @@ async function readJsonBody(req) {
 
 function resultFromError(error) {
   if (error?.public === true && Number.isInteger(error.statusCode) && typeof error.code === "string") {
+    if (typeof error.sessionId === "string") {
+      return {
+        statusCode: error.statusCode,
+        body: {
+          ok: false,
+          code: error.code,
+          error: { code: error.code, message: String(error.message || "request failed"), sessionId: error.sessionId },
+        },
+      };
+    }
     return {
       statusCode: error.statusCode,
       body: { ok: false, code: error.code, error: String(error.message || "request failed") },
@@ -163,6 +173,16 @@ function resultFromError(error) {
 
 function success(data) {
   return { statusCode: 200, body: { ok: true, data } };
+}
+
+function unwrapProxy(response) {
+  if (response?.result?.ok === true) return response.result.value;
+  const error = response?.result?.error || {};
+  throw typedError(
+    typeof error.message === "string" ? error.message : "DSH model catalog unavailable",
+    502,
+    typeof error.code === "string" ? error.code : "dsh-models-unavailable",
+  );
 }
 
 async function handleSession(req, services) {
@@ -178,6 +198,12 @@ async function handleSession(req, services) {
   if (typeof services?.sessionGateway?.start !== "function") return internalError();
   const data = await services.sessionGateway.start(body);
   return { statusCode: 201, body: { ok: true, data } };
+}
+
+async function handleModels(services) {
+  if (typeof services?.apiProxy?.llm?.models !== "function") return internalError();
+  const catalog = unwrapProxy(await services.apiProxy.llm.models({ rpcId: `workbench-models-${Date.now()}`, payload: {} }));
+  return success(sanitizeModelCatalog(catalog));
 }
 
 function modeServiceFor(services) {
@@ -275,6 +301,7 @@ export async function routeRequest(req, services) {
       return success(await Reflect.apply(diagnostics, services, []));
     }
     if (method === "GET" && path === `${API_PREFIX}/bootstrap`) return await handleBootstrap(parsed, services);
+    if (method === "GET" && path === `${API_PREFIX}/models`) return await handleModels(services);
     if (method === "POST" && path === `${API_PREFIX}/sessions`) {
       return await handleSession(req, services);
     }

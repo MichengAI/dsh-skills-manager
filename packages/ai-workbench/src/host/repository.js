@@ -88,6 +88,7 @@ export async function createRepository(unit) {
     putDraft: (mode, draft) => put("drafts", mode, { ...draft, mode, updatedAt: new Date().toISOString() }),
     getSessionMeta: (sessionId) => get("session_modes", sessionId),
     putSessionMeta: (sessionId, meta) => put("session_modes", sessionId, { ...meta, sessionId }),
+    deleteSessionMeta: (sessionId) => remove("session_modes", sessionId),
     listSessionMeta: () => list("session_modes"),
     getSettings: () => get("settings", "global") || structuredClone(DEFAULT_SETTINGS),
     putSettings: (settings) => put("settings", "global", settings),

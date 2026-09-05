@@ -44,6 +44,45 @@ test("API uses the workbench base and JSON headers for bootstrap and mutations",
   assert.equal(calls[2][1].headers["x-dsh-workbench-action"], "1");
 });
 
+test("API starts sessions and lists models through host routes", async () => {
+  const calls = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (...args) => {
+    calls.push(args);
+    return jsonResponse({ ok: true, data: { sessionId: "s1" } });
+  };
+
+  try {
+    assert.deepEqual(await workbenchApi.startSession({ mode: "chat", text: "你好", attachments: [] }), { sessionId: "s1" });
+    assert.deepEqual(await workbenchApi.listModels(), { sessionId: "s1" });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+
+  assert.equal(calls[0][0], "/api/dsh-ai-workbench/sessions");
+  assert.equal(calls[0][1].method, "POST");
+  assert.equal(calls[0][1].headers["x-dsh-workbench-action"], "1");
+  assert.equal(calls[1][0], "/api/dsh-ai-workbench/models");
+  assert.equal(calls[1][1].method, "GET");
+});
+
+test("API exposes a published session id from a structured setup error", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => jsonResponse(
+    { ok: false, code: "model-selection-failed", error: { code: "model-selection-failed", message: "cannot select", sessionId: "s1" } },
+    { ok: false, status: 409 },
+  );
+
+  try {
+    await assert.rejects(
+      () => workbenchApi.startSession({ mode: "work", text: "x", attachments: [] }),
+      (error) => error.code === "model-selection-failed" && error.status === 409 && error.sessionId === "s1",
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("API returns response data and rejects invalid modes before fetching", async () => {
   const originalFetch = globalThis.fetch;
   let calls = 0;

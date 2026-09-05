@@ -43,6 +43,8 @@ test("drafts and session metadata stay independent by mode", async () => {
   assert.equal((await repo.getDraft("chat")).text, "解释 RAG");
   assert.equal((await repo.getSessionMeta("s1")).mode, "chat");
   assert.equal(await repo.getSessionMeta("work"), null);
+  await repo.deleteSessionMeta("s1");
+  assert.equal(await repo.getSessionMeta("s1"), null);
 });
 
 test("all repository records are cloned at the boundary", async () => {
