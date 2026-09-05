@@ -139,7 +139,7 @@ async function readJsonBody(req) {
   }
 
   if (raw.length > MAX_JSON_BODY_BYTES) throw typedError("payload too large", 413, "payload-too-large");
-  if (raw.length === 0) return {};
+  if (raw.length === 0) throw typedError("request body required", 400, "invalid-json");
   try {
     return JSON.parse(raw.toString("utf8"));
   } catch {

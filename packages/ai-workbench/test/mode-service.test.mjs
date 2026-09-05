@@ -107,6 +107,42 @@ test("assignSession keeps an existing mode and writes only new classifications",
   assert.equal(writes.length, 1);
 });
 
+test("assignSession serializes concurrent mode changes and keeps same-mode calls idempotent", async () => {
+  const metas = new Map();
+  const writes = [];
+  const repository = {
+    getSessionMeta: async (sessionId) => new Promise((resolve) => {
+      setImmediate(() => resolve(metas.get(sessionId) || null));
+    }),
+    putSessionMeta: async (sessionId, value) => {
+      await Promise.resolve();
+      writes.push([sessionId, value.mode]);
+      const saved = { ...value, sessionId };
+      metas.set(sessionId, saved);
+      return saved;
+    },
+  };
+  const service = createModeService({
+    repository,
+    sessionQuery: { listSessions: async () => [], readTitleSnapshots: async () => [] },
+  });
+
+  const differentModes = await Promise.allSettled([
+    service.assignSession("race", { mode: "work" }),
+    service.assignSession("race", { mode: "chat" }),
+  ]);
+  assert.equal(differentModes.filter((result) => result.status === "fulfilled").length, 1);
+  assert.equal(differentModes.filter((result) => result.status === "rejected")[0].reason.code, "mode-conflict");
+  assert.deepEqual(writes.filter(([sessionId]) => sessionId === "race").map(([, mode]) => mode), ["work"]);
+
+  const sameMode = await Promise.allSettled([
+    service.assignSession("same", { mode: "chat" }),
+    service.assignSession("same", { mode: "chat" }),
+  ]);
+  assert.deepEqual(sameMode.map((result) => result.status), ["fulfilled", "fulfilled"]);
+  assert.deepEqual(writes.filter(([sessionId]) => sessionId === "same").map(([, mode]) => mode), ["chat"]);
+});
+
 test("contracts validate modes, normalize session metadata, and isolate Chat drafts", () => {
   assert.equal(assertMode("work"), "work");
   assert.throws(() => assertMode("other"), (error) => error.statusCode === 400 && error.code === "invalid-mode");
@@ -162,6 +198,42 @@ test("contracts reject oversized text, invalid attachments, and incomplete manua
   assert.throws(() => parseDraft({ text: "x", attachments: [], execution: { modelPolicy: "manual", provider: "openai" } }, "work"), /manual model/);
 });
 
+test("contracts reject malformed session metadata and non-string capability IDs", () => {
+  for (const value of [null, "chat", 42, []]) {
+    assert.throws(() => parseSessionMeta(value), (error) => error.statusCode === 400 && error.code === "invalid-session-meta");
+  }
+  for (const [field, value] of [["automationId", 42], ["runId", {}], ["createdAt", 0]]) {
+    assert.throws(() => parseSessionMeta({ mode: "work", [field]: value }), (error) => error.statusCode === 400 && error.code === "invalid-session-meta");
+  }
+  assert.throws(
+    () => parseDraft({ text: "x", attachments: [], capabilityIds: ["docs", 42] }, "work"),
+    (error) => error.statusCode === 400 && error.code === "invalid-capability-ids",
+  );
+});
+
+test("history converts non-coercible timestamps to the epoch", async () => {
+  const service = createModeService({
+    repository: { getSessionMeta: async () => null, putSessionMeta: async () => {} },
+    sessionQuery: {
+      listSessions: async () => [
+        session("symbol-time", Symbol("invalid")),
+        session("throwing-time", { valueOf() { throw new Error("cannot convert"); } }),
+      ],
+      readTitleSnapshots: async (ids) => ids.map((sessionId) => ({
+        sessionId,
+        status: "fulfilled",
+        value: { title: { title: sessionId } },
+      })),
+    },
+  });
+
+  const history = await service.listHistory("work");
+  assert.deepEqual(history.map(({ sessionId, createdAt }) => [sessionId, createdAt]), [
+    ["symbol-time", "1970-01-01T00:00:00.000Z"],
+    ["throwing-time", "1970-01-01T00:00:00.000Z"],
+  ]);
+});
+
 test("settings are normalized to the light workbench contract", () => {
   assert.deepEqual(parseSettings({ defaultMode: "chat", lastMode: "work", localDisplayName: "  老师  ", voiceEnabled: false }), {
     schemaVersion: 1,
@@ -172,4 +244,10 @@ test("settings are normalized to the light workbench contract", () => {
     localDisplayName: "老师",
     voiceEnabled: false,
   });
+});
+
+test("settings reject null and non-object input", () => {
+  for (const value of [null, "work", 42, []]) {
+    assert.throws(() => parseSettings(value), (error) => error.statusCode === 400 && error.code === "invalid-settings");
+  }
 });

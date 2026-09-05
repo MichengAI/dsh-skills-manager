@@ -3,8 +3,12 @@ import { assertMode, parseSessionMeta } from "../shared/contracts.js";
 const EPOCH = "1970-01-01T00:00:00.000Z";
 
 function normalizeCreatedAt(value) {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? EPOCH : date.toISOString();
+  try {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? EPOCH : date.toISOString();
+  } catch {
+    return EPOCH;
+  }
 }
 
 function sessionIdOf(session) {
@@ -16,14 +20,27 @@ function titleOf(result) {
 }
 
 export function createModeService({ repository, sessionQuery }) {
+  const assignments = new Map();
+
+  function enqueueAssignment(sessionId, operation) {
+    const previous = assignments.get(sessionId) || Promise.resolve();
+    const current = previous.catch(() => undefined).then(operation);
+    assignments.set(sessionId, current);
+    return current.finally(() => {
+      if (assignments.get(sessionId) === current) assignments.delete(sessionId);
+    });
+  }
+
   return {
     async assignSession(sessionId, input) {
       const next = parseSessionMeta(input);
-      const current = await repository.getSessionMeta(sessionId);
-      if (current && current.mode !== next.mode) {
-        throw Object.assign(new Error("mode-conflict"), { statusCode: 409, code: "mode-conflict" });
-      }
-      return current || repository.putSessionMeta(sessionId, next);
+      return enqueueAssignment(sessionId, async () => {
+        const current = await repository.getSessionMeta(sessionId);
+        if (current && current.mode !== next.mode) {
+          throw Object.assign(new Error("mode-conflict"), { statusCode: 409, code: "mode-conflict" });
+        }
+        return current || repository.putSessionMeta(sessionId, next);
+      });
     },
 
     async listHistory(mode) {

@@ -390,6 +390,31 @@ test("settings endpoint validates, saves, and returns settings", async () => {
   assert.equal(services.writes[0][0], "settings");
 });
 
+test("settings endpoint rejects a missing or null JSON body", async () => {
+  const services = modeServices();
+  const missing = await routeRequest(workbenchRequest({
+    method: "PUT",
+    url: "/api/dsh-ai-workbench/settings",
+    headers: { host: "localhost", "x-dsh-workbench-action": "1", "content-type": "application/json" },
+  }), services);
+  assert.equal(missing.statusCode, 400);
+  assert.equal(missing.body.code, "invalid-json");
+
+  const empty = await routeRequest(jsonMutationRequest(
+    "/api/dsh-ai-workbench/settings",
+    "",
+  ), services);
+  assert.equal(empty.statusCode, 400);
+  assert.equal(empty.body.code, "invalid-json");
+
+  const nullBody = await routeRequest(jsonMutationRequest(
+    "/api/dsh-ai-workbench/settings",
+    "null",
+  ), services);
+  assert.equal(nullBody.statusCode, 400);
+  assert.equal(nullBody.body.code, "invalid-settings");
+});
+
 test("mutation endpoints require the action header and JSON content type", async () => {
   const services = modeServices();
   const noAction = await routeRequest(jsonMutationRequest(

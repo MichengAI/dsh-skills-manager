@@ -1,6 +1,10 @@
 export const MODES = new Set(["work", "chat"]);
 export const ORIGINS = new Set(["user", "automation", "migration"]);
 
+function isRecord(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
 function contractError(message, code) {
   return Object.assign(new Error(message), { statusCode: 400, code, public: true });
 }
@@ -11,6 +15,12 @@ export function assertMode(value) {
 }
 
 export function parseSessionMeta(value) {
+  if (!isRecord(value)) throw contractError("invalid session metadata", "invalid-session-meta");
+  for (const field of ["automationId", "runId", "createdAt"]) {
+    if (Object.prototype.hasOwnProperty.call(value, field) && typeof value[field] !== "string") {
+      throw contractError("invalid session metadata", "invalid-session-meta");
+    }
+  }
   const mode = assertMode(value?.mode);
   const origin = ORIGINS.has(value?.origin) ? value.origin : "user";
   return {
@@ -24,6 +34,7 @@ export function parseSessionMeta(value) {
 
 export function parseDraft(value, mode) {
   assertMode(mode);
+  if (!isRecord(value)) throw contractError("invalid draft", "invalid-draft");
   if (typeof value?.text !== "string" || value.text.length > 20_000) {
     throw contractError("invalid draft", "invalid-draft");
   }
@@ -31,6 +42,12 @@ export function parseDraft(value, mode) {
   const mediaTypes = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
   if (!Array.isArray(value.attachments) || value.attachments.length > 20) {
     throw contractError("invalid attachments", "invalid-attachments");
+  }
+  if (
+    value.capabilityIds !== undefined
+    && (!Array.isArray(value.capabilityIds) || value.capabilityIds.some((id) => typeof id !== "string"))
+  ) {
+    throw contractError("invalid capability IDs", "invalid-capability-ids");
   }
 
   const attachments = value.attachments.map((item) => {
@@ -71,6 +88,7 @@ export function parseDraft(value, mode) {
 }
 
 export function parseSettings(value) {
+  if (!isRecord(value)) throw contractError("invalid settings", "invalid-settings");
   const defaultMode = assertMode(value?.defaultMode || "work");
   const lastMode = assertMode(value?.lastMode || defaultMode);
   const localDisplayName = typeof value?.localDisplayName === "string" && value.localDisplayName.trim()
