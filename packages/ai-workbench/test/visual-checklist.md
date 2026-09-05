@@ -32,7 +32,7 @@
 | 附件状态 | PASS | 两个首页均渲染附件摘要、移除按钮与错误提示。 |
 | 展开自动选择 | PASS | Work 自动选择面板按按钮 `aria-expanded` 展开，展示强度、模型、能力。 |
 | 1023 px 响应式 | PASS（静态） | `@media(max-width:1023px)` 折叠 Sidebar；真实截图仍需确认无横向滚动与控件裁切。 |
-| 语音不支持降级 | PASS（适配器测试）/ PENDING（UI fixer） | 无 `SpeechRecognition`/`webkitSpeechRecognition` 时适配器为 `supported:false`；首页按钮隐藏需由后续 UI fixer 接入并验收。 |
+| 语音不支持降级 | PASS（适配器 + UI 测试） | 无 `SpeechRecognition`/`webkitSpeechRecognition` 时适配器为 `supported:false`，Work/Chat 首页隐藏语音按钮；真实浏览器截图仍受下方宿主阻塞。 |
 
 ## 阻塞与后续
 

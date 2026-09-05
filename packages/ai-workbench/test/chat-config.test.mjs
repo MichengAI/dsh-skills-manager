@@ -43,6 +43,12 @@ test("bundled Chat home configuration keeps navigation destinations empty", asyn
   assert.doesNotThrow(() => validateChatConfig(config));
 });
 
+test("production ChatHome loads its default config from the bundled asset", async () => {
+  const source = await readFile(new URL("../lib/client.js", import.meta.url), "utf8");
+  assert.match(source, /chat-home\.json/);
+  assert.match(source, /chatConfig:/);
+});
+
 test("Chat payload keeps deep thinking and web search isolated from Work fields", () => {
   assert.deepEqual(buildChatSessionInput({
     text: "解释 RAG",

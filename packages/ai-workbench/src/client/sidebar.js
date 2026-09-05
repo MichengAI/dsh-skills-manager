@@ -19,6 +19,10 @@ export function navigationFor(mode) {
   return (mode === "chat" ? CHAT : WORK).map(([id, label, available, route]) => ({ id, label, available, route }));
 }
 
+function clearSession(sessions) {
+  if (typeof sessions?.clear === "function") sessions.clear();
+}
+
 const ICONS = {
   "new-work": "＋", workspace: "▦", capabilities: "✦", dashboard: "▥", automations: "↻", results: "□",
   "new-chat": "＋", agents: "♙", "ai-tools": "⌘",
@@ -28,8 +32,9 @@ export function createSidebar(React) {
   const h = React.createElement;
   const Brand = createBrand(React);
 
-  function dispatchNavigation(dispatch, item, mode) {
+  function dispatchNavigation(dispatch, item, mode, sessions) {
     if (item.available) {
+      if (item.route === "home") clearSession(sessions);
       dispatch({ type: "navigate", route: { name: item.route, mode } });
     } else {
       dispatch({ type: "dialog/open", dialog: { title: item.label, message: "功能暂未开发" } });
@@ -46,6 +51,7 @@ export function createSidebar(React) {
     const displayName = settings?.localDisplayName || "本地用户";
     const openSession = (sessionId) => {
       sessions?.open?.(sessionId);
+      dispatch({ type: "navigate", route: { name: "conversation", mode: state.mode } });
     };
 
     return h("div", { className: "daw-sidebar-content", "data-collapsed": collapsed ? "true" : "false" },
@@ -57,7 +63,10 @@ export function createSidebar(React) {
             type: "button",
             role: "tab",
             "aria-selected": state.mode === mode,
-            onClick: () => dispatch({ type: "mode/change", mode }),
+            onClick: () => {
+              clearSession(sessions);
+              dispatch({ type: "mode/change", mode });
+            },
           }, mode === "work" ? "Work" : "Chat"))),
         h("nav", { className: "daw-mode-navigation", "aria-label": state.mode === "work" ? "Work 导航" : "Chat 导航" },
           items.map((item) => h("button", {
@@ -65,7 +74,7 @@ export function createSidebar(React) {
             type: "button",
             className: "daw-nav-button",
             "aria-current": state.route.name === item.route ? "page" : undefined,
-            onClick: () => dispatchNavigation(dispatch, item, state.mode),
+            onClick: () => dispatchNavigation(dispatch, item, state.mode, sessions),
           }, h("span", { className: "daw-nav-icon", "aria-hidden": "true" }, ICONS[item.id] || "•"), h("span", null, item.label)))),
       ),
       h("div", { className: "daw-sidebar-divider" }),

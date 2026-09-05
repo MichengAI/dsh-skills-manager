@@ -45,11 +45,22 @@ export function buildWorkSessionInput(draft) {
 }
 
 export function workspaceItemsFromFeed(feed) {
-  const items = Array.isArray(feed?.state?.items) ? feed.state.items : [];
+  const items = Array.isArray(feed?.items)
+    ? feed.items
+    : Array.isArray(feed?.state?.items)
+      ? feed.state.items
+      : [];
+  const feedWorkspaceId = typeof feed?.workspaceId === "string" && feed.workspaceId
+    ? feed.workspaceId
+    : typeof feed?.state?.id === "string" && feed.state.id
+      ? feed.state.id
+      : null;
   return items.flatMap((item) => {
-    if (!item || typeof item.id !== "string" || typeof item.path !== "string") return [];
+    if (!item || typeof item.path !== "string") return [];
+    const id = typeof item.id === "string" && item.id ? item.id : feedWorkspaceId;
+    if (!id) return [];
     return [{
-      id: item.id,
+      id,
       title: typeof item.title === "string" && item.title ? item.title : item.path,
       path: item.path,
     }];
@@ -62,6 +73,7 @@ function workspaceFeedFrom(workbench) {
   const candidates = [
     workbench?.useWorkspaces,
     workbench?.ctx?.useWorkspaces,
+    workbench?.workspaces?.useWorkspaces,
     workbench?.ctx?.workspaces?.useWorkspaces,
     workbench?.ctx?.root?.useWorkspaces,
   ];
@@ -122,7 +134,15 @@ export function createWorkHome(React, options = {}) {
     const [sending, setSending] = React.useState(false);
     const [attachmentError, setAttachmentError] = React.useState(null);
     const [submitError, setSubmitError] = React.useState(null);
+    const [speechListening, setSpeechListening] = React.useState(false);
+    const [speechError, setSpeechError] = React.useState(null);
     const fileInput = React.useRef(null);
+    const draftRef = React.useRef(draft);
+    draftRef.current = draft;
+
+    const speech = workbench?.speech || workbench?.ctx?.speech || workbench?.ctx?.voice;
+    const speechSupported = speech?.supported === true;
+    React.useEffect(() => () => speech?.stop?.(), [speech]);
 
     React.useEffect(() => {
       if (!selectionOpen || models || modelsError) return undefined;
@@ -201,18 +221,35 @@ export function createWorkHome(React, options = {}) {
       replaceDraft({ ...draft, execution: { ...execution, modelPolicy: "manual", provider, model } });
     };
 
-    const speak = async () => {
-      const adapter = workbench?.ctx?.speech || workbench?.ctx?.voice;
-      if (typeof adapter?.start === "function") {
-        try {
-          const text = await adapter.start();
-          if (typeof text === "string" && text.trim()) changeText(`${draft.text}${draft.text ? "\n" : ""}${text.trim()}`);
-        } catch (error) {
-          setSubmitError(error);
-        }
+    const toggleSpeech = () => {
+      if (!speechSupported) return;
+      setSpeechError(null);
+      if (speechListening) {
+        speech.stop?.();
+        setSpeechListening(false);
         return;
       }
-      openDialog("语音输入", "语音输入适配器将在后续版本接入。");
+      try {
+        speech.start?.({
+          onText: (text) => {
+            const value = typeof text === "string" ? text.trim() : "";
+            if (value) {
+              const nextText = `${draftRef.current.text}${draftRef.current.text ? "\n" : ""}${value}`;
+              draftRef.current = { ...draftRef.current, text: nextText };
+              changeText(nextText);
+            }
+          },
+          onState: (nextState) => setSpeechListening(nextState === "listening"),
+          onError: (error) => {
+            setSpeechListening(false);
+            setSpeechError(error);
+          },
+        });
+        setSpeechListening(true);
+      } catch (error) {
+        setSpeechListening(false);
+        setSpeechError(error?.message || "语音识别失败，请重试");
+      }
     };
 
     const submit = async (event) => {
@@ -268,9 +305,10 @@ export function createWorkHome(React, options = {}) {
           h("div", { className: "daw-work-actions" },
             h("input", { ref: fileInput, className: "daw-visually-hidden", type: "file", accept: [...normalizedImageLimits.mediaTypes].join(","), multiple: true, onChange: addFiles }),
             h("button", { type: "button", className: "daw-tool-button", onClick: () => fileInput.current?.click(), "aria-label": "添加图片附件" }, "＋ 图片"),
-            h("button", { type: "button", className: "daw-tool-button", onClick: speak, "aria-label": "语音输入" }, "◌ 语音"),
+            speechSupported ? h("button", { type: "button", className: "daw-tool-button", onClick: toggleSpeech, "aria-label": speechListening ? "停止语音输入" : "语音输入", "aria-pressed": speechListening }, speechListening ? "◌ 停止" : "◌ 语音") : null,
             h("button", { type: "button", className: "daw-policy-chip", onClick: () => openDialog("需要时请求批准", "AI 只会在任务需要时申请宿主批准；文件与系统权限仍由 DSH 宿主策略控制。") }, "✓ 需要时请求批准")),
           h("button", { type: "submit", className: "daw-send-button", disabled: sending || !draft.text.trim() }, sending ? "发送中…" : "发送 ➤")),
+        speechError ? h("p", { className: "daw-inline-error", role: "alert" }, speechError) : null,
         submitError ? h("p", { className: "daw-inline-error", role: "alert" }, submitError.message || "任务发送失败") : null),
       h("div", { className: "daw-work-options" },
         h("label", { className: "daw-option-label" }, "工作空间", h("select", { value: draft.workspaceId || "", onChange: (event) => replaceDraft({ ...draft, workspaceId: event.target.value || null }), "aria-label": "选择工作空间" }, h("option", { value: "" }, "不指定工作空间"), workspaceItems.map((item) => h("option", { key: item.id, value: item.id }, `${item.title} · ${item.path}`))), selectedWorkspace ? h("span", { className: "daw-selected-path" }, selectedWorkspace.path) : null),

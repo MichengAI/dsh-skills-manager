@@ -46,6 +46,7 @@ async function createBuildFixture() {
   const fixtureRoot = await mkdtemp(join(packageRoot, ".generated-output-test-"));
   try {
     await cp(join(packageRoot, "src"), join(fixtureRoot, "src"), { recursive: true });
+    await cp(join(packageRoot, "assets"), join(fixtureRoot, "assets"), { recursive: true });
     await mkdir(join(fixtureRoot, "scripts"), { recursive: true });
     await cp(buildScript, join(fixtureRoot, "scripts/build.mjs"));
     return fixtureRoot;
@@ -82,6 +83,7 @@ test("root-invoked build uses crash-recoverable transactional publish without to
       "client/root.js",
       "client/shell.js",
       "client/sidebar.js",
+      "client/speech-input.js",
       "client/store.js",
       "client/styles.js",
       "client/work-home.js",

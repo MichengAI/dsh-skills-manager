@@ -35,6 +35,7 @@ async function createBuildFixture() {
   const fixtureRoot = await mkdtemp(join(packageRoot, ".generated-output-test-"));
   try {
     await cp(join(packageRoot, "src"), join(fixtureRoot, "src"), { recursive: true });
+    await cp(join(packageRoot, "assets"), join(fixtureRoot, "assets"), { recursive: true });
     await mkdir(join(fixtureRoot, "scripts"), { recursive: true });
     await cp(buildScript, join(fixtureRoot, "scripts/build.mjs"));
     return fixtureRoot;

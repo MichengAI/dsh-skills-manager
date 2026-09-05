@@ -57,7 +57,7 @@ export function createRootRegistration(ctx, defineStore) {
 export function createRootComponent(React, options = {}) {
   const h = React.createElement;
   const Sidebar = createSidebar(React);
-  const WorkbenchShell = createWorkbenchShell(React);
+  const WorkbenchShell = createWorkbenchShell(React, { config: options.chatConfig });
   const Dialog = createDialog(React);
 
   function WorkbenchFrame({ useStore, useSessions, actions, renderSlot }) {

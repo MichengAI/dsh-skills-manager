@@ -3,6 +3,10 @@ import { createChatHome } from "./chat-home.js";
 
 export const ORB_SOURCE = "/assets/ai-orb.png";
 
+function clearSession(sessions) {
+  if (typeof sessions?.clear === "function") sessions.clear();
+}
+
 export function createWorkbenchShell(React, options = {}) {
   const h = React.createElement;
   const WorkHome = createWorkHome(React, options);
@@ -31,6 +35,14 @@ export function createWorkbenchShell(React, options = {}) {
 
   return function WorkbenchShell({ state, renderSlot, useSessions, workbench }) {
     const currentSessionId = useSessions ? useSessions((snapshot) => snapshot.current) : undefined;
+    React.useEffect(() => {
+      if (state.route.name === "home") clearSession(workbench?.sessions);
+    }, [state.route.name, state.route.mode, currentSessionId, workbench?.sessions]);
+    if (state.route.name === "home") {
+      if (state.mode === "work") return h(WorkHome, { state, dispatch: workbench?.dispatch, workbench });
+      return h(ChatHome, { state, dispatch: workbench?.dispatch, workbench });
+    }
+    if (state.route.name === "conversation") return renderSlot("conversation", {});
     if (currentSessionId) return renderSlot("conversation", {});
     if (state.route.name === "capabilities") return h(Placeholder, { title: "能力库", copy: "把常用能力组合起来，形成你的工作流。" });
     if (state.route.name === "automations") return h(Placeholder, { title: "自动化任务", copy: "让重复工作自动运行，稍后回来查看成果。" });

@@ -40,3 +40,10 @@ test("workspace adapter reads only safe state.items rows", () => {
     null,
   ] } }), [{ id: "w1", title: "教学空间", path: "/tmp/teaching" }]);
 });
+
+test("workspace adapter reads the runtime top-level items and workspace id", () => {
+  assert.deepEqual(workspaceItemsFromFeed({
+    workspaceId: "runtime-workspace",
+    items: [{ path: "/tmp/runtime", title: "运行时工作空间" }],
+  }), [{ id: "runtime-workspace", title: "运行时工作空间", path: "/tmp/runtime" }]);
+});

@@ -38,7 +38,15 @@ export function createChatHome(React, options = {}) {
     const [attachmentError, setAttachmentError] = React.useState(null);
     const [submitError, setSubmitError] = React.useState(null);
     const [notice, setNotice] = React.useState(null);
+    const [speechListening, setSpeechListening] = React.useState(false);
+    const [speechError, setSpeechError] = React.useState(null);
     const fileInput = React.useRef(null);
+    const draftRef = React.useRef(draft);
+    draftRef.current = draft;
+
+    const speech = workbench?.speech || workbench?.ctx?.speech || workbench?.ctx?.voice;
+    const speechSupported = speech?.supported === true;
+    React.useEffect(() => () => speech?.stop?.(), [speech]);
 
     const replaceDraft = (next) => dispatch({ type: "draft/replace", mode: "chat", draft: normalizeChatDraft(next) });
     const changeText = (text) => replaceDraft({ ...draft, text });
@@ -65,6 +73,37 @@ export function createChatHome(React, options = {}) {
     };
 
     const removeAttachment = (index) => replaceDraft({ ...draft, attachments: draft.attachments.filter((_, itemIndex) => itemIndex !== index) });
+
+    const toggleSpeech = () => {
+      if (!speechSupported) return;
+      setSpeechError(null);
+      if (speechListening) {
+        speech.stop?.();
+        setSpeechListening(false);
+        return;
+      }
+      try {
+        speech.start?.({
+          onText: (text) => {
+            const value = typeof text === "string" ? text.trim() : "";
+            if (value) {
+              const nextText = `${draftRef.current.text}${draftRef.current.text ? "\n" : ""}${value}`;
+              draftRef.current = { ...draftRef.current, text: nextText };
+              changeText(nextText);
+            }
+          },
+          onState: (nextState) => setSpeechListening(nextState === "listening"),
+          onError: (error) => {
+            setSpeechListening(false);
+            setSpeechError(error);
+          },
+        });
+        setSpeechListening(true);
+      } catch (error) {
+        setSpeechListening(false);
+        setSpeechError(error?.message || "语音识别失败，请重试");
+      }
+    };
 
     const submit = async (event) => {
       event?.preventDefault?.();
@@ -160,10 +199,12 @@ export function createChatHome(React, options = {}) {
           h("div", { className: "daw-chat-actions" },
             h("input", { ref: fileInput, className: "daw-visually-hidden", type: "file", accept: [...imageLimits.mediaTypes].join(","), multiple: true, onChange: addFiles }),
             h("button", { type: "button", className: "daw-tool-button", onClick: () => fileInput.current?.click(), "aria-label": "添加图片附件" }, "＋ 图片"),
+            speechSupported ? h("button", { type: "button", className: "daw-tool-button", onClick: toggleSpeech, "aria-label": speechListening ? "停止语音输入" : "语音输入", "aria-pressed": speechListening }, speechListening ? "◌ 停止" : "◌ 语音") : null,
             h("button", { type: "button", className: `daw-toggle-button${deepThinking ? " is-active" : ""}`, role: "switch", "aria-checked": deepThinking, onClick: () => setDeepThinking(!deepThinking) }, "深度思考"),
             h("button", { type: "button", className: `daw-toggle-button${webSearch ? " is-active" : ""}`, role: "switch", "aria-checked": webSearch, onClick: () => setWebSearch(!webSearch) }, "联网搜索")),
           h("button", { type: "submit", className: "daw-send-button", disabled: sending || !draft.text.trim() }, sending ? "发送中…" : "发送 ➤")),
         h("p", { className: "daw-keyboard-help" }, "Enter 发送，Ctrl+Enter 换行"),
+        speechError ? h("p", { className: "daw-inline-error", role: "alert" }, speechError) : null,
         submitError ? h("p", { className: "daw-inline-error", role: "alert" }, submitError.message || "问题发送失败") : null,
         notice ? h("p", { className: "daw-inline-note", role: "status" }, notice) : null),
       h("div", { className: "daw-chat-cards" },

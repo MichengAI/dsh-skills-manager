@@ -1,8 +1,10 @@
 import { probeClientContracts } from "./shared/compatibility.js";
+import CHAT_HOME_CONFIG from "../assets/chat-home.json" with { type: "json" };
 import { workbenchApi } from "./client/api.js";
 import { createRootComponent, createRootRegistration } from "./client/root.js";
 import { createDraftSaveScheduler, initialState, reduceWorkbench } from "./client/store.js";
 import { SIDEBAR_CHILDREN, createSidebar } from "./client/sidebar.js";
+import { createSpeechInput } from "./client/speech-input.js";
 import { foundationCss, installStyles } from "./client/styles.js";
 
 window.__ModuleLoader__.load({
@@ -19,6 +21,9 @@ window.__ModuleLoader__.load({
       const [settings, setSettings] = React.useState(null);
       const draftScheduler = React.useRef(null);
       const observedDrafts = React.useRef(state.drafts);
+      const speech = React.useRef(null);
+
+      if (!speech.current) speech.current = ctx.speech || ctx.voice || createSpeechInput(window);
 
       if (!draftScheduler.current) {
         draftScheduler.current = createDraftSaveScheduler(workbenchApi.saveDraft, {
@@ -57,9 +62,12 @@ window.__ModuleLoader__.load({
           dispatch,
           settings,
           sessions: ctx.sessions,
+          speech: speech.current,
           ctx,
           imageLimits: ctx.imageLimits,
           capabilities: ctx.capabilities,
+          useWorkspaces: ctx.useWorkspaces,
+          workspaces: ctx.workspaces,
           workspaceFeed: ctx.workspaceFeed,
         },
       }, children);
@@ -79,7 +87,7 @@ window.__ModuleLoader__.load({
         // The official Sidebar already declares these child slots. Reuse that
         // declaration while shadowing only the Sidebar renderer itself.
         const disposeSidebar = ctx.slots.register({ name: "sidebar", priority: 1, children: SIDEBAR_CHILDREN }, Sidebar);
-        const disposeRoot = ctx.slots.register(registration, createRootComponent(React, { context: WorkbenchContext, provider: (props) => h(WorkbenchProvider, { ctx, ...props }) }));
+        const disposeRoot = ctx.slots.register(registration, createRootComponent(React, { context: WorkbenchContext, chatConfig: CHAT_HOME_CONFIG, provider: (props) => h(WorkbenchProvider, { ctx, ...props }) }));
         return () => { disposeRoot?.(); disposeSidebar?.(); };
       });
       return undefined;

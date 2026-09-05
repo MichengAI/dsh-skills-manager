@@ -77,3 +77,9 @@ test("loader factory uses the browser runtime client entry and registers Root", 
 test("workbench frame establishes the containing block for its overlay", () => {
   assert.match(foundationCss, /\.daw-frame\{[^}]*position:relative/);
 });
+
+test("provider forwards runtime workspace hook and workspaces context to client UI", async () => {
+  const source = await readFile(new URL("../lib/client.js", import.meta.url), "utf8");
+  assert.match(source, /useWorkspaces:\s*ctx\.useWorkspaces/);
+  assert.match(source, /workspaces:\s*ctx\.workspaces/);
+});
