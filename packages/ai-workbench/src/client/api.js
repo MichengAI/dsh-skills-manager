@@ -6,6 +6,14 @@ function clientError(message, code) {
   return Object.assign(new Error(message), { code, status: 400 });
 }
 
+function responseError(message, code, status, cause) {
+  return Object.assign(new Error(message), {
+    code,
+    status,
+    ...(cause !== undefined ? { cause } : {}),
+  });
+}
+
 function assertMode(mode) {
   if (!MODES.has(mode)) throw clientError("invalid mode", "invalid-mode");
   return mode;
@@ -42,26 +50,37 @@ export async function request(path, options = {}) {
     "content-type": "application/json",
     ...(method !== "GET" ? { "x-dsh-workbench-action": "1" } : {}),
   };
-  const response = await fetch(`${BASE}${assertPath(path)}`, { ...options, method, headers });
+  const requestPath = assertPath(path);
+  let response;
+  try {
+    response = await fetch(`${BASE}${requestPath}`, { ...options, method, headers });
+  } catch (cause) {
+    throw responseError("network error", "network-error", 0, cause);
+  }
 
   let payload;
   try {
     payload = await response.json();
   } catch (cause) {
-    throw Object.assign(new Error("invalid JSON response"), {
-      code: "invalid-json-response",
-      status: response.status,
-      cause,
-    });
+    throw responseError("invalid response", "invalid-response", response.status, cause);
   }
 
-  if (!response.ok || payload?.ok === false) {
-    throw Object.assign(new Error(payload?.error || "request failed"), {
-      code: payload?.code || "request-failed",
-      status: response.status,
-    });
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    throw responseError("invalid response", "invalid-response", response.status);
   }
-  return payload?.data;
+
+  const hasData = Object.prototype.hasOwnProperty.call(payload, "data");
+  if (!response.ok) {
+    if (payload.ok === false && typeof payload.code === "string") {
+      throw responseError(payload.error || "request failed", payload.code, response.status);
+    }
+    throw responseError("invalid response", "invalid-response", response.status);
+  }
+
+  if (payload.ok !== true || !hasData || payload.data === undefined) {
+    throw responseError("invalid response", "invalid-response", response.status);
+  }
+  return payload.data;
 }
 
 export const workbenchApi = {

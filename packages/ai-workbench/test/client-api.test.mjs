@@ -121,3 +121,70 @@ test("API errors include the server code and HTTP status", async () => {
     globalThis.fetch = originalFetch;
   }
 });
+
+test("API rejects malformed response envelopes with invalid-response", async () => {
+  const originalFetch = globalThis.fetch;
+  const responses = [
+    null,
+    [],
+    { ok: false, code: "server-error", error: "server error" },
+    { ok: false, code: "server-error", error: "server error", data: {} },
+    { ok: "true", data: {} },
+    { ok: true },
+    { ok: true, data: undefined },
+  ];
+
+  try {
+    for (const payload of responses) {
+      globalThis.fetch = async () => jsonResponse(payload, { ok: true, status: 200 });
+      await assert.rejects(
+        () => request("/bootstrap?mode=work"),
+        (error) => error instanceof Error
+          && error.code === "invalid-response"
+          && error.status === 200,
+      );
+    }
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("API maps malformed JSON responses to invalid-response", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => ({
+    ok: true,
+    status: 200,
+    async json() {
+      throw new Error("malformed JSON");
+    },
+  });
+
+  try {
+    await assert.rejects(
+      () => request("/bootstrap?mode=work"),
+      (error) => error instanceof Error
+        && error.code === "invalid-response"
+        && error.status === 200,
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("API wraps network failures with network-error and status zero", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => {
+    throw new Error("connection refused");
+  };
+
+  try {
+    await assert.rejects(
+      () => request("/bootstrap?mode=work"),
+      (error) => error instanceof Error
+        && error.code === "network-error"
+        && error.status === 0,
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

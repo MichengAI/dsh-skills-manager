@@ -56,6 +56,63 @@ test("draft replace replaces only the requested mode", () => {
   assert.deepEqual(state.drafts.chat, originalChatDraft);
 });
 
+test("draft replace deep clones the action draft payload", () => {
+  const draft = {
+    mode: "work",
+    text: "原始文本",
+    attachments: [{ mediaType: "image/png", data: "aA==", name: "原始文件" }],
+    execution: { provider: "provider-a", model: "model-a" },
+  };
+  const state = reduceWorkbench(initialState(), { type: "draft/replace", mode: "work", draft });
+
+  draft.text = "外部修改";
+  draft.attachments[0].name = "外部文件修改";
+  draft.execution.model = "外部模型修改";
+  assert.equal(state.drafts.work.text, "原始文本");
+  assert.equal(state.drafts.work.attachments[0].name, "原始文件");
+  assert.equal(state.drafts.work.execution.model, "model-a");
+
+  state.drafts.work.attachments[0].name = "state 修改";
+  assert.equal(draft.attachments[0].name, "外部文件修改");
+});
+
+test("bootstrap success deep clones draft and history action payloads", () => {
+  const data = {
+    draft: {
+      mode: "chat",
+      text: "初始问题",
+      attachments: [{ mediaType: "image/png", data: "aA==", name: "资料" }],
+    },
+    history: [{ sessionId: "chat-1", title: "初始标题", labels: ["问答"] }],
+  };
+  const state = reduceWorkbench(initialState(), { type: "bootstrap/success", mode: "chat", data });
+
+  data.draft.attachments[0].name = "外部资料修改";
+  data.history[0].labels[0] = "外部标签修改";
+  assert.equal(state.drafts.chat.attachments[0].name, "资料");
+  assert.equal(state.history.chat[0].labels[0], "问答");
+
+  state.history.chat[0].labels[0] = "state 修改";
+  assert.equal(data.history[0].labels[0], "外部标签修改");
+});
+
+test("mode-bearing reducer actions fail closed for unsupported modes", () => {
+  const state = initialState();
+  const invalidActions = [
+    { type: "mode/change", mode: "admin" },
+    { type: "draft/change", mode: "admin", text: "不应写入" },
+    { type: "draft/replace", mode: "admin", draft: { text: "不应写入" } },
+    { type: "bootstrap/start", mode: "admin" },
+    { type: "bootstrap/success", mode: "admin", data: { draft: {}, history: [] } },
+    { type: "bootstrap/error", mode: "admin", error: new Error("不应写入") },
+    { type: "navigate", route: { name: "home", mode: "admin" } },
+  ];
+
+  for (const action of invalidActions) {
+    assert.strictEqual(reduceWorkbench(state, action), state, action.type);
+  }
+});
+
 test("navigation clears an open dialog", () => {
   let state = reduceWorkbench(initialState(), {
     type: "dialog/open",
