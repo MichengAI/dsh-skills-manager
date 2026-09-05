@@ -59,8 +59,11 @@ export function probeClientContracts(ctx) {
     if (getFunction(layout, method) == null) failures.push(`layout:${method}`);
   }
   const sessions = readProperty(source, "sessions");
-  for (const method of ["open", "binding", "subscribe"]) {
+  for (const method of ["open", "binding"]) {
     if (getFunction(sessions, method) == null) failures.push(`sessions:${method}`);
+  }
+  if (getFunction(sessions, "subscribe") == null && getFunction(readProperty(sessions, "list"), "subscribe") == null) {
+    failures.push("sessions:subscribe");
   }
   return { ok: failures.length === 0, failures };
 }

@@ -15,6 +15,18 @@ test("client probe accepts the required DSH slot and layout faces", () => {
   assert.deepEqual(result, { ok: true, failures: [] });
 });
 
+test("client probe accepts the current session list subscription face", () => {
+  const result = probeClientContracts({
+    slots: {
+      spec: () => ({}),
+      register() {},
+    },
+    layout: { toggleSidebar() {}, openDetails() {}, closeDetails() {}, attachPanels() {} },
+    sessions: { open() {}, binding() {}, list: { subscribe() {} } },
+  });
+  assert.deepEqual(result, { ok: true, failures: [] });
+});
+
 test("client probe reports missing contracts without throwing", () => {
   const result = probeClientContracts({ slots: { spec: () => undefined } });
   assert.equal(result.ok, false);

@@ -58,9 +58,10 @@ test("loader factory uses the browser runtime client entry and registers Root", 
   assert.doesNotThrow(() => bundle.apply(ctx));
   assert.equal(effects.length, 2);
   assert.doesNotThrow(() => effects[1]());
-  assert.equal(registrations.length, 1);
-  assert.equal(registrations[0][0].name, "root");
+  assert.equal(registrations.length, 2);
+  assert.deepEqual(registrations.map(([registration]) => registration.name), ["sidebar", "root"]);
   assert.equal(typeof registrations[0][1], "function");
+  assert.equal(typeof registrations[1][1], "function");
 });
 
 test("workbench frame establishes the containing block for its overlay", () => {

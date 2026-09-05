@@ -1,3 +1,7 @@
+import { createDialog } from "./dialog.js";
+import { createSidebar } from "./sidebar.js";
+import { createWorkbenchShell } from "./shell.js";
+
 export const ROOT_CHILDREN = {
   sidebar: { kind: "single", scope: "root" },
   conversation: { kind: "single", scope: "session-maybe" },
@@ -39,7 +43,7 @@ function createLayoutStore(defineStore) {
 export function createRootRegistration(ctx, defineStore) {
   return {
     name: "root",
-    children: ROOT_CHILDREN,
+    priority: 1,
     store: () => createLayoutStore(defineStore),
     inject(actions) {
       if (typeof ctx.layout?.attachPanels !== "function") throw new Error("DSH layout.attachPanels is unavailable");
@@ -49,17 +53,44 @@ export function createRootRegistration(ctx, defineStore) {
   };
 }
 
-export function createRootComponent(React) {
+export function createRootComponent(React, options = {}) {
   const h = React.createElement;
-  return function WorkbenchFrame({ useStore, actions, renderSlot }) {
+  const Sidebar = createSidebar(React);
+  const WorkbenchShell = createWorkbenchShell(React);
+  const Dialog = createDialog(React);
+
+  function WorkbenchFrame({ useStore, useSessions, actions, renderSlot }) {
     const panels = useStore((value) => value);
+    const workbench = options.context ? React.useContext(options.context) : null;
+    const state = workbench?.state || { mode: "work", route: { name: "home", mode: "work" }, drafts: { work: {}, chat: {} }, history: { work: [], chat: [] }, dialog: null };
     const collapsed = panels.narrow ? !panels.narrowExpanded : panels.sidebar === 0;
     const sidebar = collapsed ? 56 : panels.sidebar;
     return h("div", { className: "daw-frame", style: { gridTemplateColumns: `${sidebar}px minmax(0,1fr) ${panels.details}px` } },
-      h("aside", { className: "daw-sidebar" }, renderSlot("sidebar", { collapsed, width: sidebar, toggleSidebar: actions.toggleSidebar })),
-      h("main", { className: "daw-center" }, renderSlot("conversation", {})),
+      h("aside", { className: "daw-sidebar", "data-expanded": collapsed ? "false" : "true" },
+        renderSlot("sidebar", {
+          collapsed,
+          width: sidebar,
+          toggleSidebar: actions.toggleSidebar,
+          state,
+          settings: workbench?.settings,
+          dispatch: workbench?.dispatch,
+          sessions: workbench?.sessions,
+        })),
+      h("main", { className: "daw-center" }, h(WorkbenchShell, {
+        state,
+        renderSlot,
+        useSessions,
+      })),
       h("aside", { className: "daw-details" }, renderSlot("details", {})),
-      h("div", { className: "daw-overlay" }, renderSlot("shell.overlay", {})),
+      h("div", { className: "daw-overlay" },
+        renderSlot("shell.overlay", {}),
+        state.dialog ? h(Dialog, { dialog: state.dialog, onClose: () => workbench?.dispatch?.({ type: "dialog/close" }) }) : null,
+      ),
     );
+  }
+
+  if (typeof options.provider !== "function") return WorkbenchFrame;
+  return function WorkbenchRoot(props) {
+    return h(options.provider, null, h(WorkbenchFrame, props));
   };
 }
