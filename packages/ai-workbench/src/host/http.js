@@ -206,6 +206,11 @@ async function handleModels(services) {
   return success(sanitizeModelCatalog(catalog));
 }
 
+async function handleCapabilityPreferences(services) {
+  if (typeof services?.capabilityService?.get !== "function") return internalError();
+  return success(await services.capabilityService.get());
+}
+
 function modeServiceFor(services) {
   if (services?.modeService) return services.modeService;
   if (services?.repository && services?.sessionQuery) {
@@ -242,6 +247,11 @@ async function handleMutation(req, path, services) {
     throw typedError("content-type must be application/json", 415, "content-type-required");
   }
 
+  if (path === `${API_PREFIX}/capability-preferences`) {
+    if (typeof services?.capabilityService?.replace !== "function") return internalError();
+    const body = await readJsonBody(req);
+    return success(await services.capabilityService.replace(body?.enabledIds));
+  }
   const repository = services?.repository;
   if (!repository) return internalError();
   if (path === `${API_PREFIX}/settings`) {
@@ -302,6 +312,7 @@ export async function routeRequest(req, services) {
     }
     if (method === "GET" && path === `${API_PREFIX}/bootstrap`) return await handleBootstrap(parsed, services);
     if (method === "GET" && path === `${API_PREFIX}/models`) return await handleModels(services);
+    if (method === "GET" && path === `${API_PREFIX}/capability-preferences`) return await handleCapabilityPreferences(services);
     if (method === "POST" && path === `${API_PREFIX}/sessions`) {
       return await handleSession(req, services);
     }
@@ -309,6 +320,7 @@ export async function routeRequest(req, services) {
       method === "PUT"
       && (
         path === `${API_PREFIX}/settings`
+        || path === `${API_PREFIX}/capability-preferences`
         || path === `${API_PREFIX}/drafts/work`
         || path === `${API_PREFIX}/drafts/chat`
       )

@@ -12,8 +12,10 @@ const requiredOutputs = [
   "lib/index.js",
   "lib/client.js",
   "lib/shared/capabilities.js",
+  "lib/shared/capability-manifest.js",
   "lib/shared/compatibility.js",
   "lib/host/http.js",
+  "lib/host/capability-service.js",
   "lib/client/root.js",
   "lib/client/styles.js",
 ];

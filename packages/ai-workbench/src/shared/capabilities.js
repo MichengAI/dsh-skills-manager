@@ -17,19 +17,22 @@ function compareCapabilities(left, right) {
     (KIND_ORDER.get(right.kind) ?? Number.MAX_SAFE_INTEGER) ||
     compareText(left.name, right.name) ||
     compareText(left.source, right.source) ||
-    compareText(left.id, right.id);
+    compareText(left.id, right.id) ||
+    compareText(left.description, right.description) ||
+    compareText(JSON.stringify(left.details), JSON.stringify(right.details));
 }
 
 function normalizeSkillCapabilities(skillState, enabled) {
   const roots = Array.isArray(skillState?.roots) ? skillState.roots : [];
   return roots.flatMap((root) => {
     const rootKey = clean(root?.key);
-    const source = clean(root?.label) || rootKey;
-    const skills = Array.isArray(root?.skills) ? root.skills : [];
-    return skills.map((skill) => {
+  const source = clean(root?.label) || rootKey;
+  const skills = Array.isArray(root?.skills) ? root.skills : [];
+    return skills.flatMap((skill) => {
       const skillName = clean(skill?.name);
+      if (!rootKey || !skillName) return [];
       const id = `skill:${rootKey}:${skillName}`;
-      return {
+      return [{
         id,
         name: clean(skill?.declaredName) || skillName,
         description: clean(skill?.description) || "未提供简介",
@@ -42,17 +45,18 @@ function normalizeSkillCapabilities(skillState, enabled) {
           path: clean(skill?.path) || null,
           modelInvocable: skill?.effectiveModelInvocable !== false,
         },
-      };
+      }];
     });
   });
 }
 
 function normalizeToolCapabilities(manifest, enabled) {
   const tools = Array.isArray(manifest?.tools) ? manifest.tools : [];
-  return tools.map((item) => {
+  return tools.flatMap((item) => {
     const itemId = clean(item?.id);
+    if (!itemId) return [];
     const id = `tool:${itemId}`;
-    return {
+    return [{
       id,
       name: clean(item?.name) || itemId,
       description: clean(item?.description) || "未提供简介",
@@ -61,16 +65,17 @@ function normalizeToolCapabilities(manifest, enabled) {
       available: item?.available !== false,
       enabled: enabled.has(id),
       details: {},
-    };
+    }];
   });
 }
 
 function normalizeBusinessCapabilities(manifest, enabled) {
   const systems = Array.isArray(manifest?.businessSystems) ? manifest.businessSystems : [];
-  return systems.map((item) => {
+  return systems.flatMap((item) => {
     const itemId = clean(item?.id);
+    if (!itemId) return [];
     const id = `business:${itemId}`;
-    return {
+    return [{
       id,
       name: clean(item?.name) || itemId,
       description: clean(item?.description) || "未提供简介",
@@ -79,22 +84,35 @@ function normalizeBusinessCapabilities(manifest, enabled) {
       available: item?.connected === true,
       enabled: enabled.has(id),
       details: { connectionHint: clean(item?.connectionHint) || null },
-    };
+    }];
   });
 }
 
-export function normalizeCapabilities({ skillState, manifest, enabledIds } = {}) {
+function dedupeCapabilities(items) {
+  const seen = new Set();
+  return items
+    .sort(compareCapabilities)
+    .filter((item) => {
+      if (seen.has(item.id)) return false;
+      seen.add(item.id);
+      return true;
+    });
+}
+
+export function normalizeCapabilities(options = {}) {
+  const { skillState, manifest, enabledIds } = options && typeof options === "object" ? options : {};
   const enabled = new Set(Array.isArray(enabledIds) ? enabledIds : []);
-  return [
+  return dedupeCapabilities([
     ...normalizeSkillCapabilities(skillState, enabled),
     ...normalizeToolCapabilities(manifest, enabled),
     ...normalizeBusinessCapabilities(manifest, enabled),
-  ].sort(compareCapabilities);
+  ]);
 }
 
-export function filterCapabilities(items, { query = "", kind = "all", source = "all" } = {}) {
+export function filterCapabilities(items, options = {}) {
+  const { query = "", kind = "all", source = "all" } = options && typeof options === "object" ? options : {};
   const needle = clean(query).toLocaleLowerCase("zh-CN");
-  return (Array.isArray(items) ? items : []).filter((item) =>
+  return (Array.isArray(items) ? items : []).filter((item) => item && typeof item === "object" &&
     (kind === "all" || item.kind === kind) &&
     (source === "all" || item.source === source) &&
     (!needle || [item.name, item.description, item.source, item.kind]
@@ -103,7 +121,7 @@ export function filterCapabilities(items, { query = "", kind = "all", source = "
 }
 
 export function summarizeCapabilities(items) {
-  const capabilities = Array.isArray(items) ? items : [];
+  const capabilities = (Array.isArray(items) ? items : []).filter((item) => item && typeof item === "object");
   return {
     total: capabilities.length,
     enabled: capabilities.filter((item) => item.enabled).length,

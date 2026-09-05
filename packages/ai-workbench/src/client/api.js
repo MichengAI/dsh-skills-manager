@@ -93,6 +93,11 @@ export const workbenchApi = {
   bootstrap: (mode) => request(`/bootstrap?mode=${encodeURIComponent(assertMode(mode))}`),
   startSession: (input) => request("/sessions", { method: "POST", body: JSON.stringify(input) }),
   listModels: () => request("/models"),
+  capabilityPreferences: () => request("/capability-preferences"),
+  saveCapabilityPreferences: (enabledIds) => request("/capability-preferences", {
+    method: "PUT",
+    body: JSON.stringify({ enabledIds }),
+  }),
   saveDraft: (mode, draft) => request(`/drafts/${assertMode(mode)}`, { method: "PUT", body: JSON.stringify(draft) }),
   saveSettings: (settings) => request("/settings", { method: "PUT", body: JSON.stringify(settings) }),
 };

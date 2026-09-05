@@ -1,6 +1,7 @@
 import { probeChatContracts, probeHostContracts } from "./shared/compatibility.js";
 import { ensureChatPreset } from "./host/chat-preset.js";
 import { createDiagnostics } from "./host/diagnostics.js";
+import { createCapabilityService } from "./host/capability-service.js";
 import { API_PREFIX, routeRequest, sendJson } from "./host/http.js";
 import { createModeService } from "./host/mode-service.js";
 import { createRepository, openWorkbenchUnit } from "./host/repository.js";
@@ -31,6 +32,7 @@ async function apply(ctx) {
     throw error;
   }
   const modeService = createModeService({ repository, sessionQuery: ctx.sessionQuery });
+  const capabilityService = createCapabilityService({ repository });
   const sessionGateway = hostProbe.ok
     ? createSessionGateway({
       apiProxy: ctx.apiProxy,
@@ -48,6 +50,7 @@ async function apply(ctx) {
         diagnostics,
         features: { chat: chatFeature },
         modeService,
+        capabilityService,
         repository,
         sessionQuery: ctx.sessionQuery,
         apiProxy: ctx.apiProxy,

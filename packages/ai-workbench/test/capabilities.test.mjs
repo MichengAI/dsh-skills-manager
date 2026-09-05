@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { normalizeCapabilities, filterCapabilities, summarizeCapabilities } from "../lib/shared/capabilities.js";
+import { capabilityManifest, validateCapabilityManifest } from "../lib/shared/capability-manifest.js";
 
 const MODEL_KEYS = ["id", "name", "description", "kind", "source", "available", "enabled", "details"];
 
@@ -114,9 +115,27 @@ test("summary counts enabled, disabled, and unavailable independently", () => {
   });
 });
 
+test("normalization helpers tolerate null options and malformed list entries", () => {
+  assert.deepEqual(normalizeCapabilities(null), []);
+  assert.deepEqual(filterCapabilities([null, { id: "tool:web", name: "联网搜索", description: "网页", kind: "tool", source: "DSH" }], null).map((item) => item.id), ["tool:web"]);
+  assert.deepEqual(summarizeCapabilities([null, { enabled: true, available: true }]), {
+    total: 1,
+    enabled: 1,
+    disabled: 0,
+    unavailable: 0,
+  });
+});
+
+test("production capability manifest is versioned and runtime-validated", () => {
+  assert.equal(capabilityManifest.version, 1);
+  assert.doesNotThrow(() => validateCapabilityManifest(capabilityManifest));
+  assert.throws(() => validateCapabilityManifest({ ...capabilityManifest, version: 2 }), /unsupported capability manifest version/);
+});
+
 test("capability manifest contains only the declared DSH tools and no business systems", async () => {
   const manifest = JSON.parse(await readFile(new URL("../assets/capabilities.json", import.meta.url), "utf8"));
   assert.deepEqual(manifest, {
+    version: 1,
     tools: [
       { id: "web", name: "联网搜索", description: "搜索公开网页信息", source: "DSH", available: true },
       { id: "local-files", name: "工作区文件", description: "读取和编辑已授权工作区内的文件", source: "DSH", available: true },
