@@ -74,7 +74,9 @@ test("root-invoked build uses crash-recoverable transactional publish without to
     const workbenchFiles = await snapshotTree(workbenchLib);
     assert.deepEqual(workbenchFiles.map(([path]) => path).sort(), [
       "client.js",
+      "client/api.js",
       "client/root.js",
+      "client/store.js",
       "client/styles.js",
       "host/diagnostics.js",
       "host/http.js",
