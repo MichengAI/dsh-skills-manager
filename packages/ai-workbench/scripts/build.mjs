@@ -9,6 +9,8 @@ const sourceRoot = join(packageRoot, "src");
 const libDirectory = join(packageRoot, "lib");
 const buildLockDirectory = join(packageRoot, ".lib-build.lock");
 const buildLockOwner = join(buildLockDirectory, "owner.json");
+const buildLockOwnerTemp = join(buildLockDirectory, "owner.json.tmp");
+const buildLockInitializationGraceMs = 30_000;
 const stagingPrefix = ".lib-staging-";
 const backupPrefix = ".lib-backup-";
 
@@ -30,38 +32,69 @@ async function acquireBuildLock() {
   };
 
   for (;;) {
-    let createdLockDirectory = false;
     try {
       await mkdir(buildLockDirectory);
-      createdLockDirectory = true;
-      await writeFile(buildLockOwner, JSON.stringify(owner), "utf8");
-      return async () => {
-        try {
-          const currentOwner = JSON.parse(await readFile(buildLockOwner, "utf8"));
-          if (currentOwner?.token === owner.token) {
-            await rm(buildLockDirectory, { recursive: true, force: true });
-          }
-        } catch (error) {
-          if (error.code !== "ENOENT") throw error;
-        }
-      };
     } catch (error) {
-      if (createdLockDirectory) {
-        await rm(buildLockDirectory, { recursive: true, force: true }).catch(() => {});
-      }
       if (error.code !== "EEXIST") throw error;
 
       let currentOwner;
+      let ownerReadError;
       try {
         currentOwner = JSON.parse(await readFile(buildLockOwner, "utf8"));
       } catch (readError) {
-        throw new Error("[dsh-ai-workbench] build lock exists but owner metadata is unreadable", { cause: readError });
+        if (readError.code === "ENOENT") {
+          currentOwner = null;
+        } else {
+          ownerReadError = readError;
+        }
       }
+
       if (isProcessAlive(currentOwner?.pid)) {
         throw new Error(`[dsh-ai-workbench] build lock is held by process ${currentOwner.pid}`);
       }
-      await rm(buildLockDirectory, { recursive: true, force: true });
+
+      if (currentOwner && Number.isInteger(currentOwner.pid)) {
+        await rm(buildLockDirectory, { recursive: true, force: true });
+        continue;
+      }
+
+      let lockAgeMs;
+      try {
+        lockAgeMs = Date.now() - (await stat(buildLockDirectory)).mtimeMs;
+      } catch (statError) {
+        if (statError.code === "ENOENT") continue;
+        throw statError;
+      }
+      if (lockAgeMs >= buildLockInitializationGraceMs) {
+        await rm(buildLockDirectory, { recursive: true, force: true });
+        continue;
+      }
+      if (ownerReadError) {
+        throw new Error("[dsh-ai-workbench] build lock owner metadata is unreadable while the lock is recent", {
+          cause: ownerReadError,
+        });
+      }
+      throw new Error("[dsh-ai-workbench] build lock is initializing; owner metadata is not yet available");
     }
+
+    try {
+      await writeFile(buildLockOwnerTemp, JSON.stringify(owner), { encoding: "utf8", flag: "wx" });
+      await rename(buildLockOwnerTemp, buildLockOwner);
+    } catch (error) {
+      await rm(buildLockDirectory, { recursive: true, force: true }).catch(() => {});
+      throw error;
+    }
+
+    return async () => {
+      try {
+        const currentOwner = JSON.parse(await readFile(buildLockOwner, "utf8"));
+        if (currentOwner?.token === owner.token) {
+          await rm(buildLockDirectory, { recursive: true, force: true });
+        }
+      } catch (error) {
+        if (error.code !== "ENOENT") throw error;
+      }
+    };
   }
 }
 
@@ -150,6 +183,9 @@ async function findJavaScriptFiles(directory) {
 }
 
 async function publish(stagingRoot, stagingLib) {
+  // Node 20 has no portable directory-exchange primitive here. This is a
+  // transactional, crash-recoverable publish: rename the old lib to a backup,
+  // install the staged lib, roll back on failure, and recover backups on startup.
   const backupDirectory = join(packageRoot, `.lib-backup-${basename(stagingRoot)}`);
   let previousLibMoved = false;
   let newLibPublished = false;

@@ -108,6 +108,37 @@ test("a stale build lock directory is reclaimed before building", async () => {
   }
 });
 
+test("a recent lock without owner metadata is treated as an active initialization", async () => {
+  const fixtureRoot = await createBuildFixture();
+  try {
+    await mkdir(join(fixtureRoot, ".lib-build.lock"));
+
+    const build = runBuild(fixtureRoot);
+    assert.notEqual(build.status, 0, `${build.stdout}\n${build.stderr}`);
+    assert.match(`${build.stdout}\n${build.stderr}`, /build lock is initializing/i);
+    await assert.rejects(stat(join(fixtureRoot, ".lib-build.lock/owner.json")), { code: "ENOENT" });
+  } finally {
+    await rm(fixtureRoot, { recursive: true, force: true });
+  }
+});
+
+test("an old lock without owner metadata is reclaimed by lock age", async () => {
+  const fixtureRoot = await createBuildFixture();
+  try {
+    const lockDirectory = join(fixtureRoot, ".lib-build.lock");
+    await mkdir(lockDirectory);
+    const old = new Date("2020-01-01T00:00:00Z");
+    await utimes(lockDirectory, old, old);
+
+    const build = runBuild(fixtureRoot);
+    assert.equal(build.status, 0, `${build.stdout}\n${build.stderr}`);
+    await assertFilesExist(fixtureRoot, ["lib/index.js"]);
+    await assert.rejects(stat(lockDirectory), { code: "ENOENT" });
+  } finally {
+    await rm(fixtureRoot, { recursive: true, force: true });
+  }
+});
+
 test("startup recovers orphaned publish artifacts before a failed build", async () => {
   const fixtureRoot = await createBuildFixture();
   try {

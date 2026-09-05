@@ -42,6 +42,19 @@ async function snapshotTree(directory) {
   return entries;
 }
 
+async function createBuildFixture() {
+  const fixtureRoot = await mkdtemp(join(packageRoot, ".generated-output-test-"));
+  try {
+    await cp(join(packageRoot, "src"), join(fixtureRoot, "src"), { recursive: true });
+    await mkdir(join(fixtureRoot, "scripts"), { recursive: true });
+    await cp(buildScript, join(fixtureRoot, "scripts/build.mjs"));
+    return fixtureRoot;
+  } catch (error) {
+    await rm(fixtureRoot, { recursive: true, force: true });
+    throw error;
+  }
+}
+
 function runBuild(fixtureRoot, env = {}) {
   return spawnSync(process.execPath, [join(fixtureRoot, "scripts/build.mjs")], {
     cwd: repositoryRoot,
@@ -50,13 +63,9 @@ function runBuild(fixtureRoot, env = {}) {
   });
 }
 
-test("root-invoked build publishes atomically without touching root lib", async () => {
-  const fixtureRoot = await mkdtemp(join(packageRoot, ".generated-output-test-"));
+test("root-invoked build uses crash-recoverable transactional publish without touching root lib", async () => {
+  const fixtureRoot = await createBuildFixture();
   try {
-    await cp(join(packageRoot, "src"), join(fixtureRoot, "src"), { recursive: true });
-    await mkdir(join(fixtureRoot, "scripts"), { recursive: true });
-    await cp(buildScript, join(fixtureRoot, "scripts/build.mjs"));
-
     const rootLibBefore = await snapshotTree(rootLib);
     const build = runBuild(fixtureRoot);
     assert.equal(build.status, 0, `${build.stdout}\n${build.stderr}`);
