@@ -11,7 +11,7 @@
     "./client": "./lib/client.js",
     "./package.json": "./package.json"
   },
-  "files": ["lib", "assets", "presets", "cordis.patch.yml", "README.md"],
+  "files": ["lib", "assets", "presets", "scripts", "docs", "cordis.patch.yml", "README.md"],
   "dsh": {
     "bundle": { "patch": "./cordis.patch.yml" },
     "client": {
@@ -27,7 +27,9 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "prepack": "npm run build",
-    "test": "npm run build && node --test test/*.test.mjs",
+    "test:unit": "npm run build && node --test --test-concurrency=1 test/*.test.mjs",
+    "test": "npm run test:unit",
+    "smoke:profile": "node scripts/profile-smoke.mjs",
     "pack:check": "npm pack --dry-run --json",
     "verify": "npm test && npm run pack:check"
   },

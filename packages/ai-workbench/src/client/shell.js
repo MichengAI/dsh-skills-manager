@@ -1,6 +1,7 @@
 import { createWorkHome } from "./work-home.js";
 import { createChatHome } from "./chat-home.js";
 import { createCapabilityLibrary } from "./capability-library.js";
+import { createAutomationList } from "./automation-list.js";
 
 export const ORB_SOURCE = "/assets/ai-orb.png";
 
@@ -13,6 +14,7 @@ export function createWorkbenchShell(React, options = {}) {
   const WorkHome = createWorkHome(React, options);
   const ChatHome = createChatHome(React, options);
   const CapabilityLibrary = createCapabilityLibrary(React, options);
+  const AutomationList = createAutomationList(React, options);
 
   function Home({ mode, draft }) {
     const title = mode === "work" ? "从一个任务开始" : "从一个问题开始";
@@ -47,7 +49,7 @@ export function createWorkbenchShell(React, options = {}) {
     if (state.route.name === "conversation") return renderSlot("conversation", {});
     if (currentSessionId) return renderSlot("conversation", {});
     if (state.route.name === "capabilities") return h(CapabilityLibrary, { workbench });
-    if (state.route.name === "automations") return h(Placeholder, { title: "自动化任务", copy: "让重复工作自动运行，稍后回来查看成果。" });
+    if (state.route.name === "automations") return h(AutomationList, { workbench });
     if (state.mode === "work") return h(WorkHome, { state, dispatch: workbench?.dispatch, workbench });
     return h(ChatHome, { state, dispatch: workbench?.dispatch, workbench });
   };

@@ -25,7 +25,7 @@ test("workbench publishes independent host and client entries", async () => {
   assert.equal(pkg.exports["./client"], "./lib/client.js");
   assert.equal(pkg.exports["./package.json"], "./package.json");
   assert.equal(pkg.scripts.prepack, "npm run build");
-  assert.deepEqual(pkg.files, ["lib", "assets", "presets", "cordis.patch.yml", "README.md"]);
+  assert.deepEqual(pkg.files, ["lib", "assets", "presets", "scripts", "docs", "cordis.patch.yml", "README.md"]);
   assert.equal(pkg.dsh.bundle.patch, "./cordis.patch.yml");
   assert.deepEqual(pkg.dsh.client.inject, [
     "@deepseek-ai/dsh-client-runtime",
