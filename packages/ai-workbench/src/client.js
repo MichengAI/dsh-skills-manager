@@ -1,11 +1,10 @@
 import { probeClientContracts } from "./shared/compatibility.js";
 import CHAT_HOME_CONFIG from "../assets/chat-home.json" with { type: "json" };
 import { workbenchApi } from "./client/api.js";
-import { createRootComponent, createRootRegistration } from "./client/root.js";
 import { createDraftSaveScheduler, initialState, reduceWorkbench } from "./client/store.js";
-import { SIDEBAR_CHILDREN, createSidebar } from "./client/sidebar.js";
 import { createSpeechInput } from "./client/speech-input.js";
-import { automationCss, automationEnhancementCss, foundationCss, installStyles } from "./client/styles.js";
+import { automationCss, automationEnhancementCss, foundationCss, installStyles, overlayCss } from "./client/styles.js";
+import { createWorkbenchOverlay } from "./client/workbench-overlay.js";
 
 window.__ModuleLoader__.load({
   id: "@michengai/dsh-ai-workbench",
@@ -14,14 +13,18 @@ window.__ModuleLoader__.load({
     const runtime = require("@deepseek-ai/dsh-client-runtime/client");
     const WorkbenchContext = typeof React.createContext === "function" ? React.createContext(null) : { Provider: ({ children }) => children };
     const name = "ai-workbench-client";
-    const inject = ["slots", "layout", "sessions"];
+    const inject = ["slots", "sessions"];
 
-    function WorkbenchProvider({ ctx, children }) {
-      const [state, dispatch] = React.useReducer(reduceWorkbench, undefined, initialState);
+    function WorkbenchProvider({ ctx, children, onConversation }) {
+      const [state, reduce] = React.useReducer(reduceWorkbench, undefined, initialState);
       const [settings, setSettings] = React.useState(null);
       const draftScheduler = React.useRef(null);
       const observedDrafts = React.useRef(state.drafts);
       const speech = React.useRef(null);
+      const dispatch = (action) => {
+        reduce(action);
+        if (action?.type === "navigate" && action.route?.name === "conversation") onConversation?.();
+      };
 
       if (!speech.current) speech.current = ctx.speech || ctx.voice || createSpeechInput(window);
 
@@ -80,16 +83,18 @@ window.__ModuleLoader__.load({
         console.error("[dsh-ai-workbench] client compatibility failed", JSON.stringify(probe.failures));
         return undefined;
       }
-      ctx.effect(() => installStyles(`${foundationCss}${automationCss}${automationEnhancementCss}`));
-      const registration = createRootRegistration(ctx, runtime.defineStore);
-      const Sidebar = createSidebar(React);
-      ctx.effect(() => {
-        // The official Sidebar already declares these child slots. Reuse that
-        // declaration while shadowing only the Sidebar renderer itself.
-        const disposeSidebar = ctx.slots.register({ name: "sidebar", priority: 1, children: SIDEBAR_CHILDREN }, Sidebar);
-        const disposeRoot = ctx.slots.register(registration, createRootComponent(React, { context: WorkbenchContext, chatConfig: CHAT_HOME_CONFIG, provider: (props) => h(WorkbenchProvider, { ctx, ...props }) }));
-        return () => { disposeRoot?.(); disposeSidebar?.(); };
+      ctx.effect(() => installStyles(`${foundationCss}${automationCss}${automationEnhancementCss}${overlayCss}`));
+      const Overlay = createWorkbenchOverlay(React, {
+        context: WorkbenchContext,
+        chatConfig: CHAT_HOME_CONFIG,
+        provider: (props) => h(WorkbenchProvider, { ctx, ...props }),
       });
+      ctx.slots.inject("shell.overlay", () => ctx.slots.register({
+        name: "shell.overlay",
+        id: "dsh-ai-workbench",
+        order: 100,
+        label: "正方 AI 工作台",
+      }, Overlay));
       return undefined;
     }
     return { apply, inject, name };

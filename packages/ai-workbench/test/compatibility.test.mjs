@@ -3,26 +3,28 @@ import assert from "node:assert/strict";
 import { probeChatContracts, probeClientContracts, probeHostContracts } from "../lib/shared/compatibility.js";
 import { apply as applyPlugin } from "../lib/index.js";
 
-test("client probe accepts the required DSH slot and layout faces", () => {
+const CLIENT_FAILURES = ["slot:shell.overlay", "slots:register", "slots:inject", "sessions:open"];
+
+test("client probe accepts the additive overlay and session-opening faces", () => {
   const result = probeClientContracts({
     slots: {
-      spec: (name) => ({ root: {}, sidebar: {}, conversation: {}, details: {}, "shell.overlay": {} })[name],
+      spec: (name) => ({ "shell.overlay": {} })[name],
       register() {},
+      inject() {},
     },
-    layout: { toggleSidebar() {}, openDetails() {}, closeDetails() {}, attachPanels() {} },
-    sessions: { open() {}, binding() {}, subscribe() {} },
+    sessions: { open() {} },
   });
   assert.deepEqual(result, { ok: true, failures: [] });
 });
 
-test("client probe accepts the current session list subscription face", () => {
+test("client probe accepts an injected overlay registration face", () => {
   const result = probeClientContracts({
     slots: {
       spec: () => ({}),
       register() {},
+      inject() {},
     },
-    layout: { toggleSidebar() {}, openDetails() {}, closeDetails() {}, attachPanels() {} },
-    sessions: { open() {}, binding() {}, list: { subscribe() {} } },
+    sessions: { open() {} },
   });
   assert.deepEqual(result, { ok: true, failures: [] });
 });
@@ -30,29 +32,15 @@ test("client probe accepts the current session list subscription face", () => {
 test("client probe reports missing contracts without throwing", () => {
   const result = probeClientContracts({ slots: { spec: () => undefined } });
   assert.equal(result.ok, false);
-  assert.ok(result.failures.includes("slot:conversation"));
-  assert.ok(result.failures.includes("layout:attachPanels"));
+  assert.ok(result.failures.includes("slot:shell.overlay"));
+  assert.ok(result.failures.includes("slots:inject"));
 });
 
 test("client probe fails closed when the context is missing", () => {
   const result = probeClientContracts(null);
   assert.deepEqual(result, {
     ok: false,
-    failures: [
-      "slot:root",
-      "slot:sidebar",
-      "slot:conversation",
-      "slot:details",
-      "slot:shell.overlay",
-      "slots:register",
-      "layout:toggleSidebar",
-      "layout:openDetails",
-      "layout:closeDetails",
-      "layout:attachPanels",
-      "sessions:open",
-      "sessions:binding",
-      "sessions:subscribe",
-    ],
+    failures: CLIENT_FAILURES,
   });
 });
 
@@ -66,42 +54,14 @@ test("client probe fails closed when a slot spec throws", () => {
   });
   assert.deepEqual(result, {
     ok: false,
-    failures: [
-      "slot:root",
-      "slot:sidebar",
-      "slot:conversation",
-      "slot:details",
-      "slot:shell.overlay",
-      "slots:register",
-      "layout:toggleSidebar",
-      "layout:openDetails",
-      "layout:closeDetails",
-      "layout:attachPanels",
-      "sessions:open",
-      "sessions:binding",
-      "sessions:subscribe",
-    ],
+    failures: CLIENT_FAILURES,
   });
 });
 
 test("client probe fails closed for an undefined context", () => {
   assert.deepEqual(probeClientContracts(undefined), {
     ok: false,
-    failures: [
-      "slot:root",
-      "slot:sidebar",
-      "slot:conversation",
-      "slot:details",
-      "slot:shell.overlay",
-      "slots:register",
-      "layout:toggleSidebar",
-      "layout:openDetails",
-      "layout:closeDetails",
-      "layout:attachPanels",
-      "sessions:open",
-      "sessions:binding",
-      "sessions:subscribe",
-    ],
+    failures: CLIENT_FAILURES,
   });
 });
 
@@ -118,21 +78,7 @@ test("client probe fails closed when context and nested service reads throw", ()
     },
   })), {
     ok: false,
-    failures: [
-      "slot:root",
-      "slot:sidebar",
-      "slot:conversation",
-      "slot:details",
-      "slot:shell.overlay",
-      "slots:register",
-      "layout:toggleSidebar",
-      "layout:openDetails",
-      "layout:closeDetails",
-      "layout:attachPanels",
-      "sessions:open",
-      "sessions:binding",
-      "sessions:subscribe",
-    ],
+    failures: CLIENT_FAILURES,
   });
 
   const result = probeClientContracts({
@@ -149,21 +95,7 @@ test("client probe fails closed when context and nested service reads throw", ()
   });
   assert.deepEqual(result, {
     ok: false,
-    failures: [
-      "slot:root",
-      "slot:sidebar",
-      "slot:conversation",
-      "slot:details",
-      "slot:shell.overlay",
-      "slots:register",
-      "layout:toggleSidebar",
-      "layout:openDetails",
-      "layout:closeDetails",
-      "layout:attachPanels",
-      "sessions:open",
-      "sessions:binding",
-      "sessions:subscribe",
-    ],
+    failures: CLIENT_FAILURES,
   });
 });
 

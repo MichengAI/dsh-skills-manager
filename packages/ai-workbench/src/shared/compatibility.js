@@ -62,7 +62,7 @@ export function probeClientContracts(ctx) {
   const failures = [];
   const slots = readProperty(source, "slots");
   const spec = getFunction(slots, "spec");
-  for (const slot of ["root", "sidebar", "conversation", "details", "shell.overlay"]) {
+  for (const slot of ["shell.overlay"]) {
     if (spec == null) {
       failures.push(`slot:${slot}`);
       continue;
@@ -74,17 +74,9 @@ export function probeClientContracts(ctx) {
     }
   }
   if (getFunction(slots, "register") == null) failures.push("slots:register");
-  const layout = readProperty(source, "layout");
-  for (const method of ["toggleSidebar", "openDetails", "closeDetails", "attachPanels"]) {
-    if (getFunction(layout, method) == null) failures.push(`layout:${method}`);
-  }
+  if (getFunction(slots, "inject") == null) failures.push("slots:inject");
   const sessions = readProperty(source, "sessions");
-  for (const method of ["open", "binding"]) {
-    if (getFunction(sessions, method) == null) failures.push(`sessions:${method}`);
-  }
-  if (getFunction(sessions, "subscribe") == null && getFunction(readProperty(sessions, "list"), "subscribe") == null) {
-    failures.push("sessions:subscribe");
-  }
+  if (getFunction(sessions, "open") == null) failures.push("sessions:open");
   return { ok: failures.length === 0, failures };
 }
 

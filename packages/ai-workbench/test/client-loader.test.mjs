@@ -16,11 +16,12 @@ async function loadDefinition() {
   return definition;
 }
 
-test("loader factory uses the browser runtime client entry and registers Root", async () => {
+test("loader factory preserves host-owned seats and contributes only an additive overlay", async () => {
   const definition = await loadDefinition();
   const required = [];
   const effects = [];
   const registrations = [];
+  const injections = [];
   let runtime;
 
   const bundle = definition.factory((id) => {
@@ -42,6 +43,10 @@ test("loader factory uses the browser runtime client entry and registers Root", 
       register(...args) {
         registrations.push(args);
       },
+      inject(name, callback) {
+        injections.push(name);
+        return callback();
+      },
     },
     layout: {
       toggleSidebar() {},
@@ -56,22 +61,13 @@ test("loader factory uses the browser runtime client entry and registers Root", 
   };
 
   assert.doesNotThrow(() => bundle.apply(ctx));
-  assert.equal(effects.length, 2);
-  assert.doesNotThrow(() => effects[1]());
-  assert.equal(registrations.length, 2);
-  assert.deepEqual(registrations.map(([registration]) => registration.name), ["sidebar", "root"]);
+  assert.equal(effects.length, 1);
+  assert.deepEqual(injections, ["shell.overlay"]);
+  assert.equal(registrations.length, 1);
+  assert.deepEqual(registrations.map(([registration]) => registration.name), ["shell.overlay"]);
   assert.equal(typeof registrations[0][1], "function");
-  assert.equal(typeof registrations[1][1], "function");
-  assert.deepEqual(registrations[0][0].children, {
-    "sidebar.settings": { kind: "single", scope: "root" },
-    "sidebar.footer.action": { kind: "list", scope: "root" },
-  });
-  assert.deepEqual(registrations[1][0].children, {
-    sidebar: { kind: "single", scope: "root" },
-    conversation: { kind: "single", scope: "session-maybe" },
-    details: { kind: "single", scope: "session" },
-    "shell.overlay": { kind: "list", scope: "root" },
-  });
+  assert.equal(registrations[0][0].id, "dsh-ai-workbench");
+  assert.equal("children" in registrations[0][0], false);
 });
 
 test("workbench frame establishes the containing block for its overlay", () => {
