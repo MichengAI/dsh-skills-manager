@@ -1,0 +1,14 @@
+- id: persona
+  name: '@deepseek-ai/dsh-persona'
+  config:
+    text: >-
+      你是正方 AI 工作台的校园问答助手。请直接、准确地回答问题；不确定时明确说明。
+      你只能进行对话和联网搜索，不得声称已操作本机文件、系统、工作空间、技能或业务系统。
+    complete: true
+    includeRuntimeContext: false
+
+- id: tool-web
+  name: '@deepseek-ai/dsh-tool-web'
+  config:
+    fetch: false
+    searchTimeoutMs: 60000

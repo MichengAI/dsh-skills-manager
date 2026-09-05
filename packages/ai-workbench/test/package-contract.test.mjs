@@ -35,6 +35,8 @@ test("workbench publishes independent host and client entries", async () => {
   ]);
   assert.equal(pkg.dsh.client.platform, "web");
   assert.equal(pkg.peerDependencies["@deepseek-ai/cordis"], ">=4.0.1 <5.0.0");
+  assert.equal(pkg.peerDependencies["@deepseek-ai/dsh-agent-presets"], "0.1.2-rc.1");
+  assert.equal(pkg.peerDependencies["@deepseek-ai/dsh-permission-presets"], "0.1.2-rc.1");
   for (const name of dshPeerNames) {
     assert.equal(pkg.peerDependencies[name], "0.1.1-rc.2");
   }

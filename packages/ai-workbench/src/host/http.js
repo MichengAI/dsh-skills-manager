@@ -99,6 +99,10 @@ function typedError(message, statusCode, code) {
   return Object.assign(new Error(message), { statusCode, code, public: true });
 }
 
+function chatUnavailable() {
+  return typedError("Chat preset is unavailable", 503, "chat-preset-unavailable");
+}
+
 function contentType(headers) {
   return String(headers?.["content-type"] || "").split(";", 1)[0].trim().toLowerCase();
 }
@@ -159,6 +163,21 @@ function resultFromError(error) {
 
 function success(data) {
   return { statusCode: 200, body: { ok: true, data } };
+}
+
+async function handleSession(req, services) {
+  if (req.headers?.["x-dsh-workbench-action"] !== "1") {
+    throw typedError("action header required", 403, "action-required");
+  }
+  if (contentType(req.headers) !== "application/json") {
+    throw typedError("content-type must be application/json", 415, "content-type-required");
+  }
+  const body = await readJsonBody(req);
+  const chatAvailable = services?.features?.chat?.available === true || services?.chatAvailable === true;
+  if (body?.mode === "chat" && !chatAvailable) throw chatUnavailable();
+  if (typeof services?.sessionGateway?.start !== "function") return internalError();
+  const data = await services.sessionGateway.start(body);
+  return { statusCode: 201, body: { ok: true, data } };
 }
 
 function modeServiceFor(services) {
@@ -256,6 +275,9 @@ export async function routeRequest(req, services) {
       return success(await Reflect.apply(diagnostics, services, []));
     }
     if (method === "GET" && path === `${API_PREFIX}/bootstrap`) return await handleBootstrap(parsed, services);
+    if (method === "POST" && path === `${API_PREFIX}/sessions`) {
+      return await handleSession(req, services);
+    }
     if (
       method === "PUT"
       && (

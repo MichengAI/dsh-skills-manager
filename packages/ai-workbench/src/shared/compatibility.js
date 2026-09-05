@@ -37,6 +37,18 @@ function probeHostMethod(owner, key) {
   return isSafeHostMethod(method);
 }
 
+export function probeChatContracts(ctx) {
+  const source = ctx ?? {};
+  const failures = [];
+  const agentPresets = readProperty(source, "agentPresets");
+  for (const method of ["list", "read", "copy", "resolve", "remove"]) {
+    if (!probeHostMethod(agentPresets, method)) failures.push(`agentPresets:${method}`);
+  }
+  const permissionPresets = readProperty(source, "permissionPresets");
+  if (!probeHostMethod(permissionPresets, "set")) failures.push("permissionPresets:set");
+  return { ok: failures.length === 0, failures };
+}
+
 export function probeClientContracts(ctx) {
   const source = ctx ?? {};
   const failures = [];
