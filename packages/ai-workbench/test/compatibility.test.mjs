@@ -353,21 +353,29 @@ test("host probe rejects bound host methods without invoking them", () => {
   assert.equal(businessActions, 0);
 });
 
-test("plugin registration does not invoke host business methods", () => {
+test("plugin registration does not invoke host business methods", async () => {
   let businessActions = 0;
   const hostMethod = () => {
     businessActions += 1;
   };
   let registrations = 0;
+  let registeredOptions;
+  const unit = {
+    async loadAll() { return { tables: {}, global: null }; },
+    async putRecord() {},
+    async deleteRecord() {},
+    async close() {},
+  };
 
-  const result = applyPlugin({
+  const disposer = await applyPlugin({
     apiProxy: { sessions: { create: hostMethod, prompt: hostMethod } },
     sessionQuery: { listSessions: hostMethod },
-    storage: { backend: { get: hostMethod } },
+    storage: { backend: { get: () => ({ kv: { open: () => unit } }) } },
     setTimeout: hostMethod,
     webServer: {
       register(options) {
         registrations += 1;
+        registeredOptions = options;
         return options;
       },
     },
@@ -375,5 +383,7 @@ test("plugin registration does not invoke host business methods", () => {
 
   assert.equal(registrations, 1);
   assert.equal(businessActions, 0);
-  assert.equal(typeof result.handler, "function");
+  assert.equal(typeof registeredOptions.handler, "function");
+  assert.equal(typeof disposer, "function");
+  await disposer();
 });

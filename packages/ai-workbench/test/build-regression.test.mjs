@@ -78,6 +78,7 @@ test("root-invoked build uses crash-recoverable transactional publish without to
       "client/styles.js",
       "host/diagnostics.js",
       "host/http.js",
+      "host/repository.js",
       "index.js",
       "shared/compatibility.js",
     ]);
