@@ -1,14 +1,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readdir, readFile, stat } from "node:fs/promises";
+import { cp, mkdtemp, mkdir, readdir, readFile, rm, stat } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { join, relative } from "node:path";
 
 const packageRoot = fileURLToPath(new URL("../", import.meta.url));
 const repositoryRoot = fileURLToPath(new URL("../../../", import.meta.url));
-const workbenchLib = join(packageRoot, "lib");
 const rootLib = join(repositoryRoot, "lib");
+const buildScript = join(packageRoot, "scripts/build.mjs");
 
 async function snapshotTree(directory) {
   const entries = [];
@@ -42,8 +42,8 @@ async function snapshotTree(directory) {
   return entries;
 }
 
-function runBuild(env = {}) {
-  return spawnSync(process.execPath, ["packages/ai-workbench/scripts/build.mjs"], {
+function runBuild(fixtureRoot, env = {}) {
+  return spawnSync(process.execPath, [join(fixtureRoot, "scripts/build.mjs")], {
     cwd: repositoryRoot,
     encoding: "utf8",
     env: { ...process.env, ...env },
@@ -51,24 +51,34 @@ function runBuild(env = {}) {
 }
 
 test("root-invoked build publishes atomically without touching root lib", async () => {
-  const rootLibBefore = await snapshotTree(rootLib);
-  const build = runBuild();
-  assert.equal(build.status, 0, `${build.stdout}\n${build.stderr}`);
+  const fixtureRoot = await mkdtemp(join(packageRoot, ".generated-output-test-"));
+  try {
+    await cp(join(packageRoot, "src"), join(fixtureRoot, "src"), { recursive: true });
+    await mkdir(join(fixtureRoot, "scripts"), { recursive: true });
+    await cp(buildScript, join(fixtureRoot, "scripts/build.mjs"));
 
-  const workbenchFiles = await snapshotTree(workbenchLib);
-  assert.deepEqual(workbenchFiles.map(([path]) => path).sort(), [
-    "client.js",
-    "client/root.js",
-    "client/styles.js",
-    "host/diagnostics.js",
-    "host/http.js",
-    "index.js",
-    "shared/compatibility.js",
-  ]);
-  assert.deepEqual(await snapshotTree(rootLib), rootLibBefore);
+    const rootLibBefore = await snapshotTree(rootLib);
+    const build = runBuild(fixtureRoot);
+    assert.equal(build.status, 0, `${build.stdout}\n${build.stderr}`);
 
-  const publishedBeforeFailure = workbenchFiles;
-  const failedBuild = runBuild({ DSH_AI_WORKBENCH_TEST_FAIL_BEFORE_PUBLISH: "1" });
-  assert.notEqual(failedBuild.status, 0, `${failedBuild.stdout}\n${failedBuild.stderr}`);
-  assert.deepEqual(await snapshotTree(workbenchLib), publishedBeforeFailure);
+    const workbenchLib = join(fixtureRoot, "lib");
+    const workbenchFiles = await snapshotTree(workbenchLib);
+    assert.deepEqual(workbenchFiles.map(([path]) => path).sort(), [
+      "client.js",
+      "client/root.js",
+      "client/styles.js",
+      "host/diagnostics.js",
+      "host/http.js",
+      "index.js",
+      "shared/compatibility.js",
+    ]);
+    assert.deepEqual(await snapshotTree(rootLib), rootLibBefore);
+
+    const publishedBeforeFailure = workbenchFiles;
+    const failedBuild = runBuild(fixtureRoot, { DSH_AI_WORKBENCH_TEST_FAIL_BEFORE_PUBLISH: "1" });
+    assert.notEqual(failedBuild.status, 0, `${failedBuild.stdout}\n${failedBuild.stderr}`);
+    assert.deepEqual(await snapshotTree(workbenchLib), publishedBeforeFailure);
+  } finally {
+    await rm(fixtureRoot, { recursive: true, force: true });
+  }
 });

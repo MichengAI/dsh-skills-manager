@@ -4,4 +4,8 @@ docs/
 *.tgz
 .DS_Store
 packages/ai-workbench/lib/
+packages/ai-workbench/.lib-staging-*/
+packages/ai-workbench/.lib-backup-*/
+packages/ai-workbench/.generated-output-test-*/
+packages/ai-workbench/.lib-build.lock/
 .superpowers/
