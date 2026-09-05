@@ -6,7 +6,7 @@ window.__ModuleLoader__.load({
   id: "@michengai/dsh-ai-workbench",
   factory: (require) => {
     const React = require("react");
-    const runtime = require("@deepseek-ai/dsh-client-runtime");
+    const runtime = require("@deepseek-ai/dsh-client-runtime/client");
     const name = "ai-workbench-client";
     const inject = ["slots", "layout", "sessions"];
     function apply(ctx) {
