@@ -58,6 +58,8 @@ test("root-invoked build publishes atomically without touching root lib", async 
   const workbenchFiles = await snapshotTree(workbenchLib);
   assert.deepEqual(workbenchFiles.map(([path]) => path).sort(), [
     "client.js",
+    "client/root.js",
+    "client/styles.js",
     "host/diagnostics.js",
     "host/http.js",
     "index.js",

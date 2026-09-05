@@ -49,8 +49,20 @@ try {
   await build({
     entryPoints: [join(packageRoot, "src/client.js")],
     outfile: join(stagingLib, "client.js"),
-    bundle: false,
+    bundle: true,
     format: "iife",
+    platform: "browser",
+    target: "es2022",
+  });
+  await build({
+    entryPoints: [
+      join(packageRoot, "src/client/root.js"),
+      join(packageRoot, "src/client/styles.js"),
+    ],
+    outdir: join(stagingLib, "client"),
+    outbase: join(packageRoot, "src/client"),
+    bundle: false,
+    format: "esm",
     platform: "browser",
     target: "es2022",
   });
