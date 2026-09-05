@@ -19,6 +19,10 @@ const requiredOutputs = [
   "lib/host/http.js",
   "lib/host/capability-service.js",
   "lib/host/automation-service.js",
+  "lib/host/automation-runner.js",
+  "lib/host/notification-service.js",
+  "lib/host/notifications.js",
+  "lib/host/scheduler.js",
   "lib/client/root.js",
   "lib/client/styles.js",
 ];

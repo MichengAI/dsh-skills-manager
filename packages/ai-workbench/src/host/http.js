@@ -244,14 +244,45 @@ async function handleAutomations(req, parsed, services) {
 
   if (req.headers?.["x-dsh-workbench-action"] !== "1") throw typedError("action header required", 403, "action-required");
   if (contentType(req.headers) !== "application/json") throw typedError("content-type must be application/json", 415, "content-type-required");
-  if (req.method === "POST" && parts.length === 0) return { statusCode: 201, body: { ok: true, data: await service.create(await readJsonBody(req)) } };
-  if (req.method === "PUT" && parts.length === 1) return success(await service.update(parts[0], await readJsonBody(req)));
-  if (req.method === "DELETE" && parts.length === 1) return success(await service.remove(parts[0]));
+  if (req.method === "POST" && parts.length === 0) {
+    const result = await service.create(await readJsonBody(req));
+    await services.scheduler?.changed?.();
+    return { statusCode: 201, body: { ok: true, data: result } };
+  }
+  if (req.method === "PUT" && parts.length === 1) {
+    const result = await service.update(parts[0], await readJsonBody(req));
+    await services.scheduler?.changed?.();
+    return success(result);
+  }
+  if (req.method === "DELETE" && parts.length === 1) {
+    const result = await service.remove(parts[0]);
+    await services.scheduler?.changed?.();
+    return success(result);
+  }
   if (req.method === "POST" && parts.length === 2 && parts[1] === "enabled") {
     const body = await readJsonBody(req);
-    return success(await service.setEnabled(parts[0], body?.enabled === true));
+    const result = await service.setEnabled(parts[0], body?.enabled === true);
+    await services.scheduler?.changed?.();
+    return success(result);
   }
   return { statusCode: 404, body: { ok: false, code: "not-found", error: "not found" } };
+}
+
+async function handleNotifications(req, services) {
+  const service = services?.notificationService;
+  if (!service) return internalError();
+  const prefix = `${API_PREFIX}/notifications`;
+  const path = new URL(req.url, "http://localhost").pathname.replace(/\/+$/, "");
+  if (req.method === "GET" && path === prefix) return success(await service.list());
+  if (req.method === "POST" && path.startsWith(`${prefix}/`) && path.endsWith("/read")) {
+    if (req.headers?.["x-dsh-workbench-action"] !== "1") throw typedError("action header required", 403, "action-required");
+    if (contentType(req.headers) !== "application/json") throw typedError("content-type must be application/json", 415, "content-type-required");
+    const id = decodeURIComponent(path.slice(prefix.length + 1, -"/read".length));
+    if (!id || id.includes("/")) return { statusCode: 404, body: { ok: false, code: "not-found", error: "not found" } };
+    const result = await service.markRead(id);
+    return result ? success(result) : { statusCode: 404, body: { ok: false, code: "notification-not-found", error: "notification not found" } };
+  }
+  return null;
 }
 
 function modeServiceFor(services) {
@@ -356,6 +387,10 @@ export async function routeRequest(req, services) {
     if (method === "GET" && path === `${API_PREFIX}/bootstrap`) return await handleBootstrap(parsed, services);
     if (method === "GET" && path === `${API_PREFIX}/models`) return await handleModels(services);
     if (method === "GET" && path === `${API_PREFIX}/capability-preferences`) return await handleCapabilityPreferences(services);
+    if (path === `${API_PREFIX}/notifications` || path.startsWith(`${API_PREFIX}/notifications/`)) {
+      const result = await handleNotifications(req, services);
+      if (result) return result;
+    }
     if (path === `${API_PREFIX}/automations` || path.startsWith(`${API_PREFIX}/automations/`)) {
       const result = await handleAutomations(req, parsed, services);
       if (result) return result;

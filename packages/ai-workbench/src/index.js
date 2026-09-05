@@ -1,8 +1,13 @@
+import { spawn } from "node:child_process";
 import { probeChatContracts, probeHostContracts } from "./shared/compatibility.js";
 import { ensureChatPreset } from "./host/chat-preset.js";
 import { createDiagnostics } from "./host/diagnostics.js";
 import { createCapabilityService } from "./host/capability-service.js";
 import { createAutomationService } from "./host/automation-service.js";
+import { createAutomationRunner } from "./host/automation-runner.js";
+import { createNotifier } from "./host/notifications.js";
+import { createNotificationService } from "./host/notification-service.js";
+import { createScheduler } from "./host/scheduler.js";
 import { API_PREFIX, routeRequest, sendJson } from "./host/http.js";
 import { createModeService } from "./host/mode-service.js";
 import { createRepository, openWorkbenchUnit } from "./host/repository.js";
@@ -43,6 +48,12 @@ async function apply(ctx) {
       sessions: ctx.sessions,
     })
     : null;
+  const notificationService = createNotificationService({ repository, notifier: createNotifier({ spawn }) });
+  const automationRunner = createAutomationRunner({ service: automationService, gateway: sessionGateway, notifications: notificationService });
+  const scheduler = createScheduler({ automationService, execute: automationRunner.execute });
+  const onSessionEvent = typeof ctx.on === "function"
+    ? ctx.on("session/event", (session, event) => automationRunner.handleEvent(session, event), { global: true })
+    : null;
   let unregister;
   try {
     unregister = ctx.webServer.register({
@@ -54,13 +65,17 @@ async function apply(ctx) {
         modeService,
         capabilityService,
         automationService,
+        notificationService,
+        scheduler,
         repository,
         sessionQuery: ctx.sessionQuery,
         apiProxy: ctx.apiProxy,
         sessionGateway,
       })),
     });
+    await scheduler.start();
   } catch (error) {
+    scheduler.dispose();
     await repository.close();
     throw error;
   }
@@ -70,6 +85,8 @@ async function apply(ctx) {
     if (disposed) return;
     disposed = true;
     try {
+      scheduler.dispose();
+      if (typeof onSessionEvent === "function") await onSessionEvent();
       if (typeof unregister === "function") await unregister();
     } finally {
       await repository.close();

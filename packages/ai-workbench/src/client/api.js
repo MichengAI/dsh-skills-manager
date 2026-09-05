@@ -105,6 +105,8 @@ export const workbenchApi = {
   deleteAutomation: (id) => request(`/automations/${encodeURIComponent(id)}`, { method: "DELETE" }),
   setAutomationEnabled: (id, enabled) => request(`/automations/${encodeURIComponent(id)}/enabled`, { method: "POST", body: JSON.stringify({ enabled }) }),
   listAutomationRuns: (id) => request(`/automations/${encodeURIComponent(id)}/runs`),
+  listNotifications: () => request("/notifications"),
+  markNotificationRead: (id) => request(`/notifications/${encodeURIComponent(id)}/read`, { method: "POST" }),
   saveDraft: (mode, draft) => request(`/drafts/${assertMode(mode)}`, { method: "PUT", body: JSON.stringify(draft) }),
   saveSettings: (settings) => request("/settings", { method: "PUT", body: JSON.stringify(settings) }),
 };

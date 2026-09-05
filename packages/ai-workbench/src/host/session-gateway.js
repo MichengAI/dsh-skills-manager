@@ -84,8 +84,7 @@ export function createSessionGateway(dependencies) {
     return unwrap(await sessions.selectModel({ rpcId: makeRpcId(), payload }), 409);
   }
 
-  return {
-    async start(raw) {
+  const start = async (raw) => {
       const input = parseSessionStart(raw);
       if (!input.text.trim()) throw gatewayError("prompt is empty", "empty-prompt", 400);
 
@@ -185,6 +184,33 @@ export function createSessionGateway(dependencies) {
         if (published) original.sessionId = publishedSessionId;
         throw original;
       }
+    };
+
+  return {
+    start,
+    async startAutomation(automation, run) {
+      const workspaceRef = typeof automation?.workspaceRef === "string" ? automation.workspaceRef : null;
+      const workspaceId = workspaceRef?.startsWith("workspace:") ? workspaceRef.slice("workspace:".length) : workspaceRef;
+      const result = await start({
+        mode: "work",
+        text: automation?.prompt || "",
+        workspaceId,
+        attachments: [],
+        capabilityIds: Array.isArray(automation?.capabilitySelection) ? automation.capabilitySelection : [],
+        execution: { modelPolicy: "auto", provider: null, model: null, intensity: "standard" },
+        deepThinking: false,
+        webSearch: false,
+        clientTimeZone: automation?.timezone || null,
+      });
+      const meta = await dependencies.repository.getSessionMeta(result.sessionId);
+      await dependencies.repository.putSessionMeta(result.sessionId, {
+        ...(meta || {}),
+        mode: "work",
+        origin: "automation",
+        automationId: automation?.id || null,
+        runId: run?.id || null,
+      });
+      return result;
     },
   };
 }
