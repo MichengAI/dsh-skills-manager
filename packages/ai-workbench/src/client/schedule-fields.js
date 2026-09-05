@@ -15,12 +15,42 @@ export const SCHEDULE_LABELS = {
   interval: "按间隔",
 };
 
+const WEEKDAY_LABELS = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
+
+function hasTime(value) {
+  return /^([01]\d|2[0-3]):[0-5]\d$/.test(value || "");
+}
+
+function validDate(value) {
+  return Number.isFinite(Date.parse(value || ""));
+}
+
+export function localDateTimeInput(value) {
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return "";
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 16);
+}
+
+export function isoFromLocalDateTime(value) {
+  const timestamp = Date.parse(value || "");
+  return Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : "";
+}
+
 export function scheduleCopy(schedule = {}) {
   const label = SCHEDULE_LABELS[schedule.kind] || "自定义计划";
   if (schedule.kind === "once") return `${label} · ${schedule.at ? new Date(schedule.at).toLocaleString("zh-CN") : "待设置"}`;
-  if (schedule.kind === "weekly") return `${label} ${schedule.weekdays?.join("、") || ""} · ${schedule.time || ""}`;
+  if (schedule.kind === "weekly") {
+    const weekdays = Array.isArray(schedule.weekdays)
+      ? schedule.weekdays.map((day) => WEEKDAY_LABELS[day]).filter(Boolean).join("、")
+      : "";
+    return `${label} ${weekdays} · ${schedule.time || ""}`;
+  }
   if (schedule.kind === "monthly") return `${label} ${schedule.day || ""} 日 · ${schedule.time || ""}`;
-  if (schedule.kind === "interval") return `每 ${schedule.every || ""} ${schedule.unit || ""}`;
+  if (schedule.kind === "interval") {
+    const units = { minute: "分钟", hour: "小时", day: "天" };
+    return `每 ${schedule.every || ""} ${units[schedule.unit] || schedule.unit || ""}`;
+  }
   return `${label} · ${schedule.time || ""}`;
 }
 
@@ -33,7 +63,15 @@ export function validateAutomationDraft(value = {}) {
   if (!String(value.name || "").trim()) errors.name = "请输入任务名称";
   if (!String(value.prompt || "").trim()) errors.prompt = "请输入任务内容";
   if (value.type === "work" && !String(value.workspaceRef || "").trim()) errors.workspaceRef = "Work 任务需要选择工作空间";
-  if (!value.schedule?.kind) errors.schedule = "请选择执行频率";
-  if (["daily", "weekly", "monthly", "workdays"].includes(value.schedule?.kind) && !/^([01]\d|2[0-3]):[0-5]\d$/.test(value.schedule?.time || "")) errors.time = "请输入有效时间";
+  const schedule = value.schedule || {};
+  if (!schedule.kind) errors.schedule = "请选择执行频率";
+  if (["daily", "weekly", "monthly", "workdays"].includes(schedule.kind) && !hasTime(schedule.time)) errors.time = "请输入有效时间";
+  if (schedule.kind === "once" && !validDate(schedule.at)) errors.at = "请选择执行时间";
+  if (schedule.kind === "weekly" && (!Array.isArray(schedule.weekdays) || schedule.weekdays.length === 0 || schedule.weekdays.some((day) => !Number.isInteger(day) || day < 0 || day > 6))) errors.weekdays = "请至少选择一天";
+  if (schedule.kind === "monthly" && (!Number.isInteger(schedule.day) || schedule.day < 1 || schedule.day > 31)) errors.day = "请选择每月执行日期";
+  if (schedule.kind === "interval") {
+    if (!Number.isInteger(schedule.every) || schedule.every < 1 || schedule.every > 999 || !["minute", "hour", "day"].includes(schedule.unit)) errors.interval = "请输入 1 到 999 的间隔值";
+    if (!validDate(schedule.anchorAt)) errors.anchorAt = "请选择开始时间";
+  }
   return errors;
 }

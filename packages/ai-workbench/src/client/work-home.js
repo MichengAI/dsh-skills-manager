@@ -71,7 +71,7 @@ export function workspaceItemsFromFeed(feed) {
   });
 }
 
-function workspaceFeedFrom(workbench) {
+export function workspaceFeedFromWorkbench(workbench) {
   const direct = workbench?.workspaceFeed;
   if (direct !== undefined) return direct;
   const candidates = [
@@ -90,7 +90,7 @@ function workspaceFeedFrom(workbench) {
   }
 }
 
-function capabilitiesFrom(workbench) {
+export function capabilityItemsFromWorkbench(workbench) {
   const source = workbench?.capabilities || workbench?.ctx?.capabilities || workbench?.ctx?.skills;
   if (!Array.isArray(source)) return [];
   return source.flatMap((item) => {
@@ -124,11 +124,11 @@ export function createWorkHome(React, options = {}) {
 
   return function WorkHome({ state, dispatch, workbench }) {
     const draft = normalizeWorkDraft(state?.drafts?.work);
-    const capabilityOptions = capabilitiesFrom(workbench);
+    const capabilityOptions = capabilityItemsFromWorkbench(workbench);
     const enabledIds = capabilityOptions.map((item) => item.id);
     const recommendation = recommendExecution(draft.text, enabledIds);
     const execution = executionFor(draft, recommendation);
-    const workspaceFeed = workspaceFeedFrom(workbench);
+    const workspaceFeed = workspaceFeedFromWorkbench(workbench);
     const workspaceItems = workspaceItemsFromFeed(workspaceFeed);
     const imageLimits = workbench?.imageLimits || workbench?.ctx?.imageLimits || {};
     const normalizedImageLimits = normalizeImageLimits(imageLimits);

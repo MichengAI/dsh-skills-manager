@@ -15,7 +15,7 @@ function getFunction(value, key) {
   return typeof property === "function" ? property : null;
 }
 
-function isSafeHostMethod(value) {
+function isSafeHostMethod(value, { allowCordisBound = false } = {}) {
   if (typeof value !== "function") return false;
 
   let source;
@@ -25,27 +25,35 @@ function isSafeHostMethod(value) {
     return false;
   }
 
-  // Function#toString reports bound functions and callable Proxies as
-  // native-looking. They cannot be validated without invoking their apply
-  // behavior, so reject them instead of executing a host method at startup.
-  if (/\[native code\]/.test(source) || /^\s*class\b/.test(source)) return false;
+  // Cordis exposes injected methods as bound wrappers. Function#toString
+  // renders those wrappers as native-looking, even though the host service is
+  // available. Only a trusted Cordis context may opt into that form; generic
+  // callable Proxies remain rejected without executing their apply trap.
+  if (/\[native code\]/.test(source)) return allowCordisBound;
+  if (/^\s*class\b/.test(source)) return false;
   return true;
 }
 
-function probeHostMethod(owner, key) {
+function isCordisContext(value) {
+  return typeof getFunction(value, "get") === "function"
+    && readProperty(value, "reflect") !== missing;
+}
+
+function probeHostMethod(owner, key, options) {
   const method = getFunction(owner, key);
-  return isSafeHostMethod(method);
+  return isSafeHostMethod(method, options);
 }
 
 export function probeChatContracts(ctx) {
   const source = ctx ?? {};
+  const options = { allowCordisBound: isCordisContext(source) };
   const failures = [];
   const agentPresets = readProperty(source, "agentPresets");
   for (const method of ["list", "read", "copy", "resolve", "remove"]) {
-    if (!probeHostMethod(agentPresets, method)) failures.push(`agentPresets:${method}`);
+    if (!probeHostMethod(agentPresets, method, options)) failures.push(`agentPresets:${method}`);
   }
   const permissionPresets = readProperty(source, "permissionPresets");
-  if (!probeHostMethod(permissionPresets, "set")) failures.push("permissionPresets:set");
+  if (!probeHostMethod(permissionPresets, "set", options)) failures.push("permissionPresets:set");
   return { ok: failures.length === 0, failures };
 }
 
@@ -82,24 +90,24 @@ export function probeClientContracts(ctx) {
 
 export function probeHostContracts(ctx) {
   const source = ctx ?? {};
+  const options = { allowCordisBound: isCordisContext(source) };
   const failures = [];
   const apiProxy = readProperty(source, "apiProxy");
   const apiSessions = readProperty(apiProxy, "sessions");
   for (const method of ["create", "prompt", "models", "selectModel"]) {
-    if (!probeHostMethod(apiSessions, method)) failures.push(`apiProxy.sessions:${method}`);
+    if (!probeHostMethod(apiSessions, method, options)) failures.push(`apiProxy.sessions:${method}`);
   }
   const apiLlm = readProperty(apiProxy, "llm");
-  if (!probeHostMethod(apiLlm, "models")) failures.push("apiProxy.llm:models");
+  if (!probeHostMethod(apiLlm, "models", options)) failures.push("apiProxy.llm:models");
   const sessions = readProperty(source, "sessions");
-  if (!probeHostMethod(sessions, "get")) failures.push("sessions:get");
+  if (!probeHostMethod(sessions, "get", options)) failures.push("sessions:get");
   const permissionPresets = readProperty(source, "permissionPresets");
-  if (!probeHostMethod(permissionPresets, "set")) failures.push("permissionPresets:set");
+  if (!probeHostMethod(permissionPresets, "set", options)) failures.push("permissionPresets:set");
   const sessionQuery = readProperty(source, "sessionQuery");
-  if (!probeHostMethod(sessionQuery, "listSessions")) failures.push("sessionQuery:listSessions");
-  if (!probeHostMethod(sessionQuery, "readTitleSnapshots")) failures.push("sessionQuery:readTitleSnapshots");
+  if (!probeHostMethod(sessionQuery, "listSessions", options)) failures.push("sessionQuery:listSessions");
+  if (!probeHostMethod(sessionQuery, "readTitleSnapshots", options)) failures.push("sessionQuery:readTitleSnapshots");
   const storage = readProperty(source, "storage");
   const backend = readProperty(storage, "backend");
-  if (!probeHostMethod(backend, "get")) failures.push("storage.backend:get");
-  if (!probeHostMethod(source, "setTimeout")) failures.push("timer:setTimeout");
+  if (!probeHostMethod(backend, "get", options)) failures.push("storage.backend:get");
   return { ok: failures.length === 0, failures };
 }

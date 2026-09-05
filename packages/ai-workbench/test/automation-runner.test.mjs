@@ -2,13 +2,16 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createAutomationRunner } from "../lib/host/automation-runner.js";
 
-function setup() {
-  const runs = new Map([["r1", { id: "r1", automationId: "a1", status: "scheduled" }]]);
+function setup({ initialRuns = [["r1", { id: "r1", automationId: "a1", status: "scheduled" }]], automations = [["a1", { id: "a1", name: "任务", type: "work", prompt: "执行", notificationPolicy: {} }]] } = {}) {
+  const runs = new Map(initialRuns);
+  const automationMap = new Map(automations);
   const updates = [];
   return {
     updates,
     service: {
       updateRun: async (id, patch) => { const next = { ...runs.get(id), ...patch }; runs.set(id, next); updates.push(next); return next; },
+      listRuns: async () => [...runs.values()],
+      get: async (id) => automationMap.get(id) || null,
     },
     gateway: { startAutomation: async () => ({ sessionId: "s1" }) },
     notifications: { create: async (input) => updates.push({ notification: input }) },
@@ -38,4 +41,16 @@ test("approval and terminal events update state without answering approvals", as
   assert.equal(setupValue.updates.at(-1).status, "rejected");
   await runner.handleEvent({ id: "s1" }, { type: "turn/end", data: { reason: { kind: "completed" } } });
   assert.equal(setupValue.updates.at(-1).status, "rejected");
+});
+
+test("a fresh runner restores an active Work run when DSH emits a later session event", async () => {
+  const setupValue = setup({
+    initialRuns: [["r1", { id: "r1", automationId: "a1", status: "running", sessionId: "s-restored" }]],
+  });
+  const runner = createAutomationRunner(setupValue);
+
+  await runner.handleEvent({ id: "s-restored" }, { type: "approval/asked", data: { approvalId: "p1", toolName: "write", reason: "需要写入" } });
+
+  assert.equal(setupValue.updates.at(-1).status, "waiting_approval");
+  assert.equal(runner.runForSession("s-restored"), "r1");
 });

@@ -167,7 +167,7 @@ test("client probe fails closed when context and nested service reads throw", ()
   });
 });
 
-test("host probe requires the gateway, query, title query, storage, and timer faces", () => {
+test("host probe requires the gateway, query, title query, and storage faces", () => {
   const result = probeHostContracts({
     apiProxy: { sessions: { create() {}, prompt() {}, models() {}, selectModel() {} }, llm: { models() {} } },
     sessions: { get() {} },
@@ -177,6 +177,44 @@ test("host probe requires the gateway, query, title query, storage, and timer fa
     setTimeout() {},
   });
   assert.equal(result.ok, true);
+});
+
+test("host probe accepts Cordis-bound methods from the trusted host context", () => {
+  const bound = (method) => method.bind({});
+  const result = probeHostContracts({
+    get() {},
+    reflect: { get() {} },
+    apiProxy: {
+      sessions: {
+        create: bound(function create() {}),
+        prompt: bound(function prompt() {}),
+        models: bound(function models() {}),
+        selectModel: bound(function selectModel() {}),
+      },
+      llm: { models: bound(function models() {}) },
+    },
+    sessions: { get: bound(function get() {}) },
+    permissionPresets: { set: bound(function set() {}) },
+    sessionQuery: {
+      listSessions: bound(function listSessions() {}),
+      readTitleSnapshots: bound(function readTitleSnapshots() {}),
+    },
+    storage: { backend: { get: bound(function get() {}) } },
+  });
+
+  assert.deepEqual(result, { ok: true, failures: [] });
+});
+
+test("host probe does not require the optional Cordis timer service", () => {
+  const result = probeHostContracts({
+    apiProxy: { sessions: { create() {}, prompt() {}, models() {}, selectModel() {} }, llm: { models() {} } },
+    sessions: { get() {} },
+    permissionPresets: { set() {} },
+    sessionQuery: { listSessions() {}, readTitleSnapshots() {} },
+    storage: { backend: { get() {} } },
+  });
+
+  assert.deepEqual(result, { ok: true, failures: [] });
 });
 
 test("host probe reports a missing permission preset face explicitly", () => {
@@ -226,7 +264,6 @@ test("host probe fails closed when the context is missing", () => {
       "sessionQuery:listSessions",
       "sessionQuery:readTitleSnapshots",
       "storage.backend:get",
-      "timer:setTimeout",
     ],
   });
 });
@@ -245,7 +282,6 @@ test("host probe fails closed for an undefined context", () => {
       "sessionQuery:listSessions",
       "sessionQuery:readTitleSnapshots",
       "storage.backend:get",
-      "timer:setTimeout",
     ],
   });
 });
@@ -274,7 +310,6 @@ test("host probe fails closed when context and nested service reads throw", () =
       "sessionQuery:listSessions",
       "sessionQuery:readTitleSnapshots",
       "storage.backend:get",
-      "timer:setTimeout",
     ],
   });
 
@@ -308,7 +343,6 @@ test("host probe fails closed when context and nested service reads throw", () =
       "sessionQuery:listSessions",
       "sessionQuery:readTitleSnapshots",
       "storage.backend:get",
-      "timer:setTimeout",
     ],
   });
 });
@@ -355,7 +389,6 @@ test("host probe rejects callable proxies whose apply trap throws", () => {
       "sessionQuery:listSessions",
       "sessionQuery:readTitleSnapshots",
       "storage.backend:get",
-      "timer:setTimeout",
     ],
   });
   assert.equal(applyCalls, 0);
@@ -404,7 +437,6 @@ test("host probe rejects callable proxies without invoking a successful apply tr
       "sessionQuery:listSessions",
       "sessionQuery:readTitleSnapshots",
       "storage.backend:get",
-      "timer:setTimeout",
     ],
   });
   assert.deepEqual(calls, []);
@@ -457,7 +489,6 @@ test("host probe rejects bound host methods without invoking them", () => {
     "sessionQuery:listSessions",
     "sessionQuery:readTitleSnapshots",
     "storage.backend:get",
-    "timer:setTimeout",
   ]);
   assert.equal(businessActions, 0);
 });

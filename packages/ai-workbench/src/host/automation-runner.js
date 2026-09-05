@@ -12,6 +12,22 @@ export function createAutomationRunner({ service, gateway, notifications, now = 
   const sessions = new Map();
   const terminal = new Set();
 
+  async function contextForSession(sessionId) {
+    if (typeof sessionId !== "string" || !sessionId) return null;
+    const inMemory = sessions.get(sessionId);
+    if (inMemory) return inMemory;
+    const runs = await service.listRuns?.();
+    const run = Array.isArray(runs)
+      ? runs.find((item) => item?.sessionId === sessionId && ["running", "waiting_approval"].includes(item.status))
+      : null;
+    if (!run) return null;
+    const automation = await service.get?.(run.automationId);
+    if (!automation) return null;
+    const restored = { runId: run.id, automation };
+    sessions.set(sessionId, restored);
+    return restored;
+  }
+
   async function notify(automation, run, kind, summary) {
     if (!policyAllows(automation, kind)) return;
     await notifications?.create?.({
@@ -43,7 +59,7 @@ export function createAutomationRunner({ service, gateway, notifications, now = 
   }
 
   async function handleEvent(session, event) {
-    const context = sessions.get(session?.id);
+    const context = await contextForSession(session?.id);
     if (!context) return null;
     const { runId, automation } = context;
     if (terminal.has(runId)) return null;

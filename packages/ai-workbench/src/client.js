@@ -5,7 +5,7 @@ import { createRootComponent, createRootRegistration } from "./client/root.js";
 import { createDraftSaveScheduler, initialState, reduceWorkbench } from "./client/store.js";
 import { SIDEBAR_CHILDREN, createSidebar } from "./client/sidebar.js";
 import { createSpeechInput } from "./client/speech-input.js";
-import { automationCss, foundationCss, installStyles } from "./client/styles.js";
+import { automationCss, automationEnhancementCss, foundationCss, installStyles } from "./client/styles.js";
 
 window.__ModuleLoader__.load({
   id: "@michengai/dsh-ai-workbench",
@@ -80,7 +80,7 @@ window.__ModuleLoader__.load({
         console.error("[dsh-ai-workbench] client compatibility failed", JSON.stringify(probe.failures));
         return undefined;
       }
-      ctx.effect(() => installStyles(`${foundationCss}${automationCss}`));
+      ctx.effect(() => installStyles(`${foundationCss}${automationCss}${automationEnhancementCss}`));
       const registration = createRootRegistration(ctx, runtime.defineStore);
       const Sidebar = createSidebar(React);
       ctx.effect(() => {
