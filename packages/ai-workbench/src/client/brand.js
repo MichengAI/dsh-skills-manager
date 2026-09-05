@@ -1,5 +1,6 @@
+import { BRAND_LOGO_SOURCE } from "./assets.js";
+
 export const BRAND_NAME = "正方 AI 工作台";
-export const BRAND_LOGO_SOURCE = "/assets/logo-source.png";
 
 export function createBrand(React) {
   const h = React.createElement;

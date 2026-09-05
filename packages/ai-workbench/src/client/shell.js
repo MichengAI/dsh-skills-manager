@@ -2,8 +2,9 @@ import { createWorkHome } from "./work-home.js";
 import { createChatHome } from "./chat-home.js";
 import { createCapabilityLibrary } from "./capability-library.js";
 import { createAutomationList } from "./automation-list.js";
+import { AI_ORB_SOURCE } from "./assets.js";
 
-export const ORB_SOURCE = "/assets/ai-orb.png";
+export const ORB_SOURCE = AI_ORB_SOURCE;
 
 function clearSession(sessions) {
   if (typeof sessions?.clear === "function") sessions.clear();

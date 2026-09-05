@@ -26,7 +26,7 @@ window.__ModuleLoader__.load({
         if (action?.type === "navigate" && action.route?.name === "conversation") onConversation?.();
       };
 
-      if (!speech.current) speech.current = ctx.speech || ctx.voice || createSpeechInput(window);
+      if (!speech.current) speech.current = createSpeechInput(window);
 
       if (!draftScheduler.current) {
         draftScheduler.current = createDraftSaveScheduler(workbenchApi.saveDraft, {
@@ -66,12 +66,6 @@ window.__ModuleLoader__.load({
           settings,
           sessions: ctx.sessions,
           speech: speech.current,
-          ctx,
-          imageLimits: ctx.imageLimits,
-          capabilities: ctx.capabilities,
-          useWorkspaces: ctx.useWorkspaces,
-          workspaces: ctx.workspaces,
-          workspaceFeed: ctx.workspaceFeed,
         },
       }, children);
     }

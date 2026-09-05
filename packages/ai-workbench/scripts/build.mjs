@@ -182,6 +182,11 @@ async function findJavaScriptFiles(directory) {
   return files;
 }
 
+async function pngDataUrl(path) {
+  const png = await readFile(path);
+  return `data:image/png;base64,${png.toString("base64")}`;
+}
+
 async function publish(stagingRoot, stagingLib) {
   // Node 20 has no portable directory-exchange primitive here. This is a
   // transactional, crash-recoverable publish: rename the old lib to a backup,
@@ -220,6 +225,10 @@ try {
   const hostEntries = await findJavaScriptFiles(join(sourceRoot, "host"));
   const sharedEntries = await findJavaScriptFiles(join(sourceRoot, "shared"));
   const clientEntries = await findJavaScriptFiles(join(sourceRoot, "client"));
+  const clientAssetDefines = {
+    __DSH_WORKBENCH_AI_ORB_SOURCE__: JSON.stringify(await pngDataUrl(join(packageRoot, "assets/ai-orb.png"))),
+    __DSH_WORKBENCH_BRAND_LOGO_SOURCE__: JSON.stringify(await pngDataUrl(join(packageRoot, "assets/logo-source.png"))),
+  };
 
   await build({
     entryPoints: [join(sourceRoot, "index.js"), ...hostEntries, ...sharedEntries],
@@ -234,6 +243,7 @@ try {
     entryPoints: [join(packageRoot, "src/client.js")],
     outfile: join(stagingLib, "client.js"),
     bundle: true,
+    define: clientAssetDefines,
     format: "iife",
     platform: "browser",
     target: "es2022",

@@ -2,6 +2,7 @@ import { recommendExecution } from "../shared/auto-select.js";
 import { findWorkTemplate, WORK_TEMPLATES } from "../shared/work-templates.js";
 import { workbenchApi } from "./api.js";
 import { normalizeImageLimits, readImageAttachment } from "./image-input.js";
+import { AI_ORB_SOURCE } from "./assets.js";
 
 export const EMPTY_WORK_DRAFT = {
   text: "",
@@ -290,7 +291,7 @@ export function createWorkHome(React, options = {}) {
 
     return h("section", { className: "daw-work-home", "aria-labelledby": "daw-work-home-title" },
       h("div", { className: "daw-work-hero" },
-        h("img", { className: "daw-ai-orb", src: "/assets/ai-orb.png", alt: "", width: 104, height: 104 }),
+        h("img", { className: "daw-ai-orb", src: AI_ORB_SOURCE, alt: "", width: 104, height: 104 }),
         h("p", { className: "daw-eyebrow" }, "WORK MODE"),
         h("h1", { id: "daw-work-home-title" }, "今天，想完成什么工作？"),
         h("p", { className: "daw-work-copy" }, "描述目标，选择工作空间与能力，AI 会按需完成并交付结果。")),

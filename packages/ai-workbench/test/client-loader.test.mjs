@@ -74,8 +74,72 @@ test("workbench frame establishes the containing block for its overlay", () => {
   assert.match(foundationCss, /\.daw-frame\{[^}]*position:relative/);
 });
 
-test("provider forwards runtime workspace hook and workspaces context to client UI", async () => {
+test("provider only reads explicitly injected session services from the host", async () => {
   const source = await readFile(new URL("../lib/client.js", import.meta.url), "utf8");
-  assert.match(source, /useWorkspaces:\s*ctx\.useWorkspaces/);
-  assert.match(source, /workspaces:\s*ctx\.workspaces/);
+  assert.match(source, /sessions:\s*ctx\.sessions/);
+  assert.match(source, /speech:\s*speech\.current/);
+  assert.doesNotMatch(source, /ctx\.(speech|voice|imageLimits|capabilities|useWorkspaces|workspaces|workspaceFeed)/);
+});
+
+test("client bundles its brand images instead of relying on host-global asset paths", async () => {
+  const source = await readFile(new URL("../lib/client.js", import.meta.url), "utf8");
+
+  assert.doesNotMatch(source, /[\"']\/assets\/(?:ai-orb|logo-source)\.png[\"']/);
+  assert.match(source, /data:image\/png;base64,/);
+});
+
+test("overlay provider does not probe optional un-injected host services", async () => {
+  let useStateCalls = 0;
+  const React = {
+    createElement(type, props, ...children) {
+      return {
+        type,
+        props: { ...props, children: children.length === 1 ? children[0] : children },
+      };
+    },
+    createContext() {
+      return { Provider: () => null };
+    },
+    useEffect() {},
+    useReducer(reducer, argument, initializer) {
+      return [initializer(argument), () => {}];
+    },
+    useRef(value) {
+      return { current: value };
+    },
+    useState(value) {
+      const next = useStateCalls === 0 ? true : value;
+      useStateCalls += 1;
+      return [next, () => {}];
+    },
+  };
+  const definition = await loadDefinition();
+  const registrations = [];
+  const allowed = {
+    effect() {},
+    sessions: { open() {} },
+    slots: {
+      spec: () => ({}),
+      inject(_name, callback) { return callback(); },
+      register(...args) { registrations.push(args); },
+    },
+  };
+  const ctx = new Proxy(allowed, {
+    get(target, property, receiver) {
+      if (Reflect.has(target, property)) return Reflect.get(target, property, receiver);
+      throw new Error(`cannot get property ${String(property)} without inject`);
+    },
+  });
+  const bundle = definition.factory((id) => {
+    if (id === "react") return React;
+    if (id === "@deepseek-ai/dsh-client-runtime/client") return { defineStore() {} };
+    throw new Error(`unexpected require: ${id}`);
+  });
+
+  bundle.apply(ctx);
+  const Overlay = registrations[0][1];
+  const provider = Overlay();
+  const workbenchProvider = provider.type(provider.props);
+
+  assert.doesNotThrow(() => workbenchProvider.type(workbenchProvider.props));
 });
