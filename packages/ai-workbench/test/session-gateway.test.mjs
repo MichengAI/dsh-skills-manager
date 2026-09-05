@@ -111,6 +111,44 @@ test("Work uses standard, workspace-write, and records selected capabilities", a
   assert.match(calls.find(([kind]) => kind === "prompt")[1].content[0].text, /skill:docs/);
 });
 
+test("published sessions use the actual created id as the canonical metadata and response id", async () => {
+  const { calls, meta, deps } = createDeps();
+  deps.apiProxy.sessions.create = async (request) => {
+    calls.push(["create", request.payload]);
+    return ok({ sessionId: "published-session" });
+  };
+  const gateway = createSessionGateway(deps);
+
+  const result = await gateway.start({ mode: "work", text: "x", attachments: [] });
+
+  assert.equal(result.sessionId, "published-session");
+  assert.equal(meta.has("session-1"), false);
+  assert.deepEqual(meta.get("published-session").mode, "work");
+  assert.equal(calls.find(([kind]) => kind === "permission")[1].id, "published-session");
+  assert.equal(calls.find(([kind]) => kind === "prompt")[1].sessionId, "published-session");
+  assert.deepEqual(calls.filter(([kind]) => kind === "delete-meta").map(([, id]) => id), ["session-1"]);
+});
+
+test("a missing or invalid created session id is a structured unpublished failure", async () => {
+  for (const created of [{}, { sessionId: "" }, { sessionId: 42 }]) {
+    const { calls, meta, deps } = createDeps();
+    deps.apiProxy.sessions.create = async (request) => {
+      calls.push(["create", request.payload]);
+      return ok(created);
+    };
+    const gateway = createSessionGateway(deps);
+
+    await assert.rejects(
+      gateway.start({ mode: "work", text: "x", attachments: [] }),
+      (error) => error.code === "invalid-created-session-id"
+        && error.statusCode === 502
+        && error.public === true,
+    );
+    assert.equal(meta.has("session-1"), false);
+    assert.deepEqual(calls.filter(([kind]) => kind === "delete-meta").map(([, id]) => id), ["session-1"]);
+  }
+});
+
 test("manual Work model is checked against the catalog before publishing", async () => {
   const { calls, meta, deps } = createDeps({
     apiProxy: {
@@ -144,6 +182,27 @@ test("deep reasoning applies only an effort available to the live session model"
   });
 });
 
+test("deep reasoning does not fall back to the standard effort", async () => {
+  const { calls, deps } = createDeps();
+  deps.apiProxy.sessions.models = async (request) => {
+    calls.push(["session-models", request.payload]);
+    return ok({
+      current: { provider: "openai", model: "gpt-5" },
+      groups: [{ id: "openai", models: [{ id: "gpt-5", reasoning: { efforts: ["standard"] } }] }],
+    });
+  };
+  const gateway = createSessionGateway(deps);
+
+  const result = await gateway.start({ mode: "work", text: "x", attachments: [], deepThinking: true });
+
+  assert.deepEqual(result.reasoning, { requested: true, applied: false, reason: "unsupported" });
+  assert.deepEqual(calls.find(([kind]) => kind === "select-model")[1], {
+    sessionId: "session-1",
+    provider: "openai",
+    model: "gpt-5",
+  });
+});
+
 test("published setup failures retain failed metadata and session id", async () => {
   const { calls, meta, deps } = createDeps({
     apiProxy: {
@@ -163,6 +222,51 @@ test("published setup failures retain failed metadata and session id", async () 
   assert.equal(meta.get("session-1").setupStatus, "failed");
   assert.equal(meta.get("session-1").setupErrorCode, "model-selection-failed");
   assert.equal(calls.some(([kind]) => kind === "delete-meta"), false);
+});
+
+test("published dependency errors become structured failures with the canonical session id", async () => {
+  const { meta, deps } = createDeps();
+  deps.apiProxy.sessions.create = async () => ok({ sessionId: "published-session" });
+  deps.permissionPresets.set = async () => {
+    throw new Error("permission setup failed");
+  };
+  const gateway = createSessionGateway(deps);
+
+  const result = await routeRequest({
+    method: "POST",
+    url: "/api/dsh-ai-workbench/sessions",
+    headers: { host: "localhost", "x-dsh-workbench-action": "1", "content-type": "application/json" },
+    body: JSON.stringify({ mode: "work", text: "x", attachments: [] }),
+  }, { features: { chat: { available: true } }, sessionGateway: gateway });
+
+  assert.equal(result.statusCode, 502);
+  assert.deepEqual(result.body.error, {
+    code: "gateway-error",
+    message: "permission setup failed",
+    sessionId: "published-session",
+  });
+  assert.equal(meta.has("session-1"), false);
+  assert.equal(meta.get("published-session").setupStatus, "failed");
+  assert.equal(meta.get("published-session").setupErrorCode, "gateway-error");
+});
+
+test("unpublished dependency errors are structured and clean the original metadata", async () => {
+  const { meta, deps } = createDeps();
+  deps.apiProxy.llm.models = async () => {
+    throw new Error("catalog unavailable");
+  };
+  const gateway = createSessionGateway(deps);
+
+  await assert.rejects(
+    gateway.start({
+      mode: "work",
+      text: "x",
+      attachments: [],
+      execution: { modelPolicy: "manual", provider: "openai", model: "gpt-5" },
+    }),
+    (error) => error.code === "gateway-error" && error.statusCode === 502 && error.public === true,
+  );
+  assert.equal(meta.has("session-1"), false);
 });
 
 test("models route returns a de-identified catalog", async () => {

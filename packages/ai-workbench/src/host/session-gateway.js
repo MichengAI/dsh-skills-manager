@@ -11,6 +11,18 @@ function gatewayError(message, code, statusCode = 502, details) {
   });
 }
 
+function normalizeGatewayError(error) {
+  const normalized = error instanceof Error ? error : new Error("session gateway failed");
+  if (typeof normalized.code !== "string" || normalized.code.length === 0) normalized.code = "gateway-error";
+  if (!Number.isInteger(normalized.statusCode)) normalized.statusCode = 502;
+  if (typeof normalized.public !== "boolean") normalized.public = true;
+  return normalized;
+}
+
+function isSessionId(value) {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
 function unwrap(response, statusCode = 502) {
   if (response?.result?.ok === true) return response.result.value;
   const error = response?.result?.error || {};
@@ -39,7 +51,7 @@ function deepEffort(catalog, provider, modelId) {
   const model = group?.models?.find((item) => item?.id === modelId);
   const efforts = Array.isArray(model?.reasoning?.efforts) ? model.reasoning.efforts : [];
   const ids = efforts.map((item) => typeof item === "string" ? item : item?.id).filter((id) => typeof id === "string");
-  return ids.find((id) => /^(deep|high|xhigh|max|ultra)$/i.test(id)) || ids.at(-1) || null;
+  return ids.find((id) => /^(deep|high|xhigh|max|ultra)$/i.test(id)) || null;
 }
 
 function containsModel(catalog, provider, modelId) {
@@ -108,8 +120,15 @@ export function createSessionGateway(dependencies) {
             ...(input.mode === "work" && input.workspaceId ? { workspaceId: input.workspaceId } : {}),
           },
         }));
+        if (!isSessionId(created?.sessionId)) {
+          throw gatewayError("created session id is missing or invalid", "invalid-created-session-id");
+        }
         published = true;
-        publishedSessionId = created?.sessionId || sessionId;
+        publishedSessionId = created.sessionId;
+        if (publishedSessionId !== sessionId) {
+          await dependencies.repository.deleteSessionMeta(sessionId);
+          await dependencies.repository.putSessionMeta(publishedSessionId, meta);
+        }
 
         if (input.mode === "work") {
           const session = await dependencies.sessions.get(publishedSessionId);
@@ -149,10 +168,10 @@ export function createSessionGateway(dependencies) {
 
         return { sessionId: publishedSessionId, mode: input.mode, agentPreset, reasoning };
       } catch (error) {
-        const original = error;
+        const original = normalizeGatewayError(error);
         try {
           if (published) {
-            await dependencies.repository.putSessionMeta(sessionId, {
+            await dependencies.repository.putSessionMeta(publishedSessionId, {
               ...meta,
               setupStatus: "failed",
               setupErrorCode: original.code || "internal",

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { probeClientContracts, probeHostContracts } from "../lib/shared/compatibility.js";
+import { probeChatContracts, probeClientContracts, probeHostContracts } from "../lib/shared/compatibility.js";
 import { apply as applyPlugin } from "../lib/index.js";
 
 test("client probe accepts the required DSH slot and layout faces", () => {
@@ -171,6 +171,7 @@ test("host probe requires the gateway, query, title query, storage, and timer fa
   const result = probeHostContracts({
     apiProxy: { sessions: { create() {}, prompt() {}, models() {}, selectModel() {} }, llm: { models() {} } },
     sessions: { get() {} },
+    permissionPresets: { set() {} },
     sessionQuery: { listSessions() {}, readTitleSnapshots() {} },
     storage: { backend: { get() {} } },
     setTimeout() {},
@@ -178,10 +179,30 @@ test("host probe requires the gateway, query, title query, storage, and timer fa
   assert.equal(result.ok, true);
 });
 
+test("host probe reports a missing permission preset face explicitly", () => {
+  const result = probeHostContracts({
+    apiProxy: { sessions: { create() {}, prompt() {}, models() {}, selectModel() {} }, llm: { models() {} } },
+    sessions: { get() {} },
+    sessionQuery: { listSessions() {}, readTitleSnapshots() {} },
+    storage: { backend: { get() {} } },
+    setTimeout() {},
+  });
+  assert.equal(result.ok, false);
+  assert.deepEqual(result.failures, ["permissionPresets:set"]);
+});
+
+test("Chat probe reports the same missing permission preset face explicitly", () => {
+  const result = probeChatContracts({
+    agentPresets: { list() {}, read() {}, copy() {}, resolve() {}, remove() {} },
+  });
+  assert.deepEqual(result, { ok: false, failures: ["permissionPresets:set"] });
+});
+
 test("host probe rejects a session query without title snapshots", () => {
   const result = probeHostContracts({
     apiProxy: { sessions: { create() {}, prompt() {}, models() {}, selectModel() {} }, llm: { models() {} } },
     sessions: { get() {} },
+    permissionPresets: { set() {} },
     sessionQuery: { listSessions() {} },
     storage: { backend: { get() {} } },
     setTimeout() {},
@@ -201,6 +222,7 @@ test("host probe fails closed when the context is missing", () => {
       "apiProxy.sessions:selectModel",
       "apiProxy.llm:models",
       "sessions:get",
+      "permissionPresets:set",
       "sessionQuery:listSessions",
       "sessionQuery:readTitleSnapshots",
       "storage.backend:get",
@@ -219,6 +241,7 @@ test("host probe fails closed for an undefined context", () => {
       "apiProxy.sessions:selectModel",
       "apiProxy.llm:models",
       "sessions:get",
+      "permissionPresets:set",
       "sessionQuery:listSessions",
       "sessionQuery:readTitleSnapshots",
       "storage.backend:get",
@@ -247,6 +270,7 @@ test("host probe fails closed when context and nested service reads throw", () =
       "apiProxy.sessions:selectModel",
       "apiProxy.llm:models",
       "sessions:get",
+      "permissionPresets:set",
       "sessionQuery:listSessions",
       "sessionQuery:readTitleSnapshots",
       "storage.backend:get",
@@ -260,6 +284,7 @@ test("host probe fails closed when context and nested service reads throw", () =
         throw new Error("apiProxy.sessions getter");
       },
     },
+    permissionPresets: throwingService("permissionPresets"),
     sessionQuery: throwingService("sessionQuery"),
     storage: {
       get backend() {
@@ -279,6 +304,7 @@ test("host probe fails closed when context and nested service reads throw", () =
       "apiProxy.sessions:selectModel",
       "apiProxy.llm:models",
       "sessions:get",
+      "permissionPresets:set",
       "sessionQuery:listSessions",
       "sessionQuery:readTitleSnapshots",
       "storage.backend:get",
@@ -307,6 +333,7 @@ test("host probe rejects callable proxies whose apply trap throws", () => {
       llm: { models: throwingCallable("llm.models") },
     },
     sessions: { get: throwingCallable("sessions.get") },
+    permissionPresets: { set: throwingCallable("permissionPresets.set") },
     sessionQuery: {
       listSessions: throwingCallable("listSessions"),
       readTitleSnapshots: throwingCallable("readTitleSnapshots"),
@@ -324,6 +351,7 @@ test("host probe rejects callable proxies whose apply trap throws", () => {
       "apiProxy.sessions:selectModel",
       "apiProxy.llm:models",
       "sessions:get",
+      "permissionPresets:set",
       "sessionQuery:listSessions",
       "sessionQuery:readTitleSnapshots",
       "storage.backend:get",
@@ -354,6 +382,7 @@ test("host probe rejects callable proxies without invoking a successful apply tr
       llm: { models: safeCallable("llm.models") },
     },
     sessions: { get: safeCallable("sessions.get") },
+    permissionPresets: { set: safeCallable("permissionPresets.set") },
     sessionQuery: {
       listSessions: safeCallable("listSessions"),
       readTitleSnapshots: safeCallable("readTitleSnapshots"),
@@ -371,6 +400,7 @@ test("host probe rejects callable proxies without invoking a successful apply tr
       "apiProxy.sessions:selectModel",
       "apiProxy.llm:models",
       "sessions:get",
+      "permissionPresets:set",
       "sessionQuery:listSessions",
       "sessionQuery:readTitleSnapshots",
       "storage.backend:get",
@@ -389,6 +419,7 @@ test("host probe does not invoke real host methods while checking their callable
   const result = probeHostContracts({
     apiProxy: { sessions: { create: hostMethod, prompt: hostMethod, models: hostMethod, selectModel: hostMethod }, llm: { models: hostMethod } },
     sessions: { get: hostMethod },
+    permissionPresets: { set: hostMethod },
     sessionQuery: { listSessions: hostMethod, readTitleSnapshots: hostMethod },
     storage: { backend: { get: hostMethod } },
     setTimeout: hostMethod,
@@ -408,6 +439,7 @@ test("host probe rejects bound host methods without invoking them", () => {
   const result = probeHostContracts({
     apiProxy: { sessions: { create: boundMethod, prompt: boundMethod, models: boundMethod, selectModel: boundMethod }, llm: { models: boundMethod } },
     sessions: { get: boundMethod },
+    permissionPresets: { set: boundMethod },
     sessionQuery: { listSessions: boundMethod, readTitleSnapshots: boundMethod },
     storage: { backend: { get: boundMethod } },
     setTimeout: boundMethod,
@@ -421,6 +453,7 @@ test("host probe rejects bound host methods without invoking them", () => {
     "apiProxy.sessions:selectModel",
     "apiProxy.llm:models",
     "sessions:get",
+    "permissionPresets:set",
     "sessionQuery:listSessions",
     "sessionQuery:readTitleSnapshots",
     "storage.backend:get",
