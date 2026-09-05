@@ -18,3 +18,7 @@ pnpm run verify
 ```bash
 dsh plugin --profile web add /absolute/path/to/packages/ai-workbench
 ```
+
+## Roll back the shell
+
+Disable or remove `@michengai/dsh-ai-workbench` from the Web profile and restart DSH Web. The official DSH shell returns immediately. Original session directories are unchanged; workbench metadata remains isolated in the `dsh_ai_workbench` JSON KV unit.
