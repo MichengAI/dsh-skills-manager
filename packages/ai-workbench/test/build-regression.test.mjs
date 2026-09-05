@@ -95,6 +95,7 @@ test("root-invoked build uses crash-recoverable transactional publish without to
       "host/session-gateway.js",
       "index.js",
       "shared/auto-select.js",
+      "shared/capabilities.js",
       "shared/chat-config.js",
       "shared/compatibility.js",
       "shared/contracts.js",

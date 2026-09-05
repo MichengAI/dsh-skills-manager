@@ -11,6 +11,7 @@ const buildScript = join(packageRoot, "scripts/build.mjs");
 const requiredOutputs = [
   "lib/index.js",
   "lib/client.js",
+  "lib/shared/capabilities.js",
   "lib/shared/compatibility.js",
   "lib/host/http.js",
   "lib/client/root.js",
