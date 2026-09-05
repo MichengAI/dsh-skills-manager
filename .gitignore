@@ -3,4 +3,5 @@ docs/
 *.log
 *.tgz
 .DS_Store
+packages/ai-workbench/lib/
 .superpowers/

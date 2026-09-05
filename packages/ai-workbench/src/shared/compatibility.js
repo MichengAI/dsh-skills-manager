@@ -1,4 +1,5 @@
 const missing = Symbol("missing");
+const functionToString = Function.prototype.toString;
 
 function readProperty(value, key) {
   if (value == null) return missing;
@@ -14,60 +15,26 @@ function getFunction(value, key) {
   return typeof property === "function" ? property : null;
 }
 
-const probeAbort = Symbol("probe-abort");
-const probeReceiver = new Proxy(Object.create(null), {
-  defineProperty() {
-    throw probeAbort;
-  },
-  deleteProperty() {
-    throw probeAbort;
-  },
-  get() {
-    throw probeAbort;
-  },
-  getOwnPropertyDescriptor() {
-    throw probeAbort;
-  },
-  has() {
-    throw probeAbort;
-  },
-  ownKeys() {
-    throw probeAbort;
-  },
-  set() {
-    throw probeAbort;
-  },
-});
+function isSafeHostMethod(value) {
+  if (typeof value !== "function") return false;
 
-function isNativeCallable(value) {
+  let source;
   try {
-    return /\[native code\]/.test(Function.prototype.toString.call(value));
+    source = functionToString.call(value);
   } catch {
-    return true;
+    return false;
   }
+
+  // Function#toString reports bound functions and callable Proxies as
+  // native-looking. They cannot be validated without invoking their apply
+  // behavior, so reject them instead of executing a host method at startup.
+  if (/\[native code\]/.test(source) || /^\s*class\b/.test(source)) return false;
+  return true;
 }
 
 function probeHostMethod(owner, key) {
   const method = getFunction(owner, key);
-  if (method == null) return false;
-
-  // Source functions are only checked for their callable face. Executing a
-  // real DSH service method during plugin registration could perform work.
-  // Function#toString exposes callable Proxies as native-looking functions;
-  // invoke only that path so an apply trap that throws is not accepted.
-  if (!isNativeCallable(method)) return true;
-  if (key === "setTimeout" && method === globalThis.setTimeout) return true;
-
-  try {
-    const args = key === "setTimeout" ? [() => {}, 0] : [];
-    const result = Reflect.apply(method, probeReceiver, args);
-    if (key === "setTimeout" && result != null && typeof globalThis.clearTimeout === "function") {
-      globalThis.clearTimeout(result);
-    }
-    return true;
-  } catch (error) {
-    return error === probeAbort;
-  }
+  return isSafeHostMethod(method);
 }
 
 export function probeClientContracts(ctx) {

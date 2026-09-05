@@ -18,26 +18,29 @@ function validIpv4(host) {
     && octets.every((octet) => /^(?:0|[1-9]\d{0,2})$/.test(octet) && Number(octet) <= 255);
 }
 
-function validLoopbackHost(host) {
-  const match = /^(localhost|\[::1\]|127(?:\.\d{1,3}){3})(?::(\d+))?$/i.exec(host);
-  if (!match) return false;
-  if (match[2] !== undefined && !validPort(match[2])) return false;
-  return match[1].toLowerCase() === "localhost" || match[1] === "[::1]" || validIpv4(match[1]);
-}
-
-function canonicalLoopbackHost(host) {
-  try {
-    return new URL(`http://${host}`).host.toLowerCase();
-  } catch {
+function parseLoopbackAuthority(authority) {
+  if (typeof authority !== "string") return null;
+  const match = /^(localhost|\[::1\]|127(?:\.\d{1,3}){3})(?::(\d+))?$/i.exec(authority);
+  if (!match) return null;
+  if (match[2] !== undefined && !validPort(match[2])) return null;
+  const normalizedHost = match[1].toLowerCase();
+  if (normalizedHost !== "localhost" && normalizedHost !== "[::1]" && !validIpv4(normalizedHost)) {
     return null;
   }
+  return { host: normalizedHost, port: match[2] ?? null };
+}
+
+function validLoopbackHost(host) {
+  return parseLoopbackAuthority(host) !== null;
 }
 
 function validLocalOrigin(origin, host) {
   if (typeof origin !== "string" || origin.length === 0 || /\s/.test(origin)) return false;
 
   const authorityMatch = /^(?:http|https):\/\/([^/?#]*)$/i.exec(origin);
-  if (authorityMatch == null || !validLoopbackHost(authorityMatch[1].toLowerCase())) return false;
+  const originAuthority = authorityMatch == null ? null : parseLoopbackAuthority(authorityMatch[1]);
+  const hostAuthority = parseLoopbackAuthority(host);
+  if (originAuthority == null || hostAuthority == null) return false;
 
   let parsed;
   try {
@@ -55,7 +58,9 @@ function validLocalOrigin(origin, host) {
     || parsed.hash !== ""
   ) return false;
 
-  return parsed.host.toLowerCase() === canonicalLoopbackHost(host);
+  // Host has no scheme, so preserve the existing convention of accepting
+  // either http or https while keeping omitted and explicit ports distinct.
+  return originAuthority.host === hostAuthority.host && originAuthority.port === hostAuthority.port;
 }
 
 export function validateOrigin(req) {
@@ -100,6 +105,8 @@ export async function routeRequest(req, services) {
       || url.length === 0
       || /[\u0000-\u0020]/.test(url)
       || /%(?![0-9a-f]{2})/i.test(url)
+      || !url.startsWith("/")
+      || url.startsWith("//")
     ) {
       return badRequest();
     }
@@ -109,7 +116,9 @@ export async function routeRequest(req, services) {
 
   let path;
   try {
-    path = new URL(url, "http://localhost").pathname.replace(/\/+$/, "");
+    const parsed = new URL(url, "http://localhost");
+    if (parsed.origin !== "http://localhost") return badRequest();
+    path = parsed.pathname.replace(/\/+$/, "");
   } catch {
     return badRequest();
   }

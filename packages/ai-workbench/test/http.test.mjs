@@ -129,6 +129,28 @@ test("origin fence rejects foreign, malformed, and mismatched explicit Origins",
   }
 });
 
+test("origin fence preserves explicit default-port semantics", () => {
+  for (const [host, origin] of [
+    ["localhost", "http://localhost:80"],
+    ["localhost:80", "http://localhost"],
+    ["localhost", "https://localhost:443"],
+    ["localhost:443", "https://localhost"],
+    ["[::1]", "http://[::1]:80"],
+    ["127.0.0.1:80", "https://127.0.0.1"],
+  ]) {
+    assert.equal(validateOrigin({ headers: { host, origin } })?.statusCode, 403, `${host} <- ${origin}`);
+  }
+
+  for (const [host, origin] of [
+    ["localhost:80", "http://localhost:80"],
+    ["localhost:443", "http://localhost:443"],
+    ["[::1]:80", "https://[::1]:80"],
+    ["127.0.0.1", "http://127.0.0.1"],
+  ]) {
+    assert.equal(validateOrigin({ headers: { host, origin } }), null, `${host} <- ${origin}`);
+  }
+});
+
 test("origin fence fails closed when the explicit Origin getter throws", () => {
   let reads = 0;
   const headers = {
@@ -159,6 +181,19 @@ test("diagnostics route returns the probe snapshot", async () => {
   );
   assert.equal(result.statusCode, 200);
   assert.equal(result.body.data.compatible, false);
+});
+
+test("routeRequest rejects absolute request targets", async () => {
+  for (const url of [
+    "http://evil.example/api/dsh-ai-workbench/diagnostics",
+    "http://localhost/api/dsh-ai-workbench/diagnostics",
+    "//evil.example/api/dsh-ai-workbench/diagnostics",
+    "/\\evil.example/api/dsh-ai-workbench/diagnostics",
+  ]) {
+    const result = await routeRequest(request({ url }), { diagnostics: () => ({}) });
+    assert.equal(result.statusCode, 400, url);
+    assert.equal(result.body.code, "bad-request", url);
+  }
 });
 
 test("routeRequest returns a structured 400 for null, undefined, and invalid requests", async () => {

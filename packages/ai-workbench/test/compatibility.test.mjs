@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { probeClientContracts, probeHostContracts } from "../lib/shared/compatibility.js";
+import { apply as applyPlugin } from "../lib/index.js";
 
 test("client probe accepts the required DSH slot and layout faces", () => {
   const result = probeClientContracts({
@@ -242,8 +243,10 @@ test("host probe fails closed when context and nested service reads throw", () =
 });
 
 test("host probe rejects callable proxies whose apply trap throws", () => {
+  let applyCalls = 0;
   const throwingCallable = (name) => new Proxy(() => undefined, {
     apply() {
+      applyCalls += 1;
       throw new Error(`${name} apply trap`);
     },
   });
@@ -270,9 +273,10 @@ test("host probe rejects callable proxies whose apply trap throws", () => {
       "timer:setTimeout",
     ],
   });
+  assert.equal(applyCalls, 0);
 });
 
-test("host probe accepts callable proxies whose safe probe call returns", () => {
+test("host probe rejects callable proxies without invoking a successful apply trap", () => {
   const calls = [];
   const safeCallable = (name) => new Proxy(() => {
     calls.push(name);
@@ -294,8 +298,17 @@ test("host probe accepts callable proxies whose safe probe call returns", () => 
     setTimeout: safeCallable("setTimeout"),
   });
 
-  assert.deepEqual(result, { ok: true, failures: [] });
-  assert.deepEqual(calls, ["create", "prompt", "listSessions", "get", "setTimeout"]);
+  assert.deepEqual(result, {
+    ok: false,
+    failures: [
+      "apiProxy.sessions:create",
+      "apiProxy.sessions:prompt",
+      "sessionQuery:listSessions",
+      "storage.backend:get",
+      "timer:setTimeout",
+    ],
+  });
+  assert.deepEqual(calls, []);
 });
 
 test("host probe does not invoke real host methods while checking their callable faces", () => {
@@ -313,4 +326,54 @@ test("host probe does not invoke real host methods while checking their callable
 
   assert.deepEqual(result, { ok: true, failures: [] });
   assert.equal(businessActions, 0);
+});
+
+test("host probe rejects bound host methods without invoking them", () => {
+  let businessActions = 0;
+  const hostMethod = () => {
+    businessActions += 1;
+  };
+  const boundMethod = hostMethod.bind(null);
+
+  const result = probeHostContracts({
+    apiProxy: { sessions: { create: boundMethod, prompt: boundMethod } },
+    sessionQuery: { listSessions: boundMethod },
+    storage: { backend: { get: boundMethod } },
+    setTimeout: boundMethod,
+  });
+
+  assert.equal(result.ok, false);
+  assert.deepEqual(result.failures, [
+    "apiProxy.sessions:create",
+    "apiProxy.sessions:prompt",
+    "sessionQuery:listSessions",
+    "storage.backend:get",
+    "timer:setTimeout",
+  ]);
+  assert.equal(businessActions, 0);
+});
+
+test("plugin registration does not invoke host business methods", () => {
+  let businessActions = 0;
+  const hostMethod = () => {
+    businessActions += 1;
+  };
+  let registrations = 0;
+
+  const result = applyPlugin({
+    apiProxy: { sessions: { create: hostMethod, prompt: hostMethod } },
+    sessionQuery: { listSessions: hostMethod },
+    storage: { backend: { get: hostMethod } },
+    setTimeout: hostMethod,
+    webServer: {
+      register(options) {
+        registrations += 1;
+        return options;
+      },
+    },
+  });
+
+  assert.equal(registrations, 1);
+  assert.equal(businessActions, 0);
+  assert.equal(typeof result.handler, "function");
 });
