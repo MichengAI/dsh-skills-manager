@@ -123,9 +123,9 @@ export function createChatHome(React, options = {}) {
         if (!result?.sessionId) throw new Error("会话创建未返回 sessionId");
         replaceDraft({ text: "", attachments: [] });
         if (deepThinking && result.reasoning?.applied === false) setNotice("当前模型不支持所选深度思考级别");
-        workbench?.ctx?.sessions?.open?.(result.sessionId);
+        workbench?.sessions?.open?.(result.sessionId);
       } catch (error) {
-        if (error?.sessionId) workbench?.ctx?.sessions?.open?.(error.sessionId);
+        if (error?.sessionId) workbench?.sessions?.open?.(error.sessionId);
         setSubmitError(error);
       } finally {
         setSending(false);

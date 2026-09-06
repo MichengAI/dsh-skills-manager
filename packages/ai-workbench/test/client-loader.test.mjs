@@ -146,3 +146,16 @@ test("overlay provider does not probe optional un-injected host services", async
 
   assert.doesNotThrow(() => workbenchProvider.type(workbenchProvider.props));
 });
+
+test("Work and Chat open created sessions through the injected provider service", async () => {
+  const [workSource, chatSource] = await Promise.all([
+    readFile(new URL("../src/client/work-home.js", import.meta.url), "utf8"),
+    readFile(new URL("../src/client/chat-home.js", import.meta.url), "utf8"),
+  ]);
+
+  for (const source of [workSource, chatSource]) {
+    assert.match(source, /workbench\?\.sessions\?\.open\?\.\(result\.sessionId\)/);
+    assert.match(source, /workbench\?\.sessions\?\.open\?\.\(error\.sessionId\)/);
+    assert.doesNotMatch(source, /workbench\?\.ctx\?\.sessions/);
+  }
+});

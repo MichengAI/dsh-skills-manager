@@ -291,9 +291,9 @@ export function createWorkHome(React, options = {}) {
         const result = await api.startSession(buildWorkSessionInput({ ...draft, execution }));
         if (!result?.sessionId) throw new Error("会话创建未返回 sessionId");
         replaceDraft(EMPTY_WORK_DRAFT);
-        workbench?.ctx?.sessions?.open?.(result.sessionId);
+        workbench?.sessions?.open?.(result.sessionId);
       } catch (error) {
-        if (error?.sessionId) workbench?.ctx?.sessions?.open?.(error.sessionId);
+        if (error?.sessionId) workbench?.sessions?.open?.(error.sessionId);
         setSubmitError(error);
       } finally {
         setSending(false);
