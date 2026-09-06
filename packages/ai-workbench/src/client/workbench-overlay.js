@@ -1,3 +1,4 @@
+import { createDialog } from "./dialog.js";
 import { createSidebar } from "./sidebar.js";
 import { createWorkbenchShell } from "./shell.js";
 
@@ -13,6 +14,7 @@ export function createWorkbenchOverlay(React, options = {}) {
   const h = React.createElement;
   const Sidebar = createSidebar(React);
   const WorkbenchShell = createWorkbenchShell(React, { chatConfig: options.chatConfig });
+  const Dialog = createDialog(React);
 
   function WorkbenchOverlayBody({ onClose }) {
     const workbench = options.context ? React.useContext(options.context) : null;
@@ -37,6 +39,7 @@ export function createWorkbenchOverlay(React, options = {}) {
           workbench,
         })),
       ]),
+      state.dialog ? h(Dialog, { dialog: state.dialog, onClose: () => workbench?.dispatch?.({ type: "dialog/close" }), key: "dialog" }) : null,
     ]);
   }
 
