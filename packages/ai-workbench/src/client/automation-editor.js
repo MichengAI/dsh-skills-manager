@@ -25,6 +25,26 @@ function scheduleForKind(kind, current = {}) {
   return { kind, time };
 }
 
+function normalizeExecutionProfile(value) {
+  const manual = value?.modelPolicy === "manual"
+    && typeof value.provider === "string" && value.provider
+    && typeof value.model === "string" && value.model;
+  return {
+    modelPolicy: manual ? "manual" : "auto",
+    provider: manual ? value.provider : null,
+    model: manual ? value.model : null,
+    intensity: value?.intensity === "deep" ? "deep" : "standard",
+  };
+}
+
+function modelsFromCatalog(catalog) {
+  return Array.isArray(catalog?.groups) ? catalog.groups.flatMap((group) => {
+    if (typeof group?.id !== "string") return [];
+    const models = Array.isArray(group.models) ? group.models.filter((model) => typeof model?.id === "string") : [];
+    return [{ id: group.id, label: group.label || group.id, models }];
+  }) : [];
+}
+
 export function automationInitialValue(item, initialDraft) {
   const source = item || initialDraft || {};
   const type = source.type === "work" ? "work" : "reminder";
@@ -38,6 +58,7 @@ export function automationInitialValue(item, initialDraft) {
     timezone: typeof source.timezone === "string" && source.timezone ? source.timezone : systemTimezone(),
     workspaceRef: type === "work" && typeof source.workspaceRef === "string" ? source.workspaceRef : null,
     capabilitySelection: type === "work" && Array.isArray(source.capabilitySelection) ? [...new Set(source.capabilitySelection.filter((id) => typeof id === "string"))] : [],
+    executionProfile: type === "work" ? normalizeExecutionProfile(source.executionProfile) : null,
     notificationPolicy: {
       onSuccess: true,
       onFailure: true,
@@ -59,6 +80,7 @@ export function createAutomationEditor(React, options = {}) {
     const [value, setValue] = React.useState(() => automationInitialValue(item, initialDraft));
     const [saving, setSaving] = React.useState(false);
     const [error, setError] = React.useState("");
+    const [models, setModels] = React.useState(null);
     const workspaceItems = uniqueWorkspaceItems(workbench);
     const capabilityItems = capabilityItemsFromWorkbench(workbench);
     const errors = validateAutomationDraft(value);
@@ -68,12 +90,14 @@ export function createAutomationEditor(React, options = {}) {
       type,
       workspaceRef: type === "work" ? value.workspaceRef : null,
       capabilitySelection: type === "work" ? value.capabilitySelection : [],
+      executionProfile: type === "work" ? normalizeExecutionProfile(value.executionProfile) : null,
     });
     const changeCapability = (id, selected) => {
       const current = Array.isArray(value.capabilitySelection) ? value.capabilitySelection : [];
       update({ capabilitySelection: selected ? [...new Set([...current, id])] : current.filter((item) => item !== id) });
     };
     const changeNotification = (key, checked) => update({ notificationPolicy: { ...value.notificationPolicy, [key]: checked } });
+    const changeExecution = (patch) => update({ executionProfile: { ...normalizeExecutionProfile(value.executionProfile), ...patch } });
     const changeWeekday = (day, selected) => {
       const current = Array.isArray(value.schedule.weekdays) ? value.schedule.weekdays : [];
       updateSchedule({ weekdays: selected ? [...new Set([...current, day])].sort((left, right) => left - right) : current.filter((item) => item !== day) });
@@ -97,6 +121,20 @@ export function createAutomationEditor(React, options = {}) {
     const hasLegacyWorkspace = value.workspaceRef && !knownWorkspaceRefs.has(value.workspaceRef);
     const scheduleError = errors.schedule || errors.time || errors.at || errors.weekdays || errors.day || errors.interval || errors.anchorAt;
     const isWork = value.type === "work";
+    const execution = normalizeExecutionProfile(value.executionProfile);
+    const modelGroups = modelsFromCatalog(models);
+    const modelValue = execution.modelPolicy === "manual" ? `${execution.provider}\u0000${execution.model}` : "";
+
+    React.useEffect(() => {
+      if (!isWork || models) return undefined;
+      let active = true;
+      Promise.resolve(api.listModels?.()).then((catalog) => {
+        if (active) setModels(catalog || { groups: [] });
+      }).catch(() => {
+        if (active) setModels({ groups: [] });
+      });
+      return () => { active = false; };
+    }, [isWork, models]);
 
     return h("div", { className: "daw-automation-editor", role: "dialog", "aria-modal": "true", "aria-labelledby": "daw-automation-editor-title" }, [
       h("div", { className: "daw-dialog-header", key: "header" }, [h("h2", { id: "daw-automation-editor-title", key: "title" }, item?.id ? "编辑自动化任务" : "创建自动化任务"), h("button", { type: "button", className: "daw-dialog-close", onClick: onClose, "aria-label": "关闭", key: "close" }, "×")]),
@@ -116,6 +154,18 @@ export function createAutomationEditor(React, options = {}) {
       isWork ? h("fieldset", { className: "daw-automation-field daw-automation-capabilities", key: "capabilities" }, [
         h("legend", null, "允许使用的能力"),
         capabilityItems.length === 0 ? h("small", { className: "daw-field-help" }, "当前没有可选能力；任务将使用宿主默认能力。") : h("div", { className: "daw-check-grid" }, capabilityItems.map((capability) => h("label", { key: capability.id }, [h("input", { type: "checkbox", checked: value.capabilitySelection.includes(capability.id), onChange: (event) => changeCapability(capability.id, event.target.checked) }), h("span", null, capability.title)]))),
+      ]) : null,
+      isWork ? h("fieldset", { className: "daw-automation-field", key: "execution" }, [
+        h("legend", null, "执行设置"),
+        h("label", { className: "daw-inline-field" }, [h("span", null, "推理强度"), h("select", { value: execution.intensity, onChange: (event) => changeExecution({ intensity: event.target.value }) }, [h("option", { value: "standard" }, "标准"), h("option", { value: "deep" }, "深度")])]),
+        h("label", { className: "daw-inline-field" }, [h("span", null, "选择模型"), h("select", {
+          value: modelValue,
+          onChange: (event) => {
+            if (!event.target.value) return changeExecution({ modelPolicy: "auto", provider: null, model: null });
+            const [provider, model] = event.target.value.split("\u0000");
+            return changeExecution({ modelPolicy: "manual", provider, model });
+          },
+        }, [h("option", { value: "" }, "自动（使用 DSH 默认）"), ...modelGroups.map((group) => h("optgroup", { key: group.id, label: group.label }, group.models.map((model) => h("option", { key: `${group.id}/${model.id}`, value: `${group.id}\u0000${model.id}` }, model.label || model.id))))])]),
       ]) : null,
       h("div", { className: "daw-automation-schedule", key: "schedule" }, [
         h("span", null, "执行计划"),

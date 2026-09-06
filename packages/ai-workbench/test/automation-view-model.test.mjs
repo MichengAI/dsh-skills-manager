@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import {
   isoFromLocalDateTime,
   localDateTimeInput,
@@ -47,4 +48,26 @@ test("automation templates preserve their schedule and notification choices in t
   const value = automationInitialValue(null, template);
   assert.deepEqual(value.schedule, template.schedule);
   assert.deepEqual(value.notificationPolicy, template.notificationPolicy);
+});
+
+test("automation editor preserves the saved Work execution profile", () => {
+  const value = automationInitialValue({
+    type: "work",
+    executionProfile: { modelPolicy: "manual", provider: "openai", model: "gpt-5", intensity: "deep" },
+  });
+
+  assert.deepEqual(value.executionProfile, {
+    modelPolicy: "manual",
+    provider: "openai",
+    model: "gpt-5",
+    intensity: "deep",
+  });
+});
+
+test("automation editor exposes model and reasoning controls for Work tasks", async () => {
+  const source = await readFile(new URL("../src/client/automation-editor.js", import.meta.url), "utf8");
+
+  assert.match(source, /执行设置/);
+  assert.match(source, /推理强度/);
+  assert.match(source, /选择模型/);
 });
