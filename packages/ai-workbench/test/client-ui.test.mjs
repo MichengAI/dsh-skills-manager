@@ -44,6 +44,16 @@ function findByClassName(node, className) {
   return null;
 }
 
+function findByText(node, text) {
+  if (!node || typeof node !== "object") return null;
+  if (node.children?.includes(text)) return node;
+  for (const child of node.children || []) {
+    const result = findByText(child, text);
+    if (result) return result;
+  }
+  return null;
+}
+
 test("dialog Tab and Shift+Tab wrap focus inside the dialog", () => {
   const fake = createFakeReact();
   const Dialog = createDialog(fake.React);
@@ -100,6 +110,25 @@ test("dialog Escape and close restore the focus that opened it", () => {
 
     cleanup();
     assert.deepEqual(focusCalls, ["restored"]);
+  } finally {
+    globalThis.document = originalDocument;
+  }
+});
+
+test("dialog provides an explicit acknowledgement action", () => {
+  const fake = createFakeReact();
+  const Dialog = createDialog(fake.React);
+  const closed = [];
+  const originalDocument = globalThis.document;
+  globalThis.document = { activeElement: null };
+
+  try {
+    const tree = Dialog({ dialog: { title: "功能暂未开发", message: "敬请期待" }, onClose: () => closed.push("closed") });
+    const acknowledge = findByText(tree, "我知道了");
+    assert.ok(acknowledge);
+    assert.equal(acknowledge.type, "button");
+    acknowledge.props.onClick();
+    assert.deepEqual(closed, ["closed"]);
   } finally {
     globalThis.document = originalDocument;
   }

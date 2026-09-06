@@ -65,7 +65,9 @@ export function createDialog(React) {
       h("div", { className: "daw-dialog-header" },
         h("h2", { id: titleId }, dialog.title),
         h("button", { ref: closeButton, type: "button", className: "daw-dialog-close", onClick: onClose, "aria-label": "关闭" }, "×")),
-      h("p", { className: "daw-dialog-message" }, dialog.message)),
+      h("p", { className: "daw-dialog-message" }, dialog.message),
+      h("div", { className: "daw-dialog-actions" },
+        h("button", { type: "button", className: "daw-dialog-confirm", onClick: onClose }, dialog.confirmLabel || "我知道了"))),
     );
   };
 }
