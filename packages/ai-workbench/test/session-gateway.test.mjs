@@ -54,6 +54,7 @@ function createDeps(overrides = {}) {
     },
     repository: {
       putSessionMeta: async (id, value) => { calls.push(["put-meta", id, value]); meta.set(id, value); return value; },
+      getSessionMeta: async (id) => meta.get(id) || null,
       deleteSessionMeta: async (id) => { calls.push(["delete-meta", id]); meta.delete(id); },
     },
     permissionPresets: { set: async (...args) => calls.push(["permission", ...args]) },
@@ -121,6 +122,33 @@ test("session prompt omits a missing client time zone instead of sending null", 
     sessionId: "session-1",
     mode: "queue",
     content: [{ type: "text", text: "整理材料" }],
+  });
+});
+
+test("automation uses its saved execution profile instead of a hard-coded default", async () => {
+  const { calls, deps } = createDeps();
+  const gateway = createSessionGateway(deps);
+
+  await gateway.startAutomation({
+    id: "automation-1",
+    type: "work",
+    prompt: "汇总本周数据",
+    workspaceRef: "workspace:w1",
+    capabilitySelection: ["tool:web"],
+    executionProfile: { modelPolicy: "manual", provider: "openai", model: "gpt-5", intensity: "deep" },
+    timezone: "Asia/Shanghai",
+  }, { id: "run-1" });
+
+  assert.deepEqual(calls.find(([kind]) => kind === "create")[1], {
+    sessionId: "session-1",
+    agentPreset: "standard",
+    workspaceId: "w1",
+  });
+  assert.deepEqual(calls.find(([kind]) => kind === "select-model")[1], {
+    sessionId: "session-1",
+    provider: "openai",
+    model: "gpt-5",
+    reasoningEffort: "high",
   });
 });
 

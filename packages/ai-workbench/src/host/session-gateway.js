@@ -191,13 +191,16 @@ export function createSessionGateway(dependencies) {
     async startAutomation(automation, run) {
       const workspaceRef = typeof automation?.workspaceRef === "string" ? automation.workspaceRef : null;
       const workspaceId = workspaceRef?.startsWith("workspace:") ? workspaceRef.slice("workspace:".length) : workspaceRef;
+      const execution = automation?.executionProfile && typeof automation.executionProfile === "object"
+        ? automation.executionProfile
+        : { modelPolicy: "auto", provider: null, model: null, intensity: "standard" };
       const result = await start({
         mode: "work",
         text: automation?.prompt || "",
         workspaceId,
         attachments: [],
         capabilityIds: Array.isArray(automation?.capabilitySelection) ? automation.capabilitySelection : [],
-        execution: { modelPolicy: "auto", provider: null, model: null, intensity: "standard" },
+        execution,
         deepThinking: false,
         webSearch: false,
         clientTimeZone: automation?.timezone || null,
