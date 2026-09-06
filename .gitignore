@@ -10,3 +10,4 @@ packages/ai-workbench/.lib-backup-*/
 packages/ai-workbench/.generated-output-test-*/
 packages/ai-workbench/.lib-build.lock/
 .superpowers/
+.playwright-cli/
