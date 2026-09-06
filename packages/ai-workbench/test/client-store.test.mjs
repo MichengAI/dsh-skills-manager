@@ -91,6 +91,22 @@ test("bootstrap hydration is not marked as a user draft change", () => {
   assert.equal(state.draftDirty.chat, false);
 });
 
+test("late bootstrap cannot overwrite a locally edited draft", () => {
+  let state = reduceWorkbench(initialState(), {
+    type: "draft/change",
+    mode: "work",
+    text: "本地刚输入",
+  });
+  state = reduceWorkbench(state, {
+    type: "bootstrap/success",
+    mode: "work",
+    data: { draft: { text: "旧快照", attachments: [] }, history: [] },
+  });
+
+  assert.equal(state.drafts.work.text, "本地刚输入");
+  assert.equal(state.draftDirty.work, true);
+});
+
 test("draft save scheduler debounces and keeps Work and Chat independent", async () => {
   assert.equal(typeof store.createDraftSaveScheduler, "function");
   const timers = [];

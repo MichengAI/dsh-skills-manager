@@ -87,9 +87,15 @@ export function reduceWorkbench(state, action) {
       return {
         ...state,
         loading: false,
-        drafts: { ...state.drafts, [action.mode]: structuredClone(action.data.draft) },
+        // A bootstrap response can arrive after the user starts typing.  In that
+        // case the local draft is newer than the snapshot and must win.
+        drafts: state.draftDirty[action.mode]
+          ? state.drafts
+          : { ...state.drafts, [action.mode]: structuredClone(action.data.draft) },
         history: { ...state.history, [action.mode]: structuredClone(action.data.history) },
-        draftDirty: { ...state.draftDirty, [action.mode]: false },
+        draftDirty: state.draftDirty[action.mode]
+          ? state.draftDirty
+          : { ...state.draftDirty, [action.mode]: false },
       };
     case "bootstrap/error":
       if (action.mode !== undefined && !validMode(action.mode)) return state;
