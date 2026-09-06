@@ -1,6 +1,7 @@
 import { probeClientContracts } from "./shared/compatibility.js";
 import CHAT_HOME_CONFIG from "../assets/chat-home.json" with { type: "json" };
 import { workbenchApi } from "./client/api.js";
+import { loadCapabilitySources } from "./client/capability-source.js";
 import { createDraftSaveScheduler, initialState, reduceWorkbench } from "./client/store.js";
 import { createSpeechInput } from "./client/speech-input.js";
 import { automationCss, automationEnhancementCss, foundationCss, installStyles, overlayCss } from "./client/styles.js";
@@ -18,6 +19,7 @@ window.__ModuleLoader__.load({
     function WorkbenchProvider({ ctx, children, onConversation }) {
       const [state, reduce] = React.useReducer(reduceWorkbench, undefined, initialState);
       const [settings, setSettings] = React.useState(null);
+      const [capabilitySnapshot, setCapabilitySnapshot] = React.useState(null);
       const draftScheduler = React.useRef(null);
       const observedDrafts = React.useRef(state.drafts);
       const speech = React.useRef(null);
@@ -50,6 +52,16 @@ window.__ModuleLoader__.load({
       }, [state.mode]);
 
       React.useEffect(() => {
+        let active = true;
+        loadCapabilitySources().then((snapshot) => {
+          if (active) setCapabilitySnapshot(snapshot);
+        }).catch(() => {
+          if (active) setCapabilitySnapshot({ items: [] });
+        });
+        return () => { active = false; };
+      }, []);
+
+      React.useEffect(() => {
         for (const mode of ["work", "chat"]) {
           if (state.drafts[mode] === observedDrafts.current[mode]) continue;
           observedDrafts.current[mode] = state.drafts[mode];
@@ -64,6 +76,7 @@ window.__ModuleLoader__.load({
           state,
           dispatch,
           settings,
+          capabilities: capabilitySnapshot?.items || [],
           sessions: ctx.sessions,
           workspaces: ctx.workspaces,
           speech: speech.current,

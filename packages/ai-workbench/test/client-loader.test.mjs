@@ -83,6 +83,14 @@ test("provider exposes only explicitly injected session and workspace services",
   assert.doesNotMatch(source, /ctx\.(speech|voice|imageLimits|capabilities|useWorkspaces|workspaceFeed)/);
 });
 
+test("provider loads the capability catalog for Work task selection", async () => {
+  const source = await readFile(new URL("../src/client.js", import.meta.url), "utf8");
+
+  assert.match(source, /import \{ loadCapabilitySources \} from "\.\/client\/capability-source\.js"/);
+  assert.match(source, /loadCapabilitySources\(\)/);
+  assert.match(source, /capabilities:\s*capabilitySnapshot\?\.items/);
+});
+
 test("client bundles its brand images instead of relying on host-global asset paths", async () => {
   const source = await readFile(new URL("../lib/client.js", import.meta.url), "utf8");
 
