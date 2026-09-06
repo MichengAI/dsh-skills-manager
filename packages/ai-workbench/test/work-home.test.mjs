@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildWorkSessionInput, capabilityItemsFromWorkbench, draftFromTemplate, subscribeWorkspaceRuntime, workspaceFeedFromWorkbench, workspaceItemsFromFeed } from "../lib/client/work-home.js";
+import { buildWorkSessionInput, capabilityItemsFromWorkbench, draftFromTemplate, subscribeWorkspaceRuntime, workspaceAddGuidance, workspaceFeedFromWorkbench, workspaceItemsFromFeed } from "../lib/client/work-home.js";
 import { findWorkTemplate } from "../lib/shared/work-templates.js";
 
 test("template selection replaces the draft without creating a session", () => {
@@ -83,4 +83,9 @@ test("Work selection hides capabilities that the catalog marks unavailable", () 
     { id: "tool:web", name: "联网搜索", available: true },
     { id: "skill:dsh:broken", name: "损坏技能", available: false },
   ] }), [{ id: "tool:web", title: "联网搜索" }]);
+});
+
+test("workspace add guidance explains the verified DSH fallback", () => {
+  assert.match(workspaceAddGuidance({ create() {} }), /返回 DSH/);
+  assert.match(workspaceAddGuidance({ pickDirectory() {}, create() {} }), /选择本机目录/);
 });

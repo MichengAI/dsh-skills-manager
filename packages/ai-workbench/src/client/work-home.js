@@ -109,6 +109,13 @@ export function subscribeWorkspaceRuntime(runtime, listener) {
   }
 }
 
+export function workspaceAddGuidance(runtime) {
+  if (typeof runtime?.pickDirectory === "function" && typeof runtime?.create === "function") {
+    return "选择本机目录后即可创建工作空间。";
+  }
+  return "当前 DSH 版本不提供网页目录选择器。请点击“返回 DSH”，在官方工作空间入口添加目录；返回本页后列表会自动刷新。";
+}
+
 export function capabilityItemsFromWorkbench(workbench) {
   const source = workbench?.capabilities || workbench?.ctx?.capabilities || workbench?.ctx?.skills;
   if (!Array.isArray(source)) return [];
@@ -215,9 +222,9 @@ export function createWorkHome(React, options = {}) {
     const removeAttachment = (index) => replaceDraft({ ...draft, attachments: draft.attachments.filter((_, itemIndex) => itemIndex !== index) });
 
     const addWorkspace = async () => {
-      const workspaceApi = workbench?.ctx?.workspaces;
+      const workspaceApi = workbench?.workspaces || workbench?.ctx?.workspaces;
       if (typeof workspaceApi?.pickDirectory !== "function" || typeof workspaceApi?.create !== "function") {
-        openDialog("工作空间", "当前宿主暂未提供添加工作空间能力。");
+        openDialog("添加工作空间", workspaceAddGuidance(workspaceApi));
         return;
       }
       try {
