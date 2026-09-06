@@ -74,11 +74,13 @@ test("workbench frame establishes the containing block for its overlay", () => {
   assert.match(foundationCss, /\.daw-frame\{[^}]*position:relative/);
 });
 
-test("provider only reads explicitly injected session services from the host", async () => {
+test("provider exposes only explicitly injected session and workspace services", async () => {
   const source = await readFile(new URL("../lib/client.js", import.meta.url), "utf8");
   assert.match(source, /sessions:\s*ctx\.sessions/);
+  assert.match(source, /workspaces:\s*ctx\.workspaces/);
+  assert.match(source, /const inject = \["slots", "sessions", "workspaces"\]/);
   assert.match(source, /speech:\s*speech\.current/);
-  assert.doesNotMatch(source, /ctx\.(speech|voice|imageLimits|capabilities|useWorkspaces|workspaces|workspaceFeed)/);
+  assert.doesNotMatch(source, /ctx\.(speech|voice|imageLimits|capabilities|useWorkspaces|workspaceFeed)/);
 });
 
 test("client bundles its brand images instead of relying on host-global asset paths", async () => {
@@ -118,6 +120,7 @@ test("overlay provider does not probe optional un-injected host services", async
   const allowed = {
     effect() {},
     sessions: { open() {} },
+    workspaces: { getSnapshot() { return { items: [] }; }, subscribe() { return () => {}; } },
     slots: {
       spec: () => ({}),
       inject(_name, callback) { return callback(); },

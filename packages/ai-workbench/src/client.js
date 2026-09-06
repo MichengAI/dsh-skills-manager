@@ -13,7 +13,7 @@ window.__ModuleLoader__.load({
     const runtime = require("@deepseek-ai/dsh-client-runtime/client");
     const WorkbenchContext = typeof React.createContext === "function" ? React.createContext(null) : { Provider: ({ children }) => children };
     const name = "ai-workbench-client";
-    const inject = ["slots", "sessions"];
+    const inject = ["slots", "sessions", "workspaces"];
 
     function WorkbenchProvider({ ctx, children, onConversation }) {
       const [state, reduce] = React.useReducer(reduceWorkbench, undefined, initialState);
@@ -65,6 +65,7 @@ window.__ModuleLoader__.load({
           dispatch,
           settings,
           sessions: ctx.sessions,
+          workspaces: ctx.workspaces,
           speech: speech.current,
         },
       }, children);

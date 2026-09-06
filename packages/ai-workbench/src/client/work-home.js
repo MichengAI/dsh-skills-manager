@@ -75,6 +75,14 @@ export function workspaceItemsFromFeed(feed) {
 export function workspaceFeedFromWorkbench(workbench) {
   const direct = workbench?.workspaceFeed;
   if (direct !== undefined) return direct;
+  const runtime = workbench?.workspaces || workbench?.ctx?.workspaces;
+  if (typeof runtime?.getSnapshot === "function") {
+    try {
+      return runtime.getSnapshot();
+    } catch {
+      return null;
+    }
+  }
   const candidates = [
     workbench?.useWorkspaces,
     workbench?.ctx?.useWorkspaces,

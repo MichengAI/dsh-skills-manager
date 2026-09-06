@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildWorkSessionInput, draftFromTemplate, workspaceItemsFromFeed } from "../lib/client/work-home.js";
+import { buildWorkSessionInput, draftFromTemplate, workspaceFeedFromWorkbench, workspaceItemsFromFeed } from "../lib/client/work-home.js";
 import { findWorkTemplate } from "../lib/shared/work-templates.js";
 
 test("template selection replaces the draft without creating a session", () => {
@@ -52,4 +52,11 @@ test("workspace adapter reads the real workspace row id from top-level items", (
   assert.deepEqual(workspaceItemsFromFeed({
     items: [{ workspaceId: "w1", title: "教学", path: "/x" }],
   }), [{ id: "w1", title: "教学", path: "/x" }]);
+});
+
+test("workspace adapter reads the injected DSH workspace runtime snapshot", () => {
+  const snapshot = { items: [{ workspaceId: "w-runtime", title: "运行时空间", path: "/tmp/runtime" }] };
+  const workspaces = { getSnapshot: () => snapshot, subscribe: () => () => {} };
+
+  assert.equal(workspaceFeedFromWorkbench({ workspaces }), snapshot);
 });
