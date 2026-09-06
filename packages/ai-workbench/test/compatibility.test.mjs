@@ -65,6 +65,39 @@ test("client probe fails closed for an undefined context", () => {
   });
 });
 
+test("native client probe fails closed when root and native input services are missing", () => {
+  const result = probeClientContracts({
+    slots: {
+      spec: (name) => ({ "shell.overlay": {} })[name],
+      register() {},
+      inject() {},
+    },
+    sessions: { open() {} },
+  }, { nativeConversation: true });
+
+  assert.equal(result.ok, false);
+  assert.ok(result.failures.includes("slot:root"));
+  assert.ok(result.failures.includes("layout:attachPanels"));
+  assert.ok(result.failures.includes("inputTriggers:registerSource"));
+  assert.ok(result.failures.includes("commandUi:register"));
+});
+
+test("native client probe accepts the verified root, layout, input, and command faces", () => {
+  const result = probeClientContracts({
+    slots: {
+      spec: () => ({}),
+      register() {},
+      inject() {},
+    },
+    layout: { attachPanels() {} },
+    sessions: { open() {} },
+    inputTriggers: { registerSource() {} },
+    commandUi: { register() {} },
+  }, { nativeConversation: true });
+
+  assert.deepEqual(result, { ok: true, failures: [] });
+});
+
 test("client probe fails closed when context and nested service reads throw", () => {
   const throwingService = (name) => new Proxy({}, {
     get() {

@@ -14,7 +14,7 @@ window.__ModuleLoader__.load({
     const runtime = require("@deepseek-ai/dsh-client-runtime/client");
     const WorkbenchContext = typeof React.createContext === "function" ? React.createContext(null) : { Provider: ({ children }) => children };
     const name = "ai-workbench-client";
-    const inject = ["slots", "sessions", "workspaces"];
+    const inject = ["slots", "sessions", "workspaces", "layout", "inputTriggers", "commandUi"];
 
     function WorkbenchProvider({ ctx, children, onConversation }) {
       const [state, reduce] = React.useReducer(reduceWorkbench, undefined, initialState);
@@ -79,6 +79,9 @@ window.__ModuleLoader__.load({
           capabilities: capabilitySnapshot?.items || [],
           sessions: ctx.sessions,
           workspaces: ctx.workspaces,
+          layout: ctx.layout,
+          inputTriggers: ctx.inputTriggers,
+          commandUi: ctx.commandUi,
           speech: speech.current,
         },
       }, children);
@@ -86,7 +89,7 @@ window.__ModuleLoader__.load({
 
     const h = React.createElement;
     function apply(ctx) {
-      const probe = probeClientContracts(ctx);
+      const probe = probeClientContracts(ctx, { nativeConversation: true });
       if (!probe.ok) {
         console.error("[dsh-ai-workbench] client compatibility failed", JSON.stringify(probe.failures));
         return undefined;

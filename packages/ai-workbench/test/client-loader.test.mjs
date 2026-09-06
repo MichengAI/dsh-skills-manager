@@ -55,6 +55,8 @@ test("loader factory preserves host-owned seats and contributes only an additive
       attachPanels() {},
     },
     sessions: { open() {}, binding() {}, subscribe() {} },
+    inputTriggers: { registerSource() {} },
+    commandUi: { register() {} },
     effect(callback) {
       effects.push(callback);
     },
@@ -78,7 +80,8 @@ test("provider exposes only explicitly injected session and workspace services",
   const source = await readFile(new URL("../lib/client.js", import.meta.url), "utf8");
   assert.match(source, /sessions:\s*ctx\.sessions/);
   assert.match(source, /workspaces:\s*ctx\.workspaces/);
-  assert.match(source, /const inject = \["slots", "sessions", "workspaces"\]/);
+  assert.match(source, /const inject = \["slots", "sessions", "workspaces", "layout", "inputTriggers", "commandUi"\]/);
+  assert.match(source, /probeClientContracts\(ctx, \{ nativeConversation: true \}\)/);
   assert.match(source, /speech:\s*speech\.current/);
   assert.doesNotMatch(source, /ctx\.(speech|voice|imageLimits|capabilities|useWorkspaces|workspaceFeed)/);
 });
@@ -127,7 +130,10 @@ test("overlay provider does not probe optional un-injected host services", async
   const registrations = [];
   const allowed = {
     effect() {},
+    layout: { attachPanels() {} },
     sessions: { open() {} },
+    inputTriggers: { registerSource() {} },
+    commandUi: { register() {} },
     workspaces: { getSnapshot() { return { items: [] }; }, subscribe() { return () => {}; } },
     slots: {
       spec: () => ({}),

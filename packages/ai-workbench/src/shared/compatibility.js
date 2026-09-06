@@ -57,7 +57,7 @@ export function probeChatContracts(ctx) {
   return { ok: failures.length === 0, failures };
 }
 
-export function probeClientContracts(ctx) {
+export function probeClientContracts(ctx, options = {}) {
   const source = ctx ?? {};
   const failures = [];
   const slots = readProperty(source, "slots");
@@ -77,6 +77,26 @@ export function probeClientContracts(ctx) {
   if (getFunction(slots, "inject") == null) failures.push("slots:inject");
   const sessions = readProperty(source, "sessions");
   if (getFunction(sessions, "open") == null) failures.push("sessions:open");
+
+  if (options.nativeConversation === true) {
+    const nativeOptions = { allowCordisBound: isCordisContext(source) };
+    const rootSpec = getFunction(slots, "spec");
+    if (rootSpec == null) {
+      failures.push("slot:root");
+    } else {
+      try {
+        if (Reflect.apply(rootSpec, slots, ["root"]) == null) failures.push("slot:root");
+      } catch {
+        failures.push("slot:root");
+      }
+    }
+    const layout = readProperty(source, "layout");
+    if (!probeHostMethod(layout, "attachPanels", nativeOptions)) failures.push("layout:attachPanels");
+    const inputTriggers = readProperty(source, "inputTriggers");
+    if (!probeHostMethod(inputTriggers, "registerSource", nativeOptions)) failures.push("inputTriggers:registerSource");
+    const commandUi = readProperty(source, "commandUi");
+    if (!probeHostMethod(commandUi, "register", nativeOptions)) failures.push("commandUi:register");
+  }
   return { ok: failures.length === 0, failures };
 }
 
