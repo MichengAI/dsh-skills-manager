@@ -76,7 +76,7 @@ test("appends only final transcripts and reports microphone permission errors", 
   instances[0].onerror({ error: "not-allowed" });
 
   assert.deepEqual(texts, ["最终结果"]);
-  assert.deepEqual(errors, ["未获得麦克风权限"]);
+  assert.deepEqual(errors, ["麦克风权限未开启"]);
 });
 
 test("reports idle and cleans up recognition when recognition errors", () => {
@@ -114,6 +114,20 @@ test("stops the active recognition instance", () => {
   speech.stop();
 
   assert.equal(instances[0].stopped, 1);
+});
+
+test("starting again stops the previous recognition and reports actionable errors", () => {
+  const { browser, instances } = recognitionBrowser({ preferred: true });
+  const speech = createSpeechInput(browser);
+  const errors = [];
+
+  speech.start({ onError: (error) => errors.push(error) });
+  speech.start({ onError: (error) => errors.push(error) });
+  assert.equal(instances.length, 2);
+  assert.equal(instances[0].stopped, 1);
+
+  instances[1].onerror({ error: "audio-capture" });
+  assert.deepEqual(errors, ["未检测到可用麦克风"]);
 });
 
 test("does not expose a supported voice control when recognition is unavailable", () => {

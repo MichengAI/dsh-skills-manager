@@ -4,6 +4,17 @@ const UNSUPPORTED = {
   stop() {},
 };
 
+function speechErrorMessage(reason) {
+  const messages = {
+    "not-allowed": "麦克风权限未开启",
+    "service-not-allowed": "麦克风权限未开启",
+    "audio-capture": "未检测到可用麦克风",
+    network: "语音服务连接失败",
+    "no-speech": "没有识别到语音，请重试",
+  };
+  return messages[reason] || "语音识别失败，请重试";
+}
+
 export function createSpeechInput(browser = globalThis) {
   const Recognition = typeof browser?.SpeechRecognition === "function"
     ? browser.SpeechRecognition
@@ -17,21 +28,28 @@ export function createSpeechInput(browser = globalThis) {
   return {
     supported: true,
     start({ onText = () => {}, onState = () => {}, onError = () => {} } = {}) {
-      recognition = new Recognition();
-      recognition.lang = "zh-CN";
-      recognition.interimResults = true;
-      recognition.continuous = false;
-      recognition.onstart = () => onState("listening");
-      recognition.onend = () => {
+      recognition?.stop?.();
+      const current = new Recognition();
+      recognition = current;
+      current.lang = "zh-CN";
+      current.interimResults = true;
+      current.continuous = false;
+      current.onstart = () => {
+        if (recognition === current) onState("listening");
+      };
+      current.onend = () => {
+        if (recognition !== current) return;
         recognition = null;
         onState("idle");
       };
-      recognition.onerror = (event) => {
+      current.onerror = (event) => {
+        if (recognition !== current) return;
         recognition = null;
         onState("idle");
-        onError(event?.error === "not-allowed" ? "未获得麦克风权限" : "语音识别失败，请重试");
+        onError(speechErrorMessage(event?.error));
       };
-      recognition.onresult = (event) => {
+      current.onresult = (event) => {
+        if (recognition !== current) return;
         let finalText = "";
         const resultIndex = Number.isInteger(event?.resultIndex) ? event.resultIndex : 0;
         for (let index = resultIndex; index < (event?.results?.length || 0); index += 1) {
@@ -40,7 +58,7 @@ export function createSpeechInput(browser = globalThis) {
         }
         if (finalText) onText(finalText);
       };
-      recognition.start();
+      current.start();
     },
     stop() {
       const current = recognition;
