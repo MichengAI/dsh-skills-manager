@@ -38,3 +38,11 @@ test("workbench overlay renders global dialogs from workbench state", async () =
   assert.match(source, /state\.dialog \? h\(Dialog/);
   assert.match(source, /type: "dialog\/close"/);
 });
+
+test("overlay forwards sidebar collapse state instead of a no-op toggle", async () => {
+  const source = await readFile(new URL("../src/client/workbench-overlay.js", import.meta.url), "utf8");
+
+  assert.match(source, /collapsed:\s*state\.sidebarCollapsed/);
+  assert.match(source, /type: "sidebar\/toggle"/);
+  assert.match(source, /data-expanded/);
+});

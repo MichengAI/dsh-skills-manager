@@ -23,14 +23,14 @@ export function createWorkbenchOverlay(React, options = {}) {
     return h("section", { className: "daw-workbench-overlay", role: "dialog", "aria-modal": "true", "aria-label": "正方 AI 工作台" }, [
       h("div", { className: "daw-workbench-overlay-bar", key: "bar" }, [h("strong", { key: "title" }, "正方 AI 工作台"), h("button", { type: "button", className: "daw-tool-button", onClick: onClose, key: "close" }, "返回 DSH")]),
       h("div", { className: "daw-workbench-overlay-frame", key: "frame" }, [
-        h("aside", { className: "daw-sidebar", key: "sidebar" }, h(Sidebar, {
+        h("aside", { className: "daw-sidebar", "data-expanded": state.sidebarCollapsed ? "false" : "true", key: "sidebar" }, h(Sidebar, {
           state,
           settings: workbench?.settings,
           dispatch: workbench?.dispatch,
           sessions: workbench?.sessions,
           renderSlot: renderEmptySlot,
-          collapsed: false,
-          toggleSidebar: renderEmptySlot,
+          collapsed: state.sidebarCollapsed,
+          toggleSidebar: () => workbench?.dispatch?.({ type: "sidebar/toggle" }),
         })),
         h("main", { className: "daw-center", key: "center" }, h(WorkbenchShell, {
           state,
