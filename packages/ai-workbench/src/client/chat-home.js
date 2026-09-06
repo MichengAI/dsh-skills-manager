@@ -202,7 +202,7 @@ export function createChatHome(React, options = {}) {
             h("button", { type: "button", className: "daw-tool-button", onClick: () => fileInput.current?.click(), "aria-label": "添加图片附件" }, "＋ 图片"),
             speechSupported ? h("button", { type: "button", className: "daw-tool-button", onClick: toggleSpeech, "aria-label": speechListening ? "停止语音输入" : "语音输入", "aria-pressed": speechListening }, speechListening ? "◌ 停止" : "◌ 语音") : null,
             h("button", { type: "button", className: `daw-toggle-button${deepThinking ? " is-active" : ""}`, role: "switch", "aria-checked": deepThinking, onClick: () => setDeepThinking(!deepThinking) }, "深度思考"),
-            h("button", { type: "button", className: `daw-toggle-button${webSearch ? " is-active" : ""}`, role: "switch", "aria-checked": webSearch, onClick: () => setWebSearch(!webSearch) }, "联网搜索")),
+            h("button", { type: "button", className: "daw-toggle-button", role: "switch", "aria-checked": false, disabled: true, title: "联网能力由 DSH Chat 预设统一配置", "aria-label": "联网搜索由管理员配置" }, "联网搜索（管理员配置）")),
           h("button", { type: "submit", className: "daw-send-button", disabled: sending || !draft.text.trim() }, sending ? "发送中…" : "发送 ➤")),
         h("p", { className: "daw-keyboard-help" }, "Enter 发送，Ctrl+Enter 换行"),
         speechError ? h("p", { className: "daw-inline-error", role: "alert" }, speechError) : null,

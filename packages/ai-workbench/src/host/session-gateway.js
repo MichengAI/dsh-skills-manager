@@ -39,13 +39,6 @@ function selectedCapabilityBlock(input) {
   return `\n\n本次任务已选择的能力：${input.capabilityIds.join("、")}。仅在完成任务需要时使用这些能力，所有权限审批仍以宿主策略为准。`;
 }
 
-function chatWebBlock(input) {
-  if (input.mode !== "chat") return "";
-  return input.webSearch
-    ? "\n\n本次回答允许在确有必要时使用联网搜索，并注明信息时效。"
-    : "\n\n本次回答不要使用联网搜索；仅根据当前对话和用户附件作答。";
-}
-
 function deepEffort(catalog, provider, modelId) {
   const group = catalog?.groups?.find((item) => item?.id === provider);
   const model = group?.models?.find((item) => item?.id === modelId);
@@ -63,7 +56,7 @@ function contentFor(input) {
   return [
     {
       type: "text",
-      text: input.text.trim() + selectedCapabilityBlock(input) + chatWebBlock(input),
+      text: input.text.trim() + selectedCapabilityBlock(input),
     },
     ...input.attachments.map((image) => ({
       type: "image",

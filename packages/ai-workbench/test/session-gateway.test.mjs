@@ -89,6 +89,20 @@ test("Chat always uses the restricted preset and ignores Work-only fields", asyn
   assert.doesNotMatch(calls.find(([kind]) => kind === "prompt")[1].content[0].text, /shell|forged-workspace|evil/);
 });
 
+test("Chat control switches never rewrite the user's visible message", async () => {
+  const { calls, deps } = createDeps();
+  await createSessionGateway(deps).start({
+    mode: "chat",
+    text: "只回答 2",
+    webSearch: false,
+    deepThinking: false,
+    attachments: [],
+  });
+
+  const prompt = calls.find(([kind]) => kind === "prompt")[1];
+  assert.equal(prompt.content[0].text, "只回答 2");
+});
+
 test("Work uses standard, workspace-write, and records selected capabilities", async () => {
   const { calls, meta, deps } = createDeps();
   const gateway = createSessionGateway(deps);
