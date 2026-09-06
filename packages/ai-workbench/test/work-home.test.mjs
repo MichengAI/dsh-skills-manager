@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildWorkSessionInput, draftFromTemplate, subscribeWorkspaceRuntime, workspaceFeedFromWorkbench, workspaceItemsFromFeed } from "../lib/client/work-home.js";
+import { buildWorkSessionInput, capabilityItemsFromWorkbench, draftFromTemplate, subscribeWorkspaceRuntime, workspaceFeedFromWorkbench, workspaceItemsFromFeed } from "../lib/client/work-home.js";
 import { findWorkTemplate } from "../lib/shared/work-templates.js";
 
 test("template selection replaces the draft without creating a session", () => {
@@ -76,4 +76,11 @@ test("workspace runtime subscriptions refresh consumers and clean up", () => {
 
   assert.deepEqual(updates, ["updated"]);
   assert.equal(disposed, true);
+});
+
+test("Work selection hides capabilities that the catalog marks unavailable", () => {
+  assert.deepEqual(capabilityItemsFromWorkbench({ capabilities: [
+    { id: "tool:web", name: "联网搜索", available: true },
+    { id: "skill:dsh:broken", name: "损坏技能", available: false },
+  ] }), [{ id: "tool:web", title: "联网搜索" }]);
 });

@@ -113,9 +113,10 @@ export function capabilityItemsFromWorkbench(workbench) {
   const source = workbench?.capabilities || workbench?.ctx?.capabilities || workbench?.ctx?.skills;
   if (!Array.isArray(source)) return [];
   return source.flatMap((item) => {
+    if (item && typeof item === "object" && item.available !== true) return [];
     const id = typeof item === "string" ? item : item?.id;
     if (typeof id !== "string" || !id) return [];
-    return [{ id, title: typeof item === "object" && item.title ? item.title : id }];
+    return [{ id, title: typeof item === "object" && (item.title || item.name) ? (item.title || item.name) : id }];
   });
 }
 
