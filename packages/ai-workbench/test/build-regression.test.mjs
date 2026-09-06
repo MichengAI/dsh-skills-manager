@@ -97,6 +97,7 @@ test("root-invoked build uses crash-recoverable transactional publish without to
       "client/workbench-overlay.js",
       "host/automation-runner.js",
       "host/automation-service.js",
+      "host/capability-resolver.js",
       "host/capability-service.js",
       "host/chat-preset.js",
       "host/diagnostics.js",
