@@ -76,6 +76,13 @@ export function workspaceFeedFromWorkbench(workbench) {
   const direct = workbench?.workspaceFeed;
   if (direct !== undefined) return direct;
   const runtime = workbench?.workspaces || workbench?.ctx?.workspaces;
+  if (typeof runtime?.list?.getSnapshot === "function") {
+    try {
+      return runtime.list.getSnapshot();
+    } catch {
+      return null;
+    }
+  }
   if (typeof runtime?.getSnapshot === "function") {
     try {
       return runtime.getSnapshot();
@@ -100,9 +107,10 @@ export function workspaceFeedFromWorkbench(workbench) {
 }
 
 export function subscribeWorkspaceRuntime(runtime, listener) {
-  if (typeof runtime?.subscribe !== "function" || typeof listener !== "function") return () => {};
+  const source = typeof runtime?.list?.subscribe === "function" ? runtime.list : runtime;
+  if (typeof source?.subscribe !== "function" || typeof listener !== "function") return () => {};
   try {
-    const dispose = runtime.subscribe(listener);
+    const dispose = source.subscribe(listener);
     return typeof dispose === "function" ? dispose : () => {};
   } catch {
     return () => {};

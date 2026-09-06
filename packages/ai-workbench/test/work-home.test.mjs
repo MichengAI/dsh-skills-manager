@@ -61,6 +61,25 @@ test("workspace adapter reads the injected DSH workspace runtime snapshot", () =
   assert.equal(workspaceFeedFromWorkbench({ workspaces }), snapshot);
 });
 
+test("workspace adapter reads the DSH workspace list observable", () => {
+  const snapshot = { items: [{ workspaceId: "dsh-workspace", title: "DSH 工作区", path: "/tmp/dsh" }] };
+  let subscribed = false;
+  const workspaces = {
+    list: {
+      getSnapshot: () => snapshot,
+      subscribe(listener) {
+        subscribed = true;
+        listener();
+        return () => {};
+      },
+    },
+  };
+
+  assert.equal(workspaceFeedFromWorkbench({ workspaces }), snapshot);
+  subscribeWorkspaceRuntime(workspaces, () => {});
+  assert.equal(subscribed, true);
+});
+
 test("workspace runtime subscriptions refresh consumers and clean up", () => {
   const updates = [];
   let disposed = false;
