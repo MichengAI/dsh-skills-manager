@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildWorkSessionInput, draftFromTemplate, workspaceFeedFromWorkbench, workspaceItemsFromFeed } from "../lib/client/work-home.js";
+import { buildWorkSessionInput, draftFromTemplate, subscribeWorkspaceRuntime, workspaceFeedFromWorkbench, workspaceItemsFromFeed } from "../lib/client/work-home.js";
 import { findWorkTemplate } from "../lib/shared/work-templates.js";
 
 test("template selection replaces the draft without creating a session", () => {
@@ -59,4 +59,21 @@ test("workspace adapter reads the injected DSH workspace runtime snapshot", () =
   const workspaces = { getSnapshot: () => snapshot, subscribe: () => () => {} };
 
   assert.equal(workspaceFeedFromWorkbench({ workspaces }), snapshot);
+});
+
+test("workspace runtime subscriptions refresh consumers and clean up", () => {
+  const updates = [];
+  let disposed = false;
+  const workspaces = {
+    subscribe(listener) {
+      listener();
+      return () => { disposed = true; };
+    },
+  };
+
+  const dispose = subscribeWorkspaceRuntime(workspaces, () => updates.push("updated"));
+  dispose();
+
+  assert.deepEqual(updates, ["updated"]);
+  assert.equal(disposed, true);
 });

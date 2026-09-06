@@ -99,6 +99,16 @@ export function workspaceFeedFromWorkbench(workbench) {
   }
 }
 
+export function subscribeWorkspaceRuntime(runtime, listener) {
+  if (typeof runtime?.subscribe !== "function" || typeof listener !== "function") return () => {};
+  try {
+    const dispose = runtime.subscribe(listener);
+    return typeof dispose === "function" ? dispose : () => {};
+  } catch {
+    return () => {};
+  }
+}
+
 export function capabilityItemsFromWorkbench(workbench) {
   const source = workbench?.capabilities || workbench?.ctx?.capabilities || workbench?.ctx?.skills;
   if (!Array.isArray(source)) return [];
@@ -137,7 +147,8 @@ export function createWorkHome(React, options = {}) {
     const enabledIds = capabilityOptions.map((item) => item.id);
     const recommendation = recommendExecution(draft.text, enabledIds);
     const execution = executionFor(draft, recommendation);
-    const workspaceFeed = workspaceFeedFromWorkbench(workbench);
+    const workspaceRuntime = workbench?.workspaces || workbench?.ctx?.workspaces || null;
+    const [workspaceFeed, setWorkspaceFeed] = React.useState(workspaceFeedFromWorkbench(workbench));
     const workspaceItems = workspaceItemsFromFeed(workspaceFeed);
     const imageLimits = workbench?.imageLimits || workbench?.ctx?.imageLimits || {};
     const normalizedImageLimits = normalizeImageLimits(imageLimits);
@@ -152,6 +163,12 @@ export function createWorkHome(React, options = {}) {
     const fileInput = React.useRef(null);
     const draftRef = React.useRef(draft);
     draftRef.current = draft;
+
+    React.useEffect(() => {
+      const refresh = () => setWorkspaceFeed(workspaceFeedFromWorkbench(workbench));
+      refresh();
+      return subscribeWorkspaceRuntime(workspaceRuntime, refresh);
+    }, [workspaceRuntime]);
 
     const speech = workbench?.speech || workbench?.ctx?.speech || workbench?.ctx?.voice;
     const speechSupported = speech?.supported === true;
