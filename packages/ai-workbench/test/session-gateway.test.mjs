@@ -111,6 +111,19 @@ test("Work uses standard, workspace-write, and records selected capabilities", a
   assert.match(calls.find(([kind]) => kind === "prompt")[1].content[0].text, /skill:docs/);
 });
 
+test("session prompt omits a missing client time zone instead of sending null", async () => {
+  const { calls, deps } = createDeps();
+  const gateway = createSessionGateway(deps);
+
+  await gateway.start({ mode: "work", text: "整理材料", attachments: [] });
+
+  assert.deepEqual(calls.find(([kind]) => kind === "prompt")[1], {
+    sessionId: "session-1",
+    mode: "queue",
+    content: [{ type: "text", text: "整理材料" }],
+  });
+});
+
 test("published sessions use the actual created id as the canonical metadata and response id", async () => {
   const { calls, meta, deps } = createDeps();
   deps.apiProxy.sessions.create = async (request) => {

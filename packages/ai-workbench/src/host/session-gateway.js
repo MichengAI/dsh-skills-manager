@@ -161,7 +161,7 @@ export function createSessionGateway(dependencies) {
             sessionId: publishedSessionId,
             mode: "queue",
             content: contentFor(input),
-            clientTimeZone: input.clientTimeZone,
+            ...(typeof input.clientTimeZone === "string" ? { clientTimeZone: input.clientTimeZone } : {}),
           },
         }));
 
