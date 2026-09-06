@@ -16,7 +16,15 @@ function sessionIdOf(session) {
 }
 
 function titleOf(result) {
-  return result?.value?.title?.title || "未命名";
+  const title = result?.value?.title?.title;
+  return typeof title === "string" && title.trim() ? title.trim() : null;
+}
+
+export function historyTitle(meta, title) {
+  if (typeof title === "string" && title.trim()) return title.trim();
+  if (meta?.setupStatus === "failed") return "任务启动失败";
+  if (meta?.origin === "migration") return "导入的未命名会话";
+  return meta?.mode === "chat" ? "未命名对话" : "未命名任务";
 }
 
 export function createModeService({ repository, sessionQuery }) {
@@ -69,7 +77,7 @@ export function createModeService({ repository, sessionQuery }) {
         records.push({
           ...meta,
           sessionId,
-          title: titles.get(sessionId) || "未命名",
+          title: historyTitle(meta, titles.get(sessionId)),
           createdAt: normalizeCreatedAt(meta.createdAt ?? sessionCreatedAt),
         });
       }

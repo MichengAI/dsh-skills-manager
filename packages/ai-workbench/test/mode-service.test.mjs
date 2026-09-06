@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createModeService } from "../lib/host/mode-service.js";
+import { createModeService, historyTitle } from "../lib/host/mode-service.js";
 import {
   assertMode,
   parseDraft,
@@ -11,6 +11,13 @@ import {
 function session(id, createdAt) {
   return { header: { id, createdAt } };
 }
+
+test("history title explains failed and imported sessions without a host title", () => {
+  assert.equal(historyTitle({ mode: "work", setupStatus: "failed" }, null), "任务启动失败");
+  assert.equal(historyTitle({ mode: "chat", origin: "migration" }, null), "导入的未命名会话");
+  assert.equal(historyTitle({ mode: "chat", origin: "user" }, null), "未命名对话");
+  assert.equal(historyTitle({ mode: "work" }, "  周报任务  "), "周报任务");
+});
 
 test("unclassified sessions become virtual imported Work history without writes", async () => {
   const writes = [];
