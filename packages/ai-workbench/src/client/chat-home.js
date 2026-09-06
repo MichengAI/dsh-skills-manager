@@ -175,7 +175,6 @@ export function createChatHome(React, options = {}) {
     return h("section", { className: "daw-chat-home", "aria-labelledby": "daw-chat-home-title" },
       h("div", { className: "daw-chat-hero" },
         h("img", { className: "daw-ai-orb", src: AI_ORB_SOURCE, alt: "", width: 104, height: 104 }),
-        h("p", { className: "daw-eyebrow" }, "CHAT MODE"),
         h("h1", { id: "daw-chat-home-title" }, "有什么校园问题想问我？"),
         h("p", { className: "daw-chat-copy" }, "随时问我校园服务、学习生活和知识问题。")),
       h("form", { className: "daw-chat-composer", onSubmit: submit },

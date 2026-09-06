@@ -160,7 +160,6 @@ export function createCapabilityLibrary(React, options = {}) {
     return h("section", { className: "daw-capability-library", "aria-labelledby": "daw-capability-title", "aria-busy": loading ? "true" : "false" }, [
       h("header", { className: "daw-capability-header", key: "header" }, [
         h("div", { key: "intro" }, [
-          h("p", { className: "daw-eyebrow", key: "eyebrow" }, "WORK CAPABILITIES"),
           h("h1", { id: "daw-capability-title", key: "title" }, "能力库"),
           h("p", { className: "daw-capability-copy", key: "copy" }, "查看可用于 Work 任务的 Skills、DSH 工具和业务系统"),
         ]),
