@@ -54,6 +54,8 @@ test("API starts sessions and lists models through host routes", async () => {
 
   try {
     assert.deepEqual(await workbenchApi.startSession({ mode: "chat", text: "你好", attachments: [] }), { sessionId: "s1" });
+    assert.deepEqual(await workbenchApi.prepareSession({ mode: "work", draftKey: "draft-1" }), { sessionId: "s1" });
+    assert.deepEqual(await workbenchApi.activateSession("s1"), { sessionId: "s1" });
     assert.deepEqual(await workbenchApi.listModels(), { sessionId: "s1" });
   } finally {
     globalThis.fetch = originalFetch;
@@ -62,8 +64,14 @@ test("API starts sessions and lists models through host routes", async () => {
   assert.equal(calls[0][0], "/api/dsh-ai-workbench/sessions");
   assert.equal(calls[0][1].method, "POST");
   assert.equal(calls[0][1].headers["x-dsh-workbench-action"], "1");
-  assert.equal(calls[1][0], "/api/dsh-ai-workbench/models");
-  assert.equal(calls[1][1].method, "GET");
+  assert.equal(calls[1][0], "/api/dsh-ai-workbench/sessions");
+  assert.equal(calls[1][1].method, "POST");
+  assert.deepEqual(JSON.parse(calls[1][1].body), { mode: "work", draftKey: "draft-1", intent: "prepare" });
+  assert.equal(calls[2][0], "/api/dsh-ai-workbench/sessions");
+  assert.equal(calls[2][1].method, "POST");
+  assert.deepEqual(JSON.parse(calls[2][1].body), { sessionId: "s1", intent: "active" });
+  assert.equal(calls[3][0], "/api/dsh-ai-workbench/models");
+  assert.equal(calls[3][1].method, "GET");
 });
 
 test("API exposes a published session id from a structured setup error", async () => {

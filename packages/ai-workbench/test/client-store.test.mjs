@@ -14,6 +14,23 @@ test("switching modes preserves separate drafts", () => {
   assert.equal(state.drafts.chat.text, "解释概念");
 });
 
+test("shared workbench store keeps sidebar and overlay state synchronized", () => {
+  assert.equal(typeof store.createWorkbenchStateStore, "function");
+  const stateStore = store.createWorkbenchStateStore();
+  const snapshots = [];
+  const dispose = stateStore.subscribe(() => snapshots.push(stateStore.getState()));
+
+  stateStore.dispatch({ type: "mode/change", mode: "chat" });
+  stateStore.dispatch({ type: "draft/change", mode: "chat", text: "校园服务" });
+
+  assert.equal(stateStore.getState().mode, "chat");
+  assert.equal(stateStore.getState().drafts.chat.text, "校园服务");
+  assert.equal(snapshots.length, 2);
+  dispose();
+  stateStore.dispatch({ type: "mode/change", mode: "work" });
+  assert.equal(snapshots.length, 2);
+});
+
 test("mode changes navigate to the selected mode home", () => {
   const state = reduceWorkbench(initialState(), { type: "mode/change", mode: "chat" });
 

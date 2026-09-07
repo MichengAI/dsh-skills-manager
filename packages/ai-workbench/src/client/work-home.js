@@ -1,7 +1,9 @@
 import { recommendExecution } from "../shared/auto-select.js";
 import { findWorkTemplate, WORK_TEMPLATES } from "../shared/work-templates.js";
 import { workbenchApi } from "./api.js";
+import { createNativeComposerBridge } from "./home-composer-bridge.js";
 import { normalizeImageLimits, readImageAttachment } from "./image-input.js";
+import { createNativeSession, resolveDefaultWorkspaceId } from "./sidebar.js";
 import { AI_ORB_SOURCE } from "./assets.js";
 
 export const EMPTY_WORK_DRAFT = {
@@ -179,6 +181,8 @@ export function createWorkHome(React, options = {}) {
     const fileInput = React.useRef(null);
     const draftRef = React.useRef(draft);
     draftRef.current = draft;
+    const nativeBridgeRef = React.useRef(null);
+    const nativeBridgeKeyRef = React.useRef(null);
 
     React.useEffect(() => {
       const refresh = () => setWorkspaceFeed(workspaceFeedFromWorkbench(workbench));
@@ -189,6 +193,7 @@ export function createWorkHome(React, options = {}) {
     const speech = workbench?.speech || workbench?.ctx?.speech || workbench?.ctx?.voice;
     const speechSupported = speech?.supported === true;
     React.useEffect(() => () => speech?.stop?.(), [speech]);
+    React.useEffect(() => () => nativeBridgeRef.current?.dispose(), []);
 
     React.useEffect(() => {
       if (!selectionOpen || models || modelsError) return undefined;
@@ -298,18 +303,57 @@ export function createWorkHome(React, options = {}) {
       }
     };
 
+    const nativeBridge = () => {
+      const key = `work:${draftRef.current.workspaceId || "default"}`;
+      if (nativeBridgeRef.current && nativeBridgeKeyRef.current !== key) {
+        nativeBridgeRef.current.dispose();
+        nativeBridgeRef.current = null;
+      }
+      if (!nativeBridgeRef.current) {
+        nativeBridgeRef.current = createNativeComposerBridge({
+          ctx: workbench?.ctx,
+          sessions: workbench?.sessions,
+          mode: "work",
+          draftKey: key,
+          workspaceId: draftRef.current.workspaceId,
+          resolveWorkspaceId: async () => await resolveDefaultWorkspaceId(workbench?.workspaces, workbench?.ctx) || state.drafts?.work?.workspaceId || null,
+          createSession: (input) => createNativeSession(workbench?.sessions, workbench?.workspaces, "work", input?.workspaceId),
+          prepareSession: api.prepareSession,
+          activateSession: api.activateSession,
+        });
+        nativeBridgeKeyRef.current = key;
+      }
+      return nativeBridgeRef.current;
+    };
+
+    const openNativeComposer = async (source) => {
+      try {
+        const bridge = nativeBridge();
+        await bridge.transfer(draftRef.current);
+        dispatch({ type: "navigate", route: { name: "conversation", mode: "work", sessionId: bridge.sessionId } });
+        if (source) bridge.openSource(source, { start: 0, end: bridge.getState().draft.length });
+      } catch (error) {
+        setSubmitError(error);
+      }
+    };
+
     const submit = async (event) => {
       event.preventDefault();
       if (!draft.text.trim() || sending) return;
       setSending(true);
       setSubmitError(null);
       try {
-        const result = await api.startSession(buildWorkSessionInput({ ...draft, execution }));
+        const bridge = nativeBridge();
+        await bridge.transfer({ ...draft, execution });
+        const result = await bridge.submit();
         if (!result?.sessionId) throw new Error("会话创建未返回 sessionId");
         replaceDraft(EMPTY_WORK_DRAFT);
-        workbench?.sessions?.open?.(result.sessionId);
+        dispatch({ type: "navigate", route: { name: "conversation", mode: "work", sessionId: result.sessionId } });
       } catch (error) {
-        if (error?.sessionId) workbench?.sessions?.open?.(error.sessionId);
+        if (error?.sessionId) {
+          workbench?.sessions?.open?.(error.sessionId);
+          dispatch({ type: "navigate", route: { name: "conversation", mode: "work", sessionId: error.sessionId } });
+        }
         setSubmitError(error);
       } finally {
         setSending(false);
@@ -350,6 +394,8 @@ export function createWorkHome(React, options = {}) {
           h("div", { className: "daw-work-actions" },
             h("input", { ref: fileInput, className: "daw-visually-hidden", type: "file", accept: [...normalizedImageLimits.mediaTypes].join(","), multiple: true, onChange: addFiles }),
             h("button", { type: "button", className: "daw-tool-button", onClick: () => fileInput.current?.click(), "aria-label": "添加图片附件" }, "＋ 图片"),
+            h("button", { type: "button", className: "daw-tool-button", onClick: () => openNativeComposer("command"), "aria-label": "打开 DSH 命令菜单" }, "／ 命令"),
+            h("button", { type: "button", className: "daw-tool-button", onClick: () => openNativeComposer("skill"), "aria-label": "打开 DSH 技能菜单" }, "／ 技能"),
             speechSupported ? h("button", { type: "button", className: "daw-tool-button", onClick: toggleSpeech, "aria-label": speechListening ? "停止语音输入" : "语音输入", "aria-pressed": speechListening }, speechListening ? "◌ 停止" : "◌ 语音") : null,
             h("button", { type: "button", className: "daw-policy-chip", onClick: () => openDialog("需要时请求批准", "AI 只会在任务需要时申请宿主批准；文件与系统权限仍由 DSH 宿主策略控制。") }, "✓ 需要时请求批准")),
           h("button", { type: "submit", className: "daw-send-button", disabled: sending || !draft.text.trim() }, sending ? "发送中…" : "发送 ➤")),

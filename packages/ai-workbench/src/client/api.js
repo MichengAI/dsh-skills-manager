@@ -92,6 +92,8 @@ export async function request(path, options = {}) {
 export const workbenchApi = {
   bootstrap: (mode) => request(`/bootstrap?mode=${encodeURIComponent(assertMode(mode))}`),
   startSession: (input) => request("/sessions", { method: "POST", body: JSON.stringify(input) }),
+  prepareSession: (input) => request("/sessions", { method: "POST", body: JSON.stringify({ ...input, intent: "prepare" }) }),
+  activateSession: (sessionId) => request("/sessions", { method: "POST", body: JSON.stringify({ sessionId, intent: "active" }) }),
   listModels: () => request("/models"),
   capabilityPreferences: () => request("/capability-preferences"),
   saveCapabilityPreferences: (enabledIds) => request("/capability-preferences", {

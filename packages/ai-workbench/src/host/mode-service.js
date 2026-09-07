@@ -83,7 +83,7 @@ export function createModeService({ repository, sessionQuery }) {
       }
 
       return records
-        .filter((record) => record.mode === mode)
+        .filter((record) => record.mode === mode && record.lifecycle !== "prepared")
         .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
     },
   };

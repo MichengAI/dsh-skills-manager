@@ -60,6 +60,29 @@ export function initialState() {
   };
 }
 
+export function createWorkbenchStateStore() {
+  let state = initialState();
+  const listeners = new Set();
+
+  return {
+    getState() {
+      return state;
+    },
+    subscribe(listener) {
+      if (typeof listener !== "function") return () => {};
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    dispatch(action) {
+      const next = reduceWorkbench(state, action);
+      if (next === state) return state;
+      state = next;
+      for (const listener of listeners) listener();
+      return state;
+    },
+  };
+}
+
 export function reduceWorkbench(state, action) {
   switch (action.type) {
     case "mode/change":

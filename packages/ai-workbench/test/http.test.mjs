@@ -350,6 +350,35 @@ test("bootstrap supports Chat and rejects a missing or unknown mode", async () =
   }
 });
 
+test("session route separates preparation from message submission", async () => {
+  const services = modeServices({
+    features: { chat: { available: true } },
+    sessionGateway: {
+      prepare: async (input) => ({ sessionId: "prepared-1", mode: input.mode, lifecycle: "prepared" }),
+      markActive: async (input) => ({ sessionId: input.sessionId, mode: "work", lifecycle: "active" }),
+      start: async () => ({ sessionId: "active-1", mode: "work" }),
+    },
+  });
+  const result = await routeRequest(workbenchRequest({
+    method: "POST",
+    url: "/api/dsh-ai-workbench/sessions",
+    headers: { host: "localhost", "x-dsh-workbench-action": "1", "content-type": "application/json" },
+    body: JSON.stringify({ intent: "prepare", mode: "work", draftKey: "draft-1" }),
+  }), services);
+
+  assert.equal(result.statusCode, 201);
+  assert.deepEqual(result.body.data, { sessionId: "prepared-1", mode: "work", lifecycle: "prepared" });
+
+  const active = await routeRequest(workbenchRequest({
+    method: "POST",
+    url: "/api/dsh-ai-workbench/sessions",
+    headers: { host: "localhost", "x-dsh-workbench-action": "1", "content-type": "application/json" },
+    body: JSON.stringify({ intent: "active", sessionId: "prepared-1" }),
+  }), services);
+  assert.equal(active.statusCode, 201);
+  assert.deepEqual(active.body.data, { sessionId: "prepared-1", mode: "work", lifecycle: "active" });
+});
+
 test("draft endpoints save independent Work and Chat drafts", async () => {
   const services = modeServices();
   const work = await routeRequest(jsonMutationRequest("/api/dsh-ai-workbench/drafts/work", JSON.stringify({

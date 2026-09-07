@@ -81,20 +81,34 @@
 - 原生技能以 `/` 触发源注册，候选来自当前 session 的技能目录；选择后插入 `/${candidate.name} `。
 - 该插入行为本身不执行技能；实际执行仍由命令/技能宿主链路处理。
 
+## 本轮真实宿主验证（2026-09-07）
+
+在隔离 DSH Web 实例（`@deepseek-ai/dsh 0.1.1-rc.2`、Node 24 runtime）中重新构建并加载当前 worktree，未发送消息、未上传文件。
+
+- 工作台自定义左栏与 DSH 官方右侧 ConversationRoot 同时正常加载；页面没有插件加载错误。
+- Work 点击“新建任务”后，创建的原生会话快照显示 `displayTitle: output`、`cwd: /Users/yekechao/Documents/deepseekh/output`，输入框 `readonly` 为空、命令按钮可用。
+- Chat 点击“新建对话”后，输入框可编辑、命令按钮可用；输入 `/` 出现真实技能候选 `aihot`，不是工作台静态列表。
+- Chat 命令菜单由 DSH 原生目录提供，实测出现 `export`、`permission`、`model`；Work 菜单此前实测出现 `compact`、`export`、`permission`、`plan`、`model`。
+- 点击 Work 历史项 `AI热点动态查询概述` 后，右侧展示完整原生消息流、Skill/工具轨迹、详情入口和可继续输入框；点击 Chat 历史项 `聊天验证成功提示` 后，右侧展示 Chat 预设消息流和可继续输入框，左栏保持不变。
+- 最终干净实例控制台日志为空；本轮没有发送新的模型消息或上传文件，历史项仅用于读取已有会话。
+- 发现并修复两类会话问题：`sessions.create()`/`connectWorkspace()` 返回的结构化结果解析，以及同一 `draftKey` 下旧 prepared 会话覆盖新原生 sessionId；新增会话现在优先创建新的 workspace session，避免复用重启后失活的空会话。
+- 单元/集成测试最终为 257/257 通过；构建产物与包检查由测试矩阵覆盖。
+
 ## 尚未通过运行时验证的契约
 
 - 当前插件上下文是否能安全获得 `commandUi`、`inputTriggers`、conversation input facade 以及对应 session scope；
 - 工作台首页无 session 时如何获得符合宿主生命周期的“准备会话”，以及准备是否会产生可见历史；
 - Chat 命令/技能拒绝应挂在 `remote.commands.execute`、host command registry、agent preset 还是更低层的 agent 权限入口；
 - 以当前插件加载顺序注册 root 时，如何避免官方 root 和工作台 root 同时存活。
+- Chat 直接调用 `Session.command(line)` 时，服务端是否会拒绝所有 Work 权限命令；原生命令菜单被过滤不等于服务端安全闭环。
 
 ## 已完成的最小运行时验证
 
-在隔离 profile 的 3090 端口实例中加载当前 worktree 后，工作台成功出现，严格兼容探针没有报告 `slot:root`、`layout:attachPanels`、`inputTriggers:registerSource` 或 `commandUi:register` 缺失，控制台没有 error/warn。该验证没有改变正式入口，也没有发送消息。
+在隔离 profile 的实例中加载当前 worktree 后，工作台成功出现，严格兼容探针没有报告 `slot:root`、`layout:attachPanels`、`inputTriggers:registerSource` 或 `commandUi:register` 缺失，控制台没有插件加载 error。该验证没有改变正式入口，也没有发送消息。
 
 尚未完成的两项不应被这次加载结果掩盖：
 
 1. 需要实际替换/组装 root 后，验证官方 root 不与工作台 root 双重存活；
-2. 需要在真实 Chat session 上验证直接调用命令入口时服务端仍拒绝 Work 权限命令。
+2. 需要在真实 Chat session 上验证直接调用命令入口时服务端仍拒绝 Work 权限命令；这仍是发布前阻塞项。
 
 这些项目必须由 NC01 的最小运行时原型或后续宿主扩展确认，未确认前不实现猜测性的调用。

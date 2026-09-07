@@ -28,6 +28,8 @@ export function createWorkbenchOverlay(React, options = {}) {
           settings: workbench?.settings,
           dispatch: workbench?.dispatch,
           sessions: workbench?.sessions,
+          workspaces: workbench?.workspaces,
+          api: workbench?.api,
           renderSlot: renderEmptySlot,
           collapsed: state.sidebarCollapsed,
           toggleSidebar: () => workbench?.dispatch?.({ type: "sidebar/toggle" }),

@@ -76,6 +76,45 @@ test("unclassified sessions become virtual imported Work history without writes"
   assert.deepEqual(writes, []);
 });
 
+test("prepared sessions stay out of ordinary mode history while legacy sessions remain visible", async () => {
+  const metas = new Map([
+    ["prepared-1", {
+      sessionId: "prepared-1",
+      mode: "work",
+      origin: "user",
+      lifecycle: "prepared",
+      draftKey: "home-work",
+      createdAt: "2026-09-05T12:00:00.000Z",
+    }],
+    ["active-1", {
+      sessionId: "active-1",
+      mode: "work",
+      origin: "user",
+      lifecycle: "active",
+      createdAt: "2026-09-04T12:00:00.000Z",
+    }],
+  ]);
+  const service = createModeService({
+    repository: {
+      getSessionMeta: (id) => metas.get(id) || null,
+      putSessionMeta: async () => undefined,
+    },
+    sessionQuery: {
+      listSessions: async () => [
+        session("prepared-1", "2026-09-05T12:00:00.000Z"),
+        session("active-1", "2026-09-04T12:00:00.000Z"),
+      ],
+      readTitleSnapshots: async (ids) => ids.map((sessionId) => ({
+        sessionId,
+        status: "fulfilled",
+        value: { title: { title: sessionId } },
+      })),
+    },
+  });
+
+  assert.deepEqual((await service.listHistory("work")).map((item) => item.sessionId), ["active-1"]);
+});
+
 test("assignSession rejects a conflicting mode and does not write", async () => {
   const writes = [];
   const service = createModeService({

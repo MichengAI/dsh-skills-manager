@@ -2,8 +2,9 @@ import { probeClientContracts } from "./shared/compatibility.js";
 import CHAT_HOME_CONFIG from "../assets/chat-home.json" with { type: "json" };
 import { workbenchApi } from "./client/api.js";
 import { loadCapabilitySources } from "./client/capability-source.js";
-import { createDraftSaveScheduler, initialState, reduceWorkbench } from "./client/store.js";
+import { createDraftSaveScheduler, createWorkbenchStateStore } from "./client/store.js";
 import { createSpeechInput } from "./client/speech-input.js";
+import { createSidebar, createSidebarRegistration } from "./client/sidebar.js";
 import { automationCss, automationEnhancementCss, foundationCss, installStyles, overlayCss } from "./client/styles.js";
 import { createWorkbenchOverlay } from "./client/workbench-overlay.js";
 
@@ -14,19 +15,25 @@ window.__ModuleLoader__.load({
     const runtime = require("@deepseek-ai/dsh-client-runtime/client");
     const WorkbenchContext = typeof React.createContext === "function" ? React.createContext(null) : { Provider: ({ children }) => children };
     const name = "ai-workbench-client";
-    const inject = ["slots", "sessions", "workspaces", "layout", "inputTriggers", "commandUi"];
+    const inject = ["slots", "sessions", "workspaces", "layout", "inputTriggers", "commandUi", "conversation", "connection"];
+    const stateStore = createWorkbenchStateStore();
+    const Sidebar = createSidebar(React);
 
     function WorkbenchProvider({ ctx, children, onConversation }) {
-      const [state, reduce] = React.useReducer(reduceWorkbench, undefined, initialState);
+      const [revision, setRevision] = React.useState(0);
+      const state = stateStore.getState();
       const [settings, setSettings] = React.useState(null);
       const [capabilitySnapshot, setCapabilitySnapshot] = React.useState(null);
       const draftScheduler = React.useRef(null);
       const observedDrafts = React.useRef(state.drafts);
       const speech = React.useRef(null);
       const dispatch = (action) => {
-        reduce(action);
+        stateStore.dispatch(action);
         if (action?.type === "navigate" && action.route?.name === "conversation") onConversation?.();
       };
+
+      React.useEffect(() => stateStore.subscribe(() => setRevision((value) => value + 1)), []);
+      void revision;
 
       if (!speech.current) speech.current = createSpeechInput(window);
 
@@ -36,6 +43,8 @@ window.__ModuleLoader__.load({
           clearTimeoutFn: (timer) => window.clearTimeout(timer),
         });
       }
+
+      const getService = (key, fallback) => fallback || ctx?.get?.(key);
 
       React.useEffect(() => {
         let active = true;
@@ -73,15 +82,17 @@ window.__ModuleLoader__.load({
 
       return h(WorkbenchContext.Provider, {
         value: {
+          ctx,
+          api: workbenchApi,
           state,
           dispatch,
           settings,
           capabilities: capabilitySnapshot?.items || [],
-          sessions: ctx.sessions,
-          workspaces: ctx.workspaces,
-          layout: ctx.layout,
-          inputTriggers: ctx.inputTriggers,
-          commandUi: ctx.commandUi,
+          sessions: getService("sessions", ctx.sessions),
+          workspaces: getService("workspaces", ctx.workspaces),
+          layout: getService("layout", ctx.layout),
+          inputTriggers: getService("inputTriggers", ctx.inputTriggers),
+          commandUi: getService("commandUi", ctx.commandUi),
           speech: speech.current,
         },
       }, children);
@@ -100,9 +111,29 @@ window.__ModuleLoader__.load({
         chatConfig: CHAT_HOME_CONFIG,
         provider: (props) => h(WorkbenchProvider, { ctx, ...props }),
       });
+      function NativeSidebar(props) {
+        function NativeSidebarBody() {
+          const workbench = React.useContext(WorkbenchContext);
+          return h(Sidebar, {
+            ...props,
+            state: workbench?.state,
+            settings: workbench?.settings,
+            dispatch: workbench?.dispatch,
+            sessions: workbench?.sessions,
+            workspaces: workbench?.workspaces,
+            api: workbench?.api,
+            ctx: workbench?.ctx,
+            renderSlot: props.renderSlot,
+          });
+        }
+        return h(WorkbenchProvider, { ctx }, h(NativeSidebarBody));
+      }
+      ctx.slots.inject("sidebar", () => {
+        return ctx.slots.register(createSidebarRegistration(), NativeSidebar);
+      });
       ctx.slots.inject("shell.overlay", () => ctx.slots.register({
         name: "shell.overlay",
-        id: "dsh-ai-workbench",
+        id: "dsh-ai-workbench-overlay",
         order: 100,
         label: "正方 AI 工作台",
       }, Overlay));

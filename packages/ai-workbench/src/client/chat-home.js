@@ -1,6 +1,8 @@
 import { DEFAULT_CHAT_CONFIG, buildChatSessionInput, keyboardAction, validateChatConfig, rotateBatch } from "../shared/chat-config.js";
 import { workbenchApi } from "./api.js";
+import { createNativeComposerBridge } from "./home-composer-bridge.js";
 import { normalizeImageLimits, readImageAttachment } from "./image-input.js";
+import { createNativeSession, resolveDefaultWorkspaceId } from "./sidebar.js";
 import { AI_ORB_SOURCE } from "./assets.js";
 
 function normalizeChatDraft(draft = {}) {
@@ -44,10 +46,12 @@ export function createChatHome(React, options = {}) {
     const fileInput = React.useRef(null);
     const draftRef = React.useRef(draft);
     draftRef.current = draft;
+    const nativeBridgeRef = React.useRef(null);
 
     const speech = workbench?.speech || workbench?.ctx?.speech || workbench?.ctx?.voice;
     const speechSupported = speech?.supported === true;
     React.useEffect(() => () => speech?.stop?.(), [speech]);
+    React.useEffect(() => () => nativeBridgeRef.current?.dispose(), []);
 
     const replaceDraft = (next) => dispatch({ type: "draft/replace", mode: "chat", draft: normalizeChatDraft(next) });
     const changeText = (text) => replaceDraft({ ...draft, text });
@@ -106,6 +110,34 @@ export function createChatHome(React, options = {}) {
       }
     };
 
+    const nativeBridge = () => {
+      if (!nativeBridgeRef.current) {
+        nativeBridgeRef.current = createNativeComposerBridge({
+          ctx: workbench?.ctx,
+          sessions: workbench?.sessions,
+          mode: "chat",
+          agentPreset: "zf-chat-workbench-v1",
+          draftKey: "chat:local",
+          resolveWorkspaceId: async () => await resolveDefaultWorkspaceId(workbench?.workspaces, workbench?.ctx) || state.drafts?.work?.workspaceId || null,
+          createSession: (input) => createNativeSession(workbench?.sessions, workbench?.workspaces, "chat", input?.workspaceId),
+          prepareSession: api.prepareSession,
+          activateSession: api.activateSession,
+        });
+      }
+      return nativeBridgeRef.current;
+    };
+
+    const openNativeComposer = async (source) => {
+      try {
+        const bridge = nativeBridge();
+        await bridge.transfer(draftRef.current);
+        dispatch({ type: "navigate", route: { name: "conversation", mode: "chat", sessionId: bridge.sessionId } });
+        if (source) bridge.openSource(source, { start: 0, end: bridge.getState().draft.length });
+      } catch (error) {
+        setSubmitError(error);
+      }
+    };
+
     const submit = async (event) => {
       event?.preventDefault?.();
       if (!draft.text.trim() || sending) return;
@@ -113,19 +145,17 @@ export function createChatHome(React, options = {}) {
       setSubmitError(null);
       setNotice(null);
       try {
-        const result = await api.startSession(buildChatSessionInput({
-          text: draft.text,
-          attachments: draft.attachments,
-          deepThinking,
-          webSearch,
-          clientTimeZone: timeZone(),
-        }));
+        const bridge = nativeBridge();
+        await bridge.transfer({ text: draft.text, attachments: draft.attachments });
+        const result = await bridge.submit();
         if (!result?.sessionId) throw new Error("会话创建未返回 sessionId");
         replaceDraft({ text: "", attachments: [] });
-        if (deepThinking && result.reasoning?.applied === false) setNotice("当前模型不支持所选深度思考级别");
-        workbench?.sessions?.open?.(result.sessionId);
+        dispatch({ type: "navigate", route: { name: "conversation", mode: "chat", sessionId: result.sessionId } });
       } catch (error) {
-        if (error?.sessionId) workbench?.sessions?.open?.(error.sessionId);
+        if (error?.sessionId) {
+          workbench?.sessions?.open?.(error.sessionId);
+          dispatch({ type: "navigate", route: { name: "conversation", mode: "chat", sessionId: error.sessionId } });
+        }
         setSubmitError(error);
       } finally {
         setSending(false);
@@ -199,6 +229,8 @@ export function createChatHome(React, options = {}) {
           h("div", { className: "daw-chat-actions" },
             h("input", { ref: fileInput, className: "daw-visually-hidden", type: "file", accept: [...imageLimits.mediaTypes].join(","), multiple: true, onChange: addFiles }),
             h("button", { type: "button", className: "daw-tool-button", onClick: () => fileInput.current?.click(), "aria-label": "添加图片附件" }, "＋ 图片"),
+            h("button", { type: "button", className: "daw-tool-button", onClick: () => openNativeComposer("command"), "aria-label": "打开 DSH 命令菜单" }, "／ 命令"),
+            h("button", { type: "button", className: "daw-tool-button", onClick: () => openNativeComposer("skill"), "aria-label": "打开 DSH 技能菜单" }, "／ 技能"),
             speechSupported ? h("button", { type: "button", className: "daw-tool-button", onClick: toggleSpeech, "aria-label": speechListening ? "停止语音输入" : "语音输入", "aria-pressed": speechListening }, speechListening ? "◌ 停止" : "◌ 语音") : null,
             h("button", { type: "button", className: `daw-toggle-button${deepThinking ? " is-active" : ""}`, role: "switch", "aria-checked": deepThinking, onClick: () => setDeepThinking(!deepThinking) }, "深度思考"),
             h("button", { type: "button", className: "daw-toggle-button", role: "switch", "aria-checked": false, disabled: true, title: "联网能力由 DSH Chat 预设统一配置", "aria-label": "联网搜索由管理员配置" }, "联网搜索（管理员配置）")),

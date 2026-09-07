@@ -53,9 +53,10 @@ function createDeps(overrides = {}) {
       },
     },
     repository: {
-      putSessionMeta: async (id, value) => { calls.push(["put-meta", id, value]); meta.set(id, value); return value; },
+      putSessionMeta: async (id, value) => { const saved = { ...value, sessionId: id }; calls.push(["put-meta", id, saved]); meta.set(id, saved); return saved; },
       getSessionMeta: async (id) => meta.get(id) || null,
       deleteSessionMeta: async (id) => { calls.push(["delete-meta", id]); meta.delete(id); },
+      listSessionMeta: async () => [...meta.values()],
     },
     permissionPresets: { set: async (...args) => calls.push(["permission", ...args]) },
     sessions: { get: (id) => ({ id }) },
@@ -65,6 +66,109 @@ function createDeps(overrides = {}) {
   };
   return { calls, meta, deps };
 }
+
+test("preparing the same draft twice reuses one session without prompting", async () => {
+  const { calls, meta, deps } = createDeps();
+  const gateway = createSessionGateway(deps);
+
+  const [first, second] = await Promise.all([
+    gateway.prepare({ mode: "work", draftKey: "draft-1", workspaceId: "workspace-1" }),
+    gateway.prepare({ mode: "work", draftKey: "draft-1", workspaceId: "workspace-1" }),
+  ]);
+
+  assert.deepEqual(first, { sessionId: "session-1", mode: "work", lifecycle: "prepared" });
+  assert.deepEqual(second, first);
+  assert.equal(calls.filter(([kind]) => kind === "create").length, 1);
+  assert.equal(calls.filter(([kind]) => kind === "prompt").length, 0);
+  assert.deepEqual(meta.get("session-1"), {
+    sessionId: "session-1",
+    mode: "work",
+    origin: "user",
+    createdAt: meta.get("session-1").createdAt,
+    workspaceId: "workspace-1",
+    draftKey: "draft-1",
+    lifecycle: "prepared",
+  });
+});
+
+test("prepared drafts remain isolated between Work and Chat", async () => {
+  const { calls, deps } = createDeps();
+  let nextId = 0;
+  deps.id = () => `session-${++nextId}`;
+  const gateway = createSessionGateway(deps);
+
+  const work = await gateway.prepare({ mode: "work", draftKey: "same-draft" });
+  const chat = await gateway.prepare({ mode: "chat", draftKey: "same-draft" });
+
+  assert.notEqual(work.sessionId, chat.sessionId);
+  assert.deepEqual(calls.filter(([kind]) => kind === "create").map(([, payload]) => payload.agentPreset), [
+    "standard",
+    "zf-chat-workbench-v1",
+  ]);
+  assert.equal(calls.filter(([kind]) => kind === "prompt").length, 0);
+});
+
+test("preparing an already-created native session only attaches workbench metadata", async () => {
+  const { calls, meta, deps } = createDeps();
+  const gateway = createSessionGateway(deps);
+
+  const result = await gateway.prepare({
+    mode: "chat",
+    draftKey: "native-draft",
+    sessionId: "native-session",
+  });
+
+  assert.deepEqual(result, { sessionId: "native-session", mode: "chat", lifecycle: "prepared" });
+  assert.equal(calls.filter(([kind]) => kind === "create").length, 0);
+  assert.equal(meta.get("native-session")?.lifecycle, "prepared");
+});
+
+test("a requested native session wins over a stale prepared draft with the same key", async () => {
+  const { calls, meta, deps } = createDeps();
+  meta.set("stale-session", {
+    sessionId: "stale-session",
+    mode: "work",
+    origin: "user",
+    createdAt: "2026-09-07T00:00:00.000Z",
+    workspaceId: null,
+    draftKey: "sidebar:work:0",
+    lifecycle: "prepared",
+  });
+  const gateway = createSessionGateway(deps);
+
+  const result = await gateway.prepare({
+    mode: "work",
+    draftKey: "sidebar:work:0",
+    workspaceId: "workspace-1",
+    sessionId: "native-session",
+  });
+
+  assert.deepEqual(result, { sessionId: "native-session", mode: "work", lifecycle: "prepared" });
+  assert.equal(meta.has("stale-session"), false);
+  assert.equal(meta.get("native-session")?.workspaceId, "workspace-1");
+  assert.equal(calls.filter(([kind]) => kind === "create").length, 0);
+});
+
+test("markActive promotes a prepared session without changing its mode metadata", async () => {
+  const { calls, meta, deps } = createDeps();
+  const gateway = createSessionGateway(deps);
+
+  await gateway.prepare({ mode: "work", draftKey: "draft-1", workspaceId: "workspace-1" });
+  const result = await gateway.markActive("session-1");
+
+  assert.deepEqual(result, { sessionId: "session-1", mode: "work", lifecycle: "active" });
+  assert.deepEqual(meta.get("session-1"), {
+    sessionId: "session-1",
+    mode: "work",
+    origin: "user",
+    createdAt: meta.get("session-1").createdAt,
+    workspaceId: "workspace-1",
+    draftKey: "draft-1",
+    lifecycle: "active",
+    activatedAt: meta.get("session-1").activatedAt,
+  });
+  assert.equal(calls.filter(([kind]) => kind === "create").length, 1);
+});
 
 test("Chat always uses the restricted preset and ignores Work-only fields", async () => {
   const { calls, deps } = createDeps();

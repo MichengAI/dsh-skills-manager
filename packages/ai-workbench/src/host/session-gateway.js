@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { CHAT_PRESET_ID } from "./chat-preset.js";
-import { parseSessionStart } from "../shared/contracts.js";
+import { assertMode, parseSessionStart } from "../shared/contracts.js";
 
 function gatewayError(message, code, statusCode = 502, details) {
   return Object.assign(new Error(message), {
@@ -71,6 +71,127 @@ export function createSessionGateway(dependencies) {
   const makeId = dependencies.id || randomUUID;
   const makeRpcId = dependencies.rpcId || randomUUID;
   const sessions = dependencies.apiProxy.sessions;
+  const preparations = new Map();
+
+  function preparationKey(mode, draftKey) {
+    return `${mode}:${draftKey}`;
+  }
+
+  async function findPreparedSession(mode, draftKey) {
+    if (typeof dependencies.repository.listSessionMeta !== "function") return null;
+    const records = await dependencies.repository.listSessionMeta();
+    return (Array.isArray(records) ? records : []).find((record) => (
+      record?.mode === mode
+      && record?.draftKey === draftKey
+      && record?.lifecycle === "prepared"
+      && isSessionId(record?.sessionId)
+    )) || null;
+  }
+
+  async function prepare(raw) {
+    const mode = assertMode(raw?.mode);
+    const draftKey = typeof raw?.draftKey === "string" ? raw.draftKey.trim().slice(0, 255) : "";
+    if (!draftKey) throw gatewayError("draft key is empty", "empty-draft-key", 400);
+    const requestedSessionId = typeof raw?.sessionId === "string" ? raw.sessionId.trim() : null;
+    if (raw?.sessionId !== undefined && !isSessionId(requestedSessionId)) {
+      throw gatewayError("session id is missing or invalid", "invalid-session-id", 400);
+    }
+    const key = preparationKey(mode, draftKey);
+    const pending = preparations.get(key);
+    if (pending) return pending;
+
+    const operation = (async () => {
+      const existing = await findPreparedSession(mode, draftKey);
+      if (existing && (!requestedSessionId || existing.sessionId === requestedSessionId)) {
+        return { sessionId: existing.sessionId, mode, lifecycle: "prepared" };
+      }
+
+      const sessionId = makeId();
+      const agentPreset = mode === "chat" ? CHAT_PRESET_ID : "standard";
+      const meta = {
+        mode,
+        origin: "user",
+        createdAt: new Date().toISOString(),
+        workspaceId: mode === "work" && typeof raw.workspaceId === "string" ? raw.workspaceId : null,
+        draftKey,
+        lifecycle: "prepared",
+      };
+      if (requestedSessionId) {
+        const nativeSession = await dependencies.sessions?.get?.(requestedSessionId);
+        if (!nativeSession) throw gatewayError("native session is not live", "session-not-live", 409);
+        if (existing && existing.sessionId !== requestedSessionId) {
+          await dependencies.repository.deleteSessionMeta(existing.sessionId);
+        }
+        await dependencies.repository.putSessionMeta(requestedSessionId, meta);
+        return { sessionId: requestedSessionId, mode, lifecycle: "prepared" };
+      }
+      await dependencies.repository.putSessionMeta(sessionId, meta);
+
+      let published = false;
+      let publishedSessionId = sessionId;
+      try {
+        const created = unwrap(await sessions.create({
+          rpcId: makeRpcId(),
+          payload: {
+            sessionId,
+            agentPreset,
+            ...(meta.workspaceId ? { workspaceId: meta.workspaceId } : {}),
+          },
+        }));
+        if (!isSessionId(created?.sessionId)) {
+          throw gatewayError("created session id is missing or invalid", "invalid-created-session-id");
+        }
+        published = true;
+        publishedSessionId = created.sessionId;
+        if (publishedSessionId !== sessionId) {
+          await dependencies.repository.deleteSessionMeta(sessionId);
+          await dependencies.repository.putSessionMeta(publishedSessionId, meta);
+        }
+        return { sessionId: publishedSessionId, mode, lifecycle: "prepared" };
+      } catch (error) {
+        const original = normalizeGatewayError(error);
+        try {
+          if (published) {
+            await dependencies.repository.putSessionMeta(publishedSessionId, {
+              ...meta,
+              lifecycle: "failed",
+              setupStatus: "failed",
+              setupErrorCode: original.code || "internal",
+            });
+          } else {
+            await dependencies.repository.deleteSessionMeta(sessionId);
+          }
+        } catch (cleanupError) {
+          original.cleanupError = cleanupError;
+        }
+        if (published) original.sessionId = publishedSessionId;
+        throw original;
+      }
+    })();
+    preparations.set(key, operation);
+    try {
+      return await operation;
+    } finally {
+      if (preparations.get(key) === operation) preparations.delete(key);
+    }
+  }
+
+  async function markActive(sessionId) {
+    if (!isSessionId(sessionId)) throw gatewayError("session id is missing or invalid", "invalid-session-id", 400);
+    const current = await dependencies.repository.getSessionMeta(sessionId);
+    if (!current) throw gatewayError("session metadata was not found", "session-meta-not-found", 404);
+    if (current.lifecycle === "failed") {
+      throw gatewayError("failed sessions cannot become active", "session-not-activatable", 409);
+    }
+    if (current.lifecycle === "active") return { sessionId, mode: current.mode, lifecycle: "active" };
+
+    await dependencies.repository.putSessionMeta(sessionId, {
+      ...current,
+      lifecycle: "active",
+      activatedAt: new Date().toISOString(),
+    });
+    return { sessionId, mode: current.mode, lifecycle: "active" };
+  }
 
   async function callModelSelection(sessionId, provider, model, reasoningEffort) {
     const payload = { sessionId, provider, model, ...(reasoningEffort ? { reasoningEffort } : {}) };
@@ -180,6 +301,8 @@ export function createSessionGateway(dependencies) {
     };
 
   return {
+    prepare,
+    markActive,
     start,
     async startAutomation(automation, run) {
       const workspaceRef = typeof automation?.workspaceRef === "string" ? automation.workspaceRef : null;

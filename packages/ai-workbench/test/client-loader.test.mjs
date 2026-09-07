@@ -64,12 +64,15 @@ test("loader factory preserves host-owned seats and contributes only an additive
 
   assert.doesNotThrow(() => bundle.apply(ctx));
   assert.equal(effects.length, 1);
-  assert.deepEqual(injections, ["shell.overlay"]);
-  assert.equal(registrations.length, 1);
-  assert.deepEqual(registrations.map(([registration]) => registration.name), ["shell.overlay"]);
+  assert.deepEqual(injections, ["sidebar", "shell.overlay"]);
+  assert.equal(registrations.length, 2);
+  assert.deepEqual(registrations.map(([registration]) => registration.name), ["sidebar", "shell.overlay"]);
   assert.equal(typeof registrations[0][1], "function");
   assert.equal(registrations[0][0].id, "dsh-ai-workbench");
   assert.equal("children" in registrations[0][0], false);
+  assert.equal(typeof registrations[1][1], "function");
+  assert.equal(registrations[1][0].id, "dsh-ai-workbench-overlay");
+  assert.equal("children" in registrations[1][0], false);
 });
 
 test("workbench frame establishes the containing block for its overlay", () => {
@@ -78,9 +81,9 @@ test("workbench frame establishes the containing block for its overlay", () => {
 
 test("provider exposes only explicitly injected session and workspace services", async () => {
   const source = await readFile(new URL("../lib/client.js", import.meta.url), "utf8");
-  assert.match(source, /sessions:\s*ctx\.sessions/);
-  assert.match(source, /workspaces:\s*ctx\.workspaces/);
-  assert.match(source, /const inject = \["slots", "sessions", "workspaces", "layout", "inputTriggers", "commandUi"\]/);
+  assert.match(source, /sessions:\s*getService\("sessions",\s*ctx\.sessions\)/);
+  assert.match(source, /workspaces:\s*getService\("workspaces",\s*ctx\.workspaces\)/);
+  assert.match(source, /const inject = \["slots", "sessions", "workspaces", "layout", "inputTriggers", "commandUi", "conversation", "connection"\]/);
   assert.match(source, /probeClientContracts\(ctx, \{ nativeConversation: true \}\)/);
   assert.match(source, /speech:\s*speech\.current/);
   assert.doesNotMatch(source, /ctx\.(speech|voice|imageLimits|capabilities|useWorkspaces|workspaceFeed)/);
@@ -134,6 +137,7 @@ test("overlay provider does not probe optional un-injected host services", async
     sessions: { open() {} },
     inputTriggers: { registerSource() {} },
     commandUi: { register() {} },
+    conversation: { input: { for() {} } },
     workspaces: { getSnapshot() { return { items: [] }; }, subscribe() { return () => {}; } },
     slots: {
       spec: () => ({}),
@@ -154,7 +158,7 @@ test("overlay provider does not probe optional un-injected host services", async
   });
 
   bundle.apply(ctx);
-  const Overlay = registrations[0][1];
+  const Overlay = registrations.find(([registration]) => registration.name === "shell.overlay")[1];
   const provider = Overlay();
   const workbenchProvider = provider.type(provider.props);
 
@@ -168,8 +172,10 @@ test("Work and Chat open created sessions through the injected provider service"
   ]);
 
   for (const source of [workSource, chatSource]) {
-    assert.match(source, /workbench\?\.sessions\?\.open\?\.\(result\.sessionId\)/);
-    assert.match(source, /workbench\?\.sessions\?\.open\?\.\(error\.sessionId\)/);
+    assert.match(source, /createNativeComposerBridge/);
+    assert.match(source, /api\.prepareSession/);
+    assert.match(source, /bridge\.transfer/);
+    assert.match(source, /bridge\.submit/);
     assert.doesNotMatch(source, /workbench\?\.ctx\?\.sessions/);
   }
 });

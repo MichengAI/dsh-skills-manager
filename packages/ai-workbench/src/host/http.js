@@ -195,8 +195,15 @@ async function handleSession(req, services) {
   const body = await readJsonBody(req);
   const chatAvailable = services?.features?.chat?.available === true || services?.chatAvailable === true;
   if (body?.mode === "chat" && !chatAvailable) throw chatUnavailable();
-  if (typeof services?.sessionGateway?.start !== "function") return internalError();
-  const data = await services.sessionGateway.start(body);
+  const prepare = body?.intent === "prepare";
+  const activate = body?.intent === "active";
+  const handler = prepare
+    ? services?.sessionGateway?.prepare
+    : activate
+      ? services?.sessionGateway?.markActive
+      : services?.sessionGateway?.start;
+  if (typeof handler !== "function") return internalError();
+  const data = await handler(body);
   return { statusCode: 201, body: { ok: true, data } };
 }
 
