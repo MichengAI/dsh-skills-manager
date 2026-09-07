@@ -77,7 +77,7 @@
     "esbuild": "0.25.0"
   },
   "engines": {
-    "node": ">=20"
+    "node": "^22.19.0 || >=24.0.0"
   },
   "keywords": [
     "deepseek-harness",

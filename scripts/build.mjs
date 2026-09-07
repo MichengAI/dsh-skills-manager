@@ -23,7 +23,7 @@ async function exists(path) {
 
 try {
   await build({
-    entryPoints: ["src/core.js", "src/index.js"],
+    entryPoints: ["src/core.js", "src/index.js", "src/plugin-updater.js"],
     outdir: stagingDirectory,
     outbase: "src",
     bundle: false,
@@ -35,7 +35,7 @@ try {
   await build({
     entryPoints: ["src/client.js"],
     outfile: join(stagingDirectory, "client.js"),
-    bundle: false,
+    bundle: true,
     format: "iife",
     platform: "browser",
     target: "es2022",

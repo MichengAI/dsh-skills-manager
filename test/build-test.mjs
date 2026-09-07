@@ -50,6 +50,8 @@ for (const path of ["../lib/core.js.map", "../lib/index.js.map", "../lib/client.
 const manifest = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
 await ok(typeof manifest.scripts?.build === "string" && manifest.scripts.build.length > 0, "package defines a build command");
 await ok(manifest.scripts?.test?.includes("build-test.mjs"), "test command enforces the source-layout contract");
+await ok(manifest.engines?.node === "^22.19.0 || >=24.0.0", "package uses the shared Node LTS baseline");
+await ok(manifest.packageManager === "pnpm@11.22.0", "package pins the shared pnpm version");
 
 const projectRoot = new URL("../", import.meta.url);
 const generatedCore = new URL("../lib/core.js", import.meta.url);

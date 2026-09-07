@@ -61,7 +61,14 @@ ok(loaded !== null && typeof loaded.factory === "function", "client bundle regis
 
 const bundle = loaded.factory((id) => {
   if (id === "react") return { createElement: function () {} };
-  if (id === "@deepseek-ai/dsh-client-ui-primitives") return { IconListPenOutline16: function () {} };
+  if (id === "react-dom/client") return { createRoot: function () { return { render: function () {} }; } };
+  if (id === "@deepseek-ai/dsh-client-ui-primitives") return {
+    IconListPenOutline16: function () {},
+    IconRefreshOutline16: function () {},
+    IconDownloadOutline16: function () {},
+    IconCopyOutline16: function () {},
+    IconCloseOutline16: function () {},
+  };
   throw new Error("unexpected require: " + id);
 });
 

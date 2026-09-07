@@ -1,3 +1,5 @@
+import { observePluginUpdate } from "./plugin-update-ui.js";
+
 // dsh-skills-manager client half：按来源分组的多 Agent Skills 管理面板。
 window.__ModuleLoader__.load({
   id: "@michengai/dsh-skills-manager",
@@ -6,7 +8,19 @@ window.__ModuleLoader__.load({
     Object.defineProperty(module.exports, Symbol.toStringTag, { value: "Module" });
     var react = require("react");
     var h = react.createElement;
+    var createRoot = require("react-dom/client").createRoot;
     var primitives = require("@deepseek-ai/dsh-client-ui-primitives");
+    var UPDATE_ICON_COMPONENTS = {
+      refresh: primitives.IconRefreshOutline16,
+      download: primitives.IconDownloadOutline16,
+      copy: primitives.IconCopyOutline16,
+      close: primitives.IconCloseOutline16,
+    };
+    function createPluginUpdateIcon(name) {
+      var element = document.createElement("span");
+      createRoot(element).render(h(UPDATE_ICON_COMPONENTS[name], { size: 16 }));
+      return element;
+    }
     var MUTATION_HEADERS = { "content-type": "application/json", "x-dsh-skills-manager": "1" };
     var NS = "skills-manager";
 
@@ -220,7 +234,7 @@ window.__ModuleLoader__.load({
     }
 
     var inject = ["slots", "locale"];
-    function apply(ctx) { ctx.effect(function () { return ctx.locale.register(NS, DICT); }); ctx.slots.inject("settings.section", function () { return ctx.slots.register({ name: "settings.section", id: "skills-manager", order: 17, label: function () { return ctx.locale.bind(NS)("title"); }, icon: "skill", locale: NS }, SkillManagerSection); }); }
+    function apply(ctx) { ctx.effect(function () { return ctx.locale.register(NS, DICT); }); ctx.effect(function () { return observePluginUpdate({ endpoint: "/api/michengai/dsh-skills-manager/update", packageName: "@michengai/dsh-skills-manager", titleRowSelector: ".dssm-title-row", linksSelector: ".dssm-feedback-links", zhName: "技能", enName: "Skills", createIcon: createPluginUpdateIcon }); }, "skills-manager: plugin update ui"); ctx.slots.inject("settings.section", function () { return ctx.slots.register({ name: "settings.section", id: "skills-manager", order: 17, label: function () { return ctx.locale.bind(NS)("title"); }, icon: "skill", locale: NS }, SkillManagerSection); }); }
     module.exports.DICT = DICT; module.exports.translateError = translateError; module.exports.parseApiResponse = parseApiResponse; module.exports.isSkillEnabled = isSkillEnabled; module.exports.countKey = countKey; module.exports.rootDisplayName = rootDisplayName; module.exports.summarizeImportResult = summarizeImportResult; module.exports.normalizeSkillQuery = normalizeSkillQuery; module.exports.matchSkillQuery = matchSkillQuery; module.exports.filterSkills = filterSkills; module.exports.visibleSkillRoots = visibleSkillRoots; module.exports.trapModalFocus = trapModalFocus; module.exports.handleModalEscape = handleModalEscape; module.exports.inspectUploadSelection = inspectUploadSelection; module.exports.apply = apply; module.exports.inject = inject;
     return module.exports;
   }

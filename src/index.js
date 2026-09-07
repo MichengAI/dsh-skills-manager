@@ -24,6 +24,7 @@ import {
   projectRoots,
   logPath,
 } from "./core.js";
+import { registerPluginUpdater } from "./plugin-updater.js";
 
 const name = "skills-manager";
 const inject = ["webServer", "webRuntime", "skills", "tools", "sessions"];
@@ -318,6 +319,11 @@ function registerAgentSkillProviders(ctx, invalidators) {
 }
 
 function apply(ctx) {
+  ctx.effect(() => registerPluginUpdater(ctx, {
+    endpoint: "/api/michengai/dsh-skills-manager/update",
+    packageName: "@michengai/dsh-skills-manager",
+    manifestUrl: new URL("../package.json", import.meta.url),
+  }), "skills-manager: plugin updater");
   const log = makeLog();
   const trustedHosts = Array.isArray(ctx.webRuntime.trustedHosts) ? ctx.webRuntime.trustedHosts : [];
   const roots = userRoots();
