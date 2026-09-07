@@ -6,6 +6,10 @@ The five most recent published versions are listed below.
 
 ## Unreleased
 
+## 0.1.42 - 2026-09-07
+
+- Fixed the release-contract check so valid package version updates no longer block verification and npm publishing.
+
 ## 0.1.41 - 2026-09-07
 
 - Added independent in-product update checks with automatic updates when a verified DSH update service is available and a profile-specific manual fallback otherwise.
