@@ -6,6 +6,8 @@ The five most recent published versions are listed below.
 
 ## Unreleased
 
+## 0.1.41 - 2026-09-07
+
 - Added independent in-product update checks with automatic updates when a verified DSH update service is available and a profile-specific manual fallback otherwise.
 - Removed the update-button dependency on `react-dom/client` so the client can load on Hosts that do not register that module id.
 
