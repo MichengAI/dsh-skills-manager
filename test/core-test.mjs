@@ -1,7 +1,7 @@
 // dsh-skills-manager core 单元测试（临时根；ZIP 用例复用生产依赖 fflate）
 // 运行：node test/core-test.mjs
 
-import { mkdtemp, mkdir, writeFile, readFile, rm, stat, symlink, rename } from "node:fs/promises";
+import { mkdtemp, mkdir, writeFile, readFile, rm, stat, symlink, rename, realpath } from "node:fs/promises";
 import { createServer, request } from "node:http";
 import { basename, dirname, join, sep } from "node:path";
 import { tmpdir } from "node:os";
@@ -169,7 +169,7 @@ ok(clientSource.includes('className: "dssm-select-trigger"'), "category filter u
 ok(clientSource.includes('.dssm-select-menu{'), "custom select menu uses design tokens instead of native chrome");
 ok(!/h\(\s*"select"/.test(clientSource), "category filter does not use a native select");
 const packageJson = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
-eq(packageJson.version, "0.1.37", "release contract tracks the package version");
+eq(packageJson.version, "1.0.0", "release contract tracks the package version");
 ok(packageJson.peerDependencies["@deepseek-ai/dsh-client-runtime"], "package declares the client runtime peer");
 ok(packageJson.peerDependencies["@deepseek-ai/dsh-client-ui-slots"], "package declares the settings slots peer");
 ok(packageJson.peerDependencies["@deepseek-ai/dsh-host-webserver"].includes("<0.2.0"), "host-webserver peer has an upper bound");
@@ -207,7 +207,7 @@ await mkdir(join(browseRoot, ".hidden"), { recursive: true });
 await writeFile(join(browseRoot, "file.txt"), "not a directory", "utf8");
 const browseResult = await browseDirectories(browseRoot);
 ok(browseResult.ok !== false, "browseDirectories lists an absolute directory");
-eq(browseResult.path, browseRoot, "browseDirectories returns the canonical current path");
+eq(browseResult.path, await realpath(browseRoot), "browseDirectories returns the canonical current path");
 eq(browseResult.entries.map((entry) => entry.name).join(","), ".hidden,zeta", "browseDirectories lists directories only and sorts them");
 ok(browseResult.entries.find((entry) => entry.name === ".hidden").hidden, "browseDirectories marks dot directories hidden");
 eq((await browseDirectories("relative-folder")).code, "error.browse.absolute", "browseDirectories rejects relative paths");
@@ -965,6 +965,7 @@ const routeProject = join(tmp, "route-project");
 const routeProjectNested = join(routeProject, "packages", "app");
 await mkdir(join(routeProject, ".git"), { recursive: true });
 await mkdir(routeProjectNested, { recursive: true });
+const canonicalRouteProject = await realpath(routeProject);
 await makeSkill(join(routeProject, ".agents", "skills"), "route-project-skill", "---\nname: route-project-skill\ndescription: Project route skill.\n---\nProject route body");
 await makeSkill(join(routeProject, ".dsh", "skills"), "route-project-dsh", "---\nname: route-project-dsh\ndescription: Project DSH route skill.\n---\nProject DSH route body");
 let route;
@@ -1006,8 +1007,8 @@ try {
   const stateResponse = await fetch(api + "/state");
   eq(stateResponse.status, 200, "state route returns 200");
   const statePayload = await stateResponse.json();
-  const httpProjectDshRoot = statePayload.data.roots.find((root) => root.kind === "project-dsh" && root.projectRoot === routeProject);
-  const httpProjectRoot = statePayload.data.roots.find((root) => root.kind === "project-agents" && root.projectRoot === routeProject);
+  const httpProjectDshRoot = statePayload.data.roots.find((root) => root.kind === "project-dsh" && root.projectRoot === canonicalRouteProject);
+  const httpProjectRoot = statePayload.data.roots.find((root) => root.kind === "project-agents" && root.projectRoot === canonicalRouteProject);
   ok(httpProjectDshRoot && httpProjectDshRoot.mutable === true, "state route exposes an active Session project DSH root as writable even before its directory exists");
   ok(httpProjectRoot && httpProjectRoot.mutable === false && httpProjectRoot.toggleable === true, "state route exposes project Agent files as read-only with manager-local toggles");
   ok(httpProjectRoot.skills.some((skill) => skill.name === "route-project-skill"), "state route lists project-scoped skills from the Session cwd");
@@ -1239,14 +1240,15 @@ await mkdir(noGitWorkspace, { recursive: true });
 eq((await projectRoots([noGitWorkspace])).length, 0, "projectRoots does not treat a readable cwd without a .git ancestor as a project");
 const secondProject = join(tmp, "second-project");
 await mkdir(join(secondProject, ".git"), { recursive: true });
+const canonicalSecondProject = await realpath(secondProject);
 await makeSkill(join(routeProject, ".dsh", "skills"), "project-priority", "---\nname: project-priority\ndescription: Project DSH winner.\n---\nDSH winner");
 await makeSkill(join(routeProject, ".agents", "skills"), "project-priority", "---\nname: project-priority\ndescription: Project Agent loser.\n---\nAgent loser");
 await makeSkill(join(secondProject, ".agents", "skills"), "project-priority", "---\nname: project-priority\ndescription: Independent workspace winner.\n---\nSecond project");
 const resolvedProjectRoots = await projectRoots([routeProjectNested, routeProject, secondProject, "relative/path"]);
 eq(resolvedProjectRoots.length, 4, "projectRoots deduplicates Sessions by nearest git root and ignores non-absolute cwd values");
 eq(new Set(resolvedProjectRoots.map((root) => root.key)).size, 4, "project source keys stay unique across workspaces and source kinds");
-const writableProjectDefinition = resolvedProjectRoots.find((root) => root.kind === "project-dsh" && root.projectRoot === routeProject);
-const readonlyProjectDefinition = resolvedProjectRoots.find((root) => root.kind === "project-agents" && root.projectRoot === routeProject);
+const writableProjectDefinition = resolvedProjectRoots.find((root) => root.kind === "project-dsh" && root.projectRoot === canonicalRouteProject);
+const readonlyProjectDefinition = resolvedProjectRoots.find((root) => root.kind === "project-agents" && root.projectRoot === canonicalRouteProject);
 ok(writableProjectDefinition.mutable === true && writableProjectDefinition.toggleable === true, "project DSH roots allow create/delete plus manager-local invocation toggles");
 ok(readonlyProjectDefinition.mutable === false && readonlyProjectDefinition.toggleable === true, "project Agent roots keep source files read-only while allowing local policy toggles");
 const directProjectCreated = await createSkill({ name: "Direct Project Created", description: "Direct project create.", body: "Direct project body." }, null, { root: writableProjectDefinition });
@@ -1262,9 +1264,9 @@ eq(directProjectRestored.root.key, writableProjectDefinition.key, "project resto
 ok((await resolveEntry(writableProjectDefinition.path, "direct-project-created")) !== null, "project restore returns the complete bundle to its original root");
 eq((await deleteSkill(readonlyProjectDefinition, "project-priority")).code, "error.root.readonly", "deleteSkill keeps project .agents/skills read-only");
 const projectSnap = await state({ projectCwds: [routeProjectNested, secondProject] });
-const firstDshProject = projectSnap.roots.find((root) => root.kind === "project-dsh" && root.projectRoot === routeProject);
-const firstAgentsProject = projectSnap.roots.find((root) => root.kind === "project-agents" && root.projectRoot === routeProject);
-const secondAgentsProject = projectSnap.roots.find((root) => root.kind === "project-agents" && root.projectRoot === secondProject);
+const firstDshProject = projectSnap.roots.find((root) => root.kind === "project-dsh" && root.projectRoot === canonicalRouteProject);
+const firstAgentsProject = projectSnap.roots.find((root) => root.kind === "project-agents" && root.projectRoot === canonicalRouteProject);
+const secondAgentsProject = projectSnap.roots.find((root) => root.kind === "project-agents" && root.projectRoot === canonicalSecondProject);
 ok(firstDshProject && firstDshProject.scope === "project" && firstDshProject.mutable === true && firstDshProject.toggleable === true, "project DSH roots expose create/delete plus non-mutating invocation-policy toggles");
 eq(firstDshProject.rank, 100, "project state exposes the official project-dsh rank");
 eq(firstAgentsProject.rank, 200, "project state exposes the official project-agents rank");

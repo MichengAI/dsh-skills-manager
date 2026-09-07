@@ -67,5 +67,5 @@ test("repository keeps both packages", async () => {
   assert.match(workspace, /packages:\n  - '\.'\n  - 'packages\/\*'/);
   const rootPkg = JSON.parse(await readFile(new URL("../../../package.json", import.meta.url), "utf8"));
   assert.equal(rootPkg.name, "@michengai/dsh-skills-manager");
-  assert.equal(rootPkg.scripts["workbench:test"], "pnpm --dir packages/ai-workbench test");
+  assert.equal(rootPkg.scripts["workbench:test"], "npm run test --prefix packages/ai-workbench");
 });

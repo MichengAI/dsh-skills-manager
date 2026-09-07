@@ -1,6 +1,6 @@
 {
   "name": "@michengai/dsh-skills-manager",
-  "version": "0.1.37",
+  "version": "1.0.0",
   "description": "NPM-installable DSH Web plugin for safely loading and managing skills across DSH and common local Agents.",
   "license": "Apache-2.0",
   "repository": {
@@ -46,7 +46,7 @@
     "pack:check": "npm pack --dry-run --json",
     "prepublishOnly": "npm run verify",
     "workbench:build": "pnpm --dir packages/ai-workbench run build",
-    "workbench:test": "pnpm --dir packages/ai-workbench test",
+    "workbench:test": "npm run test --prefix packages/ai-workbench",
     "verify:all": "npm run verify && npm run workbench:test"
   },
   "publishConfig": {

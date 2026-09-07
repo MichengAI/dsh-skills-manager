@@ -6,6 +6,13 @@ The five most recent published versions are listed below.
 
 ## Unreleased
 
+## 1.0.0 - 2026-09-07
+
+- Added the branded DSH AI Workbench V1.0 release with separate Work and Chat modes.
+- Routed new and historical Workbench sessions into the native DSH conversation surface, preserving the fixed Workbench sidebar.
+- Connected Work and Chat composers to native DSH sessions, command menus, skill candidates, workspace binding, and prepared-session recovery.
+- Added regression coverage for native session envelopes, workspace readiness, stale prepared sessions, mode isolation, and the complete Workbench package gate.
+
 ## 0.1.37 - 2026-09-03
 
 - Updated the direct DSH development dependencies from `0.1.2-alpha.5` to `0.1.2-rc.1` without changing the published peer-dependency contract.

@@ -1,6 +1,6 @@
 {
   "name": "@michengai/dsh-ai-workbench",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Branded Work and Chat workspace for DSH Web.",
   "license": "Apache-2.0",
   "type": "module",
