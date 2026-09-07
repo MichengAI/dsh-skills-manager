@@ -6,6 +6,9 @@ The five most recent published versions are listed below.
 
 ## Unreleased
 
+- Added independent in-product update checks with automatic updates when a verified DSH update service is available and a profile-specific manual fallback otherwise.
+- Removed the update-button dependency on `react-dom/client` so the client can load on Hosts that do not register that module id.
+
 ## 0.1.40 - 2026-09-05
 
 - 修复禁用的外部同名技能遮蔽已启用 DSH 技能的问题，统一管理页与运行时的赢家选择。
