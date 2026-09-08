@@ -6,6 +6,10 @@ The five most recent published versions are listed below.
 
 ## Unreleased
 
+## 0.1.43 - 2026-09-08
+
+- Fixed Settings opening with the Codex Skill list expanded by default. All Skill sources now start collapsed while matching search results still expand automatically.
+
 ## 0.1.42 - 2026-09-07
 
 - Fixed the release-contract check so valid package version updates no longer block verification and npm publishing.
@@ -24,10 +28,6 @@ The five most recent published versions are listed below.
 ## 0.1.38 - 2026-09-03
 
 - Added Cursor as a read-only, locally toggleable Skill source at `%USERPROFILE%\.cursor\skills`, with `DSH_CURSOR_HOME` override and state-file migration.
-
-## 0.1.37 - 2026-09-03
-
-- Added compatibility with DeepSeek Harness `0.1.2-rc.1`.
 
 ## 0.1.36 - 2026-09-03
 

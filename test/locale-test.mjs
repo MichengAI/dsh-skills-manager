@@ -368,6 +368,7 @@ ok(source.includes("(data.warnings || []).map"), "state-level warnings are rende
 ok(source.includes("dssm-warning"), "warning feedback has a distinct visual state");
 ok(source.includes("@container(max-width:780px)"), "skill rows respond to the settings content width rather than only the viewport");
 ok(source.includes(".dssm-source-head{box-sizing:border-box"), "source toggles stay inside narrow settings cards");
+ok(/var es = react\.useState\(\{\}\), expanded = es\[0\], setExpanded = es\[1\];/.test(source), "settings starts with every skill source collapsed");
 
 let registerOptions = null;
 const fakeCtx = {
