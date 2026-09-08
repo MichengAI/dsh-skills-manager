@@ -192,8 +192,6 @@ npm run verify
 
 `prepublishOnly` runs the complete `verify` gate before publishing: build, tests, package inspection, and generated-artifact synchronization.
 
-## Documentation and license
-
-Project status, usage boundaries, architecture, and iteration records begin at the [documentation entry point](docs/00-交接入口/00-阅读导航.md). The detailed operational guide is `docs\02-产品与业务\01-使用说明.md`.
+## License
 
 Licensed under [Apache License 2.0](LICENSE).
