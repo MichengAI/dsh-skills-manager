@@ -22,13 +22,14 @@
 
 ## Features
 
-- Discover and load user-level skills from `.agents`, CC Switch, Codex, Claude, Gemini, OpenCode, and Cursor into DSH.
-- Discover project-level `.dsh/skills` and `.agents/skills` from active Session workspaces, grouped by project; every valid Skill can be enabled or disabled through non-mutating local policy.
-- Persist every per-Skill toggle under `$DSH_HOME/skills-manager/state.json` without rewriting any source Skill file.
-- Inspect Markdown bodies, frontmatter, invocation state, duplicate shadowing, and format diagnostics in a source-first UI.
-- Create a user- or project-level DSH skill from Settings; conversational creation remains user-level and requires approval.
-- Move user- and project-level DSH skills to recoverable Trash, then restore them to the original source or permanently delete them.
-- Import `.zip` archives, skill folders, or a single `SKILL.md` safely into `$DSH_HOME/skills`.
+Bring skills from your computer and projects into one DSH management page. Find skills, read their contents, control availability, and create or import your own.
+
+- **Reuse existing skills**: discover user skills from `.agents`, CC Switch, Codex, Claude, Gemini, OpenCode, and Cursor.
+- **Organize by project**: browse DSH and `.agents` skills from active projects, with source filters and search.
+- **Toggle availability**: enabling or disabling a skill changes its availability in DSH without editing source files.
+- **Read before using**: inspect the body, source information, format diagnostics, and duplicate-name notices.
+- **Add your own skills**: create user or project skills in Settings, or import ZIP archives, skill folders, and `SKILL.md` files.
+- **Recover deleted skills**: DSH skills go to Trash first and can be restored to their original location.
 
 ## Screenshots
 
@@ -46,13 +47,20 @@ Moving a DSH-local skill to Trash requires confirmation and remains recoverable 
 
 ## DSH product ecosystem
 
-This product can be installed independently or used through the desktop app or Web suite. They share the same DSH core but serve different ways of working:
+For a ready-to-use workbench, download [DSH Codex Desktop](https://github.com/MichengAI/dsh-codex-desktop/releases). If you already use [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness), install any of these eight plugins individually. The desktop app includes all eight.
 
-| Product | Relationship to this product |
+| Plugin | What you can do |
 | --- | --- |
-| [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) | The host runtime that provides models, sessions, tools, and the plugin system |
-| [DSH Codex Desktop](https://github.com/MichengAI/dsh-codex-desktop) | A ready-to-install desktop product with this product and the other five feature products built in |
-| Six feature products | [Codex UI](https://github.com/MichengAI/dsh-codex-ui) · [IM Connect](https://github.com/MichengAI/dsh-im-connect) · [Automation](https://github.com/MichengAI/dsh-automation) · [Skills Manager](https://github.com/MichengAI/dsh-skills-manager) · [Archive Manager](https://github.com/MichengAI/dsh-archive-manager) · [Agency Agents](https://github.com/MichengAI/dsh-agency-agents) |
+| [Codex UI](https://github.com/MichengAI/dsh-codex-ui) | Organize projects and conversations, search tasks, and navigate chat turns |
+| [IM Connect](https://github.com/MichengAI/dsh-im-connect) | Send tasks and receive replies through your usual messenger |
+| [Automation](https://github.com/MichengAI/dsh-automation) | Schedule tasks and review each run |
+| [Skills Manager](https://github.com/MichengAI/dsh-skills-manager) | Find, enable, create, and import local skills |
+| [Archive Manager](https://github.com/MichengAI/dsh-archive-manager) | Search, restore, or clean up archived conversations |
+| [Agency Agents](https://github.com/MichengAI/dsh-agency-agents) | Choose and summon specialists for your task |
+| [BTW](https://github.com/MichengAI/dsh-btw) | Ask side questions without interrupting the main task |
+| [Simplify](https://github.com/MichengAI/dsh-simplify) | Use /simplify to improve code within your Git changes |
+
+The desktop introduction and download site is maintained in the [website repository](https://github.com/MichengAI/dsh-codex-desktop-website).
 
 ## Prerequisites
 
@@ -62,39 +70,15 @@ This product can be installed independently or used through the desktop app or W
 
 ## Installation
 
-`dsh plugin add` forwards to `pnpm add` in the profile directory. Without a version and official registry, a local mirror or minimum-release-age policy can leave you on an older build.
+The installation commands below use the official npm registry.
 
-### Ask another agent to install it
+### Ask an agent to install it (recommended)
 
-This plugin runs inside DeepSeek Harness Web. Copy one of the sentences below into DSH, Codex, or WorkBuddy and let that agent install it into your local `web` profile.
-
-From npm:
+Send the prompt below to any agent that can run terminal commands on your computer. Replace `web` with your actual profile. Once installed, use the plugin in DSH.
 
 ```text
-Install the latest DSH plugin @michengai/dsh-skills-manager into my local web profile using the official npm registry: dsh plugin --profile web add @michengai/dsh-skills-manager@latest --registry=https://registry.npmjs.org/. Then run dsh --profile web --dump-config, confirm skills-manager is mounted, and remind me to restart DSH Web and hard-refresh the browser.
+Install the DSH plugin @michengai/dsh-skills-manager into my local web profile by running: dsh plugin --profile web add @michengai/dsh-skills-manager@latest --registry=https://registry.npmjs.org/. Then run dsh --profile web --dump-config, confirm the configuration includes skills-manager, and explain how to reload DSH and start using the plugin.
 ```
-
-From source:
-
-```text
-Install the DSH plugin from source at https://github.com/MichengAI/dsh-skills-manager: clone it, run npm install and npm test, then run dsh plugin --profile web add . from that directory. Do not copy lib by itself. Then run dsh --profile web --dump-config, confirm skills-manager is mounted, and remind me to restart DSH Web and hard-refresh the browser.
-```
-
-| Product | How to use it |
-| --- | --- |
-| DSH | Send one of the sentences above to the current session. |
-| Codex | Send one of the sentences above to Codex and let it install locally. |
-| WorkBuddy | Send one of the sentences above to WorkBuddy; for a source install you can also paste `https://github.com/MichengAI/dsh-skills-manager`. |
-
-Codex and WorkBuddy only install the plugin. After that, open DSH Web and use **Settings → Skills**.
-
-You can also run the same npm command yourself:
-
-```powershell
-dsh plugin --profile web add @michengai/dsh-skills-manager@latest --registry=https://registry.npmjs.org/
-```
-
-If `dsh` is not on PATH, replace the leading `dsh` with `npx --yes @deepseek-ai/dsh`.
 
 ### Install the latest package from the official npm registry
 
@@ -110,24 +94,6 @@ dsh --profile web --dump-config
 To pin a release, replace `@latest` with a version such as `@0.1.25`.
 
 The configuration output should contain `skills-manager`. Restart DSH Web and hard-refresh the browser. Do not copy client files manually: `dsh plugin add` also applies `cordis.patch.yml`.
-
-### Install from source
-
-Use this for debugging or unpublished changes. The cloned directory becomes the plugin source path:
-
-```powershell
-[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-$OutputEncoding = [System.Text.Encoding]::UTF8
-Set-Location D:\Repository\deepseek-harness-plugin
-git clone https://github.com/MichengAI/dsh-skills-manager.git
-Set-Location .\dsh-skills-manager
-npm install
-npm test
-dsh plugin --profile web add .
-dsh --profile web --dump-config
-```
-
-Restart DSH Web and hard-refresh the browser. `dsh plugin ... add .` reads the package metadata and `cordis.patch.yml`; do not install by copying `lib` directly.
 
 ## Updates
 
@@ -177,6 +143,24 @@ Escape closes only the frontmost upload or confirmation dialog and leaves Settin
 - Import accepts the local path selected by the user. The Host trust fence prevents DNS rebinding but is not authentication; reverse-proxy and LAN deployments still need authentication, a VPN, or network access controls.
 
 ## Secondary development
+
+### Install from source
+
+Use this for debugging or unpublished changes. The cloned directory becomes the plugin source path:
+
+```powershell
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
+Set-Location D:\Repository\deepseek-harness-plugin
+git clone https://github.com/MichengAI/dsh-skills-manager.git
+Set-Location .\dsh-skills-manager
+npm install
+npm test
+dsh plugin --profile web add .
+dsh --profile web --dump-config
+```
+
+Restart DSH Web and hard-refresh the browser. `dsh plugin ... add .` reads the package metadata and `cordis.patch.yml`; do not install by copying `lib` directly.
 
 Runtime source is maintained under `src`; `lib` is generated by `npm run build` and published with the npm package. Change `src`, never `lib` directly.
 

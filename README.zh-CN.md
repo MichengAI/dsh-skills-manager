@@ -22,17 +22,18 @@
 
 ## 功能概览
 
-- 自动发现并把 `.agents`、CC Switch、Codex、Claude、Gemini、OpenCode 和 Cursor 的用户级技能真正加载进 DSH。
-- 从活动 Session 工作区发现项目级 `.dsh/skills` 与 `.agents/skills` 并按项目分组；所有有效 Skill 都可通过不改源文件的本地策略启停。
-- 所有逐 Skill 启停都只写入 `$DSH_HOME\skills-manager\state.json`，绝不改写任何来源 Skill 文件。
-- 按来源折叠、搜索和筛选，并查看技能正文、frontmatter、调用状态、重名遮蔽与格式诊断。
-- 在设置页创建用户级或项目级 DSH Skill；对话创建仍为用户级，并在写入前请求确认。
-- 用户级和项目级 DSH Skill 删除后先进入回收站，可恢复到原来源或二次永久删除。
-- 支持把 `.zip`、包含 `SKILL.md` 的技能文件夹或单个 `SKILL.md` 安全导入 `$DSH_HOME\skills`。
+把散落在本机和项目中的 Agent 技能集中到 DSH 管理。在同一个页面里查找技能、查看内容、控制启停，也能创建或导入自己的技能。
+
+- **复用已有技能**：发现 `.agents`、CC Switch、Codex、Claude、Gemini、OpenCode 和 Cursor 的用户级技能。
+- **按项目整理**：展示活动项目中的 DSH 与 `.agents` 技能，按来源搜索和筛选。
+- **切换启停**：只改变 DSH 中的调用策略，不改动来源技能文件。
+- **查看技能内容**：阅读正文、来源信息、格式诊断和重名提示。
+- **添加自己的技能**：在设置页创建用户级或项目级技能，或导入 ZIP、技能文件夹及 `SKILL.md`。
+- **找回误删的技能**：DSH 技能删除后先进入回收站，可恢复到原位置。
 
 ## 界面预览
 
-在「设置 → 技能」中按来源管理 DSH 与其他本机 Agent 的技能；外部技能通过 manager provider 加载，源文件保持只读：
+在「设置 → 技能」中按来源管理 DSH 与其他本机 Agent 的技能，启停不会改动来源技能文件：
 
 ![按来源管理技能的设置页面](assets/screenshots/skills-manager-v2-preview.png)
 
@@ -46,13 +47,20 @@ DSH 本地技能移入回收站前需要确认；永久删除前仍可恢复：
 
 ## DSH 产品生态
 
-本产品既可以独立安装，也可以随桌面端或 Web 套件一起使用。它们共享同一个 DSH 核心，但面向不同的使用方式：
+想直接使用完整工作台，可下载 [DSH Codex Desktop](https://github.com/MichengAI/dsh-codex-desktop/releases)；已有 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 环境，可按需独立安装以下 8 个自研插件。桌面端已随附这些插件。
 
-| 产品 | 与本产品的关系 |
+| 插件 | 你可以用它做什么 |
 | --- | --- |
-| [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) | 本产品的运行宿主，提供模型、会话、工具和插件系统 |
-| [DSH Codex Desktop](https://github.com/MichengAI/dsh-codex-desktop) | 下载安装即用的桌面产品，已内置本产品和其他 5 个功能产品 |
-| 6 个功能产品 | [Codex UI](https://github.com/MichengAI/dsh-codex-ui) · [IM Connect](https://github.com/MichengAI/dsh-im-connect) · [Automation](https://github.com/MichengAI/dsh-automation) · [Skills Manager](https://github.com/MichengAI/dsh-skills-manager) · [Archive Manager](https://github.com/MichengAI/dsh-archive-manager) · [Agency Agents](https://github.com/MichengAI/dsh-agency-agents) |
+| [Codex UI](https://github.com/MichengAI/dsh-codex-ui) | 整理项目与会话、搜索任务、跳转对话轮次 |
+| [IM Connect](https://github.com/MichengAI/dsh-im-connect) | 从微信、飞书、钉钉等消息平台下任务、收回复 |
+| [Automation](https://github.com/MichengAI/dsh-automation) | 按计划执行任务，查看每次运行的结果 |
+| [Skills Manager](https://github.com/MichengAI/dsh-skills-manager) | 统一查找、启停、创建和导入本机技能 |
+| [Archive Manager](https://github.com/MichengAI/dsh-archive-manager) | 搜索、恢复或清理已归档会话 |
+| [Agency Agents](https://github.com/MichengAI/dsh-agency-agents) | 按任务选择并召唤专业角色 |
+| [BTW](https://github.com/MichengAI/dsh-btw) | 在当前上下文中临时旁问，不打断主任务 |
+| [Simplify](https://github.com/MichengAI/dsh-simplify) | 用 /simplify 整理 Git 改动范围内的代码 |
+
+桌面端介绍与下载站的源码见[官网仓库](https://github.com/MichengAI/dsh-codex-desktop-website)。
 
 ## 前置条件
 
@@ -62,39 +70,15 @@ DSH 本地技能移入回收站前需要确认；永久删除前仍可恢复：
 
 ## 安装
 
-`dsh plugin add` 会转发到 profile 目录里的 `pnpm add`。不写版本、不指定官方源时，本机镜像和最短发布间隔可能让你停在旧版。
+以下安装命令使用官方 npm 源。
 
-### 交给其他 Agent 一句话安装
+### 让 Agent 帮你安装（推荐）
 
-本插件运行在 DeepSeek Harness Web 里。把下面其中一句复制到 DSH、Codex 或 WorkBuddy，让它代你安装到本机 `web` profile。
-
-从 npm 安装：
+把下面这段话发给任意能够执行本机终端命令的 Agent。将 `web` 替换为实际使用的 profile；安装完成后，在 DSH 中使用本插件。
 
 ```text
-请把 DSH 插件 @michengai/dsh-skills-manager 最新版装进本机 web profile，使用官方 npm 源执行：dsh plugin --profile web add @michengai/dsh-skills-manager@latest --registry=https://registry.npmjs.org/。装完执行 dsh --profile web --dump-config，确认已挂载 skills-manager，并提醒我重启 DSH Web 后硬刷新浏览器。
+请将 DSH 插件 @michengai/dsh-skills-manager 安装到本机 web profile，执行：dsh plugin --profile web add @michengai/dsh-skills-manager@latest --registry=https://registry.npmjs.org/。安装后执行 dsh --profile web --dump-config，确认配置包含 skills-manager，并告诉我如何重新加载 DSH 和开始使用。
 ```
-
-从源码安装：
-
-```text
-请从 https://github.com/MichengAI/dsh-skills-manager 安装 DSH 插件：克隆仓库，执行 npm install 和 npm test，再在该目录执行 dsh plugin --profile web add .。不要只复制 lib。然后执行 dsh --profile web --dump-config，确认已挂载 skills-manager，并提醒我重启 DSH Web 后硬刷新浏览器。
-```
-
-| 产品 | 怎么用 |
-| --- | --- |
-| DSH | 把上面其中一句发给当前会话。 |
-| Codex | 把上面其中一句发给 Codex，让它在本机执行安装。 |
-| WorkBuddy | 把上面其中一句发给 WorkBuddy；源码安装也可同时粘贴仓库地址 `https://github.com/MichengAI/dsh-skills-manager`。 |
-
-Codex 和 WorkBuddy 只负责代装；装好后仍要打开 DSH Web 使用「设置 → 技能」。
-
-也可以自己执行同一条 npm 命令：
-
-```powershell
-dsh plugin --profile web add @michengai/dsh-skills-manager@latest --registry=https://registry.npmjs.org/
-```
-
-未把 `dsh` 装进 PATH 时，把开头的 `dsh` 换成 `npx --yes @deepseek-ai/dsh`。
 
 ### 从官方 npm 安装最新版
 
@@ -110,24 +94,6 @@ dsh --profile web --dump-config
 需要钉死某一版时，把 `@latest` 换成具体版本，例如 `@0.1.25`。
 
 配置输出中应包含 `skills-manager`。安装后重启 DSH Web 并在浏览器硬刷新。不要手工复制客户端文件，`dsh plugin add` 会同时应用 `cordis.patch.yml`。
-
-### 从源码安装
-
-适用于调试或使用未发布改动。克隆后的本地路径就是插件安装路径：
-
-```powershell
-[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-$OutputEncoding = [System.Text.Encoding]::UTF8
-Set-Location D:\Repository\deepseek-harness-plugin
-git clone https://github.com/MichengAI/dsh-skills-manager.git
-Set-Location .\dsh-skills-manager
-npm install
-npm test
-dsh plugin --profile web add .
-dsh --profile web --dump-config
-```
-
-完成后重启 DSH Web 并硬刷新浏览器。`dsh plugin ... add .` 会读取当前目录的包信息和 `cordis.patch.yml`；不要改为直接复制 `lib` 目录。
 
 ## 在线更新
 
@@ -177,6 +143,24 @@ dsh --profile web --dump-config
 - 导入接受用户选定的本机路径。Host 信任栅栏用于防 DNS rebinding，不是身份认证；通过反向代理或局域网提供服务时，仍应配置认证、VPN 或网络访问控制。
 
 ## 二次开发
+
+### 从源码安装
+
+适用于调试或使用未发布改动。克隆后的本地路径就是插件安装路径：
+
+```powershell
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
+Set-Location D:\Repository\deepseek-harness-plugin
+git clone https://github.com/MichengAI/dsh-skills-manager.git
+Set-Location .\dsh-skills-manager
+npm install
+npm test
+dsh plugin --profile web add .
+dsh --profile web --dump-config
+```
+
+完成后重启 DSH Web 并硬刷新浏览器。`dsh plugin ... add .` 会读取当前目录的包信息和 `cordis.patch.yml`；不要改为直接复制 `lib` 目录。
 
 运行源码维护在 `src`，`lib` 是由 `npm run build` 生成并随 npm 包发布的产物。请修改 `src`，不要直接修改 `lib`：
 
