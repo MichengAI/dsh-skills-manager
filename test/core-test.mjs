@@ -1345,13 +1345,20 @@ if (await tryLink(unsafeProjectTarget, join(unsafeProject, ".dsh", "skills"), pr
 const overlapProject = join(tmp, "overlap-project");
 await mkdir(join(overlapProject, ".git"), { recursive: true });
 const overlapDefinition = (await projectRoots([overlapProject])).find((root) => root.kind === "project-dsh");
+const overlapAgentDefinition = (await projectRoots([overlapProject])).find((root) => root.kind === "project-agents");
+await mkdir(join(overlapProject, ".agents", "skills", "overlap-shared"), { recursive: true });
+await writeFile(join(overlapProject, ".agents", "skills", "overlap-shared", "SKILL.md"), "---\nname: overlap-shared\ndescription: 重叠回归\n---\n共享正文", "utf8");
 const originalDshHome = process.env.DSH_HOME;
 const originalAgentsHome = process.env.DSH_AGENTS_HOME;
 process.env.DSH_HOME = join(overlapProject, ".dsh");
 process.env.DSH_AGENTS_HOME = join(overlapProject, ".agents");
 try {
   const overlapRoots = await projectRoots([overlapProject]);
-  ok(overlapRoots.length === 1 && overlapRoots[0].kind === "project-agents", "只读项目 Agent 允许重叠，可写项目 DSH 继续隐藏");
+  eq(overlapRoots.length, 0, "真实存在的用户根与项目根重叠时隐藏项目来源");
+  await setSkillEnabled(join(overlapProject, ".agents", "skills"), "overlap-shared", false);
+  const overlapCandidates = (await listProviderCandidates({ cwd: overlapProject })).filter(entry => entry.name === "overlap-shared");
+  ok(overlapCandidates.length > 0 && overlapCandidates.every(entry => !entry.invocation.modelInvocable && !entry.invocation.userInvocable), "重叠项目来源不能绕过用户技能停用");
+  eq((await setSkillEnabled(overlapAgentDefinition, "overlap-shared", true)).code, "error.root.unsafe", "拒绝使用旧项目来源绕过重叠检查");
   eq((await state({ projectCwds: [overlapProject] })).roots.filter((root) => root.scope === "project").length, 0, "state exposes only the user roots when a dotfiles project overlaps them");
   eq((await createSkill({ name: "Overlap Write", description: "Must not write.", body: "Denied." }, null, { root: overlapDefinition })).code, "error.root.unsafe", "write validation rejects a previously resolved project root after it overlaps the user DSH root");
 } finally {

@@ -6,6 +6,7 @@ The five most recent published versions are listed below.
 
 ## Unreleased
 
+- Stop scanning resources inside ordinary skill bundles and skip `node_modules`, while retaining nested discovery beside a root skill. Hide overlapping project Agent roots so they cannot bypass user disable policies.
 - Read-only user and project Agent sources now discover nested skills and follow external directory symlinks and Windows junctions by default, including linked roots. Discovery has cycle, depth, and entry limits.
 - Keep list, detail, provider, and local enable/disable policies consistent across differently named aliases. Writable DSH roots and import/delete safeguards remain unchanged.
 

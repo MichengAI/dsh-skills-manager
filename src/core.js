@@ -107,8 +107,8 @@ async function nearestProjectRoot(cwd) {
 }
 
 async function projectSourceSafe(definition) {
-  // Agent 项目来源只读，目录链接不扩大文件写权限。
-  if (definition.kind === "project-agents") return true;
+  // 只读来源允许目录链接，但重叠来源会绕过用户根的停用策略。
+  if (definition.kind === "project-agents") return !(await overlapsUserSkillRoot(definition.path));
   const container = join(definition.projectRoot, definition.kind === "project-dsh" ? ".dsh" : ".agents");
   for (const path of [container, definition.path]) {
     const st = await lstatOrNull(path);

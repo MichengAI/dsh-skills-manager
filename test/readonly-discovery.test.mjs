@@ -45,7 +45,7 @@ try {
   assert.equal(await core.resolveEntry(agents.path, "group/../../external/review"), null);
 
   const nested = await skill(join(agents.path, "nested", "review"), "nested-review");
-  await link(join(agents.path, "nested"), join(nested, "loop"));
+  await link(join(agents.path, "nested"), join(agents.path, "nested", "loop"));
   await skill(join(agents.path, ".hidden", "secret"), "hidden-secret");
   const hiddenTarget = await skill(join(temp, ".hidden-target"), "visible-hidden-target");
   await link(hiddenTarget, join(agents.path, "visible"));
@@ -71,9 +71,11 @@ try {
   }
 
   const rootTarget = await skill(join(temp, "whole-root"), "root-skill");
+  await skill(join(rootTarget, "group", "child"), "root-child");
   process.env.DSH_GEMINI_HOME = join(temp, "gemini");
   const gemini = core.userRoots().find(r => r.key === "gemini");
   await link(rootTarget, gemini.path);
+  assert.ok((await core.scanEntries(gemini.path)).entries.some(e => e.name === "group/child"), "根技能与嵌套技能并存");
   assert.equal((await core.skillDetail("gemini", ".")).body, "root-skill 正文", "用户技能根本身可链接且根 SKILL.md 可读取");
   await core.setSkillEnabled(gemini.path, ".", false);
   assert.equal((await core.readManagerState()).writable, true);
@@ -97,6 +99,15 @@ try {
   assert.equal((await core.getProviderSkill(soleProject, { cwd: project })).content, "project-only 正文");
   assert.equal(await core.getProviderSkill(soleProject, { cwd: join(temp, "other-project") }), undefined, "项目候选不能跨工作区加载");
 
+  const overlapProject = join(temp, "linked-overlap-project");
+  await mkdir(join(overlapProject, ".git"), { recursive: true });
+  const staleRoot = (await core.projectRoots([overlapProject])).find(r => r.kind === "project-agents");
+  await link(agents.path, join(overlapProject, ".agents", "skills"));
+  assert.ok(!(await core.projectRoots([overlapProject])).some(r => r.kind === "project-agents"), "根 junction 指向用户来源时隐藏项目来源");
+  assert.equal((await core.setSkillEnabled(staleRoot, "nested/review", true)).code, "error.root.unsafe", "链接重叠后旧项目 key 也不可修改策略");
+  const overlapCandidate = (await core.listProviderCandidates({ cwd: overlapProject })).find(e => e.name === "nested-review");
+  assert.equal(overlapCandidate.invocation.modelInvocable, false, "链接项目根不能绕过用户停用");
+
   await link(external, join(dsh.path, "external"));
   assert.equal(await core.resolveEntry(dsh.path, "external"), null, "可写 DSH 继续拒绝目录链接");
   await rm(join(agents.path, "alias"));
@@ -113,6 +124,15 @@ try {
   }
   const { discoverReadonlyEntries } = await import("../lib/readonly-discovery.js");
   assert.equal((await discoverReadonlyEntries(wide)).truncated, true, "目录预算限制宽目录扫描");
+  const bounded = join(temp, "bounded");
+  const bundle = await skill(join(bounded, "a-bundle"), "bundle-leaf");
+  await link(wide, join(bundle, "references"));
+  await skill(join(bundle, "scripts", "internal"), "internal-resource");
+  await link(wide, join(bounded, "node_modules"));
+  await skill(join(bounded, "z-group", "nested"), "after-resources");
+  const boundedScan = await discoverReadonlyEntries(bounded);
+  assert.deepEqual(boundedScan.entries.map(e => e.name), ["a-bundle", "z-group/nested"], "bundle 资源和依赖树不作为技能扫描");
+  assert.equal(boundedScan.truncated, false, "bundle 资源和依赖树不占用遍历预算");
   console.log("只读递归发现、外部链接、项目加载、策略与写边界回归通过");
 } finally {
   await rm(temp, { recursive: true, force: true });

@@ -33,6 +33,22 @@ export async function discoverReadonlyEntries(root) {
       realDirectory = await fs.realpath(current.path);
       const key = identity(realDirectory);
       if (current.ancestors.has(key)) continue;
+      // 普通 bundle 是叶子，在枚举前识别，避免资源文件耗尽整根预算。
+      // 根自身的 SKILL.md 可与其他技能并存，因此根目录继续发现。
+      if (current.depth > 0) {
+        const docPath = join(current.path, "SKILL.md");
+        let docStat;
+        try { docStat = await fs.lstat(docPath); } catch (error) {
+          if (error.code !== "ENOENT") throw error;
+        }
+        if (docStat?.isFile() && !docStat.isSymbolicLink()) {
+          const name = relative(rootPath, current.path).split(sep).join("/");
+          const realDocPath = await fs.realpath(docPath);
+          directories++;
+          byName.set(name, { name, kind: "bundle", docPath, entryPath: current.path, realDocPath, realEntryPath: realDirectory, linked: identity(resolve(current.path)) !== identity(realDirectory) });
+          continue;
+        }
+      }
       const directory = await fs.opendir(current.path);
       if (current.depth === 0) exists = true;
       directories++;
@@ -51,6 +67,7 @@ export async function discoverReadonlyEntries(root) {
       try {
         const stat = await fs.lstat(path);
         if (stat.isDirectory() || stat.isSymbolicLink()) {
+          if (identity(item.name) === "node_modules") continue;
           if (stat.isSymbolicLink() && !(await fs.stat(path)).isDirectory()) continue;
           if (current.depth >= MAX_DEPTH) { truncated = true; continue; }
           // 待遍历队列也受目录预算约束，避免宽目录占用无界内存。
