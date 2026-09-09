@@ -4,7 +4,7 @@
 
 <div align="center">
 
-  # DSH Skills Manager
+# DSH Skills Manager
 
   **Load and safely manage skills from DSH and common local Agents**
 
@@ -18,7 +18,6 @@
 </div>
 
 > DSH Skills Manager is a community-maintained DeepSeek Harness (DSH) plugin, not an official DeepSeek AI product.
-
 
 ## Features
 

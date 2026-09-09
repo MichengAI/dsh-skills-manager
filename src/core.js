@@ -12,16 +12,28 @@
 // 文件写入错误由路由返回给调用方。
 
 import { homedir } from "node:os";
-import { join, basename, dirname, resolve, relative, isAbsolute, sep } from "node:path";
+import {
+  join,
+  basename,
+  dirname,
+  resolve,
+  relative,
+  isAbsolute,
+  sep,
+} from "node:path";
 import { promises as fs } from "node:fs";
 import { createHash, randomUUID } from "node:crypto";
 import { unzipSync } from "fflate";
-import { discoverReadonlyEntries, validDiscoveryName } from "./readonly-discovery.js";
+import {
+  discoverReadonlyEntries,
+  validDiscoveryName,
+} from "./readonly-discovery.js";
 
 const KEBAB_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const PROJECT_ROOT_KEY_RE = /^project-(?:dsh|agents):[a-f0-9]{16}$/;
 const USER_DSH_POLICY_RANK = 399;
-const WINDOWS_DEVICE_NAME_RE = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?$/i;
+const WINDOWS_DEVICE_NAME_RE =
+  /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?$/i;
 const MAX_SOURCE_DEPTH = 64;
 const MAX_ENTRY_NAME_LENGTH = 128;
 const MAX_BROWSE_ENTRIES = 500;
@@ -44,7 +56,8 @@ function codedError(message, code, params) {
 
 /** 把业务 Error 的 code/params 附加到失败明细；系统异常（ENOENT 等，非 error.* 前缀）保持原文。 */
 function attachCode(item, error) {
-  if (error && typeof error.code === "string" && /^error\./.test(error.code)) item.code = error.code;
+  if (error && typeof error.code === "string" && /^error\./.test(error.code))
+    item.code = error.code;
   if (error && error.params) item.params = error.params;
   return item;
 }
@@ -67,14 +80,93 @@ export function resolveAgentsHome() {
  */
 export function userRoots() {
   return [
-    { key: "dsh", path: join(resolveDshHome(), "skills"), label: "DSH 技能", mutable: true, toggleable: true, native: true, rank: 400 },
-    { key: "agents", path: join(resolveAgentsHome(), "skills"), label: "公共 Agent", mutable: false, toggleable: true, native: true, rank: 450 },
-    { key: "ccswitch", path: join(homedir(), ".cc-switch", "skills"), label: "CC Switch", mutable: false, toggleable: true, native: false, rank: 510 },
-    { key: "codex", path: join(process.env.DSH_CODEX_HOME || join(homedir(), ".codex"), "skills"), label: "Codex", mutable: false, toggleable: true, native: false, rank: 520 },
-    { key: "claude", path: join(process.env.DSH_CLAUDE_HOME || join(homedir(), ".claude"), "skills"), label: "Claude", mutable: false, toggleable: true, native: false, rank: 530 },
-    { key: "gemini", path: join(process.env.DSH_GEMINI_HOME || join(homedir(), ".gemini"), "skills"), label: "Gemini", mutable: false, toggleable: true, native: false, rank: 540 },
-    { key: "opencode", path: join(process.env.DSH_OPENCODE_HOME || join(homedir(), ".config", "opencode"), "skills"), label: "OpenCode", mutable: false, toggleable: true, native: false, rank: 550 },
-    { key: "cursor", path: join(process.env.DSH_CURSOR_HOME || join(homedir(), ".cursor"), "skills"), label: "Cursor", mutable: false, toggleable: true, native: false, rank: 560 },
+    {
+      key: "dsh",
+      path: join(resolveDshHome(), "skills"),
+      label: "DSH 技能",
+      mutable: true,
+      toggleable: true,
+      native: true,
+      rank: 400,
+    },
+    {
+      key: "agents",
+      path: join(resolveAgentsHome(), "skills"),
+      label: "公共 Agent",
+      mutable: false,
+      toggleable: true,
+      native: true,
+      rank: 450,
+    },
+    {
+      key: "ccswitch",
+      path: join(homedir(), ".cc-switch", "skills"),
+      label: "CC Switch",
+      mutable: false,
+      toggleable: true,
+      native: false,
+      rank: 510,
+    },
+    {
+      key: "codex",
+      path: join(
+        process.env.DSH_CODEX_HOME || join(homedir(), ".codex"),
+        "skills",
+      ),
+      label: "Codex",
+      mutable: false,
+      toggleable: true,
+      native: false,
+      rank: 520,
+    },
+    {
+      key: "claude",
+      path: join(
+        process.env.DSH_CLAUDE_HOME || join(homedir(), ".claude"),
+        "skills",
+      ),
+      label: "Claude",
+      mutable: false,
+      toggleable: true,
+      native: false,
+      rank: 530,
+    },
+    {
+      key: "gemini",
+      path: join(
+        process.env.DSH_GEMINI_HOME || join(homedir(), ".gemini"),
+        "skills",
+      ),
+      label: "Gemini",
+      mutable: false,
+      toggleable: true,
+      native: false,
+      rank: 540,
+    },
+    {
+      key: "opencode",
+      path: join(
+        process.env.DSH_OPENCODE_HOME || join(homedir(), ".config", "opencode"),
+        "skills",
+      ),
+      label: "OpenCode",
+      mutable: false,
+      toggleable: true,
+      native: false,
+      rank: 550,
+    },
+    {
+      key: "cursor",
+      path: join(
+        process.env.DSH_CURSOR_HOME || join(homedir(), ".cursor"),
+        "skills",
+      ),
+      label: "Cursor",
+      mutable: false,
+      toggleable: true,
+      native: false,
+      rank: 560,
+    },
   ];
 }
 
@@ -108,8 +200,12 @@ async function nearestProjectRoot(cwd) {
 
 async function projectSourceSafe(definition) {
   // 只读来源允许目录链接，但重叠来源会绕过用户根的停用策略。
-  if (definition.kind === "project-agents") return !(await overlapsUserSkillRoot(definition.path));
-  const container = join(definition.projectRoot, definition.kind === "project-dsh" ? ".dsh" : ".agents");
+  if (definition.kind === "project-agents")
+    return !(await overlapsUserSkillRoot(definition.path));
+  const container = join(
+    definition.projectRoot,
+    definition.kind === "project-dsh" ? ".dsh" : ".agents",
+  );
   for (const path of [container, definition.path]) {
     const st = await lstatOrNull(path);
     if (st && (!st.isDirectory() || st.isSymbolicLink())) return false;
@@ -126,18 +222,33 @@ export async function projectRoots(projectCwds = [], diagnostics) {
   for (const cwd of Array.isArray(projectCwds) ? projectCwds : []) {
     const found = await nearestProjectRoot(cwd);
     if (!found || !found.root) {
-      if (found && found.unavailable && Array.isArray(diagnostics) && typeof cwd === "string" && isAbsolute(cwd)) {
-        diagnostics.push({ code: "warning.project.unavailable", params: { path: cwd }, error: `无法从宿主读取活动工作区，项目技能未显示: ${cwd}` });
+      if (
+        found &&
+        found.unavailable &&
+        Array.isArray(diagnostics) &&
+        typeof cwd === "string" &&
+        isAbsolute(cwd)
+      ) {
+        diagnostics.push({
+          code: "warning.project.unavailable",
+          params: { path: cwd },
+          error: `无法从宿主读取活动工作区，项目技能未显示: ${cwd}`,
+        });
       }
       continue;
     }
     const identity = pathIdentity(found.root);
-    const existing = projects.get(identity) || { root: found.root, cwds: new Set() };
+    const existing = projects.get(identity) || {
+      root: found.root,
+      cwds: new Set(),
+    };
     existing.cwds.add(found.cwd);
     projects.set(identity, existing);
   }
   const roots = [];
-  for (const project of [...projects.values()].sort((a, b) => a.root.localeCompare(b.root))) {
+  for (const project of [...projects.values()].sort((a, b) =>
+    a.root.localeCompare(b.root),
+  )) {
     const id = projectIdentity(project.root);
     const common = {
       mutable: false,
@@ -149,8 +260,27 @@ export async function projectRoots(projectCwds = [], diagnostics) {
       workspaceCwds: [...project.cwds].sort(),
     };
     const candidates = [
-      { ...common, key: `project-dsh:${id}`, kind: "project-dsh", localeKey: "projectDsh", path: join(project.root, ".dsh", "skills"), label: "Project DSH", rank: 100, mutable: true, toggleable: true },
-      { ...common, key: `project-agents:${id}`, kind: "project-agents", localeKey: "projectAgents", path: join(project.root, ".agents", "skills"), label: "Project Agent", rank: 200, toggleable: true },
+      {
+        ...common,
+        key: `project-dsh:${id}`,
+        kind: "project-dsh",
+        localeKey: "projectDsh",
+        path: join(project.root, ".dsh", "skills"),
+        label: "Project DSH",
+        rank: 100,
+        mutable: true,
+        toggleable: true,
+      },
+      {
+        ...common,
+        key: `project-agents:${id}`,
+        kind: "project-agents",
+        localeKey: "projectAgents",
+        path: join(project.root, ".agents", "skills"),
+        label: "Project Agent",
+        rank: 200,
+        toggleable: true,
+      },
     ];
     for (const candidate of candidates) {
       if (await projectSourceSafe(candidate)) roots.push(candidate);
@@ -183,7 +313,12 @@ export async function browseDirectories(inputPath) {
   const requested = String(inputPath == null ? "" : inputPath).trim();
   const target = requested === "" ? homedir() : requested;
   if (!isAbsolute(target)) {
-    return { ok: false, error: `目录路径必须是绝对路径: ${target}`, code: "error.browse.absolute", params: { path: target } };
+    return {
+      ok: false,
+      error: `目录路径必须是绝对路径: ${target}`,
+      code: "error.browse.absolute",
+      params: { path: target },
+    };
   }
 
   let canonical;
@@ -192,10 +327,23 @@ export async function browseDirectories(inputPath) {
     canonical = await fs.realpath(target);
     directory = await fs.stat(canonical);
   } catch (error) {
-    return { ok: false, error: `无法读取目录: ${target}`, code: "error.browse.unreadable", params: { path: target, error: String(error && error.message ? error.message : error) } };
+    return {
+      ok: false,
+      error: `无法读取目录: ${target}`,
+      code: "error.browse.unreadable",
+      params: {
+        path: target,
+        error: String(error && error.message ? error.message : error),
+      },
+    };
   }
   if (!directory.isDirectory()) {
-    return { ok: false, error: `不是目录: ${target}`, code: "error.browse.notDirectory", params: { path: target } };
+    return {
+      ok: false,
+      error: `不是目录: ${target}`,
+      code: "error.browse.notDirectory",
+      params: { path: target },
+    };
   }
 
   const entries = [];
@@ -209,23 +357,45 @@ export async function browseDirectories(inputPath) {
       // 也明确排除 Windows junction 等重解析目录。
       const childPath = join(canonical, item.name);
       const childStat = await lstatOrNull(childPath);
-      if (!childStat || !childStat.isDirectory() || childStat.isSymbolicLink()) continue;
+      if (!childStat || !childStat.isDirectory() || childStat.isSymbolicLink())
+        continue;
       if (entries.length >= MAX_BROWSE_ENTRIES) {
         truncated = true;
         break;
       }
-      entries.push({ name: item.name, path: childPath, hidden: item.name.startsWith(".") });
+      entries.push({
+        name: item.name,
+        path: childPath,
+        hidden: item.name.startsWith("."),
+      });
     }
   } catch (error) {
-    return { ok: false, error: `无法读取目录: ${canonical}`, code: "error.browse.unreadable", params: { path: canonical, error: String(error && error.message ? error.message : error) } };
+    return {
+      ok: false,
+      error: `无法读取目录: ${canonical}`,
+      code: "error.browse.unreadable",
+      params: {
+        path: canonical,
+        error: String(error && error.message ? error.message : error),
+      },
+    };
   }
-  entries.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base", numeric: true }));
+  entries.sort((a, b) =>
+    a.name.localeCompare(b.name, undefined, {
+      sensitivity: "base",
+      numeric: true,
+    }),
+  );
 
   const crumbs = [];
   let cursor = canonical;
   for (;;) {
     const parent = dirname(cursor);
-    crumbs.unshift({ name: parent === cursor ? cursor : basename(cursor), path: cursor, hidden: false });
+    crumbs.unshift({
+      name: parent === cursor ? cursor : basename(cursor),
+      path: cursor,
+      hidden: false,
+    });
     if (parent === cursor) break;
     cursor = parent;
   }
@@ -242,12 +412,16 @@ function readonlyError(action) {
     ok: false,
     code: "error.root.readonly",
     params: { action },
-    error: action === "delete" ? "该技能来源不允许删除" : "该技能来源不允许启用或停用",
+    error:
+      action === "delete"
+        ? "该技能来源不允许删除"
+        : "该技能来源不允许启用或停用",
   };
 }
 
 function rootDefinition(root) {
-  if (root && typeof root === "object" && typeof root.key === "string") return root;
+  if (root && typeof root === "object" && typeof root.key === "string")
+    return root;
   if (typeof root !== "string") return null;
   const resolved = resolve(root);
   return userRoots().find((item) => resolve(item.path) === resolved) || null;
@@ -261,15 +435,21 @@ function rootByKey(key) {
 function writableRootDefinition(root) {
   const definition = rootDefinition(root);
   if (!definition || definition.mutable !== true) return null;
-  if (definition.key === "dsh") return resolve(definition.path) === resolve(dshRootPath()) ? rootByKey("dsh") : null;
+  if (definition.key === "dsh")
+    return resolve(definition.path) === resolve(dshRootPath())
+      ? rootByKey("dsh")
+      : null;
   if (
-    definition.scope !== "project"
-    || definition.kind !== "project-dsh"
-    || typeof definition.projectRoot !== "string"
-    || !isAbsolute(definition.projectRoot)
-    || definition.key !== `project-dsh:${projectIdentity(definition.projectRoot)}`
-    || resolve(definition.path) !== resolve(join(definition.projectRoot, ".dsh", "skills"))
-  ) return null;
+    definition.scope !== "project" ||
+    definition.kind !== "project-dsh" ||
+    typeof definition.projectRoot !== "string" ||
+    !isAbsolute(definition.projectRoot) ||
+    definition.key !==
+      `project-dsh:${projectIdentity(definition.projectRoot)}` ||
+    resolve(definition.path) !==
+      resolve(join(definition.projectRoot, ".dsh", "skills"))
+  )
+    return null;
   return definition;
 }
 
@@ -277,13 +457,23 @@ async function checkedWritableRootDefinition(root) {
   const definition = writableRootDefinition(root);
   if (!definition || definition.scope !== "project") return definition;
   if (await overlapsUserSkillRoot(definition.path)) {
-    return { ok: false, error: `项目技能目录与用户技能目录重叠，拒绝写入: ${definition.path}`, code: "error.root.unsafe", params: { path: definition.path } };
+    return {
+      ok: false,
+      error: `项目技能目录与用户技能目录重叠，拒绝写入: ${definition.path}`,
+      code: "error.root.unsafe",
+      params: { path: definition.path },
+    };
   }
   // 项目仓库内容不可信；拒绝通过 .dsh 或 skills 链接把写入重定向到项目之外。
   for (const path of [join(definition.projectRoot, ".dsh"), definition.path]) {
     const st = await lstatOrNull(path);
     if (st && (!st.isDirectory() || st.isSymbolicLink())) {
-      return { ok: false, error: `项目技能目录不安全，拒绝写入: ${path}`, code: "error.root.unsafe", params: { path } };
+      return {
+        ok: false,
+        error: `项目技能目录不安全，拒绝写入: ${path}`,
+        code: "error.root.unsafe",
+        params: { path },
+      };
     }
   }
   return definition;
@@ -292,7 +482,10 @@ async function checkedWritableRootDefinition(root) {
 /** 判断 child 是否与 parent 相同或位于其内部。跨盘符时 relative 会返回绝对路径。 */
 function isSameOrDescendant(parent, child) {
   const rel = relative(resolve(parent), resolve(child));
-  return rel === "" || (!isAbsolute(rel) && rel !== ".." && !rel.startsWith(`..${sep}`));
+  return (
+    rel === "" ||
+    (!isAbsolute(rel) && rel !== ".." && !rel.startsWith(`..${sep}`))
+  );
 }
 
 /** 解析真实路径；中间若有目录链接，按落地目录比较重叠。 */
@@ -324,7 +517,11 @@ async function overlapsUserSkillRoot(path) {
   const candidate = await comparisonPath(path);
   for (const root of userRoots()) {
     const userPath = await comparisonPath(root.path);
-    if (isSameOrDescendant(candidate, userPath) || isSameOrDescendant(userPath, candidate)) return true;
+    if (
+      isSameOrDescendant(candidate, userPath) ||
+      isSameOrDescendant(userPath, candidate)
+    )
+      return true;
   }
   return false;
 }
@@ -356,7 +553,19 @@ async function lstatOrNull(path) {
 
 /** 名称只允许一个普通路径段；不把既有技能名称限制为 kebab-case。 */
 export function entryPath(root, name) {
-  if (typeof name !== "string" || name === "" || name === "." || name === ".." || name.startsWith(".") || name.length > MAX_ENTRY_NAME_LENGTH || /[\\/:*?"<>|\0]/.test(name) || /[. ]$/.test(name) || WINDOWS_DEVICE_NAME_RE.test(name) || basename(name) !== name) return null;
+  if (
+    typeof name !== "string" ||
+    name === "" ||
+    name === "." ||
+    name === ".." ||
+    name.startsWith(".") ||
+    name.length > MAX_ENTRY_NAME_LENGTH ||
+    /[\\/:*?"<>|\0]/.test(name) ||
+    /[. ]$/.test(name) ||
+    WINDOWS_DEVICE_NAME_RE.test(name) ||
+    basename(name) !== name
+  )
+    return null;
   const rootPath = resolve(root);
   const path = resolve(rootPath, name);
   return isSameOrDescendant(rootPath, path) && rootPath !== path ? path : null;
@@ -413,13 +622,29 @@ export function parseSkillDoc(text) {
           const block = /^([>|])[-+]?\s*$/.exec(m[2]);
           if (block) {
             const content = [];
-            while (i + 1 < end && (/^\s/.test(lines[i + 1]) || lines[i + 1] === "")) {
+            while (
+              i + 1 < end &&
+              (/^\s/.test(lines[i + 1]) || lines[i + 1] === "")
+            ) {
               i++;
               content.push(lines[i]);
             }
-            const indentation = content.filter((line) => line.trim() !== "").reduce((min, line) => Math.min(min, (/^\s*/.exec(line) || [""])[0].length), Infinity);
-            const normalized = content.map((line) => Number.isFinite(indentation) ? line.slice(Math.min(indentation, line.length)) : line);
-            map[m[1]] = block[1] === ">" ? normalized.join(" ").replace(/\s+/g, " ").trim() : normalized.join("\n").trim();
+            const indentation = content
+              .filter((line) => line.trim() !== "")
+              .reduce(
+                (min, line) =>
+                  Math.min(min, (/^\s*/.exec(line) || [""])[0].length),
+                Infinity,
+              );
+            const normalized = content.map((line) =>
+              Number.isFinite(indentation)
+                ? line.slice(Math.min(indentation, line.length))
+                : line,
+            );
+            map[m[1]] =
+              block[1] === ">"
+                ? normalized.join(" ").replace(/\s+/g, " ").trim()
+                : normalized.join("\n").trim();
           } else {
             map[m[1]] = decodeYamlScalar(m[2]);
           }
@@ -442,13 +667,18 @@ function decodeYamlScalar(v) {
       /* 保留无法解析的原始内容 */
     }
   }
-  if (s.length >= 2 && s[0] === "'" && s[s.length - 1] === "'") return s.slice(1, -1).replace(/''/g, "'");
+  if (s.length >= 2 && s[0] === "'" && s[s.length - 1] === "'")
+    return s.slice(1, -1).replace(/''/g, "'");
   return s;
 }
 
 export function unquote(v) {
   const s = String(v == null ? "" : v).trim();
-  if (s.length >= 2 && ((s[0] === '"' && s[s.length - 1] === '"') || (s[0] === "'" && s[s.length - 1] === "'"))) {
+  if (
+    s.length >= 2 &&
+    ((s[0] === '"' && s[s.length - 1] === '"') ||
+      (s[0] === "'" && s[s.length - 1] === "'"))
+  ) {
     return s.slice(1, -1);
   }
   return s;
@@ -457,15 +687,28 @@ export function unquote(v) {
 /** 同目录临时文件加 rename，避免写入中断时截断原 SKILL.md。 */
 /** Windows 上杀毒软件或索引器可能短暂占用目录；只重试明确可恢复的 rename 错误。 */
 export async function renameWithRetry(source, destination, options = {}) {
-  const rename = typeof options.rename === "function" ? options.rename : fs.rename;
-  const maxAttempts = Number.isInteger(options.maxAttempts) && options.maxAttempts > 0 ? options.maxAttempts : 6;
-  const delayMs = Number.isFinite(options.delayMs) && options.delayMs >= 0 ? options.delayMs : 40;
+  const rename =
+    typeof options.rename === "function" ? options.rename : fs.rename;
+  const maxAttempts =
+    Number.isInteger(options.maxAttempts) && options.maxAttempts > 0
+      ? options.maxAttempts
+      : 6;
+  const delayMs =
+    Number.isFinite(options.delayMs) && options.delayMs >= 0
+      ? options.delayMs
+      : 40;
   for (let attempt = 1; ; attempt++) {
     try {
       return await rename(source, destination);
     } catch (error) {
-      if (!TRANSIENT_RENAME_CODES.has(error && error.code) || attempt >= maxAttempts) throw error;
-      await new Promise((resolvePromise) => setTimeout(resolvePromise, delayMs * attempt));
+      if (
+        !TRANSIENT_RENAME_CODES.has(error && error.code) ||
+        attempt >= maxAttempts
+      )
+        throw error;
+      await new Promise((resolvePromise) =>
+        setTimeout(resolvePromise, delayMs * attempt),
+      );
     }
   }
 }
@@ -473,7 +716,8 @@ export async function renameWithRetry(source, destination, options = {}) {
 async function removeMovedPath(path) {
   const st = await lstatOrNull(path);
   if (!st) return;
-  if (st.isDirectory() && !st.isSymbolicLink()) await fs.rm(path, { recursive: true, force: false });
+  if (st.isDirectory() && !st.isSymbolicLink())
+    await fs.rm(path, { recursive: true, force: false });
   else await fs.unlink(path);
 }
 
@@ -486,7 +730,10 @@ async function movePathWithFallback(source, destination, options = {}) {
     if (!error || error.code !== "EXDEV") throw error;
   }
 
-  const quarantine = join(dirname(source), `.${basename(source)}.dssm-move-${randomUUID()}`);
+  const quarantine = join(
+    dirname(source),
+    `.${basename(source)}.dssm-move-${randomUUID()}`,
+  );
   try {
     await fs.cp(source, destination, {
       recursive: true,
@@ -512,7 +759,10 @@ async function movePathWithFallback(source, destination, options = {}) {
 }
 
 async function writeFileAtomically(path, content) {
-  const temp = join(dirname(path), `.${basename(path)}.dssm-${randomUUID()}.tmp`);
+  const temp = join(
+    dirname(path),
+    `.${basename(path)}.dssm-${randomUUID()}.tmp`,
+  );
   try {
     await fs.writeFile(temp, content, "utf8");
     await fs.rename(temp, path);
@@ -537,7 +787,11 @@ export async function resolveEntry(root, name) {
   const definition = rootDefinition(root);
   if (definition && !definition.mutable) {
     if (!validDiscoveryName(name)) return null;
-    return (await discoverReadonlyEntries(definition.path)).entries.find(entry => entry.name === name) || null;
+    return (
+      (await discoverReadonlyEntries(definition.path)).entries.find(
+        (entry) => entry.name === name,
+      ) || null
+    );
   }
   root = definition ? definition.path : root;
   try {
@@ -545,22 +799,52 @@ export async function resolveEntry(root, name) {
     if (bundlePath === null) return null;
     const rootPath = resolve(root);
     const rootStat = await lstatOrNull(rootPath);
-    if (!rootStat || !rootStat.isDirectory() || rootStat.isSymbolicLink()) return null;
+    if (!rootStat || !rootStat.isDirectory() || rootStat.isSymbolicLink())
+      return null;
     const rootReal = await resolvedPath(rootPath);
     const bundleStat = await lstatOrNull(bundlePath);
-    if (bundleStat && bundleStat.isDirectory() && !bundleStat.isSymbolicLink()) {
+    if (
+      bundleStat &&
+      bundleStat.isDirectory() &&
+      !bundleStat.isSymbolicLink()
+    ) {
       const bundleDoc = join(bundlePath, "SKILL.md");
       const docStat = await lstatOrNull(bundleDoc);
-      if (docStat && docStat.isFile() && !docStat.isSymbolicLink() && await isInsideResolvedRoot(rootReal, bundleDoc)) {
-        return { kind: "bundle", docPath: bundleDoc, entryPath: bundlePath, realDocPath: await fs.realpath(bundleDoc), realEntryPath: await fs.realpath(bundlePath), linked: false };
+      if (
+        docStat &&
+        docStat.isFile() &&
+        !docStat.isSymbolicLink() &&
+        (await isInsideResolvedRoot(rootReal, bundleDoc))
+      ) {
+        return {
+          kind: "bundle",
+          docPath: bundleDoc,
+          entryPath: bundlePath,
+          realDocPath: await fs.realpath(bundleDoc),
+          realEntryPath: await fs.realpath(bundlePath),
+          linked: false,
+        };
       }
     }
     const flatDoc = resolve(rootPath, `${name}.md`);
-    if (!isSameOrDescendant(rootPath, flatDoc) || rootPath === flatDoc) return null;
+    if (!isSameOrDescendant(rootPath, flatDoc) || rootPath === flatDoc)
+      return null;
     const flatStat = await lstatOrNull(flatDoc);
-    if (flatStat && flatStat.isFile() && !flatStat.isSymbolicLink() && await isInsideResolvedRoot(rootReal, flatDoc)) {
+    if (
+      flatStat &&
+      flatStat.isFile() &&
+      !flatStat.isSymbolicLink() &&
+      (await isInsideResolvedRoot(rootReal, flatDoc))
+    ) {
       const realDocPath = await fs.realpath(flatDoc);
-      return { kind: "flat", docPath: flatDoc, entryPath: flatDoc, realDocPath, realEntryPath: realDocPath, linked: false };
+      return {
+        kind: "flat",
+        docPath: flatDoc,
+        entryPath: flatDoc,
+        realDocPath,
+        realEntryPath: realDocPath,
+        linked: false,
+      };
     }
     return null;
   } catch {
@@ -571,18 +855,37 @@ export async function resolveEntry(root, name) {
 
 function entryOf(name, kind, docPath, doc) {
   const declaredName = doc.map.name !== undefined ? unquote(doc.map.name) : "";
-  const description = doc.map.description !== undefined ? unquote(doc.map.description) : "";
+  const description =
+    doc.map.description !== undefined ? unquote(doc.map.description) : "";
   const modelValue = parseBoolValue(doc.map["disable-model-invocation"]);
   const userValue = parseBoolValue(doc.map["user-invocable"]);
   const modelDisabled = modelValue === true;
   const userDisabled = userValue === false;
-  const invocationPolicyValid = (doc.map["disable-model-invocation"] === undefined || modelValue !== undefined) && (doc.map["user-invocable"] === undefined || userValue !== undefined);
+  const invocationPolicyValid =
+    (doc.map["disable-model-invocation"] === undefined ||
+      modelValue !== undefined) &&
+    (doc.map["user-invocable"] === undefined || userValue !== undefined);
   const diagnostics = [];
-  if (!doc.hasFrontmatter) diagnostics.push({ level: "error", code: "diagnostic.frontmatter.missing" });
-  if (doc.hasFrontmatter && !declaredName) diagnostics.push({ level: "error", code: "diagnostic.name.missing" });
-  else if (declaredName && !KEBAB_RE.test(declaredName)) diagnostics.push({ level: "error", code: "diagnostic.name.invalid", params: { name: declaredName } });
-  if (doc.hasFrontmatter && !description) diagnostics.push({ level: "error", code: "diagnostic.description.missing" });
-  if (!invocationPolicyValid) diagnostics.push({ level: "error", code: "diagnostic.invocation.invalid" });
+  if (!doc.hasFrontmatter)
+    diagnostics.push({
+      level: "error",
+      code: "diagnostic.frontmatter.missing",
+    });
+  if (doc.hasFrontmatter && !declaredName)
+    diagnostics.push({ level: "error", code: "diagnostic.name.missing" });
+  else if (declaredName && !KEBAB_RE.test(declaredName))
+    diagnostics.push({
+      level: "error",
+      code: "diagnostic.name.invalid",
+      params: { name: declaredName },
+    });
+  if (doc.hasFrontmatter && !description)
+    diagnostics.push({
+      level: "error",
+      code: "diagnostic.description.missing",
+    });
+  if (!invocationPolicyValid)
+    diagnostics.push({ level: "error", code: "diagnostic.invocation.invalid" });
   return {
     name,
     declaredName,
@@ -594,7 +897,8 @@ function entryOf(name, kind, docPath, doc) {
     invocationPolicyValid,
     hasFrontmatter: doc.hasFrontmatter,
     // 调用策略值异常可以由 manager 本地策略覆盖；结构本身合法即可加载。
-    loadable: doc.hasFrontmatter && KEBAB_RE.test(declaredName) && description !== "",
+    loadable:
+      doc.hasFrontmatter && KEBAB_RE.test(declaredName) && description !== "",
     diagnostics,
   };
 }
@@ -608,14 +912,25 @@ export async function scanEntries(root, options = {}) {
     const entries = [];
     for (const entry of discovered.entries) {
       try {
-        entries.push({ ...entryOf(entry.name, entry.kind, entry.docPath, parseSkillDoc(await fs.readFile(entry.realDocPath, "utf8"))), ...entry });
-      } catch { /* 忽略已失效或不可读技能。 */ }
+        entries.push({
+          ...entryOf(
+            entry.name,
+            entry.kind,
+            entry.docPath,
+            parseSkillDoc(await fs.readFile(entry.realDocPath, "utf8")),
+          ),
+          ...entry,
+        });
+      } catch {
+        /* 忽略已失效或不可读技能。 */
+      }
     }
     return { ...discovered, entries };
   }
   root = definition ? definition.path : root;
   const rootStat = await lstatOrNull(resolve(root));
-  if (!rootStat || !rootStat.isDirectory() || rootStat.isSymbolicLink()) return { exists: false, entries: [] };
+  if (!rootStat || !rootStat.isDirectory() || rootStat.isSymbolicLink())
+    return { exists: false, entries: [] };
   let items;
   try {
     items = await fs.readdir(root, { withFileTypes: true });
@@ -630,35 +945,68 @@ export async function scanEntries(root, options = {}) {
       if (it.isDirectory() && entryPath(root, it.name) !== null) {
         const docPath = join(root, it.name, "SKILL.md");
         const st = await lstatOrNull(docPath);
-        if (!st || !st.isFile() || st.isSymbolicLink() || !(await isInsideResolvedRoot(rootReal, docPath))) continue;
-        const doc = options.metadataOnly ? { map: {}, hasFrontmatter: false } : parseSkillDoc(await fs.readFile(docPath, "utf8"));
-        byName.set(it.name, { ...entryOf(it.name, "bundle", docPath, doc), entryPath: join(root, it.name), realDocPath: await fs.realpath(docPath), realEntryPath: await fs.realpath(join(root, it.name)), linked: false });
-      } else if (it.isFile() && it.name.toLowerCase().endsWith(".md") && it.name.toLowerCase() !== "skill.md" && entryPath(root, it.name.slice(0, -3)) !== null) {
+        if (
+          !st ||
+          !st.isFile() ||
+          st.isSymbolicLink() ||
+          !(await isInsideResolvedRoot(rootReal, docPath))
+        )
+          continue;
+        const doc = options.metadataOnly
+          ? { map: {}, hasFrontmatter: false }
+          : parseSkillDoc(await fs.readFile(docPath, "utf8"));
+        byName.set(it.name, {
+          ...entryOf(it.name, "bundle", docPath, doc),
+          entryPath: join(root, it.name),
+          realDocPath: await fs.realpath(docPath),
+          realEntryPath: await fs.realpath(join(root, it.name)),
+          linked: false,
+        });
+      } else if (
+        it.isFile() &&
+        it.name.toLowerCase().endsWith(".md") &&
+        it.name.toLowerCase() !== "skill.md" &&
+        entryPath(root, it.name.slice(0, -3)) !== null
+      ) {
         const skillName = it.name.slice(0, -3);
         if (byName.has(skillName)) continue;
         const docPath = join(root, it.name);
         if (!(await isInsideResolvedRoot(rootReal, docPath))) continue;
-        const doc = options.metadataOnly ? { map: {}, hasFrontmatter: false } : parseSkillDoc(await fs.readFile(docPath, "utf8"));
+        const doc = options.metadataOnly
+          ? { map: {}, hasFrontmatter: false }
+          : parseSkillDoc(await fs.readFile(docPath, "utf8"));
         const realDocPath = await fs.realpath(docPath);
-        byName.set(skillName, { ...entryOf(skillName, "flat", docPath, doc), entryPath: docPath, realDocPath, realEntryPath: realDocPath, linked: false });
+        byName.set(skillName, {
+          ...entryOf(skillName, "flat", docPath, doc),
+          entryPath: docPath,
+          realDocPath,
+          realEntryPath: realDocPath,
+          linked: false,
+        });
       }
     } catch {
       /* 跳过不可读条目 */
     }
   }
-  const entries = [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
+  const entries = [...byName.values()].sort((a, b) =>
+    a.name.localeCompare(b.name),
+  );
   return { exists: true, entries };
 }
 
 /** 同一真实技能优先归属直接 SSOT；同类条目再按来源 rank 决胜。 */
 async function scanDeduplicatedRoots(roots = userRoots(), options = {}) {
-  const results = await Promise.all(roots.map(async (root) => [root, await scanEntries(root, options)]));
+  const results = await Promise.all(
+    roots.map(async (root) => [root, await scanEntries(root, options)]),
+  );
   const scans = new Map();
   const groups = new Map();
   for (const [root, scan] of results) {
     scans.set(root.key, scan);
     for (const entry of scan.entries) {
-      const identity = pathIdentity(entry.realEntryPath || entry.entryPath || entry.docPath);
+      const identity = pathIdentity(
+        entry.realEntryPath || entry.entryPath || entry.docPath,
+      );
       const group = groups.get(identity) || [];
       group.push({ root, entry });
       groups.set(identity, group);
@@ -666,10 +1014,19 @@ async function scanDeduplicatedRoots(roots = userRoots(), options = {}) {
   }
   const winners = new Set();
   for (const group of groups.values()) {
-    group.sort((left, right) => Number(left.entry.linked) - Number(right.entry.linked) || left.root.rank - right.root.rank);
+    group.sort(
+      (left, right) =>
+        Number(left.entry.linked) - Number(right.entry.linked) ||
+        left.root.rank - right.root.rank,
+    );
     const winner = group[0];
-    winner.entry.providerRank = Math.min(...group.map((item) => item.root.rank));
-    winner.entry.policyAliases = group.map((item) => ({ rootKey: item.root.key, name: item.entry.name }));
+    winner.entry.providerRank = Math.min(
+      ...group.map((item) => item.root.rank),
+    );
+    winner.entry.policyAliases = group.map((item) => ({
+      rootKey: item.root.key,
+      name: item.entry.name,
+    }));
     winners.add(winner.entry);
   }
   for (const scan of scans.values()) {
@@ -683,7 +1040,9 @@ async function visibleEntryForRoot(root, name) {
   if (!validDiscoveryName(name)) return null;
   const roots = root.scope === "project" ? [root] : userRoots();
   const scans = await scanDeduplicatedRoots(roots, { metadataOnly: true });
-  return scans.get(root.key)?.entries.find(entry => entry.name === name) || null;
+  return (
+    scans.get(root.key)?.entries.find((entry) => entry.name === name) || null
+  );
 }
 
 // ── Manager 本地策略（外部源只读，启停状态写入 DSH_HOME）────────────────────
@@ -715,58 +1074,139 @@ function validPolicyLists(value, allowMissing = false) {
   if (value === undefined && allowMissing) return true;
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   for (const [key, list] of Object.entries(value)) {
-    if (!userRoots().some((root) => root.key === key) && !PROJECT_ROOT_KEY_RE.test(key)) continue;
-    if (!Array.isArray(list) || list.some((name) => !validStateSkillName(name))) return false;
+    if (
+      !userRoots().some((root) => root.key === key) &&
+      !PROJECT_ROOT_KEY_RE.test(key)
+    )
+      continue;
+    if (!Array.isArray(list) || list.some((name) => !validStateSkillName(name)))
+      return false;
   }
   return true;
 }
 
 function validManagerStateDocument(value) {
-  if (!value || typeof value !== "object" || Array.isArray(value) || value.version !== 1) return false;
-  if (!value.sources || typeof value.sources !== "object" || Array.isArray(value.sources)) return false;
-  if (!validPolicyLists(value.disabledSkills) || !validPolicyLists(value.enabledSkills, true)) return false;
+  if (
+    !value ||
+    typeof value !== "object" ||
+    Array.isArray(value) ||
+    value.version !== 1
+  )
+    return false;
+  if (
+    !value.sources ||
+    typeof value.sources !== "object" ||
+    Array.isArray(value.sources)
+  )
+    return false;
+  if (
+    !validPolicyLists(value.disabledSkills) ||
+    !validPolicyLists(value.enabledSkills, true)
+  )
+    return false;
   for (const root of userRoots()) {
     if (root.key === "dsh") continue;
     if (typeof value.sources[root.key] !== "boolean") return false;
     const list = value.disabledSkills[root.key];
-    if (!Array.isArray(list) || list.some((name) => !validStateSkillName(name))) return false;
+    if (!Array.isArray(list) || list.some((name) => !validStateSkillName(name)))
+      return false;
   }
   const enabledSkills = value.enabledSkills || {};
-  for (const key of new Set([...Object.keys(value.disabledSkills), ...Object.keys(enabledSkills)])) {
+  for (const key of new Set([
+    ...Object.keys(value.disabledSkills),
+    ...Object.keys(enabledSkills),
+  ])) {
     const disabled = new Set(value.disabledSkills[key] || []);
-    if ((enabledSkills[key] || []).some((name) => disabled.has(name))) return false;
+    if ((enabledSkills[key] || []).some((name) => disabled.has(name)))
+      return false;
   }
   return true;
 }
 
 /** 仅对可识别的 version 1 状态补齐新增只读来源键，其余结构仍交由严格校验失败关闭。 */
 function migrateManagerStateDocument(value) {
-  if (!value || typeof value !== "object" || Array.isArray(value) || value.version !== 1) return value;
-  if (value.sources && typeof value.sources === "object" && !Array.isArray(value.sources) && value.sources.ccswitch === undefined) value.sources.ccswitch = true;
-  if (value.disabledSkills && typeof value.disabledSkills === "object" && !Array.isArray(value.disabledSkills) && value.disabledSkills.ccswitch === undefined) value.disabledSkills.ccswitch = [];
-  if (value.enabledSkills && typeof value.enabledSkills === "object" && !Array.isArray(value.enabledSkills) && value.enabledSkills.ccswitch === undefined) value.enabledSkills.ccswitch = [];
-  if (value.sources && typeof value.sources === "object" && !Array.isArray(value.sources) && value.sources.cursor === undefined) value.sources.cursor = true;
-  if (value.disabledSkills && typeof value.disabledSkills === "object" && !Array.isArray(value.disabledSkills) && value.disabledSkills.cursor === undefined) value.disabledSkills.cursor = [];
-  if (value.enabledSkills && typeof value.enabledSkills === "object" && !Array.isArray(value.enabledSkills) && value.enabledSkills.cursor === undefined) value.enabledSkills.cursor = [];
+  if (
+    !value ||
+    typeof value !== "object" ||
+    Array.isArray(value) ||
+    value.version !== 1
+  )
+    return value;
+  if (
+    value.sources &&
+    typeof value.sources === "object" &&
+    !Array.isArray(value.sources) &&
+    value.sources.ccswitch === undefined
+  )
+    value.sources.ccswitch = true;
+  if (
+    value.disabledSkills &&
+    typeof value.disabledSkills === "object" &&
+    !Array.isArray(value.disabledSkills) &&
+    value.disabledSkills.ccswitch === undefined
+  )
+    value.disabledSkills.ccswitch = [];
+  if (
+    value.enabledSkills &&
+    typeof value.enabledSkills === "object" &&
+    !Array.isArray(value.enabledSkills) &&
+    value.enabledSkills.ccswitch === undefined
+  )
+    value.enabledSkills.ccswitch = [];
+  if (
+    value.sources &&
+    typeof value.sources === "object" &&
+    !Array.isArray(value.sources) &&
+    value.sources.cursor === undefined
+  )
+    value.sources.cursor = true;
+  if (
+    value.disabledSkills &&
+    typeof value.disabledSkills === "object" &&
+    !Array.isArray(value.disabledSkills) &&
+    value.disabledSkills.cursor === undefined
+  )
+    value.disabledSkills.cursor = [];
+  if (
+    value.enabledSkills &&
+    typeof value.enabledSkills === "object" &&
+    !Array.isArray(value.enabledSkills) &&
+    value.enabledSkills.cursor === undefined
+  )
+    value.enabledSkills.cursor = [];
   return value;
 }
 
 function normalizeManagerState(value) {
   const normalized = defaultManagerState();
-  if (!value || typeof value !== "object" || Array.isArray(value)) return normalized;
+  if (!value || typeof value !== "object" || Array.isArray(value))
+    return normalized;
   for (const root of userRoots()) {
-    if (root.key !== "dsh" && value.sources && typeof value.sources[root.key] === "boolean") normalized.sources[root.key] = value.sources[root.key];
+    if (
+      root.key !== "dsh" &&
+      value.sources &&
+      typeof value.sources[root.key] === "boolean"
+    )
+      normalized.sources[root.key] = value.sources[root.key];
     const list = value.disabledSkills && value.disabledSkills[root.key];
-    if (Array.isArray(list)) normalized.disabledSkills[root.key] = [...new Set(list.filter((name) => validStateSkillName(name)))].sort();
+    if (Array.isArray(list))
+      normalized.disabledSkills[root.key] = [
+        ...new Set(list.filter((name) => validStateSkillName(name))),
+      ].sort();
     const enabled = value.enabledSkills && value.enabledSkills[root.key];
-    if (Array.isArray(enabled)) normalized.enabledSkills[root.key] = [...new Set(enabled.filter((name) => validStateSkillName(name)))].sort();
+    if (Array.isArray(enabled))
+      normalized.enabledSkills[root.key] = [
+        ...new Set(enabled.filter((name) => validStateSkillName(name))),
+      ].sort();
   }
   for (const field of ["disabledSkills", "enabledSkills"]) {
     const source = value[field];
     if (source && typeof source === "object" && !Array.isArray(source)) {
       for (const [key, list] of Object.entries(source)) {
         if (!PROJECT_ROOT_KEY_RE.test(key) || !Array.isArray(list)) continue;
-        normalized[field][key] = [...new Set(list.filter(validStateSkillName))].sort();
+        normalized[field][key] = [
+          ...new Set(list.filter(validStateSkillName)),
+        ].sort();
       }
     }
   }
@@ -777,21 +1217,34 @@ export async function readManagerState() {
   try {
     const raw = await fs.readFile(managerStatePath(), "utf8");
     const parsed = migrateManagerStateDocument(JSON.parse(raw));
-    if (!validManagerStateDocument(parsed)) throw codedError("invalid manager state schema", "error.state.invalid");
-    return { state: normalizeManagerState(parsed), warning: null, writable: true };
+    if (!validManagerStateDocument(parsed))
+      throw codedError("invalid manager state schema", "error.state.invalid");
+    return {
+      state: normalizeManagerState(parsed),
+      warning: null,
+      writable: true,
+    };
   } catch (error) {
-    if (error && error.code === "ENOENT") return { state: defaultManagerState(), warning: null, writable: true };
+    if (error && error.code === "ENOENT")
+      return { state: defaultManagerState(), warning: null, writable: true };
     return {
       state: failClosedManagerState(),
       writable: false,
-      warning: { code: "warning.state.invalid", params: { path: managerStatePath() }, error: `技能管理器状态文件不可读，所有技能已安全停用且状态写入已锁定: ${managerStatePath()}` },
+      warning: {
+        code: "warning.state.invalid",
+        params: { path: managerStatePath() },
+        error: `技能管理器状态文件不可读，所有技能已安全停用且状态写入已锁定: ${managerStatePath()}`,
+      },
     };
   }
 }
 
 async function writeManagerState(value) {
   await fs.mkdir(managerHomePath(), { recursive: true });
-  await writeFileAtomically(managerStatePath(), `${JSON.stringify(normalizeManagerState(value), null, 2)}\n`);
+  await writeFileAtomically(
+    managerStatePath(),
+    `${JSON.stringify(normalizeManagerState(value), null, 2)}\n`,
+  );
 }
 
 function managerSkillOverride(policy, rootKey, name, policyAliases = []) {
@@ -800,25 +1253,53 @@ function managerSkillOverride(policy, rootKey, name, policyAliases = []) {
   let inheritedEnable = false;
   for (const alias of policyAliases) {
     if (alias.rootKey === rootKey && alias.name === name) continue;
-    if ((policy.disabledSkills[alias.rootKey] || []).includes(alias.name)) return false;
-    if ((policy.enabledSkills[alias.rootKey] || []).includes(alias.name)) inheritedEnable = true;
+    if ((policy.disabledSkills[alias.rootKey] || []).includes(alias.name))
+      return false;
+    if ((policy.enabledSkills[alias.rootKey] || []).includes(alias.name))
+      inheritedEnable = true;
   }
   if (inheritedEnable) return true;
   return undefined;
 }
 
 function effectiveSkillPolicy(policyResult, root, entry) {
-  const override = managerSkillOverride(policyResult.state, root.key, entry.name, entry.policyAliases);
-  const sourceEnabled = root.key === "dsh" || root.scope === "project" || policyResult.state.sources[root.key] !== false;
+  const override = managerSkillOverride(
+    policyResult.state,
+    root.key,
+    entry.name,
+    entry.policyAliases,
+  );
+  const sourceEnabled =
+    root.key === "dsh" ||
+    root.scope === "project" ||
+    policyResult.state.sources[root.key] !== false;
   if (policyResult.writable === false || !sourceEnabled || override === false) {
-    return { override, sourceEnabled, modelInvocable: false, userInvocable: false, enabled: false };
+    return {
+      override,
+      sourceEnabled,
+      modelInvocable: false,
+      userInvocable: false,
+      enabled: false,
+    };
   }
   if (override === true) {
-    return { override, sourceEnabled, modelInvocable: true, userInvocable: true, enabled: true };
+    return {
+      override,
+      sourceEnabled,
+      modelInvocable: true,
+      userInvocable: true,
+      enabled: true,
+    };
   }
   const modelInvocable = entry.invocationPolicyValid && entry.modelInvocable;
   const userInvocable = entry.invocationPolicyValid && entry.userInvocable;
-  return { override, sourceEnabled, modelInvocable, userInvocable, enabled: modelInvocable && userInvocable };
+  return {
+    override,
+    sourceEnabled,
+    modelInvocable,
+    userInvocable,
+    enabled: modelInvocable && userInvocable,
+  };
 }
 
 function invalidManagerStateWrite() {
@@ -832,12 +1313,17 @@ function invalidManagerStateWrite() {
 
 export async function setSourceEnabled(key, enabled, log) {
   const root = rootByKey(key);
-  if (!root || root.key === "dsh" || !root.toggleable) return readonlyError("toggle");
+  if (!root || root.key === "dsh" || !root.toggleable)
+    return readonlyError("toggle");
   const current = await readManagerState();
   if (current.writable === false) return invalidManagerStateWrite();
   current.state.sources[root.key] = enabled === true;
   await writeManagerState(current.state);
-  if (log) log(enabled ? "source-enable" : "source-disable", `${enabled ? "启用" : "停用"}来源 ${root.key}: ${root.path}`);
+  if (log)
+    log(
+      enabled ? "source-enable" : "source-disable",
+      `${enabled ? "启用" : "停用"}来源 ${root.key}: ${root.path}`,
+    );
   return { root: root.key, enabled: enabled === true };
 }
 
@@ -846,17 +1332,34 @@ async function checkedPolicyRootDefinition(root) {
   if (!definition || !definition.toggleable) return null;
   if (definition.scope !== "project") {
     const canonical = rootByKey(definition.key);
-    return canonical && resolve(canonical.path) === resolve(definition.path) ? canonical : null;
+    return canonical && resolve(canonical.path) === resolve(definition.path)
+      ? canonical
+      : null;
   }
-  const validProjectRoot = (definition.kind === "project-dsh" || definition.kind === "project-agents")
-    && PROJECT_ROOT_KEY_RE.test(definition.key)
-    && typeof definition.projectRoot === "string"
-    && isAbsolute(definition.projectRoot)
-    && definition.key === `${definition.kind}:${projectIdentity(definition.projectRoot)}`
-    && resolve(definition.path) === resolve(join(definition.projectRoot, definition.kind === "project-dsh" ? ".dsh" : ".agents", "skills"));
+  const validProjectRoot =
+    (definition.kind === "project-dsh" ||
+      definition.kind === "project-agents") &&
+    PROJECT_ROOT_KEY_RE.test(definition.key) &&
+    typeof definition.projectRoot === "string" &&
+    isAbsolute(definition.projectRoot) &&
+    definition.key ===
+      `${definition.kind}:${projectIdentity(definition.projectRoot)}` &&
+    resolve(definition.path) ===
+      resolve(
+        join(
+          definition.projectRoot,
+          definition.kind === "project-dsh" ? ".dsh" : ".agents",
+          "skills",
+        ),
+      );
   if (!validProjectRoot) return null;
   if (!(await projectSourceSafe(definition))) {
-    return { ok: false, error: `项目技能目录不安全，拒绝写入状态: ${definition.path}`, code: "error.root.unsafe", params: { path: definition.path } };
+    return {
+      ok: false,
+      error: `项目技能目录不安全，拒绝写入状态: ${definition.path}`,
+      code: "error.root.unsafe",
+      params: { path: definition.path },
+    };
   }
   return definition;
 }
@@ -866,23 +1369,53 @@ async function setPolicySkillEnabled(root, name, enabled, log) {
   if (definition && definition.ok === false) return definition;
   if (!definition) return readonlyError("toggle");
   const resolved = await resolveEntry(definition, name);
-  if (resolved === null) return { ok: false, error: `技能不存在: ${name}`, code: "error.skill.notFound", params: { name } };
+  if (resolved === null)
+    return {
+      ok: false,
+      error: `技能不存在: ${name}`,
+      code: "error.skill.notFound",
+      params: { name },
+    };
   let summary;
   try {
-    summary = entryOf(name, resolved.kind, resolved.docPath, parseSkillDoc(await fs.readFile(resolved.realDocPath || resolved.docPath, "utf8")));
+    summary = entryOf(
+      name,
+      resolved.kind,
+      resolved.docPath,
+      parseSkillDoc(
+        await fs.readFile(resolved.realDocPath || resolved.docPath, "utf8"),
+      ),
+    );
   } catch {
-    return { ok: false, error: `技能不存在: ${name}`, code: "error.skill.notFound", params: { name } };
+    return {
+      ok: false,
+      error: `技能不存在: ${name}`,
+      code: "error.skill.notFound",
+      params: { name },
+    };
   }
   if (!summary.hasFrontmatter) {
-    return { ok: false, error: `技能缺少完整 frontmatter，无法${enabled ? "启用" : "停用"}: ${name}`, code: "error.skill.noFrontmatter", params: { name, action: enabled ? "enable" : "disable" } };
+    return {
+      ok: false,
+      error: `技能缺少完整 frontmatter，无法${enabled ? "启用" : "停用"}: ${name}`,
+      code: "error.skill.noFrontmatter",
+      params: { name, action: enabled ? "enable" : "disable" },
+    };
   }
   if (!summary.loadable) {
-    return { ok: false, error: `技能结构不完整，无法${enabled ? "启用" : "停用"}: ${name}`, code: "error.skill.notLoadable", params: { name, action: enabled ? "enable" : "disable" } };
+    return {
+      ok: false,
+      error: `技能结构不完整，无法${enabled ? "启用" : "停用"}: ${name}`,
+      code: "error.skill.notLoadable",
+      params: { name, action: enabled ? "enable" : "disable" },
+    };
   }
   const current = await readManagerState();
   if (current.writable === false) return invalidManagerStateWrite();
   const disabled = new Set(current.state.disabledSkills[definition.key] || []);
-  const explicitlyEnabled = new Set(current.state.enabledSkills[definition.key] || []);
+  const explicitlyEnabled = new Set(
+    current.state.enabledSkills[definition.key] || [],
+  );
   if (enabled) {
     disabled.delete(name);
     explicitlyEnabled.add(name);
@@ -893,7 +1426,11 @@ async function setPolicySkillEnabled(root, name, enabled, log) {
   current.state.disabledSkills[definition.key] = [...disabled].sort();
   current.state.enabledSkills[definition.key] = [...explicitlyEnabled].sort();
   await writeManagerState(current.state);
-  if (log) log(enabled ? "policy-enable" : "policy-disable", `${enabled ? "启用" : "停用"} ${definition.key}/${name}（本地策略，源文件不变）`);
+  if (log)
+    log(
+      enabled ? "policy-enable" : "policy-disable",
+      `${enabled ? "启用" : "停用"} ${definition.key}/${name}（本地策略，源文件不变）`,
+    );
   return { root: definition.key, name, enabled: enabled === true };
 }
 
@@ -910,17 +1447,27 @@ async function safeExistingEntryPaths(root, name) {
   if (bundle === null) return paths;
   const flat = resolve(root, `${name}.md`);
   const bundleStat = await lstatOrNull(bundle);
-  if (bundleStat && (bundleStat.isDirectory() || bundleStat.isSymbolicLink())) paths.push({ path: bundle, fileName: name, recursive: true });
+  if (bundleStat && (bundleStat.isDirectory() || bundleStat.isSymbolicLink()))
+    paths.push({ path: bundle, fileName: name, recursive: true });
   const flatStat = await lstatOrNull(flat);
-  if (flatStat && (flatStat.isFile() || flatStat.isSymbolicLink())) paths.push({ path: flat, fileName: `${name}.md`, recursive: false });
+  if (flatStat && (flatStat.isFile() || flatStat.isSymbolicLink()))
+    paths.push({ path: flat, fileName: `${name}.md`, recursive: false });
   return paths;
 }
 
 async function readTrashMetadata(id) {
   if (entryPath(trashRootPath(), id) === null) return null;
   try {
-    const value = JSON.parse(await fs.readFile(join(trashRootPath(), id, "metadata.json"), "utf8"));
-    if (!value || value.id !== id || typeof value.name !== "string" || !Array.isArray(value.entries)) return null;
+    const value = JSON.parse(
+      await fs.readFile(join(trashRootPath(), id, "metadata.json"), "utf8"),
+    );
+    if (
+      !value ||
+      value.id !== id ||
+      typeof value.name !== "string" ||
+      !Array.isArray(value.entries)
+    )
+      return null;
     return value;
   } catch {
     return null;
@@ -950,9 +1497,15 @@ async function publishTrashStage(stage, finalPath, metadata, renameOptions) {
         force: false,
       });
     }
-    await fs.writeFile(join(finalPath, "metadata.json"), `${JSON.stringify(metadata, null, 2)}\n`, "utf8");
+    await fs.writeFile(
+      join(finalPath, "metadata.json"),
+      `${JSON.stringify(metadata, null, 2)}\n`,
+      "utf8",
+    );
   } catch (error) {
-    await fs.rm(finalPath, { recursive: true, force: true }).catch(() => undefined);
+    await fs
+      .rm(finalPath, { recursive: true, force: true })
+      .catch(() => undefined);
     throw error;
   }
 
@@ -966,7 +1519,8 @@ async function publishTrashStage(stage, finalPath, metadata, renameOptions) {
 }
 
 function trashRootMetadata(definition) {
-  if (definition.key === "dsh") return { key: "dsh", scope: "user", label: definition.label };
+  if (definition.key === "dsh")
+    return { key: "dsh", scope: "user", label: definition.label };
   return {
     key: definition.key,
     scope: "project",
@@ -980,17 +1534,29 @@ function trashRootMetadata(definition) {
 async function restoreRootDefinition(metadata, options = {}) {
   // version 1 entries predate scoped Trash and always belong to $DSH_HOME/skills.
   if (!metadata.root) return rootByKey("dsh");
-  if (metadata.root.scope === "user" && metadata.root.key === "dsh") return rootByKey("dsh");
+  if (metadata.root.scope === "user" && metadata.root.key === "dsh")
+    return rootByKey("dsh");
   if (
-    metadata.root.scope !== "project"
-    || metadata.root.kind !== "project-dsh"
-    || typeof metadata.root.key !== "string"
-    || typeof metadata.root.projectRoot !== "string"
-    || !isAbsolute(metadata.root.projectRoot)
-  ) return { ok: false, error: `回收站条目来源非法: ${metadata.id}`, code: "error.trash.invalid", params: { id: metadata.id } };
+    metadata.root.scope !== "project" ||
+    metadata.root.kind !== "project-dsh" ||
+    typeof metadata.root.key !== "string" ||
+    typeof metadata.root.projectRoot !== "string" ||
+    !isAbsolute(metadata.root.projectRoot)
+  )
+    return {
+      ok: false,
+      error: `回收站条目来源非法: ${metadata.id}`,
+      code: "error.trash.invalid",
+      params: { id: metadata.id },
+    };
   const roots = await projectRoots(options.projectCwds);
   const normalizedProjectRoot = pathIdentity(metadata.root.projectRoot);
-  const root = roots.find((item) => item.key === metadata.root.key && item.kind === "project-dsh" && pathIdentity(item.projectRoot) === normalizedProjectRoot);
+  const root = roots.find(
+    (item) =>
+      item.key === metadata.root.key &&
+      item.kind === "project-dsh" &&
+      pathIdentity(item.projectRoot) === normalizedProjectRoot,
+  );
   if (!root) {
     return {
       ok: false,
@@ -1008,7 +1574,13 @@ export async function deleteSkill(root, name, log, options = {}) {
   if (definition && definition.ok === false) return definition;
   if (!definition) return readonlyError("delete");
   const resolved = await resolveEntry(definition, name);
-  if (resolved === null) return { ok: false, error: `技能不存在: ${name}`, code: "error.skill.notFound", params: { name } };
+  if (resolved === null)
+    return {
+      ok: false,
+      error: `技能不存在: ${name}`,
+      code: "error.skill.notFound",
+      params: { name },
+    };
   const targets = await safeExistingEntryPaths(definition.path, name);
   const id = `${Date.now()}-${randomUUID()}`;
   const trashRoot = trashRootPath();
@@ -1019,23 +1591,62 @@ export async function deleteSkill(root, name, log, options = {}) {
   try {
     for (const target of targets) {
       const destination = join(stage, target.fileName);
-      const transferred = await movePathWithFallback(target.path, destination, options.renameOptions);
-      if (transferred.cleanupError && log) log("trash-source-warning", `技能已跨盘移入回收站，但源盘隐藏副本等待后续清理: ${transferred.quarantine}（${transferred.cleanupError.message || transferred.cleanupError}）`);
+      const transferred = await movePathWithFallback(
+        target.path,
+        destination,
+        options.renameOptions,
+      );
+      if (transferred.cleanupError && log)
+        log(
+          "trash-source-warning",
+          `技能已跨盘移入回收站，但源盘隐藏副本等待后续清理: ${transferred.quarantine}（${transferred.cleanupError.message || transferred.cleanupError}）`,
+        );
       moved.push({ ...target, destination });
     }
-    const metadata = { version: 2, id, name, deletedAt: new Date().toISOString(), entries: moved.map((item) => item.fileName), root: trashRootMetadata(definition) };
-    await fs.writeFile(join(stage, "metadata.json"), `${JSON.stringify(metadata, null, 2)}\n`, "utf8");
-    const published = await publishTrashStage(stage, finalPath, metadata, options.renameOptions);
-    if (published.cleanupError && log) log("trash-stage-warning", `回收站已发布，但临时目录等待后续清理: ${stage}（${published.cleanupError.message || published.cleanupError}）`);
+    const metadata = {
+      version: 2,
+      id,
+      name,
+      deletedAt: new Date().toISOString(),
+      entries: moved.map((item) => item.fileName),
+      root: trashRootMetadata(definition),
+    };
+    await fs.writeFile(
+      join(stage, "metadata.json"),
+      `${JSON.stringify(metadata, null, 2)}\n`,
+      "utf8",
+    );
+    const published = await publishTrashStage(
+      stage,
+      finalPath,
+      metadata,
+      options.renameOptions,
+    );
+    if (published.cleanupError && log)
+      log(
+        "trash-stage-warning",
+        `回收站已发布，但临时目录等待后续清理: ${stage}（${published.cleanupError.message || published.cleanupError}）`,
+      );
     if (log) log("trash", `移到回收站 ${name} -> ${finalPath}`);
     return { id, name, deletedAt: metadata.deletedAt, root: metadata.root };
   } catch (error) {
     const rollbackFailures = [];
     for (const item of moved.reverse()) {
       try {
-        await movePathWithFallback(item.destination, item.path, options.renameOptions);
+        await movePathWithFallback(
+          item.destination,
+          item.path,
+          options.renameOptions,
+        );
       } catch (rollbackError) {
-        rollbackFailures.push({ path: item.destination, error: String(rollbackError && rollbackError.message ? rollbackError.message : rollbackError) });
+        rollbackFailures.push({
+          path: item.destination,
+          error: String(
+            rollbackError && rollbackError.message
+              ? rollbackError.message
+              : rollbackError,
+          ),
+        });
       }
     }
     if (rollbackFailures.length) {
@@ -1064,17 +1675,32 @@ export async function listTrash() {
     const metadata = await readTrashMetadata(item.name);
     if (metadata) result.push(metadata);
   }
-  return result.sort((a, b) => String(b.deletedAt).localeCompare(String(a.deletedAt)));
+  return result.sort((a, b) =>
+    String(b.deletedAt).localeCompare(String(a.deletedAt)),
+  );
 }
 
 export async function restoreTrash(id, log, options = {}) {
   const metadata = await readTrashMetadata(id);
-  if (!metadata) return { ok: false, error: `回收站条目不存在: ${id}`, code: "error.trash.notFound", params: { id } };
+  if (!metadata)
+    return {
+      ok: false,
+      error: `回收站条目不存在: ${id}`,
+      code: "error.trash.notFound",
+      params: { id },
+    };
   const definition = await restoreRootDefinition(metadata, options);
-  if (!definition || definition.ok === false) return definition || readonlyError("restore");
+  if (!definition || definition.ok === false)
+    return definition || readonlyError("restore");
   const root = definition.path;
   const conflicts = await safeExistingEntryPaths(root, metadata.name);
-  if (conflicts.length) return { ok: false, error: `无法恢复，同名技能已存在: ${metadata.name}`, code: "error.trash.conflict", params: { name: metadata.name } };
+  if (conflicts.length)
+    return {
+      ok: false,
+      error: `无法恢复，同名技能已存在: ${metadata.name}`,
+      code: "error.trash.conflict",
+      params: { name: metadata.name },
+    };
   await fs.mkdir(root, { recursive: true });
   const itemRoot = join(trashRootPath(), id);
   const moved = [];
@@ -1082,7 +1708,11 @@ export async function restoreTrash(id, log, options = {}) {
     for (const fileName of metadata.entries) {
       const source = join(itemRoot, fileName);
       const destination = join(root, fileName);
-      if (!isSameOrDescendant(itemRoot, source) || !isSameOrDescendant(root, destination)) throw codedError("回收站条目路径非法", "error.trash.invalid", { id });
+      if (
+        !isSameOrDescendant(itemRoot, source) ||
+        !isSameOrDescendant(root, destination)
+      )
+        throw codedError("回收站条目路径非法", "error.trash.invalid", { id });
       await movePathWithFallback(source, destination, options.renameOptions);
       moved.push({ source, destination });
     }
@@ -1090,14 +1720,25 @@ export async function restoreTrash(id, log, options = {}) {
     if (log) log("restore", `从回收站恢复 ${metadata.name} -> ${root}`);
     return { id, name: metadata.name, root: trashRootMetadata(definition) };
   } catch (error) {
-    for (const item of moved.reverse()) await movePathWithFallback(item.destination, item.source, options.renameOptions).catch(() => undefined);
+    for (const item of moved.reverse())
+      await movePathWithFallback(
+        item.destination,
+        item.source,
+        options.renameOptions,
+      ).catch(() => undefined);
     throw error;
   }
 }
 
 export async function permanentlyDeleteTrash(id, log) {
   const metadata = await readTrashMetadata(id);
-  if (!metadata) return { ok: false, error: `回收站条目不存在: ${id}`, code: "error.trash.notFound", params: { id } };
+  if (!metadata)
+    return {
+      ok: false,
+      error: `回收站条目不存在: ${id}`,
+      code: "error.trash.notFound",
+      params: { id },
+    };
   await fs.rm(join(trashRootPath(), id), { recursive: true, force: true });
   if (log) log("trash-delete", `永久删除回收站条目 ${metadata.name} (${id})`);
   return { id, name: metadata.name };
@@ -1111,45 +1752,112 @@ async function analyzeSource(source) {
   try {
     st = await fs.lstat(source);
   } catch {
-    return { kind: "none", error: `路径不存在: ${source}`, code: "error.source.notFound", params: { path: source } };
+    return {
+      kind: "none",
+      error: `路径不存在: ${source}`,
+      code: "error.source.notFound",
+      params: { path: source },
+    };
   }
-  if (st.isSymbolicLink()) return { kind: "none", error: `不支持包含符号链接的 skill 来源: ${source}`, code: "error.source.symlink", params: { path: source } };
+  if (st.isSymbolicLink())
+    return {
+      kind: "none",
+      error: `不支持包含符号链接的 skill 来源: ${source}`,
+      code: "error.source.symlink",
+      params: { path: source },
+    };
   if (st.isDirectory()) {
     const sk = join(source, "SKILL.md");
     const skSt = await lstatOrNull(sk);
     // 预检与实际导入口径一致：SKILL.md 本身是链接时直接拒绝，避免 dry-run 通过、正式导入才失败。
-    if (skSt && skSt.isSymbolicLink()) return { kind: "none", error: `不支持包含符号链接的 skill 来源: ${sk}`, code: "error.source.symlink", params: { path: sk } };
+    if (skSt && skSt.isSymbolicLink())
+      return {
+        kind: "none",
+        error: `不支持包含符号链接的 skill 来源: ${sk}`,
+        code: "error.source.symlink",
+        params: { path: sk },
+      };
     if (skSt && skSt.isFile()) {
-      return { kind: "single", rawName: basename(source), kebab: toKebab(basename(source)), source, isDir: true, skillFile: sk };
+      return {
+        kind: "single",
+        rawName: basename(source),
+        kebab: toKebab(basename(source)),
+        source,
+        isDir: true,
+        skillFile: sk,
+      };
     }
     return { kind: "batch", rawName: basename(source), source, isDir: true };
   }
   if (st.isFile() && source.toLowerCase().endsWith(".md")) {
     if (basename(source).toLowerCase() === "skill.md") {
       const parent = dirname(source);
-      return { kind: "single", rawName: basename(parent), kebab: toKebab(basename(parent)), source: parent, isDir: true, skillFile: source };
+      return {
+        kind: "single",
+        rawName: basename(parent),
+        kebab: toKebab(basename(parent)),
+        source: parent,
+        isDir: true,
+        skillFile: source,
+      };
     }
     const rawName = basename(source).slice(0, -3);
-    return { kind: "single", rawName, kebab: toKebab(rawName), source, isDir: false, skillFile: source };
+    return {
+      kind: "single",
+      rawName,
+      kebab: toKebab(rawName),
+      source,
+      isDir: false,
+      skillFile: source,
+    };
   }
-  return { kind: "none", error: `无法识别的 skill 来源: ${source}`, code: "error.source.unrecognized", params: { path: source } };
+  return {
+    kind: "none",
+    error: `无法识别的 skill 来源: ${source}`,
+    code: "error.source.unrecognized",
+    params: { path: source },
+  };
 }
 
 async function collectCandidates(dir) {
   const items = await fs.readdir(dir, { withFileTypes: true });
   const out = [];
   for (const it of items) {
-    if (it.isSymbolicLink()) throw codedError(`不支持包含符号链接的 skill 来源: ${join(dir, it.name)}`, "error.source.symlink", { path: join(dir, it.name) });
+    if (it.isSymbolicLink())
+      throw codedError(
+        `不支持包含符号链接的 skill 来源: ${join(dir, it.name)}`,
+        "error.source.symlink",
+        { path: join(dir, it.name) },
+      );
     if (it.isDirectory()) {
       const sk = join(dir, it.name, "SKILL.md");
       // lstatOrNull 吞掉 IO 异常（返回 null 即跳过）；symlink 必须抛出，不能被“跳过”逻辑掩盖。
       const st = await lstatOrNull(sk);
-      if (st && st.isSymbolicLink()) throw codedError(`不支持包含符号链接的 skill 来源: ${sk}`, "error.source.symlink", { path: sk });
+      if (st && st.isSymbolicLink())
+        throw codedError(
+          `不支持包含符号链接的 skill 来源: ${sk}`,
+          "error.source.symlink",
+          { path: sk },
+        );
       if (st && st.isFile()) {
-        out.push({ source: join(dir, it.name), kebab: toKebab(it.name), rawName: it.name, isDir: true });
+        out.push({
+          source: join(dir, it.name),
+          kebab: toKebab(it.name),
+          rawName: it.name,
+          isDir: true,
+        });
       }
-    } else if (it.isFile() && it.name.toLowerCase().endsWith(".md") && it.name.toLowerCase() !== "skill.md") {
-      out.push({ source: join(dir, it.name), kebab: toKebab(it.name.slice(0, -3)), rawName: it.name.slice(0, -3), isDir: false });
+    } else if (
+      it.isFile() &&
+      it.name.toLowerCase().endsWith(".md") &&
+      it.name.toLowerCase() !== "skill.md"
+    ) {
+      out.push({
+        source: join(dir, it.name),
+        kebab: toKebab(it.name.slice(0, -3)),
+        rawName: it.name.slice(0, -3),
+        isDir: false,
+      });
     }
   }
   return out;
@@ -1160,21 +1868,39 @@ async function assertNoSymbolicLinks(source) {
   const pending = [{ path: source, depth: 0 }];
   while (pending.length) {
     const current = pending.pop();
-    if (current.depth > MAX_SOURCE_DEPTH) throw codedError(`skill 来源目录层级超过 ${MAX_SOURCE_DEPTH} 层: ${source}`, "error.source.tooDeep", { depth: MAX_SOURCE_DEPTH, path: source });
+    if (current.depth > MAX_SOURCE_DEPTH)
+      throw codedError(
+        `skill 来源目录层级超过 ${MAX_SOURCE_DEPTH} 层: ${source}`,
+        "error.source.tooDeep",
+        { depth: MAX_SOURCE_DEPTH, path: source },
+      );
     const st = await fs.lstat(current.path);
-    if (st.isSymbolicLink()) throw codedError(`不支持包含符号链接的 skill 来源: ${current.path}`, "error.source.symlink", { path: current.path });
+    if (st.isSymbolicLink())
+      throw codedError(
+        `不支持包含符号链接的 skill 来源: ${current.path}`,
+        "error.source.symlink",
+        { path: current.path },
+      );
     if (!st.isDirectory()) continue;
     const items = await fs.readdir(current.path, { withFileTypes: true });
     for (const item of items) {
       const path = join(current.path, item.name);
-      if (item.isSymbolicLink()) throw codedError(`不支持包含符号链接的 skill 来源: ${path}`, "error.source.symlink", { path });
+      if (item.isSymbolicLink())
+        throw codedError(
+          `不支持包含符号链接的 skill 来源: ${path}`,
+          "error.source.symlink",
+          { path },
+        );
       if (item.isDirectory()) pending.push({ path, depth: current.depth + 1 });
     }
   }
 }
 
 function temporaryPath(target, kind) {
-  return join(dirname(target), `.${basename(target)}.dssm-${kind}-${randomUUID()}`);
+  return join(
+    dirname(target),
+    `.${basename(target)}.dssm-${kind}-${randomUUID()}`,
+  );
 }
 
 /** dry-run 预检执行与正式导入相同的符号链接/深度检查，预检失败即结论，不再进入覆盖确认。
@@ -1186,7 +1912,15 @@ async function preflightCandidates(pending, conflicts, failed) {
       try {
         await assertNoSymbolicLinks(candidate.source);
       } catch (error) {
-        failed.push(attachCode({ source: candidate.source, error: String(error && error.message ? error.message : error) }, error));
+        failed.push(
+          attachCode(
+            {
+              source: candidate.source,
+              error: String(error && error.message ? error.message : error),
+            },
+            error,
+          ),
+        );
         group.splice(i, 1);
       }
     }
@@ -1198,7 +1932,8 @@ async function copyToTemporary(source, target, isDir) {
   const temp = temporaryPath(target, "stage");
   try {
     await assertNoSymbolicLinks(source);
-    if (isDir) await fs.cp(source, temp, { recursive: true, dereference: false });
+    if (isDir)
+      await fs.cp(source, temp, { recursive: true, dereference: false });
     else await fs.copyFile(source, temp);
     await assertNoSymbolicLinks(temp);
     return temp;
@@ -1246,7 +1981,10 @@ async function replaceWithCopy(source, dest, isDir, existing = []) {
     } catch (error) {
       warnings.push({
         code: "warning.backupUncleaned",
-        params: { path: item.backup, error: String(error && error.message ? error.message : error) },
+        params: {
+          path: item.backup,
+          error: String(error && error.message ? error.message : error),
+        },
         error: `旧版本备份未清理: ${item.backup}（${String(error && error.message ? error.message : error)}）`,
       });
     }
@@ -1265,19 +2003,49 @@ export async function importSkill(source, log, options = {}) {
   const dryRun = options.dryRun === true;
 
   const analysis = await analyzeSource(source);
-  if (analysis.kind === "none") return { ok: false, error: analysis.error || "无法识别的 skill 来源", code: analysis.code || "error.source.unrecognized", params: analysis.params };
-  if (await pathsOverlap(analysis.source, targetRoot)) return { ok: false, error: "导入来源不能与 DSH 技能目录相同、包含或位于其中", code: "error.import.overlap" };
+  if (analysis.kind === "none")
+    return {
+      ok: false,
+      error: analysis.error || "无法识别的 skill 来源",
+      code: analysis.code || "error.source.unrecognized",
+      params: analysis.params,
+    };
+  if (await pathsOverlap(analysis.source, targetRoot))
+    return {
+      ok: false,
+      error: "导入来源不能与 DSH 技能目录相同、包含或位于其中",
+      code: "error.import.overlap",
+    };
 
   let candidates = [];
   if (analysis.kind === "single") {
-    candidates = [{ source: analysis.source, kebab: analysis.kebab, rawName: analysis.rawName, isDir: analysis.isDir }];
+    candidates = [
+      {
+        source: analysis.source,
+        kebab: analysis.kebab,
+        rawName: analysis.rawName,
+        isDir: analysis.isDir,
+      },
+    ];
   } else {
     try {
       candidates = await collectCandidates(source);
     } catch (error) {
-      return attachCode({ ok: false, error: String(error && error.message ? error.message : error) }, error);
+      return attachCode(
+        {
+          ok: false,
+          error: String(error && error.message ? error.message : error),
+        },
+        error,
+      );
     }
-    if (candidates.length === 0) return { ok: false, error: `目录下未找到任何 skill 条目（需含 SKILL.md 的子目录或 .md 文件）: ${source}`, code: "error.import.emptySource", params: { path: source } };
+    if (candidates.length === 0)
+      return {
+        ok: false,
+        error: `目录下未找到任何 skill 条目（需含 SKILL.md 的子目录或 .md 文件）: ${source}`,
+        code: "error.import.emptySource",
+        params: { path: source },
+      };
   }
 
   const pending = [];
@@ -1288,7 +2056,12 @@ export async function importSkill(source, log, options = {}) {
 
   const nameCount = new Map();
   for (const candidate of candidates) {
-    if (candidate.kebab && KEBAB_RE.test(candidate.kebab) && entryPath(targetRoot, candidate.kebab) !== null) nameCount.set(candidate.kebab, (nameCount.get(candidate.kebab) || 0) + 1);
+    if (
+      candidate.kebab &&
+      KEBAB_RE.test(candidate.kebab) &&
+      entryPath(targetRoot, candidate.kebab) !== null
+    )
+      nameCount.set(candidate.kebab, (nameCount.get(candidate.kebab) || 0) + 1);
   }
 
   function failureResult() {
@@ -1305,16 +2078,35 @@ export async function importSkill(source, log, options = {}) {
   }
 
   for (const c of candidates) {
-    if (!c.kebab || !KEBAB_RE.test(c.kebab) || entryPath(targetRoot, c.kebab) === null) {
-      failed.push({ source: c.source, error: `无法生成合法 kebab-case 名称（原始名: ${c.rawName || basename(c.source)}）`, code: "error.import.invalidName", params: { name: c.rawName || basename(c.source) } });
+    if (
+      !c.kebab ||
+      !KEBAB_RE.test(c.kebab) ||
+      entryPath(targetRoot, c.kebab) === null
+    ) {
+      failed.push({
+        source: c.source,
+        error: `无法生成合法 kebab-case 名称（原始名: ${c.rawName || basename(c.source)}）`,
+        code: "error.import.invalidName",
+        params: { name: c.rawName || basename(c.source) },
+      });
       continue;
     }
     if (nameCount.get(c.kebab) > 1) {
-      failed.push({ source: c.source, error: `批量来源中存在多个同名插件: ${c.kebab}`, code: "error.import.duplicateName", params: { name: c.kebab } });
+      failed.push({
+        source: c.source,
+        error: `批量来源中存在多个同名插件: ${c.kebab}`,
+        code: "error.import.duplicateName",
+        params: { name: c.kebab },
+      });
       continue;
     }
-    const dest = c.isDir ? join(targetRoot, c.kebab) : join(targetRoot, `${c.kebab}.md`);
-    const paths = [join(targetRoot, c.kebab), join(targetRoot, `${c.kebab}.md`)];
+    const dest = c.isDir
+      ? join(targetRoot, c.kebab)
+      : join(targetRoot, `${c.kebab}.md`);
+    const paths = [
+      join(targetRoot, c.kebab),
+      join(targetRoot, `${c.kebab}.md`),
+    ];
     const existing = [];
     for (const path of paths) {
       try {
@@ -1323,7 +2115,12 @@ export async function importSkill(source, log, options = {}) {
       } catch {}
     }
     if (existing.length) {
-      conflicts.push({ name: c.kebab, source: c.source, isDir: c.isDir, paths: existing });
+      conflicts.push({
+        name: c.kebab,
+        source: c.source,
+        isDir: c.isDir,
+        paths: existing,
+      });
       continue;
     }
     pending.push({ name: c.kebab, source: c.source, isDir: c.isDir, dest });
@@ -1338,7 +2135,10 @@ export async function importSkill(source, log, options = {}) {
     return { kind: analysis.kind, pending, conflicts, failed };
   }
 
-  if (pending.length > 0 || (conflict === "overwrite" && conflicts.length > 0)) {
+  if (
+    pending.length > 0 ||
+    (conflict === "overwrite" && conflicts.length > 0)
+  ) {
     await fs.mkdir(targetRoot, { recursive: true });
   }
 
@@ -1348,19 +2148,36 @@ export async function importSkill(source, log, options = {}) {
       imported.push({ name: p.name, overwritten: false, warnings });
       if (log) log("import", `导入 ${p.source} -> ${p.dest}`);
     } catch (e) {
-      failed.push(attachCode({ source: p.source, error: String(e && e.message ? e.message : e) }, e));
+      failed.push(
+        attachCode(
+          { source: p.source, error: String(e && e.message ? e.message : e) },
+          e,
+        ),
+      );
     }
   }
 
   if (conflict === "overwrite") {
     for (const c of conflicts) {
       try {
-        const dest = c.isDir ? join(targetRoot, c.name) : join(targetRoot, `${c.name}.md`);
-        const warnings = await replaceWithCopy(c.source, dest, c.isDir, c.paths);
+        const dest = c.isDir
+          ? join(targetRoot, c.name)
+          : join(targetRoot, `${c.name}.md`);
+        const warnings = await replaceWithCopy(
+          c.source,
+          dest,
+          c.isDir,
+          c.paths,
+        );
         imported.push({ name: c.name, overwritten: true, warnings });
         if (log) log("import-overwrite", `覆盖导入 ${c.source} -> ${dest}`);
       } catch (e) {
-        failed.push(attachCode({ source: c.source, error: String(e && e.message ? e.message : e) }, e));
+        failed.push(
+          attachCode(
+            { source: c.source, error: String(e && e.message ? e.message : e) },
+            e,
+          ),
+        );
       }
     }
   } else {
@@ -1379,13 +2196,39 @@ export async function importSkill(source, log, options = {}) {
  */
 function normalizeUploadPath(input) {
   const raw = String(input == null ? "" : input).replace(/\\/g, "/");
-  if (!raw || raw.length > MAX_UPLOAD_PATH_LENGTH || raw.includes("\0") || raw.startsWith("/") || /^[A-Za-z]:/.test(raw) || raw.startsWith("//")) {
-    throw codedError(`上传条目路径非法: ${raw}`, "error.upload.path", { path: raw });
+  if (
+    !raw ||
+    raw.length > MAX_UPLOAD_PATH_LENGTH ||
+    raw.includes("\0") ||
+    raw.startsWith("/") ||
+    /^[A-Za-z]:/.test(raw) ||
+    raw.startsWith("//")
+  ) {
+    throw codedError(`上传条目路径非法: ${raw}`, "error.upload.path", {
+      path: raw,
+    });
   }
   const directory = raw.endsWith("/");
-  const parts = raw.split("/").filter((part, index, all) => directory && index === all.length - 1 ? false : true);
-  if (!parts.length || parts.length > MAX_SOURCE_DEPTH || parts.some((part) => !part || part === "." || part === ".." || part.length > MAX_ENTRY_NAME_LENGTH || WINDOWS_DEVICE_NAME_RE.test(part))) {
-    throw codedError(`上传条目路径非法: ${raw}`, "error.upload.path", { path: raw });
+  const parts = raw
+    .split("/")
+    .filter((part, index, all) =>
+      directory && index === all.length - 1 ? false : true,
+    );
+  if (
+    !parts.length ||
+    parts.length > MAX_SOURCE_DEPTH ||
+    parts.some(
+      (part) =>
+        !part ||
+        part === "." ||
+        part === ".." ||
+        part.length > MAX_ENTRY_NAME_LENGTH ||
+        WINDOWS_DEVICE_NAME_RE.test(part),
+    )
+  ) {
+    throw codedError(`上传条目路径非法: ${raw}`, "error.upload.path", {
+      path: raw,
+    });
   }
   return { path: parts.join("/"), directory };
 }
@@ -1395,15 +2238,29 @@ function decodeUploadBase64(value, maxBytes, code = "error.upload.tooLarge") {
   const padding = raw.endsWith("==") ? 2 : raw.endsWith("=") ? 1 : 0;
   const dataLength = raw.length - padding;
   const firstPadding = raw.indexOf("=");
-  if (raw.length % 4 !== 0 || (firstPadding !== -1 && firstPadding !== dataLength)) {
+  if (
+    raw.length % 4 !== 0 ||
+    (firstPadding !== -1 && firstPadding !== dataLength)
+  ) {
     throw codedError("上传内容不是合法 Base64", "error.upload.encoding");
   }
-  const decodedLength = raw.length / 4 * 3 - padding;
-  if (decodedLength > maxBytes) throw codedError(`上传内容超过 ${maxBytes} 字节限制`, code, { limit: maxBytes });
+  const decodedLength = (raw.length / 4) * 3 - padding;
+  if (decodedLength > maxBytes)
+    throw codedError(`上传内容超过 ${maxBytes} 字节限制`, code, {
+      limit: maxBytes,
+    });
   // 避免对数 MiB 字符串使用带重复分组的正则；V8 可能在合法大文件上耗尽调用栈。
   for (let index = 0; index < dataLength; index += 1) {
     const char = raw.charCodeAt(index);
-    if (!((char >= 65 && char <= 90) || (char >= 97 && char <= 122) || (char >= 48 && char <= 57) || char === 43 || char === 47)) {
+    if (
+      !(
+        (char >= 65 && char <= 90) ||
+        (char >= 97 && char <= 122) ||
+        (char >= 48 && char <= 57) ||
+        char === 43 ||
+        char === 47
+      )
+    ) {
       throw codedError("上传内容不是合法 Base64", "error.upload.encoding");
     }
   }
@@ -1412,32 +2269,66 @@ function decodeUploadBase64(value, maxBytes, code = "error.upload.tooLarge") {
 }
 
 function uploadError(error) {
-  return attachCode({ ok: false, error: String(error && error.message ? error.message : error) }, error);
+  return attachCode(
+    {
+      ok: false,
+      error: String(error && error.message ? error.message : error),
+    },
+    error,
+  );
 }
 
 async function writeUploadedEntries(contentRoot, entries) {
-  if (!Array.isArray(entries) || entries.length === 0) throw codedError("上传内容为空", "error.upload.empty");
-  if (entries.length > MAX_UPLOAD_ENTRIES) throw codedError(`上传条目超过 ${MAX_UPLOAD_ENTRIES} 个`, "error.upload.tooMany", { limit: MAX_UPLOAD_ENTRIES });
+  if (!Array.isArray(entries) || entries.length === 0)
+    throw codedError("上传内容为空", "error.upload.empty");
+  if (entries.length > MAX_UPLOAD_ENTRIES)
+    throw codedError(
+      `上传条目超过 ${MAX_UPLOAD_ENTRIES} 个`,
+      "error.upload.tooMany",
+      { limit: MAX_UPLOAD_ENTRIES },
+    );
   let total = 0;
   const seen = new Set();
   for (const entry of entries) {
     const normalized = normalizeUploadPath(entry && entry.path);
     const key = normalized.path.toLowerCase();
-    if (seen.has(key)) throw codedError(`上传内容包含重复路径: ${normalized.path}`, "error.upload.duplicate", { path: normalized.path });
+    if (seen.has(key))
+      throw codedError(
+        `上传内容包含重复路径: ${normalized.path}`,
+        "error.upload.duplicate",
+        { path: normalized.path },
+      );
     seen.add(key);
     if (normalized.directory) continue;
-    const bytes = decodeUploadBase64(entry && entry.data, MAX_UPLOAD_ENTRY_BYTES);
+    const bytes = decodeUploadBase64(
+      entry && entry.data,
+      MAX_UPLOAD_ENTRY_BYTES,
+    );
     total += bytes.length;
-    if (total > MAX_UPLOAD_TOTAL_BYTES) throw codedError(`上传内容总大小超过 ${MAX_UPLOAD_TOTAL_BYTES} 字节`, "error.upload.tooLarge", { limit: MAX_UPLOAD_TOTAL_BYTES });
+    if (total > MAX_UPLOAD_TOTAL_BYTES)
+      throw codedError(
+        `上传内容总大小超过 ${MAX_UPLOAD_TOTAL_BYTES} 字节`,
+        "error.upload.tooLarge",
+        { limit: MAX_UPLOAD_TOTAL_BYTES },
+      );
     const target = join(contentRoot, ...normalized.path.split("/"));
-    if (!isSameOrDescendant(contentRoot, target)) throw codedError(`上传条目路径非法: ${normalized.path}`, "error.upload.path", { path: normalized.path });
+    if (!isSameOrDescendant(contentRoot, target))
+      throw codedError(
+        `上传条目路径非法: ${normalized.path}`,
+        "error.upload.path",
+        { path: normalized.path },
+      );
     await fs.mkdir(dirname(target), { recursive: true });
     await fs.writeFile(target, bytes);
   }
 }
 
 async function writeUploadedZip(contentRoot, encoded) {
-  const archive = decodeUploadBase64(encoded, MAX_UPLOAD_ARCHIVE_BYTES, "error.upload.archiveTooLarge");
+  const archive = decodeUploadBase64(
+    encoded,
+    MAX_UPLOAD_ARCHIVE_BYTES,
+    "error.upload.archiveTooLarge",
+  );
   let count = 0;
   let total = 0;
   let files;
@@ -1446,25 +2337,47 @@ async function writeUploadedZip(contentRoot, encoded) {
       filter(info) {
         const normalized = normalizeUploadPath(info.name);
         count += 1;
-        if (count > MAX_UPLOAD_ENTRIES) throw codedError(`ZIP 条目超过 ${MAX_UPLOAD_ENTRIES} 个`, "error.upload.tooMany", { limit: MAX_UPLOAD_ENTRIES });
-        if (!normalized.directory && info.originalSize > MAX_UPLOAD_ENTRY_BYTES) throw codedError(`ZIP 条目过大: ${normalized.path}`, "error.upload.tooLarge", { limit: MAX_UPLOAD_ENTRY_BYTES });
+        if (count > MAX_UPLOAD_ENTRIES)
+          throw codedError(
+            `ZIP 条目超过 ${MAX_UPLOAD_ENTRIES} 个`,
+            "error.upload.tooMany",
+            { limit: MAX_UPLOAD_ENTRIES },
+          );
+        if (!normalized.directory && info.originalSize > MAX_UPLOAD_ENTRY_BYTES)
+          throw codedError(
+            `ZIP 条目过大: ${normalized.path}`,
+            "error.upload.tooLarge",
+            { limit: MAX_UPLOAD_ENTRY_BYTES },
+          );
         total += normalized.directory ? 0 : info.originalSize;
-        if (total > MAX_UPLOAD_TOTAL_BYTES) throw codedError(`ZIP 解压后总大小超过 ${MAX_UPLOAD_TOTAL_BYTES} 字节`, "error.upload.tooLarge", { limit: MAX_UPLOAD_TOTAL_BYTES });
+        if (total > MAX_UPLOAD_TOTAL_BYTES)
+          throw codedError(
+            `ZIP 解压后总大小超过 ${MAX_UPLOAD_TOTAL_BYTES} 字节`,
+            "error.upload.tooLarge",
+            { limit: MAX_UPLOAD_TOTAL_BYTES },
+          );
         return !normalized.directory;
       },
     });
   } catch (error) {
     if (error && /^error\./.test(String(error.code || ""))) throw error;
-    throw codedError(`ZIP 无法解压: ${String(error && error.message ? error.message : error)}`, "error.upload.zipInvalid");
+    throw codedError(
+      `ZIP 无法解压: ${String(error && error.message ? error.message : error)}`,
+      "error.upload.zipInvalid",
+    );
   }
-  const entries = Object.entries(files).map(([path, bytes]) => ({ path, data: Buffer.from(bytes).toString("base64") }));
+  const entries = Object.entries(files).map(([path, bytes]) => ({
+    path,
+    data: Buffer.from(bytes).toString("base64"),
+  }));
   await writeUploadedEntries(contentRoot, entries);
 }
 
 async function prepareUploadedSource(sessionRoot, input) {
   const contentRoot = join(sessionRoot, "content");
   await fs.mkdir(contentRoot, { recursive: true });
-  if (input && input.zip !== undefined) await writeUploadedZip(contentRoot, input.zip);
+  if (input && input.zip !== undefined)
+    await writeUploadedZip(contentRoot, input.zip);
   else await writeUploadedEntries(contentRoot, input && input.entries);
 
   const rootSkill = join(contentRoot, "SKILL.md");
@@ -1472,10 +2385,20 @@ async function prepareUploadedSource(sessionRoot, input) {
   if (!rootSkillStat || !rootSkillStat.isFile()) return contentRoot;
 
   const doc = parseSkillDoc(await fs.readFile(rootSkill, "utf8"));
-  const fallback = String(input && input.name || "uploaded-skill").replace(/\.zip$/i, "").replace(/^skill\.md$/i, "uploaded-skill");
+  const fallback = String((input && input.name) || "uploaded-skill")
+    .replace(/\.zip$/i, "")
+    .replace(/^skill\.md$/i, "uploaded-skill");
   const skillName = toKebab(doc.map.name || fallback);
-  if (!skillName || !KEBAB_RE.test(skillName) || entryPath(contentRoot, skillName) === null) {
-    throw codedError(`无法生成合法 kebab-case 名称（原始名: ${doc.map.name || fallback}）`, "error.import.invalidName", { name: doc.map.name || fallback });
+  if (
+    !skillName ||
+    !KEBAB_RE.test(skillName) ||
+    entryPath(contentRoot, skillName) === null
+  ) {
+    throw codedError(
+      `无法生成合法 kebab-case 名称（原始名: ${doc.map.name || fallback}）`,
+      "error.import.invalidName",
+      { name: doc.map.name || fallback },
+    );
   }
   const batchRoot = join(sessionRoot, "batch");
   const wrappedRoot = join(batchRoot, skillName);
@@ -1498,7 +2421,9 @@ export async function importUploadedSkill(input, log, options = {}) {
   } catch (error) {
     return uploadError(error);
   } finally {
-    await fs.rm(sessionRoot, { recursive: true, force: true }).catch(() => undefined);
+    await fs
+      .rm(sessionRoot, { recursive: true, force: true })
+      .catch(() => undefined);
   }
 }
 
@@ -1509,20 +2434,47 @@ function yamlString(value) {
 }
 
 export async function createSkill(input, log, options = {}) {
-  const requestedRoot = Object.prototype.hasOwnProperty.call(options, "root") ? options.root : rootByKey("dsh");
+  const requestedRoot = Object.prototype.hasOwnProperty.call(options, "root")
+    ? options.root
+    : rootByKey("dsh");
   const definition = await checkedWritableRootDefinition(requestedRoot);
   if (definition && definition.ok === false) return definition;
   if (!definition) return readonlyError("create");
   const root = definition.path;
-  const requestedName = String(input && input.name || "").trim();
+  const requestedName = String((input && input.name) || "").trim();
   const name = toKebab(requestedName);
-  const description = String(input && input.description || "").trim();
-  const body = String(input && input.body || "").trim();
-  if (!name || !KEBAB_RE.test(name) || entryPath(root, name) === null) return { ok: false, error: `无法生成合法 kebab-case 名称（原始名: ${requestedName}）`, code: "error.import.invalidName", params: { name: requestedName } };
-  if (!description) return { ok: false, error: "技能简介不能为空", code: "error.create.descriptionRequired" };
-  if (!body) return { ok: false, error: "技能正文不能为空", code: "error.create.bodyRequired" };
-  if (description.length > 500 || body.length > (1 << 18)) return { ok: false, error: "技能内容过长", code: "error.create.tooLarge" };
-  if (await safeExistingEntryPaths(root, name).then((items) => items.length > 0)) return { ok: false, error: `同名技能已存在: ${name}`, code: "error.create.conflict", params: { name } };
+  const description = String((input && input.description) || "").trim();
+  const body = String((input && input.body) || "").trim();
+  if (!name || !KEBAB_RE.test(name) || entryPath(root, name) === null)
+    return {
+      ok: false,
+      error: `无法生成合法 kebab-case 名称（原始名: ${requestedName}）`,
+      code: "error.import.invalidName",
+      params: { name: requestedName },
+    };
+  if (!description)
+    return {
+      ok: false,
+      error: "技能简介不能为空",
+      code: "error.create.descriptionRequired",
+    };
+  if (!body)
+    return {
+      ok: false,
+      error: "技能正文不能为空",
+      code: "error.create.bodyRequired",
+    };
+  if (description.length > 500 || body.length > 1 << 18)
+    return { ok: false, error: "技能内容过长", code: "error.create.tooLarge" };
+  if (
+    await safeExistingEntryPaths(root, name).then((items) => items.length > 0)
+  )
+    return {
+      ok: false,
+      error: `同名技能已存在: ${name}`,
+      code: "error.create.conflict",
+      params: { name },
+    };
   await fs.mkdir(root, { recursive: true });
   const target = entryPath(root, name);
   const stage = temporaryPath(target, "create");
@@ -1542,14 +2494,31 @@ export async function createSkill(input, log, options = {}) {
 export async function skillDetail(key, name, options = {}) {
   const scopedRoots = await projectRoots(options.projectCwds);
   const root = rootByKey(key) || scopedRoots.find((item) => item.key === key);
-  if (!root) return { ok: false, error: `未知技能来源: ${key}`, code: "error.root.unknown", params: { root: key } };
+  if (!root)
+    return {
+      ok: false,
+      error: `未知技能来源: ${key}`,
+      code: "error.root.unknown",
+      params: { root: key },
+    };
   const entry = await visibleEntryForRoot(root, name);
-  if (!entry) return { ok: false, error: `技能不存在: ${name}`, code: "error.skill.notFound", params: { name } };
+  if (!entry)
+    return {
+      ok: false,
+      error: `技能不存在: ${name}`,
+      code: "error.skill.notFound",
+      params: { name },
+    };
   let raw;
   try {
     raw = await fs.readFile(entry.realDocPath || entry.docPath, "utf8");
   } catch {
-    return { ok: false, error: `技能不存在: ${name}`, code: "error.skill.notFound", params: { name } };
+    return {
+      ok: false,
+      error: `技能不存在: ${name}`,
+      code: "error.skill.notFound",
+      params: { name },
+    };
   }
   const doc = parseSkillDoc(raw);
   const summary = entryOf(name, entry.kind, entry.docPath, doc);
@@ -1561,7 +2530,9 @@ export async function skillDetail(key, name, options = {}) {
     path: entry.docPath,
     kind: entry.kind,
     body: doc.body.trim(),
-    frontmatter: summary.hasFrontmatter ? Object.fromEntries(Object.entries(doc.map)) : null,
+    frontmatter: summary.hasFrontmatter
+      ? Object.fromEntries(Object.entries(doc.map))
+      : null,
     diagnostics: summary.diagnostics,
     loadable: summary.loadable,
     sourceReadOnly: !root.mutable,
@@ -1574,8 +2545,11 @@ export async function listProviderCandidates(options = {}) {
   const candidates = [];
   const user = userRoots();
   const userScans = await scanDeduplicatedRoots(user);
-  const items = user.flatMap((root) => userScans.get(root.key).entries.map((entry) => ({ root, entry })));
-  const cwd = options && typeof options.cwd === "string" ? options.cwd : undefined;
+  const items = user.flatMap((root) =>
+    userScans.get(root.key).entries.map((entry) => ({ root, entry })),
+  );
+  const cwd =
+    options && typeof options.cwd === "string" ? options.cwd : undefined;
   if (cwd) {
     const roots = await projectRoots([cwd]);
     for (const root of roots) {
@@ -1590,19 +2564,51 @@ export async function listProviderCandidates(options = {}) {
     const policy = effectiveSkillPolicy(policyResult, root, entry);
     // 近作用域先于 rank 决胜；冲突时必须提供真正的赢家，避免预设原生副本回流。
     // 禁用状态不参与选赢家，禁用赢家仍需阻断低优先级副本。
-    const needsOverlay = !policyOnly || group.length > 1 || policy.override !== undefined || !entry.invocationPolicyValid || policyResult.writable === false;
+    const needsOverlay =
+      !policyOnly ||
+      group.length > 1 ||
+      policy.override !== undefined ||
+      !entry.invocationPolicyValid ||
+      policyResult.writable === false;
     if (!needsOverlay) continue;
     candidates.push({
       name: entry.declaredName,
       description: entry.description,
-      invocation: { modelInvocable: policy.modelInvocable, userInvocable: policy.userInvocable },
+      invocation: {
+        modelInvocable: policy.modelInvocable,
+        userInvocable: policy.userInvocable,
+      },
       provider: "dsh-skills-manager-external",
-      source: project ? root.kind : root.key === "dsh" ? "user-dsh" : `agent-${root.key}`,
-      rank: project ? root.rank - 1 : root.key === "dsh" ? USER_DSH_POLICY_RANK : entry.providerRank ?? root.rank,
-      locator: { rootKey: root.key, entryName: entry.name, path: entry.docPath, realEntryPath: entry.realEntryPath, realDocPath: entry.realDocPath },
-      resourceBase: { kind: "directory", path: entry.kind === "bundle" ? entry.realEntryPath : root.path },
+      source: project
+        ? root.kind
+        : root.key === "dsh"
+          ? "user-dsh"
+          : `agent-${root.key}`,
+      rank: project
+        ? root.rank - 1
+        : root.key === "dsh"
+          ? USER_DSH_POLICY_RANK
+          : (entry.providerRank ?? root.rank),
+      locator: {
+        rootKey: root.key,
+        entryName: entry.name,
+        path: entry.docPath,
+        realEntryPath: entry.realEntryPath,
+        realDocPath: entry.realDocPath,
+      },
+      resourceBase: {
+        kind: "directory",
+        path: entry.kind === "bundle" ? entry.realEntryPath : root.path,
+      },
       path: entry.docPath,
-      metadata: { dshSkillsManager: { root: root.key, readOnly: !root.mutable, sourceReadOnly: !root.mutable, policyOnly } },
+      metadata: {
+        dshSkillsManager: {
+          root: root.key,
+          readOnly: !root.mutable,
+          sourceReadOnly: !root.mutable,
+          policyOnly,
+        },
+      },
     });
   }
   return candidates;
@@ -1610,20 +2616,41 @@ export async function listProviderCandidates(options = {}) {
 
 export async function getProviderSkill(candidate, options = {}) {
   const locator = candidate && candidate.locator;
-  if (!locator || typeof locator.path !== "string" || typeof locator.rootKey !== "string" || typeof locator.realEntryPath !== "string" || typeof locator.realDocPath !== "string") return undefined;
+  if (
+    !locator ||
+    typeof locator.path !== "string" ||
+    typeof locator.rootKey !== "string" ||
+    typeof locator.realEntryPath !== "string" ||
+    typeof locator.realDocPath !== "string"
+  )
+    return undefined;
   let root = rootByKey(locator.rootKey);
-  if (!root && PROJECT_ROOT_KEY_RE.test(locator.rootKey) && typeof options.cwd === "string") {
-    root = (await projectRoots([options.cwd])).find((item) => item.key === locator.rootKey);
+  if (
+    !root &&
+    PROJECT_ROOT_KEY_RE.test(locator.rootKey) &&
+    typeof options.cwd === "string"
+  ) {
+    root = (await projectRoots([options.cwd])).find(
+      (item) => item.key === locator.rootKey,
+    );
   }
   if (!root) return undefined;
   try {
     const entry = await resolveEntry(root, String(locator.entryName || ""));
-    if (!entry || resolve(entry.docPath) !== resolve(locator.path)) return undefined;
-    if (pathIdentity(entry.realEntryPath) !== pathIdentity(locator.realEntryPath)) return undefined;
-    if (pathIdentity(entry.realDocPath) !== pathIdentity(locator.realDocPath)) return undefined;
-    const doc = parseSkillDoc(await fs.readFile(entry.realDocPath || entry.docPath, "utf8"));
+    if (!entry || resolve(entry.docPath) !== resolve(locator.path))
+      return undefined;
+    if (
+      pathIdentity(entry.realEntryPath) !== pathIdentity(locator.realEntryPath)
+    )
+      return undefined;
+    if (pathIdentity(entry.realDocPath) !== pathIdentity(locator.realDocPath))
+      return undefined;
+    const doc = parseSkillDoc(
+      await fs.readFile(entry.realDocPath || entry.docPath, "utf8"),
+    );
     const summary = entryOf(locator.entryName, entry.kind, entry.docPath, doc);
-    if (!summary.loadable || summary.declaredName !== candidate.name) return undefined;
+    if (!summary.loadable || summary.declaredName !== candidate.name)
+      return undefined;
     return {
       name: candidate.name,
       description: candidate.description,
@@ -1661,10 +2688,17 @@ function groupLoadableSkillsByName(items) {
 
 function markWinners(items, options = {}) {
   const winners = new Map();
-  for (const [canonicalName, [winner, ...shadowed]] of groupLoadableSkillsByName(items)) {
+  for (const [
+    canonicalName,
+    [winner, ...shadowed],
+  ] of groupLoadableSkillsByName(items)) {
     winners.set(canonicalName, winner);
     if (options.markShadowed !== false) {
-      for (const item of shadowed) item.view.shadowedBy = { root: winner.root.key, name: winner.entry.name };
+      for (const item of shadowed)
+        item.view.shadowedBy = {
+          root: winner.root.key,
+          name: winner.entry.name,
+        };
     }
     if (options.markWinner !== false) winner.view.winner = true;
     winner.view.enabled = winner.policy.enabled;
@@ -1681,17 +2715,37 @@ export async function state(options = {}) {
   const scoped = await projectRoots(options.projectCwds, projectWarnings);
   const policyResult = await readManagerState();
   const trash = await listTrash();
-  const result = { roots: [], projects: [], trash, warnings: [...(policyResult.warning ? [policyResult.warning] : []), ...projectWarnings] };
+  const result = {
+    roots: [],
+    projects: [],
+    trash,
+    warnings: [
+      ...(policyResult.warning ? [policyResult.warning] : []),
+      ...projectWarnings,
+    ],
+  };
   const all = [];
   for (const root of [...scoped, ...user]) {
-    const { exists, entries, truncated } = root.scope === "project" ? (await scanDeduplicatedRoots([root])).get(root.key) : userScans.get(root.key);
+    const { exists, entries, truncated } =
+      root.scope === "project"
+        ? (await scanDeduplicatedRoots([root])).get(root.key)
+        : userScans.get(root.key);
     // 即使项目 .dsh/skills 尚不存在，也要把可写根返回给创建表单；只读项目根仍按实际存在性展示。
-    if (root.scope === "project" && !exists && root.kind !== "project-dsh") continue;
-    if (truncated) result.warnings.push({ code: "warning.scan.truncated", params: { path: root.path }, error: `技能扫描达到遍历上限，部分技能未显示: ${root.path}` });
+    if (root.scope === "project" && !exists && root.kind !== "project-dsh")
+      continue;
+    if (truncated)
+      result.warnings.push({
+        code: "warning.scan.truncated",
+        params: { path: root.path },
+        error: `技能扫描达到遍历上限，部分技能未显示: ${root.path}`,
+      });
     const skills = [];
     for (const e of entries) {
       const policy = effectiveSkillPolicy(policyResult, root, e);
-      const managerEnabled = policyResult.writable !== false && policy.sourceEnabled && policy.override !== false;
+      const managerEnabled =
+        policyResult.writable !== false &&
+        policy.sourceEnabled &&
+        policy.override !== false;
       skills.push({
         name: e.name,
         declaredName: e.declaredName,
@@ -1709,7 +2763,13 @@ export async function state(options = {}) {
         diagnostics: e.diagnostics,
         path: e.docPath,
       });
-      all.push({ root, entry: e, managerEnabled, policy, view: skills[skills.length - 1] });
+      all.push({
+        root,
+        entry: e,
+        managerEnabled,
+        policy,
+        view: skills[skills.length - 1],
+      });
     }
     result.roots.push({
       key: root.key,
@@ -1722,37 +2782,62 @@ export async function state(options = {}) {
       native: root.native,
       rank: root.rank,
       scope: root.scope || "user",
-      ...(root.projectRoot ? { projectRoot: root.projectRoot, projectName: root.projectName, workspaceCwds: root.workspaceCwds } : {}),
+      ...(root.projectRoot
+        ? {
+            projectRoot: root.projectRoot,
+            projectName: root.projectName,
+            workspaceCwds: root.workspaceCwds,
+          }
+        : {}),
       exists,
       truncated: truncated === true,
-      enabled: policyResult.writable !== false && (root.scope === "project" || root.key === "dsh" || policyResult.state.sources[root.key] !== false),
+      enabled:
+        policyResult.writable !== false &&
+        (root.scope === "project" ||
+          root.key === "dsh" ||
+          policyResult.state.sources[root.key] !== false),
       skills,
     });
   }
   const userItems = all.filter((item) => item.root.scope !== "project");
   markWinners(userItems);
   const projectGroups = new Map();
-  for (const item of all.filter((candidate) => candidate.root.scope === "project")) {
+  for (const item of all.filter(
+    (candidate) => candidate.root.scope === "project",
+  )) {
     const group = projectGroups.get(item.root.projectRoot) || [];
     group.push(item);
     projectGroups.set(item.root.projectRoot, group);
   }
   for (const projectItems of projectGroups.values()) {
     // 用户级条目参与该 workspace 的优先级判定，但不把其全局视图标记为“被某项目覆盖”。
-    const userCopies = userItems.map((item) => ({ ...item, view: { ...item.view } }));
+    const userCopies = userItems.map((item) => ({
+      ...item,
+      view: { ...item.view },
+    }));
     markWinners([...projectItems, ...userCopies]);
   }
   const seenProjects = new Set();
   for (const root of result.roots.filter((item) => item.scope === "project")) {
     if (seenProjects.has(root.projectRoot)) continue;
     seenProjects.add(root.projectRoot);
-    result.projects.push({ root: root.projectRoot, name: root.projectName, workspaceCwds: root.workspaceCwds });
+    result.projects.push({
+      root: root.projectRoot,
+      name: root.projectName,
+      workspaceCwds: root.workspaceCwds,
+    });
   }
   result.summary = {
     total: all.length,
     enabled: all.filter((item) => item.view.enabled === true).length,
-    disabled: all.filter((item) => item.entry.loadable && item.policy.enabled === false).length,
-    issues: all.reduce((count, item) => count + item.entry.diagnostics.length + (item.view.shadowedBy ? 1 : 0), 0),
+    disabled: all.filter(
+      (item) => item.entry.loadable && item.policy.enabled === false,
+    ).length,
+    issues: all.reduce(
+      (count, item) =>
+        count + item.entry.diagnostics.length + (item.view.shadowedBy ? 1 : 0),
+      0,
+    ),
   };
   return result;
 }
