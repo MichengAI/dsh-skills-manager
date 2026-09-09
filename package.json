@@ -41,7 +41,7 @@
   },
   "scripts": {
     "build": "node scripts/build.mjs",
-    "test": "npm run build && node test/build-test.mjs && node test/core-test.mjs && node test/locale-test.mjs",
+    "test": "npm run build && node test/build-test.mjs && node test/core-test.mjs && node test/readonly-discovery.test.mjs && node test/locale-test.mjs",
     "verify": "npm test && npm run pack:check && node scripts/check-generated.mjs",
     "pack:check": "npm pack --dry-run --json",
     "prepublishOnly": "npm run verify"

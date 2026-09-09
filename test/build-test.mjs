@@ -20,7 +20,7 @@ async function ok(condition, message) {
   }
 }
 
-for (const path of ["../src/core.js", "../src/index.js", "../src/client.js"]) {
+for (const path of ["../src/core.js", "../src/readonly-discovery.js", "../src/index.js", "../src/client.js"]) {
   try {
     await access(new URL(path, import.meta.url), constants.R_OK);
     await ok(true, `${path} exists as maintained source`);
@@ -29,7 +29,7 @@ for (const path of ["../src/core.js", "../src/index.js", "../src/client.js"]) {
   }
 }
 
-for (const path of ["../lib/core.js", "../lib/index.js", "../lib/client.js"]) {
+for (const path of ["../lib/core.js", "../lib/readonly-discovery.js", "../lib/index.js", "../lib/client.js"]) {
   try {
     await access(new URL(path, import.meta.url), constants.R_OK);
     await ok(true, `${path} exists as generated output`);

@@ -437,14 +437,14 @@ if (await tryLink(ccswitchSkill, writableTrustedLink, providerLinkType)) {
 }
 const sameRootReadonlyLink = join(codexRoot, "code-review-alias");
 if (await tryLink(join(codexRoot, "code-review"), sameRootReadonlyLink, providerLinkType)) {
-  ok(!(await scanEntries(codexRoot)).entries.some((entry) => entry.name === "code-review-alias"), "user read-only roots reject linked aliases targeting the same Skills root");
+  ok((await scanEntries(codexRoot)).entries.some((entry) => entry.name === "code-review-alias"), "只读扫描跟随同根目录别名");
   await rm(sameRootReadonlyLink, { recursive: true, force: true });
 } else {
   ok(true, "same-root read-only link test skipped because this environment cannot create directory links");
 }
 const outsideLinkedSkill = join(codexRoot, "outside-linked");
 if (await tryLink(readonlyOutsideSkill, outsideLinkedSkill, providerLinkType)) {
-  ok(!(await scanEntries(codexRoot)).entries.some((entry) => entry.name === "outside-linked"), "user read-only roots reject linked bundles outside known Skills roots");
+  ok((await scanEntries(codexRoot)).entries.some((entry) => entry.name === "outside-linked"), "只读扫描默认跟随外部目录链接");
   await rm(outsideLinkedSkill, { recursive: true, force: true });
 } else {
   ok(true, "outside-target link test skipped because this environment cannot create directory links");
@@ -452,7 +452,7 @@ if (await tryLink(readonlyOutsideSkill, outsideLinkedSkill, providerLinkType)) {
 const hiddenCcSwitchSkill = await makeSkill(ccswitchRoot, ".hidden-ccswitch", "---\nname: hidden-ccswitch\ndescription: Hidden target.\n---\nHidden body");
 const hiddenCcSwitchLink = join(codexRoot, "hidden-via-link");
 if (await tryLink(hiddenCcSwitchSkill, hiddenCcSwitchLink, providerLinkType)) {
-  ok(!(await scanEntries(codexRoot)).entries.some((entry) => entry.name === "hidden-via-link"), "trusted links cannot expose a hidden target excluded by normal entry-name rules");
+  ok((await scanEntries(codexRoot)).entries.some((entry) => entry.name === "hidden-via-link"), "隐藏目录按发现路径过滤，可见链接允许指向隐藏目标");
   await rm(hiddenCcSwitchLink, { recursive: true, force: true });
 } else {
   ok(true, "hidden-target link test skipped because this environment cannot create directory links");
@@ -1311,14 +1311,14 @@ const outsideProjectSkill = await makeSkill(join(tmp, "outside-project-skills"),
 const projectLinkType = process.platform === "win32" ? "junction" : undefined;
 if (await tryLink(outsideProjectSkill, join(routeProject, ".agents", "skills", "linked-project"), projectLinkType)) {
   const linkedProjectSnap = await state({ projectCwds: [routeProjectNested] });
-  ok(!linkedProjectSnap.roots.find((root) => root.key === firstAgentsProject.key).skills.some((skill) => skill.name === "linked-project"), "project discovery does not follow a linked bundle outside the active project skill root");
+  ok(linkedProjectSnap.roots.find((root) => root.key === firstAgentsProject.key).skills.some((skill) => skill.name === "linked-project"), "项目 Agent 跟随外部技能目录链接");
 } else {
   ok(true, "project linked-bundle containment test skipped because this environment cannot create links");
 }
 const linkedCcSwitchProjectSkill = join(routeProject, ".agents", "skills", "linked-ccswitch-project");
 if (await tryLink(ccswitchSkill, linkedCcSwitchProjectSkill, projectLinkType)) {
   const linkedCcSwitchProjectSnap = await state({ projectCwds: [routeProjectNested] });
-  ok(!linkedCcSwitchProjectSnap.roots.find((root) => root.key === firstAgentsProject.key).skills.some((skill) => skill.name === "linked-ccswitch-project"), "project Agent roots reject links even when they target a trusted CC Switch child");
+  ok(linkedCcSwitchProjectSnap.roots.find((root) => root.key === firstAgentsProject.key).skills.some((skill) => skill.name === "linked-ccswitch-project"), "项目 Agent 跟随 CC Switch 目录链接");
   await rm(linkedCcSwitchProjectSkill, { recursive: true, force: true });
 } else {
   ok(true, "project trusted-target link test skipped because this environment cannot create directory links");
@@ -1351,7 +1351,7 @@ process.env.DSH_HOME = join(overlapProject, ".dsh");
 process.env.DSH_AGENTS_HOME = join(overlapProject, ".agents");
 try {
   const overlapRoots = await projectRoots([overlapProject]);
-  eq(overlapRoots.length, 0, "project discovery hides project roots that overlap user DSH and Agent roots");
+  ok(overlapRoots.length === 1 && overlapRoots[0].kind === "project-agents", "只读项目 Agent 允许重叠，可写项目 DSH 继续隐藏");
   eq((await state({ projectCwds: [overlapProject] })).roots.filter((root) => root.scope === "project").length, 0, "state exposes only the user roots when a dotfiles project overlaps them");
   eq((await createSkill({ name: "Overlap Write", description: "Must not write.", body: "Denied." }, null, { root: overlapDefinition })).code, "error.root.unsafe", "write validation rejects a previously resolved project root after it overlaps the user DSH root");
 } finally {

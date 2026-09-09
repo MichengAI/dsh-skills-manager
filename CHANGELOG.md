@@ -4,6 +4,11 @@
 
 The five most recent published versions are listed below.
 
+## Unreleased
+
+- Read-only user and project Agent sources now discover nested skills and follow external directory symlinks and Windows junctions by default, including linked roots. Discovery has cycle, depth, and entry limits.
+- Keep list, detail, provider, and local enable/disable policies consistent across differently named aliases. Writable DSH roots and import/delete safeguards remain unchanged.
+
 ## 0.1.44 - 2026-09-09
 
 - Unified settings headings, descriptions, and action layouts; maintenance controls no longer squeeze titles or versions. The layout adapts to native DSH settings without Codex UI.

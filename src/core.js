@@ -3,7 +3,7 @@
 // 覆盖 DSH 用户级与活动 Session 项目级技能根：
 //   - 用户根目录：~/.dsh/skills 与常见 Agent 用户目录
 //   - 项目根目录：<project>/.dsh/skills（可启停、创建、回收）、<project>/.agents/skills（本地策略启停、源文件只读）
-//   - 条目形态：<root>/<name>/SKILL.md（bundle）或 <root>/<name>.md（flat），只扫一层
+//   - 条目形态：<root>/<name>/SKILL.md（bundle）或 <root>/<name>.md（flat），只读来源递归发现，可写来源只扫一层
 //   - 前端展示 name、description 与启停状态，不做格式检查或自动修复
 //
 // 所有函数返回普通结果对象，业务校验失败返回 { ok: false, error, code?, params? }；
@@ -16,6 +16,7 @@ import { join, basename, dirname, resolve, relative, isAbsolute, sep } from "nod
 import { promises as fs } from "node:fs";
 import { createHash, randomUUID } from "node:crypto";
 import { unzipSync } from "fflate";
+import { discoverReadonlyEntries, validDiscoveryName } from "./readonly-discovery.js";
 
 const KEBAB_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const PROJECT_ROOT_KEY_RE = /^project-(?:dsh|agents):[a-f0-9]{16}$/;
@@ -106,6 +107,8 @@ async function nearestProjectRoot(cwd) {
 }
 
 async function projectSourceSafe(definition) {
+  // Agent 项目来源只读，目录链接不扩大文件写权限。
+  if (definition.kind === "project-agents") return true;
   const container = join(definition.projectRoot, definition.kind === "project-dsh" ? ".dsh" : ".agents");
   for (const path of [container, definition.path]) {
     const st = await lstatOrNull(path);
@@ -351,58 +354,6 @@ async function lstatOrNull(path) {
   }
 }
 
-/** 预解析可作为用户级链接目标的只读根，供一次扫描中的所有链接复用。 */
-async function resolvedReadonlyUserRoots() {
-  const roots = userRoots().filter((root) => !root.mutable && root.scope !== "project");
-  const resolvedRoots = await Promise.all(roots.map(async (root) => {
-    const stat = await lstatOrNull(root.path);
-    if (!stat || !stat.isDirectory() || stat.isSymbolicLink()) return null;
-    try {
-      return { root, realPath: await fs.realpath(root.path) };
-    } catch {
-      return null;
-    }
-  }));
-  return resolvedRoots.filter(Boolean);
-}
-
-/**
- * 只接受用户级只读来源中的顶层目录链接，且目标必须是另一个已知只读 Skills 根的直接子目录。
- * 这样可以兼容 CC Switch 的分发链接，同时不把任意文件系统路径扩展成技能来源。
- */
-async function resolveTrustedLinkedBundle(root, bundlePath, trustedReadonlyRoots = resolvedReadonlyUserRoots()) {
-  const sourceRoot = rootDefinition(root);
-  if (!sourceRoot || sourceRoot.mutable || sourceRoot.scope === "project") return null;
-
-  let realEntryPath;
-  try {
-    realEntryPath = await fs.realpath(bundlePath);
-  } catch {
-    return null;
-  }
-  const realEntryStat = await lstatOrNull(realEntryPath);
-  if (!realEntryStat || !realEntryStat.isDirectory() || realEntryStat.isSymbolicLink()) return null;
-
-  const resolvedRoots = await trustedReadonlyRoots;
-  const resolvedSourceRoot = resolvedRoots.find((candidate) => pathIdentity(candidate.root.path) === pathIdentity(sourceRoot.path));
-  if (!resolvedSourceRoot) return null;
-  let trusted = false;
-  for (const targetRoot of resolvedRoots) {
-    if (pathIdentity(targetRoot.realPath) === pathIdentity(resolvedSourceRoot.realPath)) continue;
-    const acceptedTarget = entryPath(targetRoot.realPath, basename(realEntryPath));
-    if (acceptedTarget && pathIdentity(acceptedTarget) === pathIdentity(realEntryPath)) {
-      trusted = true;
-      break;
-    }
-  }
-  if (!trusted) return null;
-
-  const realDocPath = join(realEntryPath, "SKILL.md");
-  const docStat = await lstatOrNull(realDocPath);
-  if (!docStat || !docStat.isFile() || docStat.isSymbolicLink()) return null;
-  return { realEntryPath, realDocPath };
-}
-
 /** 名称只允许一个普通路径段；不把既有技能名称限制为 kebab-case。 */
 export function entryPath(root, name) {
   if (typeof name !== "string" || name === "" || name === "." || name === ".." || name.startsWith(".") || name.length > MAX_ENTRY_NAME_LENGTH || /[\\/:*?"<>|\0]/.test(name) || /[. ]$/.test(name) || WINDOWS_DEVICE_NAME_RE.test(name) || basename(name) !== name) return null;
@@ -583,6 +534,12 @@ export function parseBoolValue(raw) {
 
 /** 按名称解析条目（bundle 优先，其次 flat）。找不到返回 null。 */
 export async function resolveEntry(root, name) {
+  const definition = rootDefinition(root);
+  if (definition && !definition.mutable) {
+    if (!validDiscoveryName(name)) return null;
+    return (await discoverReadonlyEntries(definition.path)).entries.find(entry => entry.name === name) || null;
+  }
+  root = definition ? definition.path : root;
   try {
     const bundlePath = entryPath(root, name);
     if (bundlePath === null) return null;
@@ -597,10 +554,6 @@ export async function resolveEntry(root, name) {
       if (docStat && docStat.isFile() && !docStat.isSymbolicLink() && await isInsideResolvedRoot(rootReal, bundleDoc)) {
         return { kind: "bundle", docPath: bundleDoc, entryPath: bundlePath, realDocPath: await fs.realpath(bundleDoc), realEntryPath: await fs.realpath(bundlePath), linked: false };
       }
-    }
-    if (bundleStat && bundleStat.isSymbolicLink()) {
-      const linked = await resolveTrustedLinkedBundle(rootPath, bundlePath);
-      if (linked) return { kind: "bundle", docPath: join(bundlePath, "SKILL.md"), entryPath: bundlePath, ...linked, linked: true };
     }
     const flatDoc = resolve(rootPath, `${name}.md`);
     if (!isSameOrDescendant(rootPath, flatDoc) || rootPath === flatDoc) return null;
@@ -646,8 +599,21 @@ function entryOf(name, kind, docPath, doc) {
   };
 }
 
-/** 扫描一个技能根（只扫一层）。返回 { exists, entries }。 */
+/** 只读来源递归发现；可写 DSH 根维持顶层扫描及链接写边界。 */
 export async function scanEntries(root, options = {}) {
+  const definition = rootDefinition(root);
+  if (definition && !definition.mutable) {
+    const discovered = await discoverReadonlyEntries(definition.path);
+    if (options.metadataOnly) return discovered;
+    const entries = [];
+    for (const entry of discovered.entries) {
+      try {
+        entries.push({ ...entryOf(entry.name, entry.kind, entry.docPath, parseSkillDoc(await fs.readFile(entry.realDocPath, "utf8"))), ...entry });
+      } catch { /* 忽略已失效或不可读技能。 */ }
+    }
+    return { ...discovered, entries };
+  }
+  root = definition ? definition.path : root;
   const rootStat = await lstatOrNull(resolve(root));
   if (!rootStat || !rootStat.isDirectory() || rootStat.isSymbolicLink()) return { exists: false, entries: [] };
   let items;
@@ -658,31 +624,21 @@ export async function scanEntries(root, options = {}) {
   }
   const byName = new Map();
   const rootReal = await resolvedPath(root);
-  let trustedReadonlyRoots = options.trustedReadonlyRoots;
   for (const it of items) {
     try {
-      if (it.isSymbolicLink()) {
-        const bundlePath = entryPath(root, it.name);
-        if (bundlePath === null) continue;
-        trustedReadonlyRoots ||= resolvedReadonlyUserRoots();
-        const linked = await resolveTrustedLinkedBundle(root, bundlePath, trustedReadonlyRoots);
-        if (!linked) continue;
-        const doc = parseSkillDoc(await fs.readFile(linked.realDocPath, "utf8"));
-        byName.set(it.name, { ...entryOf(it.name, "bundle", join(bundlePath, "SKILL.md"), doc), entryPath: bundlePath, ...linked, linked: true });
-        continue;
-      }
+      if (it.isSymbolicLink()) continue;
       if (it.isDirectory() && entryPath(root, it.name) !== null) {
         const docPath = join(root, it.name, "SKILL.md");
         const st = await lstatOrNull(docPath);
         if (!st || !st.isFile() || st.isSymbolicLink() || !(await isInsideResolvedRoot(rootReal, docPath))) continue;
-        const doc = parseSkillDoc(await fs.readFile(docPath, "utf8"));
+        const doc = options.metadataOnly ? { map: {}, hasFrontmatter: false } : parseSkillDoc(await fs.readFile(docPath, "utf8"));
         byName.set(it.name, { ...entryOf(it.name, "bundle", docPath, doc), entryPath: join(root, it.name), realDocPath: await fs.realpath(docPath), realEntryPath: await fs.realpath(join(root, it.name)), linked: false });
       } else if (it.isFile() && it.name.toLowerCase().endsWith(".md") && it.name.toLowerCase() !== "skill.md" && entryPath(root, it.name.slice(0, -3)) !== null) {
         const skillName = it.name.slice(0, -3);
         if (byName.has(skillName)) continue;
         const docPath = join(root, it.name);
         if (!(await isInsideResolvedRoot(rootReal, docPath))) continue;
-        const doc = parseSkillDoc(await fs.readFile(docPath, "utf8"));
+        const doc = options.metadataOnly ? { map: {}, hasFrontmatter: false } : parseSkillDoc(await fs.readFile(docPath, "utf8"));
         const realDocPath = await fs.realpath(docPath);
         byName.set(skillName, { ...entryOf(skillName, "flat", docPath, doc), entryPath: docPath, realDocPath, realEntryPath: realDocPath, linked: false });
       }
@@ -695,9 +651,8 @@ export async function scanEntries(root, options = {}) {
 }
 
 /** 同一真实技能优先归属直接 SSOT；同类条目再按来源 rank 决胜。 */
-async function scanDeduplicatedUserRoots(roots = userRoots()) {
-  const trustedReadonlyRoots = resolvedReadonlyUserRoots();
-  const results = await Promise.all(roots.map(async (root) => [root, await scanEntries(root.path, { trustedReadonlyRoots })]));
+async function scanDeduplicatedRoots(roots = userRoots(), options = {}) {
+  const results = await Promise.all(roots.map(async (root) => [root, await scanEntries(root, options)]));
   const scans = new Map();
   const groups = new Map();
   for (const [root, scan] of results) {
@@ -714,7 +669,7 @@ async function scanDeduplicatedUserRoots(roots = userRoots()) {
     group.sort((left, right) => Number(left.entry.linked) - Number(right.entry.linked) || left.root.rank - right.root.rank);
     const winner = group[0];
     winner.entry.providerRank = Math.min(...group.map((item) => item.root.rank));
-    winner.entry.policyRootKeys = group.map((item) => item.root.key);
+    winner.entry.policyAliases = group.map((item) => ({ rootKey: item.root.key, name: item.entry.name }));
     winners.add(winner.entry);
   }
   for (const scan of scans.values()) {
@@ -723,22 +678,12 @@ async function scanDeduplicatedUserRoots(roots = userRoots()) {
   return scans;
 }
 
-/**
- * 详情只解析被请求的条目，再从物理路径确定其直接所有者。
- * 受信链接只能指向已知只读根的顶层目录，故无需扫描并读取全部技能文档即可复现去重归属。
- */
+/** 详情与列表共享路径去重，扫描定位信息时不读取无关技能正文。 */
 async function visibleEntryForRoot(root, name) {
-  if (root.scope === "project") return resolveEntry(root.path, name);
-  const entry = await resolveEntry(root.path, name);
-  if (!entry) return null;
-  const identity = pathIdentity(entry.realEntryPath || entry.entryPath || entry.docPath);
-  const owners = (await resolvedReadonlyUserRoots())
-    .filter((candidate) => {
-      const expected = entryPath(candidate.realPath, basename(entry.realEntryPath || entry.entryPath || entry.docPath));
-      return expected !== null && pathIdentity(expected) === identity;
-    })
-    .sort((left, right) => left.root.rank - right.root.rank);
-  return owners.length === 0 || owners[0].root.key === root.key ? entry : null;
+  if (!validDiscoveryName(name)) return null;
+  const roots = root.scope === "project" ? [root] : userRoots();
+  const scans = await scanDeduplicatedRoots(roots, { metadataOnly: true });
+  return scans.get(root.key)?.entries.find(entry => entry.name === name) || null;
 }
 
 // ── Manager 本地策略（外部源只读，启停状态写入 DSH_HOME）────────────────────
@@ -756,7 +701,7 @@ function defaultManagerState() {
 }
 
 function validStateSkillName(name) {
-  return typeof name === "string" && KEBAB_RE.test(name) && entryPath(resolveDshHome(), name) !== null;
+  return validDiscoveryName(name);
 }
 
 /** 状态文件已存在但不可用时一律关闭外部来源，避免损坏配置重新暴露技能。 */
@@ -784,7 +729,7 @@ function validManagerStateDocument(value) {
     if (root.key === "dsh") continue;
     if (typeof value.sources[root.key] !== "boolean") return false;
     const list = value.disabledSkills[root.key];
-    if (!Array.isArray(list) || list.some((name) => typeof name !== "string" || entryPath(root.path, name) === null)) return false;
+    if (!Array.isArray(list) || list.some((name) => !validStateSkillName(name))) return false;
   }
   const enabledSkills = value.enabledSkills || {};
   for (const key of new Set([...Object.keys(value.disabledSkills), ...Object.keys(enabledSkills)])) {
@@ -812,9 +757,9 @@ function normalizeManagerState(value) {
   for (const root of userRoots()) {
     if (root.key !== "dsh" && value.sources && typeof value.sources[root.key] === "boolean") normalized.sources[root.key] = value.sources[root.key];
     const list = value.disabledSkills && value.disabledSkills[root.key];
-    if (Array.isArray(list)) normalized.disabledSkills[root.key] = [...new Set(list.filter((name) => typeof name === "string" && entryPath(root.path, name) !== null))].sort();
+    if (Array.isArray(list)) normalized.disabledSkills[root.key] = [...new Set(list.filter((name) => validStateSkillName(name)))].sort();
     const enabled = value.enabledSkills && value.enabledSkills[root.key];
-    if (Array.isArray(enabled)) normalized.enabledSkills[root.key] = [...new Set(enabled.filter((name) => typeof name === "string" && entryPath(root.path, name) !== null))].sort();
+    if (Array.isArray(enabled)) normalized.enabledSkills[root.key] = [...new Set(enabled.filter((name) => validStateSkillName(name)))].sort();
   }
   for (const field of ["disabledSkills", "enabledSkills"]) {
     const source = value[field];
@@ -849,21 +794,21 @@ async function writeManagerState(value) {
   await writeFileAtomically(managerStatePath(), `${JSON.stringify(normalizeManagerState(value), null, 2)}\n`);
 }
 
-function managerSkillOverride(policy, rootKey, name, policyRootKeys = []) {
+function managerSkillOverride(policy, rootKey, name, policyAliases = []) {
   if ((policy.enabledSkills[rootKey] || []).includes(name)) return true;
   if ((policy.disabledSkills[rootKey] || []).includes(name)) return false;
   let inheritedEnable = false;
-  for (const key of policyRootKeys) {
-    if (key === rootKey) continue;
-    if ((policy.disabledSkills[key] || []).includes(name)) return false;
-    if ((policy.enabledSkills[key] || []).includes(name)) inheritedEnable = true;
+  for (const alias of policyAliases) {
+    if (alias.rootKey === rootKey && alias.name === name) continue;
+    if ((policy.disabledSkills[alias.rootKey] || []).includes(alias.name)) return false;
+    if ((policy.enabledSkills[alias.rootKey] || []).includes(alias.name)) inheritedEnable = true;
   }
   if (inheritedEnable) return true;
   return undefined;
 }
 
 function effectiveSkillPolicy(policyResult, root, entry) {
-  const override = managerSkillOverride(policyResult.state, root.key, entry.name, entry.policyRootKeys);
+  const override = managerSkillOverride(policyResult.state, root.key, entry.name, entry.policyAliases);
   const sourceEnabled = root.key === "dsh" || root.scope === "project" || policyResult.state.sources[root.key] !== false;
   if (policyResult.writable === false || !sourceEnabled || override === false) {
     return { override, sourceEnabled, modelInvocable: false, userInvocable: false, enabled: false };
@@ -920,7 +865,7 @@ async function setPolicySkillEnabled(root, name, enabled, log) {
   const definition = await checkedPolicyRootDefinition(root);
   if (definition && definition.ok === false) return definition;
   if (!definition) return readonlyError("toggle");
-  const resolved = await resolveEntry(definition.path, name);
+  const resolved = await resolveEntry(definition, name);
   if (resolved === null) return { ok: false, error: `技能不存在: ${name}`, code: "error.skill.notFound", params: { name } };
   let summary;
   try {
@@ -1062,7 +1007,7 @@ export async function deleteSkill(root, name, log, options = {}) {
   const definition = await checkedWritableRootDefinition(root);
   if (definition && definition.ok === false) return definition;
   if (!definition) return readonlyError("delete");
-  const resolved = await resolveEntry(definition.path, name);
+  const resolved = await resolveEntry(definition, name);
   if (resolved === null) return { ok: false, error: `技能不存在: ${name}`, code: "error.skill.notFound", params: { name } };
   const targets = await safeExistingEntryPaths(definition.path, name);
   const id = `${Date.now()}-${randomUUID()}`;
@@ -1628,20 +1573,20 @@ export async function listProviderCandidates(options = {}) {
   const policyResult = await readManagerState();
   const candidates = [];
   const user = userRoots();
-  const userScans = await scanDeduplicatedUserRoots(user);
+  const userScans = await scanDeduplicatedRoots(user);
   const items = user.flatMap((root) => userScans.get(root.key).entries.map((entry) => ({ root, entry })));
   const cwd = options && typeof options.cwd === "string" ? options.cwd : undefined;
   if (cwd) {
     const roots = await projectRoots([cwd]);
     for (const root of roots) {
-      const scanned = await scanEntries(root.path);
+      const scanned = (await scanDeduplicatedRoots([root])).get(root.key);
       for (const entry of scanned.entries) items.push({ root, entry });
     }
   }
   for (const group of groupLoadableSkillsByName(items).values()) {
     const { root, entry } = group[0];
     const project = root.scope === "project";
-    const policyOnly = project || root.key === "dsh";
+    const policyOnly = root.mutable;
     const policy = effectiveSkillPolicy(policyResult, root, entry);
     // 近作用域先于 rank 决胜；冲突时必须提供真正的赢家，避免预设原生副本回流。
     // 禁用状态不参与选赢家，禁用赢家仍需阻断低优先级副本。
@@ -1672,7 +1617,7 @@ export async function getProviderSkill(candidate, options = {}) {
   }
   if (!root) return undefined;
   try {
-    const entry = await resolveEntry(root.path, String(locator.entryName || ""));
+    const entry = await resolveEntry(root, String(locator.entryName || ""));
     if (!entry || resolve(entry.docPath) !== resolve(locator.path)) return undefined;
     if (pathIdentity(entry.realEntryPath) !== pathIdentity(locator.realEntryPath)) return undefined;
     if (pathIdentity(entry.realDocPath) !== pathIdentity(locator.realDocPath)) return undefined;
@@ -1731,7 +1676,7 @@ function markWinners(items, options = {}) {
 /** DSH、常见 Agent 与活动 Session 项目根的技能快照。 */
 export async function state(options = {}) {
   const user = userRoots();
-  const userScans = await scanDeduplicatedUserRoots(user);
+  const userScans = await scanDeduplicatedRoots(user);
   const projectWarnings = [];
   const scoped = await projectRoots(options.projectCwds, projectWarnings);
   const policyResult = await readManagerState();
@@ -1739,9 +1684,10 @@ export async function state(options = {}) {
   const result = { roots: [], projects: [], trash, warnings: [...(policyResult.warning ? [policyResult.warning] : []), ...projectWarnings] };
   const all = [];
   for (const root of [...scoped, ...user]) {
-    const { exists, entries } = root.scope === "project" ? await scanEntries(root.path) : userScans.get(root.key);
+    const { exists, entries, truncated } = root.scope === "project" ? (await scanDeduplicatedRoots([root])).get(root.key) : userScans.get(root.key);
     // 即使项目 .dsh/skills 尚不存在，也要把可写根返回给创建表单；只读项目根仍按实际存在性展示。
     if (root.scope === "project" && !exists && root.kind !== "project-dsh") continue;
+    if (truncated) result.warnings.push({ code: "warning.scan.truncated", params: { path: root.path }, error: `技能扫描达到遍历上限，部分技能未显示: ${root.path}` });
     const skills = [];
     for (const e of entries) {
       const policy = effectiveSkillPolicy(policyResult, root, e);
@@ -1778,6 +1724,7 @@ export async function state(options = {}) {
       scope: root.scope || "user",
       ...(root.projectRoot ? { projectRoot: root.projectRoot, projectName: root.projectName, workspaceCwds: root.workspaceCwds } : {}),
       exists,
+      truncated: truncated === true,
       enabled: policyResult.writable !== false && (root.scope === "project" || root.key === "dsh" || policyResult.state.sources[root.key] !== false),
       skills,
     });
