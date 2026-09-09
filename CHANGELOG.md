@@ -6,6 +6,8 @@ The five most recent published versions are listed below.
 
 ## Unreleased
 
+- Unified settings headings, descriptions, and action layouts; maintenance controls no longer squeeze titles or versions. The layout adapts to native DSH settings without Codex UI.
+
 ## 0.1.43 - 2026-09-08
 
 - Fixed Settings opening with the Codex Skill list expanded by default. All Skill sources now start collapsed while matching search results still expand automatically.
