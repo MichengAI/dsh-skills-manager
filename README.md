@@ -63,7 +63,8 @@ For a ready-to-use workbench, download [DSH Codex Desktop](https://github.com/Mi
 
 - A working DeepSeek Harness Web installation with `dsh` available in PowerShell.
 - Examples use the `web` profile; replace it with the target profile.
-- Source installation and development require Node.js 20+. npm installation does not require running `npm install` in an arbitrary directory.
+- Plugin `0.1.46` is tested with DeepSeek Harness `0.1.0-rc.8`, `0.1.1-rc.2`, `0.1.2-rc.1`, and `0.1.5-rc.1`. Development dependencies remain pinned to `0.1.5-rc.1`; other Host versions are not implicitly supported.
+- Source installation and development require Node.js `^22.19.0 || >=24.0.0`. npm installation does not require running `npm install` in an arbitrary directory.
 
 ## Installation
 

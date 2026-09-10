@@ -354,26 +354,27 @@ ok(
   "发布包版本符合 SemVer",
 );
 ok(
-  packageJson.peerDependencies["@deepseek-ai/dsh-client-runtime"],
-  "package declares the client runtime peer",
+  !packageJson.peerDependencies["@deepseek-ai/dsh-client-runtime"],
+  "package does not install the retired client runtime peer",
 );
 ok(
   packageJson.peerDependencies["@deepseek-ai/dsh-client-ui-slots"],
   "package declares the settings slots peer",
 );
 ok(
-  packageJson.peerDependencies["@deepseek-ai/dsh-host-webserver"].includes(
-    "<0.2.0",
-  ),
-  "host-webserver peer has an upper bound",
+  packageJson.peerDependencies["@deepseek-ai/dsh-host-webserver"] ===
+    "0.1.0-rc.8 || 0.1.1-rc.2 || 0.1.2-rc.1 || 0.1.5-rc.1",
+  "host-webserver peer only supports the tested versions",
 );
 ok(
-  packageJson.peerDependencies["@deepseek-ai/dsh-skill"].includes("<0.2.0"),
-  "skill peer has an upper bound",
+  packageJson.peerDependencies["@deepseek-ai/dsh-skill"] ===
+    "0.1.0-rc.8 || 0.1.1-rc.2 || 0.1.2-rc.1 || 0.1.5-rc.1",
+  "skill peer only supports the tested versions",
 );
 ok(
-  packageJson.peerDependencies["@deepseek-ai/dsh-tools"].includes("<0.2.0"),
-  "tools peer has an upper bound",
+  packageJson.peerDependencies["@deepseek-ai/dsh-tools"] ===
+    "0.1.0-rc.8 || 0.1.1-rc.2 || 0.1.2-rc.1 || 0.1.5-rc.1",
+  "tools peer only supports the tested versions",
 );
 ok(
   !packageJson.peerDependencies["@deepseek-ai/dsh-client-ui-workspace"],

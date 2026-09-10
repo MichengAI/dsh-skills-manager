@@ -1,6 +1,6 @@
 {
   "name": "@michengai/dsh-skills-manager",
-  "version": "0.1.45",
+  "version": "0.1.46",
   "description": "NPM-installable DSH Web plugin for safely loading and managing skills across DSH and common local Agents.",
   "license": "Apache-2.0",
   "repository": {
@@ -32,7 +32,6 @@
     },
     "client": {
       "inject": [
-        "@deepseek-ai/dsh-client-runtime",
         "@deepseek-ai/dsh-client-ui-slots",
         "@deepseek-ai/dsh-client-locale"
       ],
@@ -44,7 +43,8 @@
     "test": "npm run build && node test/build-test.mjs && node test/core-test.mjs && node test/readonly-discovery.test.mjs && node test/locale-test.mjs",
     "verify": "npm test && npm run pack:check && node scripts/check-generated.mjs",
     "pack:check": "npm pack --dry-run --json",
-    "prepublishOnly": "npm run verify"
+    "prepublishOnly": "npm run verify",
+    "test:compat": "node scripts/test-host-compatibility.mjs"
   },
   "publishConfig": {
     "registry": "https://registry.npmjs.org/",
@@ -52,28 +52,27 @@
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": ">=4.0.1 <5.0.0",
-    "@deepseek-ai/dsh-client-locale": ">=0.1.0-rc.5 <0.2.0",
-    "@deepseek-ai/dsh-client-runtime": ">=0.1.0-rc.5 <0.2.0",
-    "@deepseek-ai/dsh-client-ui-primitives": ">=0.1.0-rc.5 <0.2.0",
-    "@deepseek-ai/dsh-client-ui-slots": ">=0.1.0-rc.5 <0.2.0",
-    "@deepseek-ai/dsh-host-webserver": ">=0.1.0-rc.5 <0.2.0",
-    "@deepseek-ai/dsh-session": ">=0.1.0-rc.5 <0.2.0",
-    "@deepseek-ai/dsh-skill": ">=0.1.0-rc.5 <0.2.0",
-    "@deepseek-ai/dsh-tools": ">=0.1.0-rc.5 <0.2.0",
-    "@deepseek-ai/dsh-web-app": ">=0.1.0-rc.5 <0.2.0",
+    "@deepseek-ai/dsh-client-locale": "0.1.0-rc.8 || 0.1.1-rc.2 || 0.1.2-rc.1 || 0.1.5-rc.1",
+    "@deepseek-ai/dsh-client-ui-primitives": "0.1.0-rc.8 || 0.1.1-rc.2 || 0.1.2-rc.1 || 0.1.5-rc.1",
+    "@deepseek-ai/dsh-client-ui-slots": "0.1.0-rc.8 || 0.1.1-rc.2 || 0.1.2-rc.1 || 0.1.5-rc.1",
+    "@deepseek-ai/dsh-host-webserver": "0.1.0-rc.8 || 0.1.1-rc.2 || 0.1.2-rc.1 || 0.1.5-rc.1",
+    "@deepseek-ai/dsh-session": "0.1.0-rc.8 || 0.1.1-rc.2 || 0.1.2-rc.1 || 0.1.5-rc.1",
+    "@deepseek-ai/dsh-skill": "0.1.0-rc.8 || 0.1.1-rc.2 || 0.1.2-rc.1 || 0.1.5-rc.1",
+    "@deepseek-ai/dsh-tools": "0.1.0-rc.8 || 0.1.1-rc.2 || 0.1.2-rc.1 || 0.1.5-rc.1",
+    "@deepseek-ai/dsh-web-app": "0.1.0-rc.8 || 0.1.1-rc.2 || 0.1.2-rc.1 || 0.1.5-rc.1",
     "react": "^18.2.0"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "4.0.2",
-    "@deepseek-ai/dsh-client-locale": "0.1.2-rc.1",
-    "@deepseek-ai/dsh-client-ui-primitives": "0.1.2-rc.1",
-    "@deepseek-ai/dsh-client-ui-slots": "0.1.2-rc.1",
-    "@deepseek-ai/dsh-host-webserver": "0.1.2-rc.1",
-    "@deepseek-ai/dsh-session": "0.1.2-rc.1",
-    "@deepseek-ai/dsh-scope": "0.1.2-rc.1",
-    "@deepseek-ai/dsh-skill": "0.1.2-rc.1",
-    "@deepseek-ai/dsh-tools": "0.1.2-rc.1",
-    "@deepseek-ai/dsh-web-app": "0.1.2-rc.1",
+    "@deepseek-ai/dsh-client-locale": "0.1.5-rc.1",
+    "@deepseek-ai/dsh-client-ui-primitives": "0.1.5-rc.1",
+    "@deepseek-ai/dsh-client-ui-slots": "0.1.5-rc.1",
+    "@deepseek-ai/dsh-host-webserver": "0.1.5-rc.1",
+    "@deepseek-ai/dsh-session": "0.1.5-rc.1",
+    "@deepseek-ai/dsh-scope": "0.1.5-rc.1",
+    "@deepseek-ai/dsh-skill": "0.1.5-rc.1",
+    "@deepseek-ai/dsh-tools": "0.1.5-rc.1",
+    "@deepseek-ai/dsh-web-app": "0.1.5-rc.1",
     "esbuild": "0.25.0"
   },
   "engines": {

@@ -35,8 +35,8 @@ function sameSet(a, b, msg) {
 
 const source = await readFile(new URL("../lib/client.js", import.meta.url), "utf8");
 const manifest = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
-const DSH_PEER_RANGE = ">=0.1.0-rc.5 <0.2.0";
-const DSH_DEV_VERSION = "0.1.2-rc.1";
+const DSH_PEER_RANGE = "0.1.0-rc.8 || 0.1.1-rc.2 || 0.1.2-rc.1 || 0.1.5-rc.1";
+const DSH_DEV_VERSION = "0.1.5-rc.1";
 const DSH_DEV_DEPENDENCIES = manifest.devDependencies || {};
 const DSH_ALPHA_DEV_DEPENDENCIES = [
   "@deepseek-ai/dsh-client-locale",
@@ -131,7 +131,6 @@ eq(DICT.zh["link.feedback"], "问题反馈", "Chinese feedback link copy is conc
 eq(DICT.en["link.feedback"], "Issues", "English feedback link copy matches the issue tracker destination");
 for (const dependency of [
   "@deepseek-ai/dsh-client-locale",
-  "@deepseek-ai/dsh-client-runtime",
   "@deepseek-ai/dsh-client-ui-primitives",
   "@deepseek-ai/dsh-client-ui-slots",
   "@deepseek-ai/dsh-host-webserver",
@@ -142,6 +141,8 @@ for (const dependency of [
 ]) {
   eq(manifest.peerDependencies[dependency], DSH_PEER_RANGE, `${dependency} uses the unified DSH compatibility range`);
 }
+ok(!("@deepseek-ai/dsh-client-runtime" in manifest.peerDependencies), "retired client-runtime is not installed as a peer");
+ok(!manifest.dsh.client.inject.includes("@deepseek-ai/dsh-client-runtime"), "client metadata does not reference retired runtime");
 for (const dependency of DSH_ALPHA_DEV_DEPENDENCIES) {
   eq(DSH_DEV_DEPENDENCIES[dependency], DSH_DEV_VERSION, `${dependency} is pinned to the current DSH development version`);
 }
