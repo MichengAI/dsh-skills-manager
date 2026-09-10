@@ -27,7 +27,6 @@ if (options.versions.length > 1) {
 }
 const [version] = options.versions;
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const sandbox = await mkdtemp(join(tmpdir(), `dsh-skills-compat-${version}-`));
 const manifest = JSON.parse(await readFile(join(root, "package.json"), "utf8"));
 // 从 PATH 的实际 shim 或符号链接定位入口，不依赖 Node 安装位置。
 async function findTool(name) {
@@ -47,6 +46,7 @@ async function findTool(name) {
 }
 const npm = await findTool("npm");
 const pnpm = await findTool("pnpm");
+const sandbox = await mkdtemp(join(tmpdir(), `dsh-skills-compat-${version}-`));
 const env = { ...process.env, DSH_HOME: join(sandbox, "home"), USERPROFILE: join(sandbox, "user") };
 for (const key of ["AGENTS", "CODEX", "CLAUDE", "GEMINI", "OPENCODE", "CURSOR"]) {
   env[`DSH_${key}_HOME`] = join(env.USERPROFILE, key.toLowerCase());
@@ -177,7 +177,7 @@ try {
   report.passed = true;
   await writeFile(join(sandbox, "result.json"), JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report));
-  if (process.argv.includes("--serve")) {
+  if (options.serve) {
     console.log(`浏览器验收：${url}`);
     await new Promise(resolveStop => { process.once("SIGINT", resolveStop); process.once("SIGTERM", resolveStop); });
   }
@@ -198,7 +198,7 @@ try {
     catch (error) { if (error.code !== "ENOENT") throw error; }
   }
   await writeFile(join(sandbox, "result.json"), JSON.stringify(report, null, 2));
-  if (report.passed && !process.argv.includes("--keep") && !process.argv.includes("--serve")) {
+  if (report.passed && !options.keep && !options.serve) {
     const rel = relative(resolve(tmpdir()), sandbox);
     assert(rel && !rel.startsWith("..") && !isAbsolute(rel), "清理路径必须位于临时目录内");
     try { await rm(sandbox, { recursive: true, force: true, maxRetries: 3, retryDelay: 500 }); }

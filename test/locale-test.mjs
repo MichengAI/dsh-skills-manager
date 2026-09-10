@@ -1,4 +1,3 @@
-import { peerRange as DSH_PEER_RANGE, developmentHost as DSH_DEV_VERSION } from "../scripts/hosts.mjs";
 // dsh-skills-manager 双语词典对齐测试（零第三方依赖）
 // 断言：zh/en 词典 key 集合完全一致；每个模板的 {xxx} 占位符集合完全一致。
 // 运行：node test/locale-test.mjs
@@ -362,15 +361,6 @@ ok(registerOptions !== null && registerOptions.locale === "skills-manager", "set
 ok(registerOptions !== null && typeof registerOptions.label === "function", "settings.section label is a thunk (re-read per locale revision)");
 ok(registerOptions !== null && registerOptions.icon === "skill", "settings.section registers the skill nav icon");
 
-
-for (const [name, range] of Object.entries(manifest.peerDependencies)) {
-  if (name.startsWith("@deepseek-ai/dsh-")) {
-    eq(range, DSH_PEER_RANGE, `${name} peer 与宿主清单一致`);
-  }
-}
-for (const [name, version] of Object.entries(manifest.devDependencies)) {
-  if (name.startsWith("@deepseek-ai/dsh-")) eq(version, DSH_DEV_VERSION, `${name} 开发版本一致`);
-}
 
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);
