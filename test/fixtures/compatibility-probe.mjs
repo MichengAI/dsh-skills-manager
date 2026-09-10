@@ -22,7 +22,7 @@ export function apply(ctx) {
         const list = await registry.list(options);
         const skill = await registry.get("compat-external", options);
         res.writeHead(200, { "content-type": "application/json" });
-        res.end(JSON.stringify({ list, skill }));
+        res.end(JSON.stringify({ list, skill, local: await registry.get("compat-local", options) }));
       } catch (error) {
         res.writeHead(500, { "content-type": "application/json" });
         res.end(JSON.stringify({ error: String(error.stack || error) }));

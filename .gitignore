@@ -3,3 +3,6 @@ docs/
 *.log
 *.tgz
 .DS_Store
+
+.codegraph/
+.compat-results/

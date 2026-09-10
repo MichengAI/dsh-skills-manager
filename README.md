@@ -14,7 +14,7 @@
   [![npm package](https://img.shields.io/npm/v/%40michengai%2Fdsh-skills-manager.svg?label=npm%20package)](https://www.npmjs.com/package/@michengai/dsh-skills-manager)
   [![npm downloads](https://img.shields.io/npm/dt/%40michengai%2Fdsh-skills-manager.svg?label=npm%20downloads)](https://www.npmjs.com/package/@michengai/dsh-skills-manager)
   [![DSH Web Plugin](https://img.shields.io/badge/DSH%20Web-Plugin-0f766e.svg)](https://github.com/MichengAI/dsh-skills-manager)
-  [![Node.js 20 or later](https://img.shields.io/badge/Node.js-20%20or%20later-339933.svg?logo=node.js&logoColor=white)](https://nodejs.org/)
+  [![Node.js ^22.19.0 || >=24.0.0](https://img.shields.io/badge/Node.js-22.19%2B%20%7C%20%3E%3D24-339933.svg?logo=node.js&logoColor=white)](https://nodejs.org/)
 </div>
 
 > DSH Skills Manager is a community-maintained DeepSeek Harness (DSH) plugin, not an official DeepSeek AI product.
@@ -63,7 +63,7 @@ For a ready-to-use workbench, download [DSH Codex Desktop](https://github.com/Mi
 
 - A working DeepSeek Harness Web installation with `dsh` available in PowerShell.
 - Examples use the `web` profile; replace it with the target profile.
-- Plugin `0.1.46` is tested with DeepSeek Harness `0.1.0-rc.8`, `0.1.1-rc.2`, `0.1.2-rc.1`, and `0.1.5-rc.1`. Development dependencies remain pinned to `0.1.5-rc.1`; other Host versions are not implicitly supported.
+- Plugin `0.1.46` is tested with DeepSeek Harness `0.1.0-rc.8`, `0.1.1-rc.2`, `0.1.2-rc.1`, `0.1.5-rc.1`. Development dependencies remain pinned to `0.1.5-rc.1`; other Host versions are not implicitly supported.
 - Source installation and development require Node.js `^22.19.0 || >=24.0.0`. npm installation does not require running `npm install` in an arbitrary directory.
 
 ## Installation
@@ -196,3 +196,18 @@ npm run verify
 ## License
 
 Licensed under [Apache License 2.0](LICENSE).
+
+## Host compatibility regression
+
+`scripts/hosts.mjs` defines supported hosts; contract tests check package peer and development dependencies against it. Tests cover matching official component versions, not mixed versions or unlisted alpha/RC releases.
+
+```powershell
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
+pnpm run test:compat
+pnpm run test:compat 0.1.5-rc.1 --keep
+```
+
+Without arguments, all hosts run sequentially. `--keep` retains the sandbox; `--serve` keeps the Host available for manual browser checks. Successful runs clean up by default; failures retain diagnostics. Compact evidence always goes to `.compat-results/`. npm and the project's pnpm must be available on PATH. The manual GitHub Actions compatibility workflow runs a Windows matrix and uploads evidence. It covers real Host APIs and Agent skill policies, not complete UI or external-model end-to-end testing.
+
+To change supported hosts, edit `scripts/hosts.mjs`, run `node scripts/sync-hosts.mjs --write`, update the lockfile, and run the compatibility matrix. `verify` rejects metadata and README drift.

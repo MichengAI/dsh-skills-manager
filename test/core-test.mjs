@@ -1,3 +1,4 @@
+import { peerRange as DSH_PEER_RANGE, developmentHost as DSH_DEV_VERSION } from "../scripts/hosts.mjs";
 // dsh-skills-manager core 单元测试（临时根；ZIP 用例复用生产依赖 fflate）
 // 运行：node test/core-test.mjs
 
@@ -363,17 +364,17 @@ ok(
 );
 ok(
   packageJson.peerDependencies["@deepseek-ai/dsh-host-webserver"] ===
-    "0.1.0-rc.8 || 0.1.1-rc.2 || 0.1.2-rc.1 || 0.1.5-rc.1",
+    DSH_PEER_RANGE,
   "host-webserver peer only supports the tested versions",
 );
 ok(
   packageJson.peerDependencies["@deepseek-ai/dsh-skill"] ===
-    "0.1.0-rc.8 || 0.1.1-rc.2 || 0.1.2-rc.1 || 0.1.5-rc.1",
+    DSH_PEER_RANGE,
   "skill peer only supports the tested versions",
 );
 ok(
   packageJson.peerDependencies["@deepseek-ai/dsh-tools"] ===
-    "0.1.0-rc.8 || 0.1.1-rc.2 || 0.1.2-rc.1 || 0.1.5-rc.1",
+    DSH_PEER_RANGE,
   "tools peer only supports the tested versions",
 );
 ok(

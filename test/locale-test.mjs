@@ -1,3 +1,4 @@
+import { peerRange as DSH_PEER_RANGE, developmentHost as DSH_DEV_VERSION } from "../scripts/hosts.mjs";
 // dsh-skills-manager 双语词典对齐测试（零第三方依赖）
 // 断言：zh/en 词典 key 集合完全一致；每个模板的 {xxx} 占位符集合完全一致。
 // 运行：node test/locale-test.mjs
@@ -35,19 +36,6 @@ function sameSet(a, b, msg) {
 
 const source = await readFile(new URL("../lib/client.js", import.meta.url), "utf8");
 const manifest = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
-const DSH_PEER_RANGE = "0.1.0-rc.8 || 0.1.1-rc.2 || 0.1.2-rc.1 || 0.1.5-rc.1";
-const DSH_DEV_VERSION = "0.1.5-rc.1";
-const DSH_DEV_DEPENDENCIES = manifest.devDependencies || {};
-const DSH_ALPHA_DEV_DEPENDENCIES = [
-  "@deepseek-ai/dsh-client-locale",
-  "@deepseek-ai/dsh-client-ui-primitives",
-  "@deepseek-ai/dsh-client-ui-slots",
-  "@deepseek-ai/dsh-host-webserver",
-  "@deepseek-ai/dsh-session",
-  "@deepseek-ai/dsh-skill",
-  "@deepseek-ai/dsh-tools",
-  "@deepseek-ai/dsh-web-app",
-];
 
 // 模拟宿主 AMD 加载器：执行 bundle，捕获 load 定义，再调用 factory 读取导出。
 let loaded = null;
@@ -129,23 +117,8 @@ eq(DICT.zh["link.project"], "GitHub", "Chinese project link copy matches the arc
 eq(DICT.en["link.project"], "GitHub", "English project link copy matches the archive plugin");
 eq(DICT.zh["link.feedback"], "问题反馈", "Chinese feedback link copy is concise and actionable");
 eq(DICT.en["link.feedback"], "Issues", "English feedback link copy matches the issue tracker destination");
-for (const dependency of [
-  "@deepseek-ai/dsh-client-locale",
-  "@deepseek-ai/dsh-client-ui-primitives",
-  "@deepseek-ai/dsh-client-ui-slots",
-  "@deepseek-ai/dsh-host-webserver",
-  "@deepseek-ai/dsh-session",
-  "@deepseek-ai/dsh-skill",
-  "@deepseek-ai/dsh-tools",
-  "@deepseek-ai/dsh-web-app",
-]) {
-  eq(manifest.peerDependencies[dependency], DSH_PEER_RANGE, `${dependency} uses the unified DSH compatibility range`);
-}
 ok(!("@deepseek-ai/dsh-client-runtime" in manifest.peerDependencies), "retired client-runtime is not installed as a peer");
 ok(!manifest.dsh.client.inject.includes("@deepseek-ai/dsh-client-runtime"), "client metadata does not reference retired runtime");
-for (const dependency of DSH_ALPHA_DEV_DEPENDENCIES) {
-  eq(DSH_DEV_DEPENDENCIES[dependency], DSH_DEV_VERSION, `${dependency} is pinned to the current DSH development version`);
-}
 ok(/@media\(max-width:720px\)\{\.dssm-title-row\{flex-wrap:wrap\}/.test(source), "feedback title row wraps at the archive plugin breakpoint");
 
 for (const locale of ["zh", "en"]) {
@@ -388,6 +361,16 @@ ok(registerOptions !== null && registerOptions.name === "settings.section", "app
 ok(registerOptions !== null && registerOptions.locale === "skills-manager", "settings.section registration declares the locale namespace");
 ok(registerOptions !== null && typeof registerOptions.label === "function", "settings.section label is a thunk (re-read per locale revision)");
 ok(registerOptions !== null && registerOptions.icon === "skill", "settings.section registers the skill nav icon");
+
+
+for (const [name, range] of Object.entries(manifest.peerDependencies)) {
+  if (name.startsWith("@deepseek-ai/dsh-")) {
+    eq(range, DSH_PEER_RANGE, `${name} peer 与宿主清单一致`);
+  }
+}
+for (const [name, version] of Object.entries(manifest.devDependencies)) {
+  if (name.startsWith("@deepseek-ai/dsh-")) eq(version, DSH_DEV_VERSION, `${name} 开发版本一致`);
+}
 
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

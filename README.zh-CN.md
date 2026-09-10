@@ -14,7 +14,7 @@
   [![npm package](https://img.shields.io/npm/v/%40michengai%2Fdsh-skills-manager.svg?label=npm%20package)](https://www.npmjs.com/package/@michengai/dsh-skills-manager)
   [![npm 下载量](https://img.shields.io/npm/dt/%40michengai%2Fdsh-skills-manager.svg?label=npm%20%E4%B8%8B%E8%BD%BD%E9%87%8F)](https://www.npmjs.com/package/@michengai/dsh-skills-manager)
   [![DSH Web Plugin](https://img.shields.io/badge/DSH%20Web-Plugin-0f766e.svg)](https://github.com/MichengAI/dsh-skills-manager)
-  [![Node.js 20 or later](https://img.shields.io/badge/Node.js-20%20or%20later-339933.svg?logo=node.js&logoColor=white)](https://nodejs.org/)
+  [![Node.js ^22.19.0 || >=24.0.0](https://img.shields.io/badge/Node.js-22.19%2B%20%7C%20%3E%3D24-339933.svg?logo=node.js&logoColor=white)](https://nodejs.org/)
 </div>
 
 > DSH Skills Manager 是社区维护的 DeepSeek Harness（DSH）插件，并非 DeepSeek AI 官方产品。
@@ -197,3 +197,18 @@ npm run verify
 ## 许可证
 
 本项目采用 [Apache License 2.0](LICENSE)。
+
+## 宿主兼容回归
+
+支持范围以 `scripts/hosts.mjs` 为准，契约测试检查发布包的 peer 和开发依赖与其一致。验证对象为官方同版本组件组合，不声明混装或其他 alpha/RC 版本兼容。
+
+```powershell
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
+pnpm run test:compat
+pnpm run test:compat 0.1.5-rc.1 --keep
+```
+
+不带参数顺序运行全部宿主；`--keep` 保留沙箱，`--serve` 保留宿主供手动浏览器验收。成功默认清理沙箱，失败保留诊断；精简证据始终写入 `.compat-results/`。需要 PATH 中可用的 npm 和项目指定 pnpm。GitHub Actions 的“四版本宿主兼容验证”可手动触发 Windows 矩阵并下载证据；它验证真实宿主 API 和 Agent 技能策略，不等同于完整 UI 或外部模型端到端测试。
+
+维护兼容范围时先编辑 `scripts/hosts.mjs`，运行 `node scripts/sync-hosts.mjs --write`，再更新锁文件并跑兼容矩阵；`verify` 会拦截元数据和 README 漂移。
