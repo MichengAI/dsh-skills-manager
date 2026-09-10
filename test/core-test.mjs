@@ -368,13 +368,11 @@ ok(
   "host-webserver peer only supports the tested versions",
 );
 ok(
-  packageJson.peerDependencies["@deepseek-ai/dsh-skill"] ===
-    DSH_PEER_RANGE,
+  packageJson.peerDependencies["@deepseek-ai/dsh-skill"] === DSH_PEER_RANGE,
   "skill peer only supports the tested versions",
 );
 ok(
-  packageJson.peerDependencies["@deepseek-ai/dsh-tools"] ===
-    DSH_PEER_RANGE,
+  packageJson.peerDependencies["@deepseek-ai/dsh-tools"] === DSH_PEER_RANGE,
   "tools peer only supports the tested versions",
 );
 ok(

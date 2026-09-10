@@ -4,7 +4,7 @@
 
 <div align="center">
 
-  # DSH Skills Manager
+# DSH Skills Manager
 
   **在 DeepSeek Harness 中统一加载并安全管理本机 Agent Skills**
 
@@ -18,7 +18,6 @@
 </div>
 
 > DSH Skills Manager 是社区维护的 DeepSeek Harness（DSH）插件，并非 DeepSeek AI 官方产品。
-
 
 ## 功能概览
 
@@ -64,7 +63,7 @@ DSH 本地技能移入回收站前需要确认；永久删除前仍可恢复：
 
 - 已可正常运行 DeepSeek Harness Web，且可在 PowerShell 中使用 `dsh`。
 - 以下示例使用 `web` profile；请替换为实际目标 profile。
-- `0.1.46` 已验证兼容 DeepSeek Harness `0.1.0-rc.8`、`0.1.1-rc.2`、`0.1.2-rc.1`、`0.1.5-rc.1`；开发依赖固定使用 `0.1.5-rc.1`，不自动声明支持其他版本。
+- `0.1.47` 已验证兼容 DeepSeek Harness `0.1.0-rc.8`、`0.1.1-rc.2`、`0.1.2-rc.1`、`0.1.5-rc.1`；开发依赖固定使用 `0.1.5-rc.1`，不自动声明支持其他版本。
 - 从源码安装或二次开发需要 Node.js `^22.19.0 || >=24.0.0`；仅从 npm 安装无需在任意目录执行 `npm install`。
 
 ## 安装

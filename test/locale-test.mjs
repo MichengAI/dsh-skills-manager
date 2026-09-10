@@ -15,7 +15,15 @@ function ok(cond, msg) {
   }
 }
 function eq(actual, expected, msg) {
-  ok(actual === expected, msg + " (got " + JSON.stringify(actual) + ", want " + JSON.stringify(expected) + ")");
+  ok(
+    actual === expected,
+    msg +
+      " (got " +
+      JSON.stringify(actual) +
+      ", want " +
+      JSON.stringify(expected) +
+      ")",
+  );
 }
 
 /** 提取模板字符串中的 {xxx} 占位符集合（顺序无关）。 */
@@ -33,38 +41,61 @@ function sameSet(a, b, msg) {
   ok(av === bv, msg + " (got " + av + ", want " + bv + ")");
 }
 
-const source = await readFile(new URL("../lib/client.js", import.meta.url), "utf8");
-const manifest = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
+const source = await readFile(
+  new URL("../lib/client.js", import.meta.url),
+  "utf8",
+);
+const manifest = JSON.parse(
+  await readFile(new URL("../package.json", import.meta.url), "utf8"),
+);
 
 // 模拟宿主 AMD 加载器：执行 bundle，捕获 load 定义，再调用 factory 读取导出。
 let loaded = null;
 const fakeWindow = {
   __ModuleLoader__: {
-    load(definition) { loaded = definition; },
+    load(definition) {
+      loaded = definition;
+    },
   },
 };
 new Function("window", source)(fakeWindow);
-ok(loaded !== null && typeof loaded.factory === "function", "client bundle registers via window.__ModuleLoader__.load with a factory");
+ok(
+  loaded !== null && typeof loaded.factory === "function",
+  "client bundle registers via window.__ModuleLoader__.load with a factory",
+);
 
 const bundle = loaded.factory((id) => {
   if (id === "react") return { createElement: function () {} };
-  if (id === "react-dom/client") return { createRoot: function () { return { render: function () {} }; } };
-  if (id === "@deepseek-ai/dsh-client-ui-primitives") return {
-    IconListPenOutline16: function () {},
-    IconRefreshOutline16: function () {},
-    IconDownloadOutline16: function () {},
-    IconCopyOutline16: function () {},
-    IconCloseOutline16: function () {},
-  };
+  if (id === "react-dom/client")
+    return {
+      createRoot: function () {
+        return { render: function () {} };
+      },
+    };
+  if (id === "@deepseek-ai/dsh-client-ui-primitives")
+    return {
+      IconListPenOutline16: function () {},
+      IconRefreshOutline16: function () {},
+      IconDownloadOutline16: function () {},
+      IconCopyOutline16: function () {},
+      IconCloseOutline16: function () {},
+    };
   throw new Error("unexpected require: " + id);
 });
 
 const DICT = bundle.DICT;
-ok(DICT !== undefined && DICT.zh !== undefined && DICT.en !== undefined, "factory exports the zh/en dictionaries");
+ok(
+  DICT !== undefined && DICT.zh !== undefined && DICT.en !== undefined,
+  "factory exports the zh/en dictionaries",
+);
 
 const zhKeys = Object.keys(DICT.zh).sort();
 const enKeys = Object.keys(DICT.en).sort();
-eq(zhKeys.length, enKeys.length, "zh and en dictionaries have the same key count");
+eq(
+  zhKeys.length,
+  enKeys.length,
+  "zh and en dictionaries have the same key count",
+);
 for (let i = 0; i < Math.max(zhKeys.length, enKeys.length); i++) {
   eq(zhKeys[i], enKeys[i], "dictionary key " + (i + 1) + " is aligned");
 }
@@ -72,14 +103,27 @@ for (let i = 0; i < Math.max(zhKeys.length, enKeys.length); i++) {
 // 命名约定：点分小写为主（如 btn.refresh、status.enabled）；业务错误码段允许 camelCase
 // （如 error.skill.notFound、error.source.tooDeep），首段仍必须小写字母开头。
 for (const key of zhKeys) {
-  ok(/^[a-z][A-Za-z0-9]*(?:\.[A-Za-z0-9]+)*$/.test(key), "key uses dot-lowercase naming: " + key);
+  ok(
+    /^[a-z][A-Za-z0-9]*(?:\.[A-Za-z0-9]+)*$/.test(key),
+    "key uses dot-lowercase naming: " + key,
+  );
 }
 
 // 占位符对齐：每个 key 的模板在 zh/en 中引用完全相同的参数名。
 for (const key of zhKeys) {
-  sameSet(placeholders(DICT.zh[key]), placeholders(DICT.en[key]), "placeholder set of \"" + key + "\" matches across zh/en");
-  ok(typeof DICT.zh[key] === "string" && DICT.zh[key].length > 0, "zh value of \"" + key + "\" is a non-empty string");
-  ok(typeof DICT.en[key] === "string" && DICT.en[key].length > 0, "en value of \"" + key + "\" is a non-empty string");
+  sameSet(
+    placeholders(DICT.zh[key]),
+    placeholders(DICT.en[key]),
+    'placeholder set of "' + key + '" matches across zh/en',
+  );
+  ok(
+    typeof DICT.zh[key] === "string" && DICT.zh[key].length > 0,
+    'zh value of "' + key + '" is a non-empty string',
+  );
+  ok(
+    typeof DICT.en[key] === "string" && DICT.en[key].length > 0,
+    'en value of "' + key + '" is a non-empty string',
+  );
 }
 
 const hostSources = await Promise.all([
@@ -88,41 +132,122 @@ const hostSources = await Promise.all([
 ]);
 const hostCodes = new Set();
 for (const hostSource of hostSources) {
-  for (const match of hostSource.matchAll(/["']((?:error|warning|diagnostic)\.[A-Za-z]+(?:\.[A-Za-z]+)*)["']/g)) hostCodes.add(match[1]);
+  for (const match of hostSource.matchAll(
+    /["']((?:error|warning|diagnostic)\.[A-Za-z]+(?:\.[A-Za-z]+)*)["']/g,
+  ))
+    hostCodes.add(match[1]);
 }
 for (const code of hostCodes) {
-  ok(code in DICT.zh && code in DICT.en, "host error code exists in both dictionaries: " + code);
+  ok(
+    code in DICT.zh && code in DICT.en,
+    "host error code exists in both dictionaries: " + code,
+  );
 }
 
 const literalTranslationKeys = new Set();
-for (const match of source.matchAll(/\bt\(\s*["']([A-Za-z][A-Za-z0-9]*(?:\.[A-Za-z0-9]+)*)["']/g)) literalTranslationKeys.add(match[1]);
+for (const match of source.matchAll(
+  /\bt\(\s*["']([A-Za-z][A-Za-z0-9]*(?:\.[A-Za-z0-9]+)*)["']/g,
+))
+  literalTranslationKeys.add(match[1]);
 for (const key of literalTranslationKeys) {
-  ok(key in DICT.zh && key in DICT.en, "literal client translation key exists in both dictionaries: " + key);
+  ok(
+    key in DICT.zh && key in DICT.en,
+    "literal client translation key exists in both dictionaries: " + key,
+  );
 }
 
 // 设置标题右侧与归档插件一致：项目主页和问题反馈均需使用各自对应的图标与链接。
-ok(/className: "dssm-title-row"/.test(source), "settings title uses a dedicated title row for external actions");
-ok(/className: "dssm-feedback-links"/.test(source), "settings title groups the project and feedback links together");
-ok(/require\w*\(["']@deepseek-ai\/dsh-client-ui-primitives["']\)/.test(source), "feedback link loads the host primitive icon module");
-ok(/IconListPenOutline16/.test(source), "feedback link uses the archive plugin feedback icon");
-ok(/function GithubMark16\(\)/.test(source), "project link defines the archive plugin GitHub brand icon");
-ok(/fill: "currentColor"/.test(source), "project link GitHub icon follows the active theme color");
-ok(/className: "dssm-feedback-link"/.test(source), "settings title renders a semantically named feedback link");
-ok(/href: "https:\/\/github\.com\/MichengAI\/dsh-skills-manager", target: "_blank", rel: "noreferrer", "aria-label": t\("link\.project"\)/.test(source), "project link points to the Skills Manager repository");
-ok(/href: "https:\/\/github\.com\/MichengAI\/dsh-skills-manager\/issues"/.test(source), "feedback link points to the Skills Manager issue tracker");
-ok(/target: "_blank", rel: "noreferrer", "aria-label": t\("link\.feedback"\)/.test(source), "feedback link opens safely with a localized accessible name");
-ok(/\.dssm-feedback-link:focus-visible\{outline:2px solid var\(--dsw-alias-state-success-primary\);outline-offset:2px\}/.test(source), "feedback link has a visible keyboard focus style");
-eq(DICT.zh["link.project"], "GitHub", "Chinese project link copy matches the archive plugin");
-eq(DICT.en["link.project"], "GitHub", "English project link copy matches the archive plugin");
-eq(DICT.zh["link.feedback"], "问题反馈", "Chinese feedback link copy is concise and actionable");
-eq(DICT.en["link.feedback"], "Issues", "English feedback link copy matches the issue tracker destination");
-ok(!("@deepseek-ai/dsh-client-runtime" in manifest.peerDependencies), "retired client-runtime is not installed as a peer");
-ok(!manifest.dsh.client.inject.includes("@deepseek-ai/dsh-client-runtime"), "client metadata does not reference retired runtime");
-ok(/@media\(max-width:720px\)\{\.dssm-title-row\{flex-wrap:wrap\}/.test(source), "feedback title row wraps at the archive plugin breakpoint");
+ok(
+  /className: "dssm-title-row"/.test(source),
+  "settings title uses a dedicated title row for external actions",
+);
+ok(
+  /className: "dssm-feedback-links"/.test(source),
+  "settings title groups the project and feedback links together",
+);
+ok(
+  /require\w*\(["']@deepseek-ai\/dsh-client-ui-primitives["']\)/.test(source),
+  "feedback link loads the host primitive icon module",
+);
+ok(
+  /IconListPenOutline16/.test(source),
+  "feedback link uses the archive plugin feedback icon",
+);
+ok(
+  /function GithubMark16\(\)/.test(source),
+  "project link defines the archive plugin GitHub brand icon",
+);
+ok(
+  /fill: "currentColor"/.test(source),
+  "project link GitHub icon follows the active theme color",
+);
+ok(
+  /className: "dssm-feedback-link"/.test(source),
+  "settings title renders a semantically named feedback link",
+);
+ok(
+  /href: "https:\/\/github\.com\/MichengAI\/dsh-skills-manager", target: "_blank", rel: "noreferrer", "aria-label": t\("link\.project"\)/.test(
+    source,
+  ),
+  "project link points to the Skills Manager repository",
+);
+ok(
+  /href: "https:\/\/github\.com\/MichengAI\/dsh-skills-manager\/issues"/.test(
+    source,
+  ),
+  "feedback link points to the Skills Manager issue tracker",
+);
+ok(
+  /target: "_blank", rel: "noreferrer", "aria-label": t\("link\.feedback"\)/.test(
+    source,
+  ),
+  "feedback link opens safely with a localized accessible name",
+);
+ok(
+  /\.dssm-feedback-link:focus-visible\{outline:2px solid var\(--dsw-alias-state-success-primary\);outline-offset:2px\}/.test(
+    source,
+  ),
+  "feedback link has a visible keyboard focus style",
+);
+eq(
+  DICT.zh["link.project"],
+  "GitHub",
+  "Chinese project link copy matches the archive plugin",
+);
+eq(
+  DICT.en["link.project"],
+  "GitHub",
+  "English project link copy matches the archive plugin",
+);
+eq(
+  DICT.zh["link.feedback"],
+  "问题反馈",
+  "Chinese feedback link copy is concise and actionable",
+);
+eq(
+  DICT.en["link.feedback"],
+  "Issues",
+  "English feedback link copy matches the issue tracker destination",
+);
+ok(
+  !("@deepseek-ai/dsh-client-runtime" in manifest.peerDependencies),
+  "retired client-runtime is not installed as a peer",
+);
+ok(
+  !manifest.dsh.client.inject.includes("@deepseek-ai/dsh-client-runtime"),
+  "client metadata does not reference retired runtime",
+);
+ok(
+  /@media\(max-width:720px\)\{\.dssm-title-row\{flex-wrap:wrap\}/.test(source),
+  "feedback title row wraps at the archive plugin breakpoint",
+);
 
 for (const locale of ["zh", "en"]) {
   for (const [key, value] of Object.entries(DICT[locale])) {
-    ok(!/(?:已加载|已发现|\bLoaded\b|\bDiscovered\b)/.test(value), `${locale} translation avoids legacy loading terminology: ${key}`);
+    ok(
+      !/(?:已加载|已发现|\bLoaded\b|\bDiscovered\b)/.test(value),
+      `${locale} translation avoids legacy loading terminology: ${key}`,
+    );
   }
 }
 
@@ -130,238 +255,790 @@ for (const locale of ["zh", "en"]) {
 const translateError = bundle.translateError;
 ok(typeof translateError === "function", "factory exports translateError");
 const isSkillEnabled = bundle.isSkillEnabled;
-ok(typeof isSkillEnabled === "function", "factory exports the shared enabled-state predicate");
-ok(isSkillEnabled({ invocationPolicyValid: true, modelInvocable: true, userInvocable: true }), "valid model and user invocation is enabled");
-ok(!isSkillEnabled({ invocationPolicyValid: true, modelInvocable: true, userInvocable: false }), "user-disabled skill is not enabled");
-ok(!isSkillEnabled({ invocationPolicyValid: false, modelInvocable: true, userInvocable: true }), "invalid invocation policy is not enabled");
-ok(isSkillEnabled({ enabled: true, invocationPolicyValid: false, modelInvocable: false, userInvocable: false }), "explicit manager policy is authoritative over source invocation fields");
+ok(
+  typeof isSkillEnabled === "function",
+  "factory exports the shared enabled-state predicate",
+);
+ok(
+  isSkillEnabled({
+    invocationPolicyValid: true,
+    modelInvocable: true,
+    userInvocable: true,
+  }),
+  "valid model and user invocation is enabled",
+);
+ok(
+  !isSkillEnabled({
+    invocationPolicyValid: true,
+    modelInvocable: true,
+    userInvocable: false,
+  }),
+  "user-disabled skill is not enabled",
+);
+ok(
+  !isSkillEnabled({
+    invocationPolicyValid: false,
+    modelInvocable: true,
+    userInvocable: true,
+  }),
+  "invalid invocation policy is not enabled",
+);
+ok(
+  isSkillEnabled({
+    enabled: true,
+    invocationPolicyValid: false,
+    modelInvocable: false,
+    userInvocable: false,
+  }),
+  "explicit manager policy is authoritative over source invocation fields",
+);
 const countKey = bundle.countKey;
-ok(typeof countKey === "function", "factory exports locale plural-key selection");
-eq(countKey("summary.group", 1), "summary.group.one", "singular count selects the one form");
-eq(countKey("summary.group", 0), "summary.group.other", "zero count selects the other form");
-eq(countKey("summary.group", 2), "summary.group.other", "plural count selects the other form");
-for (const base of ["summary.total", "summary.enabled", "summary.disabled", "summary.issues", "summary.group", "upload.selected", "trash.count"]) {
-  ok(countKey(base, 1) in DICT.zh && countKey(base, 1) in DICT.en, `singular translation exists for ${base}`);
-  ok(countKey(base, 2) in DICT.zh && countKey(base, 2) in DICT.en, `plural translation exists for ${base}`);
+ok(
+  typeof countKey === "function",
+  "factory exports locale plural-key selection",
+);
+eq(
+  countKey("summary.group", 1),
+  "summary.group.one",
+  "singular count selects the one form",
+);
+eq(
+  countKey("summary.group", 0),
+  "summary.group.other",
+  "zero count selects the other form",
+);
+eq(
+  countKey("summary.group", 2),
+  "summary.group.other",
+  "plural count selects the other form",
+);
+for (const base of [
+  "summary.total",
+  "summary.enabled",
+  "summary.disabled",
+  "summary.issues",
+  "summary.group",
+  "upload.selected",
+  "trash.count",
+]) {
+  ok(
+    countKey(base, 1) in DICT.zh && countKey(base, 1) in DICT.en,
+    `singular translation exists for ${base}`,
+  );
+  ok(
+    countKey(base, 2) in DICT.zh && countKey(base, 2) in DICT.en,
+    `plural translation exists for ${base}`,
+  );
 }
-eq(DICT.en[countKey("summary.group", 1)], "{count} skill", "English singular source count is grammatical");
-eq(DICT.en[countKey("upload.selected", 1)], "{count} file · {size}", "English singular upload count is grammatical");
+eq(
+  DICT.en[countKey("summary.group", 1)],
+  "{count} skill",
+  "English singular source count is grammatical",
+);
+eq(
+  DICT.en[countKey("upload.selected", 1)],
+  "{count} file · {size}",
+  "English singular upload count is grammatical",
+);
 const summarizeImportResult = bundle.summarizeImportResult;
-ok(typeof summarizeImportResult === "function", "factory exports import-result summarization");
+ok(
+  typeof summarizeImportResult === "function",
+  "factory exports import-result summarization",
+);
 
 // ── 技能列表检索：对齐专家插件的名称/简介包含匹配与分类收窄 ──
 const normalizeSkillQuery = bundle.normalizeSkillQuery;
 const matchSkillQuery = bundle.matchSkillQuery;
 const filterSkills = bundle.filterSkills;
 const visibleSkillRoots = bundle.visibleSkillRoots;
-ok(typeof normalizeSkillQuery === "function", "factory exports normalizeSkillQuery");
+ok(
+  typeof normalizeSkillQuery === "function",
+  "factory exports normalizeSkillQuery",
+);
 ok(typeof matchSkillQuery === "function", "factory exports matchSkillQuery");
 ok(typeof filterSkills === "function", "factory exports filterSkills");
-ok(typeof visibleSkillRoots === "function", "factory exports project-root presentation filtering");
-eq(normalizeSkillQuery("  UI  "), "ui", "normalizeSkillQuery trims and lowercases");
-eq(normalizeSkillQuery("   "), "", "normalizeSkillQuery treats whitespace-only as empty");
+ok(
+  typeof visibleSkillRoots === "function",
+  "factory exports project-root presentation filtering",
+);
+eq(
+  normalizeSkillQuery("  UI  "),
+  "ui",
+  "normalizeSkillQuery trims and lowercases",
+);
+eq(
+  normalizeSkillQuery("   "),
+  "",
+  "normalizeSkillQuery treats whitespace-only as empty",
+);
 const sampleSkills = [
-  { name: "travel-plan-viz", description: "把旅行行程做成网页", kind: "bundle", kindLabel: "目录插件", statusLabel: "已启用", rootKey: "dsh", rootLabel: "DSH skills" },
-  { name: "photo-revival", description: "Turn photos into illustrations", kind: "single", kindLabel: "单文件", statusLabel: "已停用", rootKey: "agents", rootLabel: "Shared Agent skills" },
+  {
+    name: "travel-plan-viz",
+    description: "把旅行行程做成网页",
+    kind: "bundle",
+    kindLabel: "目录插件",
+    statusLabel: "已启用",
+    rootKey: "dsh",
+    rootLabel: "DSH skills",
+  },
+  {
+    name: "photo-revival",
+    description: "Turn photos into illustrations",
+    kind: "single",
+    kindLabel: "单文件",
+    statusLabel: "已停用",
+    rootKey: "agents",
+    rootLabel: "Shared Agent skills",
+  },
 ];
 ok(matchSkillQuery(sampleSkills[0], ""), "empty query matches every skill");
-ok(matchSkillQuery(sampleSkills[0], "  "), "whitespace-only query matches every skill");
-ok(matchSkillQuery(sampleSkills[0], "行程"), "matchSkillQuery hits Chinese description");
-ok(matchSkillQuery(sampleSkills[1], "Photo"), "matchSkillQuery is case-insensitive on name");
-ok(matchSkillQuery(sampleSkills[0], "目录插件"), "matchSkillQuery hits localized kind label");
-ok(matchSkillQuery(sampleSkills[1], "shared"), "matchSkillQuery hits root label");
-ok(!matchSkillQuery(sampleSkills[0], "photo"), "unrelated query does not match");
-eq(filterSkills(sampleSkills, { query: "   " }).length, 2, "blank query keeps the full list");
-eq(filterSkills(sampleSkills, { query: "illustration" }).map(function (item) { return item.name; }).join(","), "photo-revival", "filterSkills matches English description");
-eq(filterSkills(sampleSkills, { rootKey: "dsh" }).map(function (item) { return item.name; }).join(","), "travel-plan-viz", "filterSkills narrows by root category");
-eq(filterSkills(sampleSkills, { rootKey: "dsh", query: "photo" }).length, 0, "category and query are combined");
-eq(filterSkills(sampleSkills, { query: "SINGLE" }).map(function (item) { return item.name; }).join(","), "photo-revival", "filterSkills matches kind");
-eq(visibleSkillRoots([
-  { key: "project-empty", scope: "project", skills: [] },
-  { key: "project-used", scope: "project", skills: [{ name: "demo" }] },
-  { key: "codex", scope: "user", skills: [] },
-]).map(function (root) { return root.key; }).join(","), "project-used,codex", "main source list hides only empty project roots and keeps empty user sources");
+ok(
+  matchSkillQuery(sampleSkills[0], "  "),
+  "whitespace-only query matches every skill",
+);
+ok(
+  matchSkillQuery(sampleSkills[0], "行程"),
+  "matchSkillQuery hits Chinese description",
+);
+ok(
+  matchSkillQuery(sampleSkills[1], "Photo"),
+  "matchSkillQuery is case-insensitive on name",
+);
+ok(
+  matchSkillQuery(sampleSkills[0], "目录插件"),
+  "matchSkillQuery hits localized kind label",
+);
+ok(
+  matchSkillQuery(sampleSkills[1], "shared"),
+  "matchSkillQuery hits root label",
+);
+ok(
+  !matchSkillQuery(sampleSkills[0], "photo"),
+  "unrelated query does not match",
+);
+eq(
+  filterSkills(sampleSkills, { query: "   " }).length,
+  2,
+  "blank query keeps the full list",
+);
+eq(
+  filterSkills(sampleSkills, { query: "illustration" })
+    .map(function (item) {
+      return item.name;
+    })
+    .join(","),
+  "photo-revival",
+  "filterSkills matches English description",
+);
+eq(
+  filterSkills(sampleSkills, { rootKey: "dsh" })
+    .map(function (item) {
+      return item.name;
+    })
+    .join(","),
+  "travel-plan-viz",
+  "filterSkills narrows by root category",
+);
+eq(
+  filterSkills(sampleSkills, { rootKey: "dsh", query: "photo" }).length,
+  0,
+  "category and query are combined",
+);
+eq(
+  filterSkills(sampleSkills, { query: "SINGLE" })
+    .map(function (item) {
+      return item.name;
+    })
+    .join(","),
+  "photo-revival",
+  "filterSkills matches kind",
+);
+eq(
+  visibleSkillRoots([
+    { key: "project-empty", scope: "project", skills: [] },
+    { key: "project-used", scope: "project", skills: [{ name: "demo" }] },
+    { key: "codex", scope: "user", skills: [] },
+  ])
+    .map(function (root) {
+      return root.key;
+    })
+    .join(","),
+  "project-used,codex",
+  "main source list hides only empty project roots and keeps empty user sources",
+);
 
 const parseApiResponse = bundle.parseApiResponse;
-ok(typeof parseApiResponse === "function", "factory exports API response parsing for regression tests");
-await parseApiResponse({ status: 502, json: function () { return Promise.reject(new SyntaxError("Unexpected token <")); } }).then(
-  function () { ok(false, "non-JSON API response rejects"); },
+ok(
+  typeof parseApiResponse === "function",
+  "factory exports API response parsing for regression tests",
+);
+await parseApiResponse({
+  status: 502,
+  json: function () {
+    return Promise.reject(new SyntaxError("Unexpected token <"));
+  },
+}).then(
+  function () {
+    ok(false, "non-JSON API response rejects");
+  },
   function (error) {
-    eq(error.code, "error.proto.nonJson", "non-JSON API error carries a translatable code");
-    eq(translateError(mockT, error), "Server returned a non-JSON response (HTTP 502)", "non-JSON API error uses the locale dictionary");
-  }
+    eq(
+      error.code,
+      "error.proto.nonJson",
+      "non-JSON API error carries a translatable code",
+    );
+    eq(
+      translateError(mockT, error),
+      "Server returned a non-JSON response (HTTP 502)",
+      "non-JSON API error uses the locale dictionary",
+    );
+  },
 );
 const trapModalFocus = bundle.trapModalFocus;
-ok(typeof trapModalFocus === "function", "factory exports modal focus trapping for regression tests");
+ok(
+  typeof trapModalFocus === "function",
+  "factory exports modal focus trapping for regression tests",
+);
 const handleModalEscape = bundle.handleModalEscape;
-ok(typeof handleModalEscape === "function", "factory exports modal Escape handling for regression tests");
+ok(
+  typeof handleModalEscape === "function",
+  "factory exports modal Escape handling for regression tests",
+);
 let escapePrevented = false;
 let escapeStopped = false;
 let nativeEscapeStopped = false;
 let escapeClosed = 0;
-ok(handleModalEscape({ key: "Escape", preventDefault: function () { escapePrevented = true; }, stopPropagation: function () { escapeStopped = true; }, nativeEvent: { stopImmediatePropagation: function () { nativeEscapeStopped = true; } } }, function () { escapeClosed += 1; }), "Escape is handled by the topmost plugin modal");
-ok(escapePrevented && escapeStopped && nativeEscapeStopped && escapeClosed === 1, "modal Escape is consumed before the Settings dialog can close");
-ok(!handleModalEscape({ key: "Enter" }, function () { escapeClosed += 1; }), "non-Escape keys pass through modal Escape handling");
+ok(
+  handleModalEscape(
+    {
+      key: "Escape",
+      preventDefault: function () {
+        escapePrevented = true;
+      },
+      stopPropagation: function () {
+        escapeStopped = true;
+      },
+      nativeEvent: {
+        stopImmediatePropagation: function () {
+          nativeEscapeStopped = true;
+        },
+      },
+    },
+    function () {
+      escapeClosed += 1;
+    },
+  ),
+  "Escape is handled by the topmost plugin modal",
+);
+ok(
+  escapePrevented && escapeStopped && nativeEscapeStopped && escapeClosed === 1,
+  "modal Escape is consumed before the Settings dialog can close",
+);
+ok(
+  !handleModalEscape({ key: "Enter" }, function () {
+    escapeClosed += 1;
+  }),
+  "non-Escape keys pass through modal Escape handling",
+);
 const inspectUploadSelection = bundle.inspectUploadSelection;
-ok(typeof inspectUploadSelection === "function", "factory exports upload selection validation");
-eq(inspectUploadSelection([{ name: "README.md", size: 1 }]).error.code, "select.file.invalid", "file picker rejects files other than ZIP or SKILL.md");
-eq(inspectUploadSelection([{ name: "SKILL.md", size: 10 }]).kind, "skill", "single SKILL.md is accepted without an absolute path");
-eq(inspectUploadSelection([{ name: "demo.zip", size: 10 }]).kind, "zip", "ZIP archive is accepted");
-eq(inspectUploadSelection([{ name: "SKILL.md", webkitRelativePath: "demo/SKILL.md", size: 10 }, { name: "run.js", webkitRelativePath: "demo/scripts/run.js", size: 10 }]).kind, "folder", "native folder selection is accepted as one upload");
-eq(inspectUploadSelection([{ name: "fnos.zip", size: 11 << 20 }]).kind, "zip", "ZIP archives above the former 10 MiB limit are accepted");
-eq(inspectUploadSelection([{ name: "SKILL.md", size: (32 << 20) + 1 }]).error.code, "error.upload.tooLarge", "single SKILL.md is rejected before exceeding the per-entry limit");
-eq(inspectUploadSelection([{ name: "demo.zip", size: (32 << 20) + 1 }]).error.code, "error.upload.archiveTooLarge", "ZIP archives are rejected before exceeding the archive limit");
-eq(inspectUploadSelection([{ name: "SKILL.md", webkitRelativePath: "demo/SKILL.md", size: 10 }, { name: "asset.bin", webkitRelativePath: "demo/asset.bin", size: (32 << 20) + 1 }]).error.code, "error.upload.tooLarge", "folder selection rejects an oversized entry before reading file contents");
-eq(inspectUploadSelection([{ name: "SKILL.md", webkitRelativePath: "demo/SKILL.md", size: 10 }].concat(Array.from({ length: 3 }, (_, index) => ({ name: `asset-${index}.bin`, webkitRelativePath: `demo/asset-${index}.bin`, size: 24 * (1 << 20) })))).error.params.limit, 64 << 20, "folder selection rejects decoded totals above 64 MiB");
-eq(inspectUploadSelection([{ name: "SKILL.md", webkitRelativePath: "demo/SKILL.md", size: 10 }].concat(Array.from({ length: 1000 }, (_, index) => ({ name: `asset-${index}.txt`, webkitRelativePath: `demo/asset-${index}.txt`, size: 1 })))).error.code, "error.upload.tooMany", "folder selection rejects more than 1000 entries");
+ok(
+  typeof inspectUploadSelection === "function",
+  "factory exports upload selection validation",
+);
+eq(
+  inspectUploadSelection([{ name: "README.md", size: 1 }]).error.code,
+  "select.file.invalid",
+  "file picker rejects files other than ZIP or SKILL.md",
+);
+eq(
+  inspectUploadSelection([{ name: "SKILL.md", size: 10 }]).kind,
+  "skill",
+  "single SKILL.md is accepted without an absolute path",
+);
+eq(
+  inspectUploadSelection([{ name: "demo.zip", size: 10 }]).kind,
+  "zip",
+  "ZIP archive is accepted",
+);
+eq(
+  inspectUploadSelection([
+    { name: "SKILL.md", webkitRelativePath: "demo/SKILL.md", size: 10 },
+    { name: "run.js", webkitRelativePath: "demo/scripts/run.js", size: 10 },
+  ]).kind,
+  "folder",
+  "native folder selection is accepted as one upload",
+);
+eq(
+  inspectUploadSelection([{ name: "fnos.zip", size: 11 << 20 }]).kind,
+  "zip",
+  "ZIP archives above the former 10 MiB limit are accepted",
+);
+eq(
+  inspectUploadSelection([{ name: "SKILL.md", size: (32 << 20) + 1 }]).error
+    .code,
+  "error.upload.tooLarge",
+  "single SKILL.md is rejected before exceeding the per-entry limit",
+);
+eq(
+  inspectUploadSelection([{ name: "demo.zip", size: (32 << 20) + 1 }]).error
+    .code,
+  "error.upload.archiveTooLarge",
+  "ZIP archives are rejected before exceeding the archive limit",
+);
+eq(
+  inspectUploadSelection([
+    { name: "SKILL.md", webkitRelativePath: "demo/SKILL.md", size: 10 },
+    {
+      name: "asset.bin",
+      webkitRelativePath: "demo/asset.bin",
+      size: (32 << 20) + 1,
+    },
+  ]).error.code,
+  "error.upload.tooLarge",
+  "folder selection rejects an oversized entry before reading file contents",
+);
+eq(
+  inspectUploadSelection(
+    [
+      { name: "SKILL.md", webkitRelativePath: "demo/SKILL.md", size: 10 },
+    ].concat(
+      Array.from({ length: 3 }, (_, index) => ({
+        name: `asset-${index}.bin`,
+        webkitRelativePath: `demo/asset-${index}.bin`,
+        size: 24 * (1 << 20),
+      })),
+    ),
+  ).error.params.limit,
+  64 << 20,
+  "folder selection rejects decoded totals above 64 MiB",
+);
+eq(
+  inspectUploadSelection(
+    [
+      { name: "SKILL.md", webkitRelativePath: "demo/SKILL.md", size: 10 },
+    ].concat(
+      Array.from({ length: 1000 }, (_, index) => ({
+        name: `asset-${index}.txt`,
+        webkitRelativePath: `demo/asset-${index}.txt`,
+        size: 1,
+      })),
+    ),
+  ).error.code,
+  "error.upload.tooMany",
+  "folder selection rejects more than 1000 entries",
+);
 let focused = "";
-const firstButton = { focus: function () { focused = "first"; } };
-const lastButton = { focus: function () { focused = "last"; } };
-const fakeModal = { querySelectorAll: function () { return [firstButton, lastButton]; }, contains: function (node) { return node === firstButton || node === lastButton; } };
+const firstButton = {
+  focus: function () {
+    focused = "first";
+  },
+};
+const lastButton = {
+  focus: function () {
+    focused = "last";
+  },
+};
+const fakeModal = {
+  querySelectorAll: function () {
+    return [firstButton, lastButton];
+  },
+  contains: function (node) {
+    return node === firstButton || node === lastButton;
+  },
+};
 const previousDocument = globalThis.document;
 globalThis.document = { activeElement: lastButton };
 let focusPrevented = false;
-trapModalFocus(fakeModal, { key: "Tab", shiftKey: false, preventDefault: function () { focusPrevented = true; } });
+trapModalFocus(fakeModal, {
+  key: "Tab",
+  shiftKey: false,
+  preventDefault: function () {
+    focusPrevented = true;
+  },
+});
 globalThis.document = previousDocument;
-ok(focusPrevented && focused === "first", "modal focus trap wraps Tab from the last element");
+ok(
+  focusPrevented && focused === "first",
+  "modal focus trap wraps Tab from the last element",
+);
 
 function mockT(key, params) {
   const template = DICT.en[key] || key;
   if (!params) return template;
-  return template.replace(/\{(\w+)\}/g, (m, name) => (name in params ? String(params[name]) : m));
+  return template.replace(/\{(\w+)\}/g, (m, name) =>
+    name in params ? String(params[name]) : m,
+  );
 }
 
 const rootDisplayName = bundle.rootDisplayName;
-ok(typeof rootDisplayName === "function", "factory exports project-aware source labels");
-eq(rootDisplayName(mockT, { key: "project-agents:abc", kind: "project-agents", localeKey: "projectAgents", label: "Project Agent", projectName: "demo" }), "Project Agent · demo", "project source labels include the workspace name without translating the dynamic key");
-eq(rootDisplayName(mockT, { key: "codex", label: "Codex" }), "Codex", "fixed user source labels remain unchanged");
-ok(DICT.zh["root.projectDsh"] && DICT.en["root.projectAgents"], "project DSH and Agent sources are localized in both languages");
-ok(DICT.zh["status.project"] && DICT.en["status.project"], "project-scope status is localized in both languages");
-eq(DICT.zh["status.enabled"], "已启用", "Chinese status describes invocation policy without claiming body loading");
-eq(DICT.en["status.enabled"], "Enabled", "English status describes invocation policy without claiming body loading");
-ok(DICT.zh["summary.enabled.one"] && DICT.en["summary.enabled.other"], "enabled summary terminology is localized in both languages");
-eq(mockT("status.rank", { rank: 100 }), "Rank 100", "project source priority is visible in the localized UI");
-ok(DICT.zh["create.target"] && DICT.en["trash.source"], "project create targets and Trash source labels are localized in both languages");
-
-eq(summarizeImportResult(mockT, { imported: [{ name: "alpha" }], skipped: [] }).text, "Import complete: alpha", "successful import names the imported skill");
-eq(summarizeImportResult(mockT, { imported: [], skipped: [{ name: "alpha" }] }).text, "No skills were imported; existing skills were skipped: alpha", "all-skipped import is never reported as completed");
-ok(summarizeImportResult(mockT, { imported: [], skipped: [{ name: "alpha" }] }).ok === false, "all-skipped import is rendered as a warning/error state");
-eq(summarizeImportResult(mockT, { imported: [{ name: "alpha" }], skipped: [{ name: "beta" }] }).text, "Imported: alpha; skipped existing skills: beta", "partial import reports both imported and skipped names");
-const importWarning = summarizeImportResult(mockT, { imported: [{ name: "alpha", warnings: [{ code: "warning.backupUncleaned", params: { path: "C:\\bak", error: "EPERM" } }] }], skipped: [] });
-ok(importWarning.warning === true, "import cleanup warnings use the warning presentation state");
-eq(importWarning.text, "Import complete: alpha; warnings: Old version backup was not cleaned up: C:\\bak (EPERM)", "import cleanup warnings remain visible in the result summary");
+ok(
+  typeof rootDisplayName === "function",
+  "factory exports project-aware source labels",
+);
+eq(
+  rootDisplayName(mockT, {
+    key: "project-agents:abc",
+    kind: "project-agents",
+    localeKey: "projectAgents",
+    label: "Project Agent",
+    projectName: "demo",
+  }),
+  "Project Agent · demo",
+  "project source labels include the workspace name without translating the dynamic key",
+);
+eq(
+  rootDisplayName(mockT, { key: "codex", label: "Codex" }),
+  "Codex",
+  "fixed user source labels remain unchanged",
+);
+ok(
+  DICT.zh["root.projectDsh"] && DICT.en["root.projectAgents"],
+  "project DSH and Agent sources are localized in both languages",
+);
+ok(
+  DICT.zh["status.project"] && DICT.en["status.project"],
+  "project-scope status is localized in both languages",
+);
+eq(
+  DICT.zh["status.enabled"],
+  "已启用",
+  "Chinese status describes invocation policy without claiming body loading",
+);
+eq(
+  DICT.en["status.enabled"],
+  "Enabled",
+  "English status describes invocation policy without claiming body loading",
+);
+ok(
+  DICT.zh["summary.enabled.one"] && DICT.en["summary.enabled.other"],
+  "enabled summary terminology is localized in both languages",
+);
+eq(
+  mockT("status.rank", { rank: 100 }),
+  "Rank 100",
+  "project source priority is visible in the localized UI",
+);
+ok(
+  DICT.zh["create.target"] && DICT.en["trash.source"],
+  "project create targets and Trash source labels are localized in both languages",
+);
 
 eq(
-  translateError(mockT, { code: "error.skill.notFound", params: { name: "foo" }, error: "技能不存在: foo" }),
+  summarizeImportResult(mockT, { imported: [{ name: "alpha" }], skipped: [] })
+    .text,
+  "Import complete: alpha",
+  "successful import names the imported skill",
+);
+eq(
+  summarizeImportResult(mockT, { imported: [], skipped: [{ name: "alpha" }] })
+    .text,
+  "No skills were imported; existing skills were skipped: alpha",
+  "all-skipped import is never reported as completed",
+);
+ok(
+  summarizeImportResult(mockT, { imported: [], skipped: [{ name: "alpha" }] })
+    .ok === false,
+  "all-skipped import is rendered as a warning/error state",
+);
+eq(
+  summarizeImportResult(mockT, {
+    imported: [{ name: "alpha" }],
+    skipped: [{ name: "beta" }],
+  }).text,
+  "Imported: alpha; skipped existing skills: beta",
+  "partial import reports both imported and skipped names",
+);
+const importWarning = summarizeImportResult(mockT, {
+  imported: [
+    {
+      name: "alpha",
+      warnings: [
+        {
+          code: "warning.backupUncleaned",
+          params: { path: "C:\\bak", error: "EPERM" },
+        },
+      ],
+    },
+  ],
+  skipped: [],
+});
+ok(
+  importWarning.warning === true,
+  "import cleanup warnings use the warning presentation state",
+);
+eq(
+  importWarning.text,
+  "Import complete: alpha; warnings: Old version backup was not cleaned up: C:\\bak (EPERM)",
+  "import cleanup warnings remain visible in the result summary",
+);
+
+eq(
+  translateError(mockT, {
+    code: "error.skill.notFound",
+    params: { name: "foo" },
+    error: "技能不存在: foo",
+  }),
   "Skill not found: foo",
-  "translateError translates a known error code with params"
+  "translateError translates a known error code with params",
 );
 eq(
   translateError(mockT, { code: "error.unknown", error: "原文错误" }),
   "原文错误",
-  "translateError falls back to error text on an unknown code"
+  "translateError falls back to error text on an unknown code",
 );
 eq(
-  translateError(mockT, { code: "error.root.readonly", params: { action: "toggle" }, error: "公共 Agent 技能目录不允许启用或停用" }),
+  translateError(mockT, {
+    code: "error.root.readonly",
+    params: { action: "toggle" },
+    error: "公共 Agent 技能目录不允许启用或停用",
+  }),
   "This source does not allow enabling or disabling",
-  "translateError maps the action param through the action.* dictionary"
+  "translateError maps the action param through the action.* dictionary",
 );
-eq(translateError(mockT, new Error("boom")), "boom", "translateError handles Error objects");
-eq(translateError(mockT, "plain"), "plain", "translateError passes through plain strings");
 eq(
-  translateError(() => null, { code: "error.skill.notFound", params: {}, error: "原文" }),
+  translateError(mockT, new Error("boom")),
+  "boom",
+  "translateError handles Error objects",
+);
+eq(
+  translateError(mockT, "plain"),
+  "plain",
+  "translateError passes through plain strings",
+);
+eq(
+  translateError(() => null, {
+    code: "error.skill.notFound",
+    params: {},
+    error: "原文",
+  }),
   "原文",
-  "translateError falls back when the host t returns null (not a string)"
+  "translateError falls back when the host t returns null (not a string)",
 );
 eq(
-  translateError(() => undefined, { code: "error.skill.notFound", params: {}, error: "原文" }),
+  translateError(() => undefined, {
+    code: "error.skill.notFound",
+    params: {},
+    error: "原文",
+  }),
   "原文",
-  "translateError falls back when the host t returns undefined"
+  "translateError falls back when the host t returns undefined",
 );
 eq(
-  translateError(mockT, { code: "error.proto.forbiddenHost", error: "forbidden host" }),
+  translateError(mockT, {
+    code: "error.proto.forbiddenHost",
+    error: "forbidden host",
+  }),
   "Forbidden request origin (invalid host)",
-  "translateError maps illegal Host to forbiddenHost"
+  "translateError maps illegal Host to forbiddenHost",
 );
 eq(
-  translateError(mockT, { code: "error.import.rollbackFailed", params: { path: "C:\\bak", error: "EPERM" }, error: "覆盖导入回滚失败" }),
+  translateError(mockT, {
+    code: "error.import.rollbackFailed",
+    params: { path: "C:\\bak", error: "EPERM" },
+    error: "覆盖导入回滚失败",
+  }),
   "Overwrite import rollback failed; backups kept at: C:\\bak (EPERM)",
-  "translateError translates rollback failure with params"
+  "translateError translates rollback failure with params",
 );
 eq(
-  translateError(mockT, { code: "error.trash.rollbackFailed", params: { path: "C:\\stage", error: "EPERM" }, error: "移入回收站回滚失败" }),
+  translateError(mockT, {
+    code: "error.trash.rollbackFailed",
+    params: { path: "C:\\stage", error: "EPERM" },
+    error: "移入回收站回滚失败",
+  }),
   "Move-to-trash rollback failed; unrecovered content was kept at: C:\\stage (EPERM)",
-  "translateError translates move-to-trash rollback preservation"
+  "translateError translates move-to-trash rollback preservation",
 );
 eq(
-  translateError(mockT, { code: "error.trash.projectUnavailable", params: { path: "C:\\project" }, error: "原项目不活动" }),
+  translateError(mockT, {
+    code: "error.trash.projectUnavailable",
+    params: { path: "C:\\project" },
+    error: "原项目不活动",
+  }),
   "The original project is not an active workspace, so this skill cannot be restored: C:\\project",
-  "translateError explains that project restore requires an active workspace"
+  "translateError explains that project restore requires an active workspace",
 );
 eq(
-  translateError(mockT, { code: "error.root.unsafe", params: { path: "C:\\project\\.dsh\\skills" }, error: "不安全目录" }),
+  translateError(mockT, {
+    code: "error.root.unsafe",
+    params: { path: "C:\\project\\.dsh\\skills" },
+    error: "不安全目录",
+  }),
   "The project skill directory is unsafe, so the write was refused: C:\\project\\.dsh\\skills",
-  "translateError explains linked project-root write rejection"
+  "translateError explains linked project-root write rejection",
 );
 eq(
-  translateError(mockT, { code: "error.state.invalid", params: { path: "C:\\state.json" }, error: "状态不可读" }),
+  translateError(mockT, {
+    code: "error.state.invalid",
+    params: { path: "C:\\state.json" },
+    error: "状态不可读",
+  }),
   "The manager state file could not be read, so overwriting it was refused: C:\\state.json",
-  "translateError translates invalid-state write refusal"
+  "translateError translates invalid-state write refusal",
 );
 eq(
-  translateError(mockT, { code: "warning.backupUncleaned", params: { path: "C:\\bak", error: "EPERM" }, error: "旧版本备份未清理" }),
+  translateError(mockT, {
+    code: "warning.backupUncleaned",
+    params: { path: "C:\\bak", error: "EPERM" },
+    error: "旧版本备份未清理",
+  }),
   "Old version backup was not cleaned up: C:\\bak (EPERM)",
-  "translateError translates backup cleanup warning"
+  "translateError translates backup cleanup warning",
 );
 
 // ── 注册契约断言：inject 声明 locale，settings.section 注册携带 locale 命名空间 ──
-ok(Array.isArray(bundle.inject) && bundle.inject.includes("locale"), "bundle.inject declares the locale service");
-ok(Array.isArray(bundle.inject) && bundle.inject.includes("slots"), "bundle.inject declares slots");
-ok(!bundle.inject.includes("workspaces"), "bundle no longer invokes the Node-hosted workspace directory picker");
-ok(source.includes('type: "file"') && source.includes('accept: ".zip,.md"'), "import dialog accepts ZIP and SKILL.md in the native picker");
-ok(source.includes("webkitdirectory"), "import dialog exposes a native folder picker");
-ok(source.includes("pickerOpenRef.current"), "native picker has a synchronous multi-click guard");
-ok(source.includes('post("/upload"'), "selected content is uploaded instead of sending an absolute path");
-ok(source.includes('result && modal !== "import"'), "upload feedback is not left behind the active import modal");
-ok(source.includes('role: "alert" }, result.text'), "import modal renders upload feedback where it remains visible");
-ok(/setResult\(null\);\s*setUpload\(null\);\s*setModal\("import"\)/.test(source), "opening import clears stale upload feedback and selection");
-ok(/onClick:\s*function\s*\(\)\s*\{\s*refresh\(false\);/.test(source), "settings exposes an explicit refresh action for project file changes");
-ok(source.includes('h(SourceSelect, { value: form.root, options: createOptions'), "create dialog lets the user choose a writable user or project DSH root");
-ok(source.includes('t("trash.source", { source: trashRootLabel(item) })'), "Trash identifies the original user or project source before restore");
-ok(source.includes('createRoots = allRoots.filter'), "empty project roots remain available as first-Skill create destinations");
-ok(source.includes('root.scope !== "project" && root.key !== "dsh"'), "project roots never expose the unsupported source-level toggle");
-ok(!source.includes('"status.discovered"'), "project rows no longer use the ambiguous Discovered status");
-ok(!source.includes('"summary.loaded"'), "summary no longer claims that enabled Skill bodies are loaded");
-ok(!source.includes("dssm-loaded"), "internal status styling also uses enabled terminology");
-ok(/h\(SourceSelect,\s*\{\s*value:\s*activeSource,\s*options(?:\s*:\s*options)?/.test(source), "a selected project source that becomes empty falls back to All Sources");
-ok(!source.includes('setModal("browse")'), "native selection never chains into a second directory browser");
-ok(!source.includes('callApi("/browse"'), "client no longer uses the in-app absolute-path browser");
-ok(!source.includes('btn.repair.enable') && !source.includes("repairable"), "toggle UI never offers a source-rewriting repair action");
-ok(source.includes("(data.warnings || []).map"), "state-level warnings are rendered in the settings page");
-ok(source.includes("dssm-warning"), "warning feedback has a distinct visual state");
-ok(source.includes("@container(max-width:780px)"), "skill rows respond to the settings content width rather than only the viewport");
-ok(source.includes(".dssm-source-head{box-sizing:border-box"), "source toggles stay inside narrow settings cards");
-ok(/var es = react\.useState\(\{\}\), expanded = es\[0\], setExpanded = es\[1\];/.test(source), "settings starts with every skill source collapsed");
+ok(
+  Array.isArray(bundle.inject) && bundle.inject.includes("locale"),
+  "bundle.inject declares the locale service",
+);
+ok(
+  Array.isArray(bundle.inject) && bundle.inject.includes("slots"),
+  "bundle.inject declares slots",
+);
+ok(
+  !bundle.inject.includes("workspaces"),
+  "bundle no longer invokes the Node-hosted workspace directory picker",
+);
+ok(
+  source.includes('type: "file"') && source.includes('accept: ".zip,.md"'),
+  "import dialog accepts ZIP and SKILL.md in the native picker",
+);
+ok(
+  source.includes("webkitdirectory"),
+  "import dialog exposes a native folder picker",
+);
+ok(
+  source.includes("pickerOpenRef.current"),
+  "native picker has a synchronous multi-click guard",
+);
+ok(
+  source.includes('post("/upload"'),
+  "selected content is uploaded instead of sending an absolute path",
+);
+ok(
+  source.includes('result && modal !== "import"'),
+  "upload feedback is not left behind the active import modal",
+);
+ok(
+  source.includes('role: "alert" }, result.text'),
+  "import modal renders upload feedback where it remains visible",
+);
+ok(
+  /setResult\(null\);\s*setUpload\(null\);\s*setModal\("import"\)/.test(source),
+  "opening import clears stale upload feedback and selection",
+);
+ok(
+  /onClick:\s*function\s*\(\)\s*\{\s*refresh\(false\);/.test(source),
+  "settings exposes an explicit refresh action for project file changes",
+);
+ok(
+  source.includes("h(SourceSelect, { value: form.root, options: createOptions"),
+  "create dialog lets the user choose a writable user or project DSH root",
+);
+ok(
+  source.includes('t("trash.source", { source: trashRootLabel(item) })'),
+  "Trash identifies the original user or project source before restore",
+);
+ok(
+  source.includes("createRoots = allRoots.filter"),
+  "empty project roots remain available as first-Skill create destinations",
+);
+ok(
+  source.includes('root.scope !== "project" && root.key !== "dsh"'),
+  "project roots never expose the unsupported source-level toggle",
+);
+ok(
+  !source.includes('"status.discovered"'),
+  "project rows no longer use the ambiguous Discovered status",
+);
+ok(
+  !source.includes('"summary.loaded"'),
+  "summary no longer claims that enabled Skill bodies are loaded",
+);
+ok(
+  !source.includes("dssm-loaded"),
+  "internal status styling also uses enabled terminology",
+);
+ok(
+  /h\(SourceSelect,\s*\{\s*value:\s*activeSource,\s*options(?:\s*:\s*options)?/.test(
+    source,
+  ),
+  "a selected project source that becomes empty falls back to All Sources",
+);
+ok(
+  !source.includes('setModal("browse")'),
+  "native selection never chains into a second directory browser",
+);
+ok(
+  !source.includes('callApi("/browse"'),
+  "client no longer uses the in-app absolute-path browser",
+);
+ok(
+  !source.includes("btn.repair.enable") && !source.includes("repairable"),
+  "toggle UI never offers a source-rewriting repair action",
+);
+ok(
+  source.includes("(data.warnings || []).map"),
+  "state-level warnings are rendered in the settings page",
+);
+ok(
+  source.includes("dssm-warning"),
+  "warning feedback has a distinct visual state",
+);
+ok(
+  source.includes("@container(max-width:780px)"),
+  "skill rows respond to the settings content width rather than only the viewport",
+);
+ok(
+  source.includes(".dssm-source-head{box-sizing:border-box"),
+  "source toggles stay inside narrow settings cards",
+);
+ok(
+  /var es = react\.useState\(\{\}\), expanded = es\[0\], setExpanded = es\[1\];/.test(
+    source,
+  ),
+  "settings starts with every skill source collapsed",
+);
 
 let registerOptions = null;
 const fakeCtx = {
-  effect(fn) { return fn(); },
+  effect(fn) {
+    return fn();
+  },
   locale: {
-    register() { return () => {}; },
-    bind() { return () => "title"; },
+    register() {
+      return () => {};
+    },
+    bind() {
+      return () => "title";
+    },
   },
   slots: {
-    inject(name, fn) { if (name === "settings.section") registerOptions = fn(); },
-    register(opts) { return opts; },
+    inject(name, fn) {
+      if (name === "settings.section") registerOptions = fn();
+    },
+    register(opts) {
+      return opts;
+    },
   },
 };
 bundle.apply(fakeCtx);
-ok(registerOptions !== null && registerOptions.name === "settings.section", "apply registers the settings.section entry");
-ok(registerOptions !== null && registerOptions.locale === "skills-manager", "settings.section registration declares the locale namespace");
-ok(registerOptions !== null && typeof registerOptions.label === "function", "settings.section label is a thunk (re-read per locale revision)");
-ok(registerOptions !== null && registerOptions.icon === "skill", "settings.section registers the skill nav icon");
-
+ok(
+  registerOptions !== null && registerOptions.name === "settings.section",
+  "apply registers the settings.section entry",
+);
+ok(
+  registerOptions !== null && registerOptions.locale === "skills-manager",
+  "settings.section registration declares the locale namespace",
+);
+ok(
+  registerOptions !== null && typeof registerOptions.label === "function",
+  "settings.section label is a thunk (re-read per locale revision)",
+);
+ok(
+  registerOptions !== null && registerOptions.icon === "skill",
+  "settings.section registers the skill nav icon",
+);
 
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);
-

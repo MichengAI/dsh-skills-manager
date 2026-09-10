@@ -4,6 +4,12 @@
 
 The five most recent published versions are listed below.
 
+## 0.1.47 - 2026-09-10
+
+- Centralize supported Host versions and validate package metadata, required peers, and README consistency; retain the exact four tested RC versions and development dependencies.
+- Harden real-Host regression tooling with complete argument parsing, single-version browser serving, tool discovery, process shutdown, sandbox cleanup, and retained evidence; add a manually triggered four-version Windows CI matrix.
+- Align CI peer installation settings with the lockfile and correct README Node.js badges and requirements; plugin runtime behavior is unchanged.
+
 ## 0.1.46 - 2026-09-10
 
 - Upgrade official development dependencies to `0.1.5-rc.1` and explicitly support Host versions `0.1.0-rc.8`, `0.1.1-rc.2`, `0.1.2-rc.1`, and `0.1.5-rc.1`; remove the retired `dsh-client-runtime` peer and client loading metadata to avoid pulling in the legacy runtime.
@@ -22,7 +28,3 @@ The five most recent published versions are listed below.
 ## 0.1.43 - 2026-09-08
 
 - Fixed Settings opening with the Codex Skill list expanded by default. All Skill sources now start collapsed while matching search results still expand automatically.
-
-## 0.1.42 - 2026-09-07
-
-- Fixed the release-contract check so valid package version updates no longer block verification and npm publishing.
