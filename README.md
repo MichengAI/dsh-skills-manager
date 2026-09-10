@@ -63,7 +63,7 @@ For a ready-to-use workbench, download [DSH Codex Desktop](https://github.com/Mi
 
 - A working DeepSeek Harness Web installation with `dsh` available in PowerShell.
 - Examples use the `web` profile; replace it with the target profile.
-- Plugin `0.1.47` is tested with DeepSeek Harness `0.1.0-rc.8`, `0.1.1-rc.2`, `0.1.2-rc.1`, `0.1.5-rc.1`. Development dependencies remain pinned to `0.1.5-rc.1`; other Host versions are not implicitly supported.
+- Plugin `0.1.48` is tested with DeepSeek Harness `0.1.0-rc.8`, `0.1.1-rc.2`, `0.1.2-rc.1`, `0.1.5-rc.1`, `0.1.5-rc.2`. Development dependencies remain pinned to `0.1.5-rc.2`; other Host versions are not implicitly supported.
 - Source installation and development require Node.js `^22.19.0 || >=24.0.0`. npm installation does not require running `npm install` in an arbitrary directory.
 
 ## Installation
@@ -205,7 +205,7 @@ Licensed under [Apache License 2.0](LICENSE).
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $OutputEncoding = [System.Text.Encoding]::UTF8
 pnpm run test:compat
-pnpm run test:compat 0.1.5-rc.1 --keep
+pnpm run test:compat 0.1.5-rc.2 --keep
 ```
 
 Without arguments, all hosts run sequentially. `--keep` retains the sandbox; `--serve` keeps the Host available for manual browser checks. Successful runs clean up by default; failures retain diagnostics. Compact evidence always goes to `.compat-results/`. npm and the project's pnpm must be available on PATH. The manual GitHub Actions compatibility workflow runs a Windows matrix and uploads evidence. It covers real Host APIs and Agent skill policies, not complete UI or external-model end-to-end testing.

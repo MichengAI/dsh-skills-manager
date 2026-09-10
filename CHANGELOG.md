@@ -4,6 +4,10 @@
 
 The five most recent published versions are listed below.
 
+## 0.1.48 - 2026-09-11
+
+- Add support for DeepSeek Harness `0.1.5-rc.2` while retaining support for the four previously supported versions; skill discovery, enable/disable policies, and management workflows remain unchanged.
+
 ## 0.1.47 - 2026-09-10
 
 - Centralize supported Host versions and validate package metadata, required peers, and README consistency; retain the exact four tested RC versions and development dependencies.
@@ -24,7 +28,3 @@ The five most recent published versions are listed below.
 ## 0.1.44 - 2026-09-09
 
 - Unified settings headings, descriptions, and action layouts; maintenance controls no longer squeeze titles or versions. The layout adapts to native DSH settings without Codex UI.
-
-## 0.1.43 - 2026-09-08
-
-- Fixed Settings opening with the Codex Skill list expanded by default. All Skill sources now start collapsed while matching search results still expand automatically.

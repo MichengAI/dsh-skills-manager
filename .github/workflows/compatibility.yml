@@ -1,4 +1,4 @@
-name: 四版本宿主兼容验证
+name: 五版本宿主兼容验证
 on:
   workflow_dispatch:
 permissions:

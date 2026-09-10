@@ -63,7 +63,7 @@ DSH 本地技能移入回收站前需要确认；永久删除前仍可恢复：
 
 - 已可正常运行 DeepSeek Harness Web，且可在 PowerShell 中使用 `dsh`。
 - 以下示例使用 `web` profile；请替换为实际目标 profile。
-- `0.1.47` 已验证兼容 DeepSeek Harness `0.1.0-rc.8`、`0.1.1-rc.2`、`0.1.2-rc.1`、`0.1.5-rc.1`；开发依赖固定使用 `0.1.5-rc.1`，不自动声明支持其他版本。
+- `0.1.48` 已验证兼容 DeepSeek Harness `0.1.0-rc.8`、`0.1.1-rc.2`、`0.1.2-rc.1`、`0.1.5-rc.1`、`0.1.5-rc.2`；开发依赖固定使用 `0.1.5-rc.2`，不自动声明支持其他版本。
 - 从源码安装或二次开发需要 Node.js `^22.19.0 || >=24.0.0`；仅从 npm 安装无需在任意目录执行 `npm install`。
 
 ## 安装
@@ -205,9 +205,9 @@ npm run verify
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $OutputEncoding = [System.Text.Encoding]::UTF8
 pnpm run test:compat
-pnpm run test:compat 0.1.5-rc.1 --keep
+pnpm run test:compat 0.1.5-rc.2 --keep
 ```
 
-不带参数顺序运行全部宿主；`--keep` 保留沙箱，`--serve` 保留宿主供手动浏览器验收。成功默认清理沙箱，失败保留诊断；精简证据始终写入 `.compat-results/`。需要 PATH 中可用的 npm 和项目指定 pnpm。GitHub Actions 的“四版本宿主兼容验证”可手动触发 Windows 矩阵并下载证据；它验证真实宿主 API 和 Agent 技能策略，不等同于完整 UI 或外部模型端到端测试。
+不带参数顺序运行全部宿主；`--keep` 保留沙箱，`--serve` 保留宿主供手动浏览器验收。成功默认清理沙箱，失败保留诊断；精简证据始终写入 `.compat-results/`。需要 PATH 中可用的 npm 和项目指定 pnpm。GitHub Actions 的“五版本宿主兼容验证”可手动触发 Windows 矩阵并下载证据；它验证真实宿主 API 和 Agent 技能策略，不等同于完整 UI 或外部模型端到端测试。
 
 维护兼容范围时先编辑 `scripts/hosts.mjs`，运行 `node scripts/sync-hosts.mjs --write`，再更新锁文件并跑兼容矩阵；`verify` 会拦截元数据和 README 漂移。
