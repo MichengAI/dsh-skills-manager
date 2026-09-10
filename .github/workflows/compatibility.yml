@@ -14,6 +14,9 @@ jobs:
         with:
           node-version: "24"
           package-manager-cache: false
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile --config.minimumReleaseAge=0 --config.auto-install-peers=true --config.strictDepBuilds=false
+      - run: npm run verify
       - id: hosts
         run: node --input-type=module -e "import { supportedHosts } from './scripts/hosts.mjs'; console.log('hosts=' + JSON.stringify(supportedHosts))" >> "$GITHUB_OUTPUT"
   compatibility:
@@ -39,7 +42,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           pnpm install --frozen-lockfile --config.minimumReleaseAge=0 --config.auto-install-peers=true --config.strictDepBuilds=false
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          npm run verify
+          npm run build
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           npm run test:compat -- ${{ matrix.host }}
           exit $LASTEXITCODE

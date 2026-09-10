@@ -8,11 +8,16 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import assert from "node:assert/strict";
 
 import { supportedHosts as supported } from "./hosts.mjs";
-const version = process.argv[2];
-if (!version || version === "--all") {
-  for (const item of supported) {
+import { parseOptions, usage } from "./compatibility-options.mjs";
+let options;
+try { options = parseOptions(process.argv.slice(2)); }
+catch (error) { console.error(`${error.message}\n${usage}`); process.exit(1); }
+if (options.help) { console.log(usage); process.exit(0); }
+if (options.list) { console.log(JSON.stringify(supported)); process.exit(0); }
+if (options.versions.length > 1) {
+  for (const version of options.versions) {
     const code = await new Promise((done, reject) => {
-      const child = spawn(process.execPath, [fileURLToPath(import.meta.url), item, ...process.argv.slice(3)], { stdio: "inherit", windowsHide: true });
+      const child = spawn(process.execPath, [fileURLToPath(import.meta.url), version, ...(options.keep ? ["--keep"] : []), ...(options.serve ? ["--serve"] : [])], { stdio: "inherit", windowsHide: true });
       child.once("error", reject);
       child.once("exit", done);
     });
@@ -20,8 +25,7 @@ if (!version || version === "--all") {
   }
   process.exit(0);
 }
-if (version === "--list") { console.log(JSON.stringify(supported)); process.exit(0); }
-assert(supported.includes(version), `用法：node scripts/test-host-compatibility.mjs <${supported.join("|")}> [--serve]`);
+const [version] = options.versions;
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const sandbox = await mkdtemp(join(tmpdir(), `dsh-skills-compat-${version}-`));
 const manifest = JSON.parse(await readFile(join(root, "package.json"), "utf8"));
@@ -54,7 +58,8 @@ await mkdir(env.USERPROFILE, { recursive: true });
 
 async function run(args, cwd = sandbox, taskEnv = process.env) {
   return new Promise((resolveRun, reject) => {
-    const child = spawn(process.execPath, args, { cwd, env: taskEnv, windowsHide: true, detached: process.platform !== "win32", stdio: ["ignore", "pipe", "pipe"] });
+    const directTool = process.platform !== "win32" && [npm, pnpm].includes(args[0]);
+    const child = spawn(directTool ? args[0] : process.execPath, directTool ? args.slice(1) : args, { cwd, env: taskEnv, windowsHide: true, detached: process.platform !== "win32", stdio: ["ignore", "pipe", "pipe"] });
     let output = "";
     const timeout = setTimeout(() => {
       void stopProcess(child).catch(error => console.error(error));

@@ -1,4 +1,4 @@
-import { peerRange as DSH_PEER_RANGE, developmentHost as DSH_DEV_VERSION } from "../scripts/hosts.mjs";
+import { peerRange as DSH_PEER_RANGE } from "../scripts/hosts.mjs";
 // dsh-skills-manager core 单元测试（临时根；ZIP 用例复用生产依赖 fflate）
 // 运行：node test/core-test.mjs
 

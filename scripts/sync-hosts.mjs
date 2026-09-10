@@ -1,10 +1,11 @@
 // 默认只校验；--write 从版本清单同步发布元数据和当前 README，历史 CHANGELOG 不参与生成。
 import { readFile, writeFile } from "node:fs/promises";
 import assert from "node:assert/strict";
-import { supportedHosts, peerRange, developmentHost } from "./hosts.mjs";
+import { supportedHosts, peerRange, developmentHost, assertHostPeers } from "./hosts.mjs";
 const manifestUrl = new URL("../package.json", import.meta.url);
 const original = await readFile(manifestUrl, "utf8");
 const manifest = JSON.parse(original);
+assertHostPeers(manifest.peerDependencies);
 assert.equal(new Set(supportedHosts).size, supportedHosts.length);
 assert(supportedHosts.includes(developmentHost));
 for (const [field, value] of [["peerDependencies", peerRange], ["devDependencies", developmentHost]]) {
