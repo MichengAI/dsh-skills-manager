@@ -113,7 +113,7 @@ for (const key of [
 }
 const workspace = join(sandbox, "workspace");
 await mkdir(workspace, { recursive: true });
-await mkdir(join(workspace, ".git"));
+// 先验证普通工作区，随后补 Git 标记验证两种根目录规则一致。
 await mkdir(env.USERPROFILE, { recursive: true });
 
 async function run(args, cwd = sandbox, taskEnv = process.env) {
@@ -432,6 +432,13 @@ try {
   snapshot = await toggleScoped("dsh", true);
   assert.equal(snapshot.scoped.content, "PROJECT_BODY");
   report.checks.push("项目优先、项目停用后全局回退、全部停用阻断、分别恢复及 UI 状态一致");
+  report.checks.push("非 Git 工作区的真实宿主发现、读取、启停及全局回退");
+  await mkdir(join(workspace, ".git"));
+  const gitState = await request("/api/dsh-skills-manager/state");
+  assert.equal(gitState.data.roots.find((r) => r.kind === "project-dsh").key, projectRoot.key);
+  assert.equal((await probe()).scoped.content, "PROJECT_BODY");
+  await rm(join(workspace, ".git"), { recursive: true });
+  report.checks.push("添加 Git 标记后项目身份和正文保持一致，移除后恢复非 Git 验收环境");
   report.passed = true;
   await writeFile(
     join(sandbox, "result.json"),

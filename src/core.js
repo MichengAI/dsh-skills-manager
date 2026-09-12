@@ -324,7 +324,8 @@ async function nearestProjectRoot(cwd) {
       /* 继续向上查找最近的项目根 */
     }
     const parent = dirname(current);
-    if (parent === current) return null;
+    // 与宿主一致：无 Git 标记时使用已校验的会话 cwd。
+    if (parent === current) return { root: start, cwd: start };
     current = parent;
   }
 }

@@ -76,6 +76,27 @@ try {
   }
   await writeFile(core.managerStatePath(), JSON.stringify(migrated.state), "utf8");
   const project = join(temp, "project"), other = join(temp, "other");
+  // 无 Git 时只使用当前 cwd，不向上猜测其他普通工作区。
+  const plain = join(temp, "plain"), nested = join(plain, "nested");
+  await mkdir(nested, { recursive: true });
+  for (const directory of [".dsh", ".agents", ".github"]) {
+    await skill(join(plain, directory, "skills", "plain-skill"), "plain-skill");
+  }
+  await skill(join(copilot.path, "plain-skill"), "plain-skill");
+  const plainRoots = await core.projectRoots([plain]);
+  assert.deepEqual(plainRoots.map((r) => r.kind), ["project-dsh", "project-agents", "project-copilot"], "非 Git 工作区发现原生及外部来源");
+  assert.ok(plainRoots.every((r) => r.projectRoot === plain));
+  assert.ok((await core.projectRoots([nested])).every((r) => r.projectRoot === nested), "无 Git 的子目录独立使用自身 cwd");
+  const plainView = await core.state({ projectCwds: [plain] });
+  assert.equal(plainView.roots.filter((r) => r.scope === "project").flatMap((r) => r.skills).length, 3, "管理页面可见全部项目副本");
+  for (const r of plainRoots) await core.setSkillEnabled(r, "plain-skill", false);
+  const fallback = (await core.listProviderCandidates({ cwd: plain })).find((c) => c.name === "plain-skill");
+  assert.equal(fallback.locator.rootKey, copilot.key, "停用项目副本回退全局");
+  await core.setSkillEnabled(plainRoots[2], "plain-skill", true);
+  const restored = (await core.listProviderCandidates({ cwd: plain })).find((c) => c.name === "plain-skill");
+  assert.equal(restored.locator.rootKey, plainRoots[2].key);
+  assert.equal((await core.getProviderSkill(restored, { cwd: plain })).content, "plain-skill 正文");
+  assert.equal(await core.getProviderSkill(restored, { cwd: nested }), undefined, "非 Git 工作区不能跨 cwd 读取");
   await mkdir(join(project, ".git"), { recursive: true });
   await mkdir(join(other, ".git"), { recursive: true });
   const sources = {

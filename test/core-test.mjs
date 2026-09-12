@@ -3477,8 +3477,8 @@ const noGitWorkspace = join(tmp, "no-git-workspace");
 await mkdir(noGitWorkspace, { recursive: true });
 eq(
   (await projectRoots([noGitWorkspace])).length,
-  0,
-  "projectRoots does not treat a readable cwd without a .git ancestor as a project",
+  1,
+  "projectRoots falls back to a readable cwd without a .git ancestor",
 );
 const secondProject = join(tmp, "second-project");
 await mkdir(join(secondProject, ".git"), { recursive: true });
