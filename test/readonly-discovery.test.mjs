@@ -241,9 +241,12 @@ try {
 
   const overlapProject = join(temp, "linked-overlap-project");
   await mkdir(join(overlapProject, ".git"), { recursive: true });
+  await mkdir(join(overlapProject, ".agents", "skills"), { recursive: true });
   const staleRoot = (await core.projectRoots([overlapProject])).find(
     (r) => r.kind === "project-agents",
   );
+  assert.ok(staleRoot, "存在的项目 Agent 来源可先解析再被重叠隐藏");
+  await rm(join(overlapProject, ".agents", "skills"), { recursive: true, force: true });
   await link(agents.path, join(overlapProject, ".agents", "skills"));
   assert.ok(
     !(await core.projectRoots([overlapProject])).some(

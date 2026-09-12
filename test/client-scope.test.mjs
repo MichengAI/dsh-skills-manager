@@ -16,9 +16,9 @@ const data = {
   roots: [
     { key: "dsh", mutable: true, skills: [skill("global-one")] },
     { key: "copilot", exists: true, enabled: true, skills: [skill("global-two")] },
-    { key: "a-dsh", scope: "project", projectRoot: "/a", localeKey: "projectDsh", mutable: true, skills: [] },
-    { key: "a-copilot", scope: "project", projectRoot: "/a", localeKey: "copilot", exists: true, skills: [skill("project-a")] },
-    { key: "b-dsh", scope: "project", projectRoot: "/b", localeKey: "projectDsh", mutable: true, skills: [skill("project-b")] },
+    { key: "a-dsh", scope: "project", kind: "project-dsh", projectRoot: "/a", localeKey: "projectDsh", mutable: true, skills: [] },
+    { key: "a-copilot", scope: "project", kind: "project-copilot", projectRoot: "/a", localeKey: "copilot", exists: true, toggleable: true, skills: [skill("project-a")] },
+    { key: "b-dsh", scope: "project", kind: "project-dsh", projectRoot: "/b", localeKey: "projectDsh", mutable: true, skills: [skill("project-b")] },
   ],
 };
 const originalFetch = globalThis.fetch;
@@ -48,6 +48,18 @@ try {
   assert.deepEqual(rows(), [], "多个项目未选择时不猜测当前项目");
   change("选择项目", "/a");
   assert.deepEqual(rows(), ["project-a"]);
+  change(t("filter.source"), "a-copilot");
+  assert.ok(
+    find((node) => node.props.role === "switch" && String(node.props["aria-label"] || "").includes(t("source.toggle"))),
+    "项目 Tab 选中只读来源时显示来源开关",
+  );
+  change(t("filter.source"), "a-dsh");
+  assert.equal(
+    find((node) => node.props.role === "switch" && String(node.props["aria-label"] || "").includes(t("source.toggle"))),
+    undefined,
+    "项目 DSH 不显示来源总开关",
+  );
+  change(t("filter.source"), "");
   change(t("search"), "not-found");
   assert.deepEqual(rows(), []);
   change("选择项目", "/b");

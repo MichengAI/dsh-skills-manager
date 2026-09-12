@@ -50,7 +50,7 @@ try {
   const copilot = core.userRoots().find((root) => root.key === "copilot");
   await skill(join(copilot.path, "global"), "global-copilot");
   const oldState = (await core.readManagerState()).state;
-  for (const key of ["copilot", "windsurf", "trae", "openclaw", "roo", "codebuddy"]) {
+  for (const key of ["copilot", "windsurf", "windsurf-user", "trae", "trae-cn", "openclaw", "clawdbot", "roo", "codebuddy"]) {
     delete oldState.sources[key];
     delete oldState.disabledSkills[key];
     delete oldState.enabledSkills[key];
@@ -59,7 +59,9 @@ try {
   await writeFile(core.managerStatePath(), JSON.stringify(oldState), "utf8");
   const migrated = await core.readManagerState();
   assert.equal(migrated.writable, true, "旧状态可兼容新来源");
-  assert.equal(migrated.state.sources.windsurf, true, "迁移补齐 Windsurf");
+  assert.equal(migrated.state.sources["windsurf-user"], true, "迁移补齐 Windsurf 主目录");
+  assert.equal(migrated.state.sources["trae-cn"], true, "迁移补齐 Trae 国内版");
+  assert.equal(migrated.state.sources.clawdbot, true, "迁移补齐 OpenClaw 旧目录");
   assert.equal(migrated.state.sources.codebuddy, true, "迁移补齐 CodeBuddy");
   const project = join(temp, "project"), other = join(temp, "other");
   await mkdir(join(project, ".git"), { recursive: true });
@@ -93,14 +95,33 @@ try {
     assert.equal(await readFile(file, "utf8"), before, "启停不修改来源正文");
     await core.setSkillEnabled(root, `group/${key}`, true);
   }
+  const bare = join(temp, "bare");
+  await mkdir(join(bare, ".git"), { recursive: true });
+  assert.deepEqual(
+    (await core.projectRoots([bare])).map((root) => root.kind),
+    ["project-dsh"],
+    "缺少目录的只读项目来源不进入 projectRoots",
+  );
+  const dsh = core.userRoots().find((root) => root.key === "dsh");
+  await skill(join(dsh.path, "shared"), "shared");
+  await skill(join(project, ".github", "skills", "shared"), "shared");
+  const dshWinner = (await core.listProviderCandidates({ cwd: project })).find((c) => c.name === "shared");
+  assert.equal(dshWinner.source, "user-dsh", "只读项目 Agent 不能顶掉用户 DSH 同名技能");
   await skill(join(copilot.path, "same"), "same-name");
   await skill(join(project, ".github", "skills", "same"), "same-name");
   const winner = (await core.listProviderCandidates({ cwd: project })).find((c) => c.name === "same-name");
-  assert.equal(winner.source, "project-copilot", "项目来源优先于全局");
+  assert.equal(winner.source, "project-copilot", "项目 Copilot 仍可覆盖其他用户 Agent 的同名副本");
   const root = (await core.projectRoots([project])).find((r) => r.kind === "project-copilot");
+  assert.ok(root.rank > 400, "只读项目 Agent rank 低于用户 DSH");
   await core.setSkillEnabled(root, "same", false);
   assert.equal((await core.listProviderCandidates({ cwd: project })).find((c) => c.name === "same-name").invocation.modelInvocable, false, "禁用赢家不回流全局副本");
   assert.equal((await core.listProviderCandidates({ cwd: other })).find((c) => c.name === "same-name").invocation.modelInvocable, true);
+  await core.setSkillEnabled(root, "same", true);
+  assert.equal((await core.setSourceEnabled(root.key, false, undefined, { projectCwds: [project] })).enabled, false);
+  assert.equal((await core.readManagerState()).state.sources[root.key], false);
+  assert.equal((await core.listProviderCandidates({ cwd: project })).find((c) => c.name === "project-copilot").invocation.modelInvocable, false, "项目来源总开关写入 manager 状态");
+  const afterDisable = await core.state({ projectCwds: [project] });
+  assert.equal(afterDisable.roots.find((item) => item.key === root.key).enabled, false);
   console.log("项目来源、Copilot 迁移与加载回归通过");
 } finally {
   await rm(temp, { recursive: true, force: true });

@@ -160,6 +160,7 @@ eq(
   "Cursor source ranks after the existing app-specific roots",
 );
 const firstTierUserRoots = {
+  copilot: join(testUserHome, ".copilot", "skills"),
   windsurf: join(testUserHome, ".codeium", "windsurf", "skills"),
   "windsurf-user": join(testUserHome, ".windsurf", "skills"),
   trae: join(testUserHome, ".trae", "skills"),
@@ -3643,8 +3644,11 @@ ok(
   "same-named skills in another workspace report their independent invocation policy",
 );
 ok(
-  projectSnap.summary.enabled > snap.summary.enabled,
-  "the enabled summary includes independently enabled project winners",
+  firstDshProject.skills.find((skill) => skill.name === "project-priority")
+    .enabled === true &&
+    secondAgentsProject.skills.find((skill) => skill.name === "project-priority")
+      .enabled === true,
+  "independently enabled project winners keep their own invocation policy",
 );
 const projectDetail = await skillDetail(
   firstDshProject.key,
@@ -3831,12 +3835,6 @@ if (
 }
 const overlapProject = join(tmp, "overlap-project");
 await mkdir(join(overlapProject, ".git"), { recursive: true });
-const overlapDefinition = (await projectRoots([overlapProject])).find(
-  (root) => root.kind === "project-dsh",
-);
-const overlapAgentDefinition = (await projectRoots([overlapProject])).find(
-  (root) => root.kind === "project-agents",
-);
 await mkdir(join(overlapProject, ".agents", "skills", "overlap-shared"), {
   recursive: true,
 });
@@ -3845,6 +3843,13 @@ await writeFile(
   "---\nname: overlap-shared\ndescription: 重叠回归\n---\n共享正文",
   "utf8",
 );
+const overlapDefinition = (await projectRoots([overlapProject])).find(
+  (root) => root.kind === "project-dsh",
+);
+const overlapAgentDefinition = (await projectRoots([overlapProject])).find(
+  (root) => root.kind === "project-agents",
+);
+ok(overlapAgentDefinition, "存在的项目 Agent 来源可先解析再被重叠隐藏");
 const originalDshHome = process.env.DSH_HOME;
 const originalAgentsHome = process.env.DSH_AGENTS_HOME;
 process.env.DSH_HOME = join(overlapProject, ".dsh");

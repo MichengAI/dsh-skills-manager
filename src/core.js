@@ -34,20 +34,26 @@ const KEBAB_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const PROJECT_SOURCES = [
   { key: "dsh", directory: ".dsh", localeKey: "projectDsh", label: "Project DSH", rank: 100, mutable: true, native: true },
   { key: "agents", directory: ".agents", localeKey: "projectAgents", label: "Project Agent", rank: 200, native: true },
-  { key: "copilot", directory: ".github", localeKey: "copilot", label: "Copilot", rank: 210 },
-  { key: "codex", directory: ".codex", localeKey: "codex", label: "Codex", rank: 220 },
-  { key: "claude", directory: ".claude", localeKey: "claude", label: "Claude", rank: 230 },
-  { key: "gemini", directory: ".gemini", localeKey: "gemini", label: "Gemini", rank: 240 },
-  { key: "opencode", directory: ".opencode", localeKey: "opencode", label: "OpenCode", rank: 250 },
-  { key: "cursor", directory: ".cursor", localeKey: "cursor", label: "Cursor", rank: 260 },
-  { key: "windsurf", directory: ".windsurf", localeKey: "windsurf", label: "Windsurf", rank: 270 },
-  { key: "trae", directory: ".trae", localeKey: "trae", label: "Trae", rank: 280 },
-  { key: "trae-cn", directory: ".trae-cn", localeKey: "traeCn", label: "Trae CN", rank: 285 },
-  { key: "openclaw", directory: ".openclaw", localeKey: "openclaw", label: "OpenClaw", rank: 290 },
-  { key: "roo", directory: ".roo", localeKey: "roo", label: "Roo", rank: 300 },
-  { key: "codebuddy", directory: ".codebuddy", localeKey: "codebuddy", label: "CodeBuddy", rank: 310 },
+  // 只读项目 Agent 排在用户 DSH（399/400）之后，避免仓库自带目录默认顶掉用户技能。
+  { key: "copilot", directory: ".github", localeKey: "copilot", label: "Copilot", rank: 500 },
+  { key: "codex", directory: ".codex", localeKey: "codex", label: "Codex", rank: 510 },
+  { key: "claude", directory: ".claude", localeKey: "claude", label: "Claude", rank: 520 },
+  { key: "gemini", directory: ".gemini", localeKey: "gemini", label: "Gemini", rank: 530 },
+  { key: "opencode", directory: ".opencode", localeKey: "opencode", label: "OpenCode", rank: 540 },
+  { key: "cursor", directory: ".cursor", localeKey: "cursor", label: "Cursor", rank: 550 },
+  { key: "windsurf", directory: ".windsurf", localeKey: "windsurf", label: "Windsurf", rank: 560 },
+  { key: "trae", directory: ".trae", localeKey: "trae", label: "Trae", rank: 570 },
+  { key: "trae-cn", directory: ".trae-cn", localeKey: "traeCn", label: "Trae CN", rank: 575 },
+  { key: "openclaw", directory: ".openclaw", localeKey: "openclaw", label: "OpenClaw", rank: 580 },
+  { key: "roo", directory: ".roo", localeKey: "roo", label: "Roo", rank: 590 },
+  { key: "codebuddy", directory: ".codebuddy", localeKey: "codebuddy", label: "CodeBuddy", rank: 600 },
 ];
-const PROJECT_ROOT_KEY_RE = new RegExp(`^project-(?:${PROJECT_SOURCES.map((source) => source.key).join("|")}):[a-f0-9]{16}$`);
+const PROJECT_ROOT_KEY_RE = new RegExp(
+  `^project-(?:${[...PROJECT_SOURCES]
+    .map((source) => source.key)
+    .sort((left, right) => right.length - left.length)
+    .join("|")}):[a-f0-9]{16}$`,
+);
 function projectSourceDefinition(kind) {
   return PROJECT_SOURCES.find((source) => `project-${source.key}` === kind);
 }
@@ -395,7 +401,8 @@ export async function projectRoots(projectCwds = [], diagnostics) {
       toggleable: true,
     }));
     for (const candidate of candidates) {
-      if (!candidate.native && !(await lstatOrNull(candidate.path))) continue;
+      if (candidate.kind !== "project-dsh" && !(await lstatOrNull(candidate.path)))
+        continue;
       if (await projectSourceSafe(candidate)) roots.push(candidate);
     }
   }
@@ -1282,6 +1289,12 @@ function normalizeManagerState(value) {
         ...new Set(enabled.filter((name) => validStateSkillName(name))),
       ].sort();
   }
+  if (value.sources && typeof value.sources === "object" && !Array.isArray(value.sources)) {
+    for (const [key, flag] of Object.entries(value.sources)) {
+      if (PROJECT_ROOT_KEY_RE.test(key) && !key.startsWith("project-dsh:") && typeof flag === "boolean")
+        normalized.sources[key] = flag;
+    }
+  }
   for (const field of ["disabledSkills", "enabledSkills"]) {
     const source = value[field];
     if (source && typeof source === "object" && !Array.isArray(source)) {
@@ -1354,7 +1367,7 @@ function effectiveSkillPolicy(policyResult, root, entry) {
   );
   const sourceEnabled =
     root.key === "dsh" ||
-    root.scope === "project" ||
+    root.kind === "project-dsh" ||
     policyResult.state.sources[root.key] !== false;
   if (policyResult.writable === false || !sourceEnabled || override === false) {
     return {
@@ -1394,9 +1407,11 @@ function invalidManagerStateWrite() {
   };
 }
 
-export async function setSourceEnabled(key, enabled, log) {
-  const root = rootByKey(key);
-  if (!root || root.key === "dsh" || !root.toggleable)
+export async function setSourceEnabled(key, enabled, log, options = {}) {
+  let root = rootByKey(key);
+  if (!root && PROJECT_ROOT_KEY_RE.test(key) && !key.startsWith("project-dsh:"))
+    root = (await projectRoots(options.projectCwds)).find((item) => item.key === key);
+  if (!root || root.key === "dsh" || root.kind === "project-dsh" || !root.toggleable)
     return readonlyError("toggle");
   const current = await readManagerState();
   if (current.writable === false) return invalidManagerStateWrite();
@@ -2876,8 +2891,8 @@ export async function state(options = {}) {
       truncated: truncated === true,
       enabled:
         policyResult.writable !== false &&
-        (root.scope === "project" ||
-          root.key === "dsh" ||
+        (root.key === "dsh" ||
+          root.kind === "project-dsh" ||
           policyResult.state.sources[root.key] !== false),
       skills,
     });
@@ -2910,18 +2925,6 @@ export async function state(options = {}) {
       workspaceCwds: root.workspaceCwds,
     });
   }
-  result.summary = {
-    total: all.length,
-    enabled: all.filter((item) => item.view.enabled === true).length,
-    disabled: all.filter(
-      (item) => item.entry.loadable && item.policy.enabled === false,
-    ).length,
-    issues: all.reduce(
-      (count, item) =>
-        count + item.entry.diagnostics.length + (item.view.shadowedBy ? 1 : 0),
-      0,
-    ),
-  };
   return result;
 }
 

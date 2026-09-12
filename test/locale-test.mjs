@@ -298,26 +298,26 @@ ok(
   "factory exports locale plural-key selection",
 );
 eq(
-  countKey("summary.group", 1),
-  "summary.group.one",
+  countKey("summary.shadowed", 1),
+  "summary.shadowed.one",
   "singular count selects the one form",
 );
 eq(
-  countKey("summary.group", 0),
-  "summary.group.other",
+  countKey("summary.shadowed", 0),
+  "summary.shadowed.other",
   "zero count selects the other form",
 );
 eq(
-  countKey("summary.group", 2),
-  "summary.group.other",
+  countKey("summary.shadowed", 2),
+  "summary.shadowed.other",
   "plural count selects the other form",
 );
 for (const base of [
   "summary.total",
   "summary.enabled",
   "summary.disabled",
-  "summary.issues",
-  "summary.group",
+  "summary.shadowed",
+  "summary.invalid",
   "upload.selected",
   "trash.count",
 ]) {
@@ -331,9 +331,9 @@ for (const base of [
   );
 }
 eq(
-  DICT.en[countKey("summary.group", 1)],
-  "{count} skill",
-  "English singular source count is grammatical",
+  DICT.en[countKey("summary.shadowed", 1)],
+  "{count} shadowed",
+  "English singular shadowed count is grammatical",
 );
 eq(
   DICT.en[countKey("upload.selected", 1)],
@@ -701,10 +701,6 @@ ok(
   DICT.zh["scope.user"] && DICT.en["scope.project"] && DICT.zh["import.global"] && DICT.en["filter.status"],
   "scope tabs, global import, and status filter are localized in both languages",
 );
-ok(
-  DICT.zh["status.project"] && DICT.en["status.project"],
-  "project-scope status is localized in both languages",
-);
 eq(
   DICT.zh["status.enabled"],
   "已启用",
@@ -716,13 +712,33 @@ eq(
   "English status describes invocation policy without claiming body loading",
 );
 ok(
-  DICT.zh["summary.enabled.one"] && DICT.en["summary.enabled.other"],
-  "enabled summary terminology is localized in both languages",
+  DICT.zh["summary.enabled.one"] && DICT.en["summary.enabled.other"] &&
+    DICT.zh["summary.shadowed.one"] && DICT.en["summary.invalid.other"],
+  "enabled, shadowed, and invalid summary terminology is localized in both languages",
 );
 eq(
-  mockT("status.rank", { rank: 100 }),
-  "Rank 100",
-  "project source priority is visible in the localized UI",
+  mockT("status.shadowedBy", { source: rootDisplayName(mockT, { key: "dsh", label: "DSH skills" }) }),
+  "Overridden by the same skill in DSH skills",
+  "shadow hints use the localized source display name",
+);
+eq(bundle.nextScopeTab("user", "ArrowLeft"), "user", "left arrow stays on the first tab");
+eq(bundle.nextScopeTab("user", "ArrowRight"), "project", "right arrow moves to the next tab");
+eq(bundle.nextScopeTab("project", "ArrowRight"), "project", "right arrow stays on the last tab");
+eq(bundle.nextScopeTab("project", "Home"), "user", "Home moves to the first tab");
+ok(bundle.canToggleSource({ key: "copilot", toggleable: true }), "user Agent sources keep a source toggle");
+ok(bundle.canToggleSource({ key: "project-copilot:abc", kind: "project-copilot", toggleable: true }), "read-only project Agent sources expose a source toggle");
+ok(!bundle.canToggleSource({ key: "dsh", toggleable: true }), "user DSH has no source-wide toggle");
+ok(!bundle.canToggleSource({ key: "project-dsh:abc", kind: "project-dsh", toggleable: true }), "project DSH has no source-wide toggle");
+eq(
+  JSON.stringify(bundle.countSkillStatuses([
+    { skill: { enabled: true, loadable: true } },
+    { skill: { enabled: true, loadable: true } },
+    { skill: { enabled: false, loadable: true } },
+    { skill: { enabled: true, loadable: true, shadowedBy: { root: "dsh" } } },
+    { skill: { enabled: false, loadable: false } },
+  ])),
+  JSON.stringify({ total: 5, enabled: 2, disabled: 1, shadowed: 1, invalid: 1 }),
+  "summary counts match status-filter buckets",
 );
 ok(
   DICT.zh["create.target"] && DICT.en["trash.source"],
@@ -950,8 +966,9 @@ ok(
   "empty project roots remain available as first-Skill create destinations",
 );
 ok(
-  source.includes('scope === "user" && selectedRoot.key !== "dsh"'),
-  "project roots never expose the unsupported source-level toggle",
+  source.includes("canToggleSource(selectedRoot)") &&
+    source.includes('root.kind !== "project-dsh"'),
+  "source-level toggles are available for Agent sources on both tabs, except DSH roots",
 );
 ok(
   !source.includes('"status.discovered"'),
