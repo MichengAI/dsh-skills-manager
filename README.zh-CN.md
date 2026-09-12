@@ -63,7 +63,7 @@ DSH 本地技能移入回收站前需要确认；永久删除前仍可恢复：
 
 - 已可正常运行 DeepSeek Harness Web，且可在 PowerShell 中使用 `dsh`。
 - 以下示例使用 `web` profile；请替换为实际目标 profile。
-- `0.1.48` 已验证兼容 DeepSeek Harness `0.1.0-rc.8`、`0.1.1-rc.2`、`0.1.2-rc.1`、`0.1.5-rc.1`、`0.1.5-rc.2`；开发依赖固定使用 `0.1.5-rc.2`，不自动声明支持其他版本。
+- `0.1.49` 已验证兼容 DeepSeek Harness `0.1.0-rc.8`、`0.1.1-rc.2`、`0.1.2-rc.1`、`0.1.5-rc.1`、`0.1.5-rc.2`；开发依赖固定使用 `0.1.5-rc.2`，不自动声明支持其他版本。
 - 从源码安装或二次开发需要 Node.js `^22.19.0 || >=24.0.0`；仅从 npm 安装无需在任意目录执行 `npm install`。
 
 ## 安装
@@ -106,7 +106,7 @@ dsh --profile web --dump-config
 | 搜索或筛选 | 先选择全局或项目作用域，再按来源、调用状态、名称或简介收窄列表。 | 当前作用域 |
 | 查看详情与诊断 | 查看正文、frontmatter、源文件路径、格式问题和重名遮蔽。 | 全部来源 |
 | 启用或停用 | 只更新 manager 本地调用策略，不修改来源 Skill 文件。 | 全部用户级来源与活动项目来源中的有效 Skill |
-| 创建或导入 | 在设置页创建时选择用户 DSH 或活动项目 DSH；导入仍为用户级。 | `$DSH_HOME\skills`，创建可选活动 `<project>/.dsh/skills` |
+| 创建或导入 | 设置页创建和导入均固定保存到全局 DSH。 | `$DSH_HOME\skills` |
 | 从对话创建 | 让 Agent 调用 `create_skill`；写入前由 DSH 审批界面确认。 | `$DSH_HOME\skills` |
 | 删除与恢复 | 删除先进入回收站；可恢复到原来源或永久二次删除。 | 用户级与活动项目级 DSH Skill |
 
@@ -123,21 +123,21 @@ dsh --profile web --dump-config
 | `~\.cc-switch\skills` | 支持，默认开启 | 仅写 manager 状态 | 不支持 | 不支持 |
 | `%USERPROFILE%\.cursor\skills`（或 `$DSH_CURSOR_HOME\skills`） | 支持 | 仅写 manager 状态 | 不支持 | 不支持 |
 | `~/.codex/skills`、`~/.claude/skills`、`~/.gemini/skills`、`~/.config/opencode/skills`、`~/.copilot/skills`、`~/.codeium/windsurf/skills`、`~/.windsurf/skills`、`~/.trae/skills`、`~/.trae-cn/skills`、`~/.openclaw/skills`、`~/.clawdbot/skills`、`~/.roo/skills`、`~/.codebuddy/skills` | 支持 | 仅写 manager 状态 | 不支持 | 不支持 |
-| `<project>/.dsh/skills` | 支持活动 Session 工作区 | 仅写 manager 状态 | 设置页支持创建 | 进入回收站并恢复到原项目 |
+| `<project>/.dsh/skills` | 支持活动 Session 工作区 | 仅写 manager 状态 | 设置页不提供项目创建 | 进入回收站并恢复到原项目 |
 | `<project>/.agents/skills`、`<project>/.github/skills`、`<project>/.codex/skills`、`<project>/.claude/skills`、`<project>/.gemini/skills`、`<project>/.opencode/skills`、`<project>/.cursor/skills`、`<project>/.windsurf/skills`、`<project>/.trae/skills`、`<project>/.trae-cn/skills`、`<project>/skills`、`<project>/.roo/skills`、`<project>/.codebuddy/skills` | 支持活动 Session 工作区 | 仅写 manager 状态 | 不支持 | 不支持 |
 
 - 启用、停用和删除只接受单个普通技能名称，目录穿越名称会被拒绝。
 - 根目录 `<project>/skills` 显示为“项目 Skills”，可兼容 OpenClaw workspace 技能，但不据此判断所属 Agent；现有启停策略保持兼容。
-- 项目根只从活动 Session 的 `cwd` 推导；客户端只提交不透明来源 key，不能指定任意工作区路径。
+- 项目页只跟随当前会话，不提供项目选择框。请求通过 `x-dsh-skills-session` 携带当前会话 ID，后端只从该会话的 `cwd` 推导项目根；缺失或失效时不回退到其他会话，客户端不能指定任意工作区路径。
 - 启停仅影响所选来源的副本。管理器在未被停用的副本中按优先级选择：停用项目副本后可使用其他已启用项目副本或全局副本；停用全局副本不影响项目副本。全部副本停用时才阻断该技能；停用行会标明当前接管的全局或项目来源，frontmatter 自带的调用限制仍然生效。
 - 项目来源遵循 DSH 最近 `.git` 项目根和固定优先级（`project-dsh` 100、`project-agents` 200，其余项目来源 210–320，之后为全局 DSH 400、公共 Agent 450、其他全局来源 500–640）。管理器每次读取状态或详情时重新扫描；显式项目策略通过 workspace 作用域 rank 覆盖候选执行，用户 DSH 策略使用 rank 399；没有覆盖时仍由 DSH 官方 provider 负责。启停只写 manager 状态，项目文件写入仅发生在用户明确执行 `.dsh/skills` 创建、回收或恢复时。
 - 当项目与 `$DSH_HOME` 位于不同磁盘时，回收站会降级为“复制后在源盘原子隐藏”；恢复使用反向的同一安全流程。
-- 项目回收站条目保存原始不透明来源身份。仅当原项目仍由活动 Session 工作区提供时才允许恢复；客户端不能指定替代路径。
+- 项目回收站条目保存原始不透明来源身份。仅当原项目与当前会话的项目一致时才允许恢复；客户端不能指定替代路径。
 - 项目写入会拒绝链接形式的 `.dsh` 或 `.dsh/skills` 目录，避免仓库把创建、删除或恢复重定向到项目根之外。
 - 用户级只读来源与项目 Agent 来源默认递归发现 `SKILL.md`，允许技能目录、技能根及其父目录通过软链接或 Windows junction 指向外部目录，无需开关或目录白名单；按真实路径去重，启停只写 manager 状态。忽略 `SKILL.md` 文件链接，限制扫描深度和数量并终止循环；可写 DSH 与导入、删除仍保留原有边界。
 - 普通技能目录发现 `SKILL.md` 后作为 bundle 叶子，不再扫描内部资源，并跳过 `node_modules`；扫描根自身的 `SKILL.md` 仍可与嵌套技能并存。项目 Agent 根与用户技能根真实路径重叠时隐藏，避免绕过用户停用策略。
 - 列表和摘要统一使用“已启用/已停用”，不再使用“已加载”：这里描述的是调用策略，完整 Skill 正文仍由 DSH 按需加载。IDE、Git 或 shell 改动后可点击“刷新”；项目 catalog 的 watcher 与 invalidation 仍由官方 provider 负责。
-- 不存在的只读项目来源不会出现在列表中；空的项目 DSH 仍可作为“创建技能”目标，以便写入第一条项目技能。项目 DSH 只提供逐 Skill 启停，不提供整个项目来源总开关。
+- 不存在的只读项目来源不会出现在列表中；空的项目 DSH 保留来源展示；界面的创建和导入始终写入全局 DSH。项目 DSH 只提供逐 Skill 启停，不提供整个项目来源总开关。
 - 覆盖前先复制到同目录临时路径；复制成功前不会改动现有技能。
 - 全部接口（含 GET `/state`）只接受 loopback `Host`，或 DSH Web runtime 已通过 LAN 绑定和 `--trusted-host` 明确信任的 `host[:port]`；未知 Host 继续返回 403。
 - 浏览器请求还必须满足同源 `Origin` 且不能标记为 cross-site；写入接口继续要求 JSON 与 DSH 客户端请求标记。

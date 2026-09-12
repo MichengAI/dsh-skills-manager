@@ -2517,11 +2517,12 @@ await new Promise((resolve, reject) => {
 const address = server.address();
 const api = `http://127.0.0.1:${address.port}/api/dsh-skills-manager`;
 const secureHeaders = {
+  "x-dsh-skills-session": "sess-live",
   "content-type": "application/json",
   "x-dsh-skills-manager": "1",
 };
 try {
-  const stateResponse = await fetch(api + "/state");
+  const stateResponse = await fetch(api + "/state", { headers: { "x-dsh-skills-session": "sess-live" } });
   eq(stateResponse.status, 200, "state route returns 200");
   const statePayload = await stateResponse.json();
   const httpProjectDshRoot = statePayload.data.roots.find(
@@ -2547,6 +2548,15 @@ try {
     ),
     "state route lists project-scoped skills from the Session cwd",
   );
+  for (const sessionId of [undefined, "sess-blank", "missing"]) {
+    const headers = sessionId ? { "x-dsh-skills-session": sessionId } : {};
+    const payload = await (await fetch(api + "/state", { headers })).json();
+    ok(payload.data.projects.length === 0 && payload.data.roots.every((root) => root.scope !== "project"), "absent, blank or unknown Session never exposes another project's skills");
+    const result = await requestJson(api + "/detail", "POST", { ...secureHeaders, "x-dsh-skills-session": sessionId || "" }, JSON.stringify({ root: httpProjectRoot.key, name: "route-project-skill" }));
+    ok(result.status >= 400, "another Session cannot use the old project root for details");
+    const mutation = await requestJson(api + "/source-disable", "POST", { ...secureHeaders, "x-dsh-skills-session": sessionId || "" }, JSON.stringify({ root: httpProjectRoot.key }));
+    ok(mutation.status >= 400, "another Session cannot change the old project source policy");
+  }
   const projectDetailResponse = await requestJson(
     api + "/detail",
     "POST",
@@ -2596,7 +2606,7 @@ try {
     projectAgentSourceBeforeToggle,
     "project Agent disable never rewrites the shared source file",
   );
-  const disabledProjectState = await (await fetch(api + "/state")).json();
+  const disabledProjectState = await (await fetch(api + "/state", { headers: secureHeaders })).json();
   const disabledProjectAgent = disabledProjectState.data.roots
     .find((root) => root.key === httpProjectRoot.key)
     .skills.find((skill) => skill.name === "route-project-skill");
@@ -3452,14 +3462,14 @@ eq(
   activeSessionCwds({
     sessions: {
       list: () => [
-        { header: { cwd: routeProjectNested } },
-        { header: { cwd: routeProjectNested } },
+        { id: "first", header: { cwd: routeProjectNested } },
+        { id: "second", header: { cwd: "/other" } },
         { header: {} },
       ],
     },
-  }).length,
+  }, "first").length,
   1,
-  "activeSessionCwds deduplicates valid workspace paths",
+  "activeSessionCwds only resolves the selected Session",
 );
 
 // ── 项目级 Skill：按 workspace 隔离、遵循官方优先级、每次请求重新发现 ──

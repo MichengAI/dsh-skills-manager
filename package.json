@@ -1,6 +1,6 @@
 {
   "name": "@michengai/dsh-skills-manager",
-  "version": "0.1.48",
+  "version": "0.1.49",
   "description": "NPM-installable DSH Web plugin for safely loading and managing skills across DSH and common local Agents.",
   "license": "Apache-2.0",
   "repository": {
@@ -40,7 +40,7 @@
   },
   "scripts": {
     "build": "node scripts/build.mjs",
-    "test": "npm run build && node test/build-test.mjs && node test/core-test.mjs && node test/readonly-discovery.test.mjs && node test/project-sources.test.mjs && node test/locale-test.mjs && node test/client-scope.test.mjs && node test/compatibility-options-test.mjs",
+    "test": "npm run build && node test/build-test.mjs && node test/core-test.mjs && node test/readonly-discovery.test.mjs && node test/project-sources.test.mjs && node test/locale-test.mjs && node test/plugin-update-locale.test.mjs && node test/client-scope.test.mjs && node test/compatibility-options-test.mjs",
     "verify": "node scripts/sync-hosts.mjs && npm test && npm run pack:check && node scripts/check-generated.mjs",
     "pack:check": "npm pack --dry-run --json",
     "prepublishOnly": "npm run verify",

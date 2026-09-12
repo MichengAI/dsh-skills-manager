@@ -355,6 +355,7 @@ try {
       method: body ? "POST" : "GET",
       headers: {
         cookie,
+        "x-dsh-skills-session": "skills-manager-compat-agent",
         origin: base,
         "content-type": "application/json",
         "x-dsh-skills-manager": "1",

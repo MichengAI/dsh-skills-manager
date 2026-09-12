@@ -56,8 +56,7 @@ const EN = {
 };
 function strings() {
   const lang = document.documentElement.lang.toLowerCase();
-  const settings = document.querySelector('[role="dialog"]')?.textContent ?? "";
-  return lang.startsWith("en") || settings.includes("Settings") && !settings.includes("\u8BBE\u7F6E") ? EN : ZH;
+  return lang.startsWith("zh") ? ZH : EN;
 }
 function ensureStyle() {
   if (document.getElementById(STYLE_ID) !== null) return;
@@ -103,6 +102,7 @@ function observePluginUpdate(options) {
   let payload;
   let overlay;
   let frame;
+  let refreshDialog;
   const setButtonContent = (button, label, iconName) => {
     const icon = options.createIcon(iconName);
     icon.classList.add("mpi-icon");
@@ -115,7 +115,7 @@ function observePluginUpdate(options) {
   const setButtonLabel = (button, label) => {
     const text = button.querySelector("[data-mpi-label]");
     if (text === null) button.textContent = label;
-    else text.textContent = label;
+    else if (text.textContent !== label) text.textContent = label;
   };
   const applyControls = () => {
     const row = document.querySelector(options.titleRowSelector);
@@ -133,7 +133,12 @@ function observePluginUpdate(options) {
       if (version.textContent !== versionLabel) version.textContent = versionLabel;
     }
     const links = row.querySelector(options.linksSelector);
-    if (links === null || links.querySelector(`[data-mpi-check="${options.packageName}"]`) !== null) return;
+    if (links === null) return;
+    const existing = links.querySelector(`[data-mpi-check="${options.packageName}"]`);
+    if (existing !== null) {
+      setButtonLabel(existing, strings().check);
+      return;
+    }
     const button = document.createElement("button");
     button.type = "button";
     button.className = "mpi-check";
@@ -150,10 +155,11 @@ function observePluginUpdate(options) {
   const closeDialog = () => {
     overlay?.remove();
     overlay = void 0;
+    refreshDialog = void 0;
   };
   function openDialog() {
     closeDialog();
-    const text = strings();
+    let text = strings();
     overlay = document.createElement("div");
     overlay.className = "mpi-overlay";
     const dialog = document.createElement("section");
@@ -161,15 +167,6 @@ function observePluginUpdate(options) {
     dialog.setAttribute("role", "dialog");
     dialog.setAttribute("aria-modal", "true");
     dialog.innerHTML = `<header class="mpi-head"><h2></h2><button type="button" class="mpi-dialog-close" data-action="close"></button></header><p class="mpi-intro"></p><dl class="mpi-meta"><dt></dt><dd data-role="current"></dd><dt></dt><dd data-role="latest"></dd><dt></dt><dd data-role="profile"></dd></dl><div class="mpi-status" role="status"></div><div class="mpi-progress" hidden></div><section class="mpi-manual"><h3></h3><p></p><div class="mpi-command"><code></code><button type="button" class="mpi-action" data-action="copy"></button></div></section><footer class="mpi-actions"><div class="mpi-actions-group"><button type="button" class="mpi-action" data-action="check"></button><button type="button" class="mpi-action mpi-primary" data-action="update"></button></div></footer>`;
-    const name = document.documentElement.lang.toLowerCase().startsWith("en") ? options.enName : options.zhName;
-    dialog.querySelector("h2").textContent = `${name} ${text.update}`;
-    dialog.querySelector(".mpi-intro").textContent = text.intro;
-    const terms = dialog.querySelectorAll("dt");
-    terms[0].textContent = text.current;
-    terms[1].textContent = text.latestLabel;
-    terms[2].textContent = text.profile;
-    dialog.querySelector(".mpi-manual h3").textContent = text.manual;
-    dialog.querySelector(".mpi-manual p").textContent = text.manualHint;
     const status = dialog.querySelector(".mpi-status");
     const progress = dialog.querySelector(".mpi-progress");
     const command = dialog.querySelector(".mpi-command code");
@@ -185,8 +182,11 @@ function observePluginUpdate(options) {
     setButtonContent(update, text.auto, "download");
     setButtonContent(copy, text.copy, "copy");
     let busy = false;
+    let updating = false;
+    let currentMessage;
     const setMessage = (message, kind = "") => {
-      status.textContent = message;
+      currentMessage = message;
+      status.textContent = typeof message === "function" ? message() : message;
       status.dataset.kind = kind;
     };
     const setBusy = (value) => {
@@ -202,38 +202,40 @@ function observePluginUpdate(options) {
       dialog.querySelector("[data-role=profile]").textContent = payload?.profileName ?? text.unknown;
       command.textContent = manualPluginUpdateCommand(payload?.profileName ?? "", options.packageName, payload?.latestVersion ?? "latest");
       update.disabled = busy || payload?.canAutoUpdate !== true || payload.updateAvailable !== true;
-      if (payload === void 0) setMessage(text.checking);
-      else if (payload.latestCheckFailed) setMessage(text.failed, "error");
-      else if (payload.updateAvailable) setMessage(`${text.found}: v${payload.latestVersion ?? text.unknown}`);
-      else setMessage(text.latest, "success");
-      if (payload !== void 0 && !payload.canAutoUpdate && payload.updateAvailable) setMessage(text.unavailable);
+      if (payload === void 0) setMessage(() => text.checking);
+      else if (payload.latestCheckFailed) setMessage(() => text.failed, "error");
+      else if (payload.updateAvailable) setMessage(() => `${text.found}: v${payload.latestVersion ?? text.unknown}`);
+      else setMessage(() => text.latest, "success");
+      if (payload !== void 0 && !payload.canAutoUpdate && payload.updateAvailable) setMessage(() => text.unavailable);
     };
     const checkNow = async () => {
       if (busy) return;
       setBusy(true);
-      setMessage(text.checking);
+      setMessage(() => text.checking);
       try {
         await load();
         setBusy(false);
         render();
       } catch (error) {
         setBusy(false);
-        setMessage(error instanceof Error ? error.message : text.failed, "error");
+        setMessage(error instanceof Error ? error.message : () => text.failed, "error");
       }
     };
     const updateNow = async () => {
       if (busy) return;
+      updating = true;
       setBusy(true);
       setButtonLabel(update, text.updating);
-      setMessage(text.updating);
+      setMessage(() => text.updating);
       try {
         payload = await requestStatus(options.endpoint, "POST", controller.signal);
         applyControls();
         render();
-        setMessage(payload.autoReload === true ? text.restarting : text.restart, "success");
+        setMessage(() => payload.autoReload === true ? text.restarting : text.restart, "success");
       } catch (error) {
-        setMessage(error instanceof Error ? error.message : text.failed, "error");
+        setMessage(error instanceof Error ? error.message : () => text.failed, "error");
       } finally {
+        updating = false;
         setButtonLabel(update, text.auto);
         setBusy(false);
       }
@@ -255,6 +257,31 @@ function observePluginUpdate(options) {
         setButtonLabel(copy, text.copyFailed);
       });
     });
+    refreshDialog = () => {
+      const next = strings();
+      if (next === text && dialog.dataset.localeReady) return;
+      text = next;
+      dialog.dataset.localeReady = "true";
+      const name = text === EN ? options.enName : options.zhName;
+      dialog.querySelector("h2").textContent = `${name} ${text.update}`;
+      dialog.querySelector(".mpi-intro").textContent = text.intro;
+      const terms = dialog.querySelectorAll("dt");
+      terms[0].textContent = text.current;
+      terms[1].textContent = text.latestLabel;
+      terms[2].textContent = text.profile;
+      dialog.querySelector(".mpi-manual h3").textContent = text.manual;
+      dialog.querySelector(".mpi-manual p").textContent = text.manualHint;
+      close.setAttribute("aria-label", text.close);
+      close.title = text.close;
+      setButtonLabel(check, text.recheck);
+      setButtonLabel(update, updating ? text.updating : text.auto);
+      setButtonLabel(copy, text.copy);
+      dialog.querySelector("[data-role=current]").textContent = payload === void 0 ? text.unknown : `v${payload.currentVersion}`;
+      dialog.querySelector("[data-role=latest]").textContent = payload?.latestVersion === void 0 ? text.unknown : `v${payload.latestVersion}`;
+      dialog.querySelector("[data-role=profile]").textContent = payload?.profileName ?? text.unknown;
+      if (currentMessage !== undefined) status.textContent = typeof currentMessage === "function" ? currentMessage() : currentMessage;
+    };
+    refreshDialog();
     overlay.addEventListener("click", (event) => {
       if (event.target === overlay) closeDialog();
     });
@@ -272,9 +299,11 @@ function observePluginUpdate(options) {
     frame = window.requestAnimationFrame(() => {
       frame = void 0;
       applyControls();
+      refreshDialog?.();
     });
   });
-  observer.observe(document.body, { childList: true, subtree: true });
+  // 宿主 locale 服务同步 HTML lang；同时监听已有按钮和弹窗的语言变化。
+  observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ["lang"] });
   applyControls();
   void load().catch(() => {
   });

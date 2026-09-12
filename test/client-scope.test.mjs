@@ -3,14 +3,16 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 let definition, component, cursor = 0;
-const state = [], effects = [];
+let state = [];
+const outerState = [], effects = [];
+let innerState = [], mountedKey, currentSession = "session-a";
 const react = {
   createElement: (type, props, ...children) => ({ type, props: props || {}, children: children.flat(Infinity).filter((child) => child != null && typeof child !== "boolean") }),
-  useState(initial) { const index = cursor++; if (!(index in state)) state[index] = initial; return [state[index], (next) => { state[index] = typeof next === "function" ? next(state[index]) : next; }]; },
+  useState(initial) { const index = cursor++, store = state; if (!(index in store)) store[index] = initial; return [store[index], (next) => { store[index] = typeof next === "function" ? next(store[index]) : next; }]; },
   useRef(value) { const index = cursor++; return state[index] || (state[index] = { current: value }); },
   useEffect(effect) { const index = cursor++; if (!(index in state)) { state[index] = true; effects.push(effect); } },
 };
-const skill = (name) => ({ name, description: name, enabled: true, loadable: true });
+const skill = (name) => ({ name, description: "LONG_DESCRIPTION_" + name, enabled: true, loadable: true });
 const data = {
   projects: [{ root: "/a", name: "A" }, { root: "/b", name: "B" }], trash: [],
   roots: [
@@ -21,15 +23,30 @@ const data = {
     { key: "b-dsh", scope: "project", kind: "project-dsh", projectRoot: "/b", localeKey: "projectDsh", mutable: true, skills: [skill("project-b")] },
   ],
 };
+function sessionData(options) {
+  const project = options?.headers?.["x-dsh-skills-session"] === "session-a" ? "/a" : options?.headers?.["x-dsh-skills-session"] === "session-b" ? "/b" : "";
+  return { ...data, projects: data.projects.filter((p) => p.root === project), roots: data.roots.filter((root) => root.scope !== "project" || root.projectRoot === project) };
+}
 const originalFetch = globalThis.fetch;
-globalThis.fetch = async () => ({ ok: true, json: async () => ({ data }) });
+globalThis.fetch = async (_, options) => ({ ok: true, json: async () => ({ data: sessionData(options) }) });
 try {
   new Function("window", await readFile(new URL("../lib/client.js", import.meta.url), "utf8"))({ __ModuleLoader__: { load(value) { definition = value; } } });
   const client = definition.factory((id) => id === "react" ? react : {});
   client.apply({ effect() {}, slots: { inject(name, fn) { fn(); }, register(options, fn) { component = fn; } } });
   const t = (key, params = {}) => (client.DICT.zh[key] || key).replace(/\{(\w+)\}/g, (_, name) => String(params[name] ?? "{" + name + "}"));
   let tree;
-  function render() { cursor = 0; tree = component({ t }); }
+  function render() {
+    state = outerState; cursor = 0;
+    const view = component({ t, useSessions: (selector) => selector({ current: currentSession }) });
+    if (mountedKey !== view.props.key) { mountedKey = view.props.key; innerState = []; }
+    state = innerState; cursor = 0; tree = view.type(view.props);
+  }
+  async function selectSession(id) {
+    currentSession = id; render();
+    assert.equal(nodes().some((node) => node.props.className === "dssm-source"), false, "切换会话立即隐藏旧项目，等待新状态");
+    effects.splice(0).forEach((effect) => effect());
+    await new Promise((resolve) => setImmediate(resolve)); render();
+  }
   function nodes(node = tree) {
     if (!node || typeof node !== "object") return [];
     if (typeof node.type === "function") return nodes(node.type({ ...node.props, children: node.children }));
@@ -41,12 +58,23 @@ try {
   const tab = (name) => { find((node) => node.props.role === "tab" && node.children.includes(name)).props.onClick(); render(); };
   render(); effects.splice(0).forEach((effect) => effect());
   await new Promise((resolve) => setImmediate(resolve)); render();
+  const groups = () => nodes().filter((node) => node.props.className === "dssm-source-head-main");
+  const expandAll = () => { groups().filter((node) => !node.props["aria-expanded"]).forEach((node) => node.props.onClick()); render(); };
+  assert.deepEqual(rows(), [], "来源默认折叠，不平铺所有技能");
+  assert.equal(groups().length, 2, "全局按来源分组");
+  assert.ok(nodes(groups()[0]).some((node) => node.children.includes("1 个技能")), "来源数量使用翻译文案");
+  expandAll();
   assert.deepEqual(rows(), ["global-one", "global-two"]);
+  assert.ok(!JSON.stringify(nodes()).includes("LONG_DESCRIPTION_global-one"), "展开来源后仍不显示长描述");
+  groups()[0].props.onClick(); render();
+  assert.deepEqual(rows(), ["global-two"], "来源可独立折叠");
   change(t("search"), "two");
   assert.deepEqual(rows(), ["global-two"]);
   tab("项目技能");
-  assert.deepEqual(rows(), [], "多个项目未选择时不猜测当前项目");
-  change("选择项目", "/a");
+  assert.equal(find((node) => node.props["aria-label"] === "选择项目"), undefined, "没有项目选择框");
+  assert.deepEqual(rows(), [], "项目来源默认折叠");
+  assert.equal(groups().length, 2, "空的可写项目来源保留分组入口");
+  expandAll();
   assert.deepEqual(rows(), ["project-a"]);
   change(t("filter.source"), "a-copilot");
   assert.ok(
@@ -62,12 +90,14 @@ try {
   change(t("filter.source"), "");
   change(t("search"), "not-found");
   assert.deepEqual(rows(), []);
-  change("选择项目", "/b");
+  await selectSession("session-b");
+  assert.deepEqual(rows(), [], "项目展开状态独立");
+  expandAll();
   assert.deepEqual(rows(), ["project-b"], "不同项目保存独立筛选");
   tab("全局技能");
   assert.deepEqual(rows(), ["global-two"], "返回全局保留搜索");
   tab("项目技能");
-  change("选择项目", "/a");
+  await selectSession("session-a");
   assert.deepEqual(rows(), [], "返回原项目保留搜索");
   change(t("search"), "");
   const projectCopy = data.roots.find((r) => r.key === "a-copilot").skills[0];
@@ -78,7 +108,7 @@ try {
   let toggleRequest;
   globalThis.fetch = async (url, options) => {
     if (options?.method === "POST") toggleRequest = { url, body: JSON.parse(options.body) };
-    return { ok: true, json: async () => ({ data }) };
+    return { ok: true, json: async () => ({ data: sessionData(options) }) };
   };
   shadowedSwitch.props.onClick();
   await new Promise((resolve) => setImmediate(resolve));
@@ -108,7 +138,7 @@ try {
       toggleRequest = { url, body: JSON.parse(options.body) };
       data.trash = data.trash.filter((item) => item.id !== toggleRequest.body.id);
     }
-    return { ok: true, json: async () => ({ data }) };
+    return { ok: true, json: async () => ({ data: sessionData(options) }) };
   };
   render(); tab("回收站");
   assert.deepEqual(rows(), ["removed-a", "removed-b"], "回收站直接展示全局和项目条目");
@@ -140,10 +170,33 @@ try {
   tab("项目技能");
   assert.deepEqual(rows(), ["project-a"], "经过回收站仍保留所选项目与筛选");
   const create = find((node) => node.type === "button" && node.children.includes(t("btn.create")));
-  assert.equal(create.props.disabled, false, "空项目 DSH 仍支持创建");
+  assert.equal(create.props.disabled, false, "项目页仍可创建全局技能");
   create.props.onClick(); render();
-  const target = find((node) => node.props["aria-label"] === t("create.target"));
-  assert.equal(target.props.value, "a-dsh", "创建默认落到所选项目 DSH");
-  assert.deepEqual(target.children.map((option) => option.props.value), ["a-dsh"]);
-  console.log("Tab、项目隔离、筛选记忆和创建目标交互回归通过");
+  assert.equal(find((node) => node.props["aria-label"] === t("create.target")), undefined, "创建位置没有下拉框");
+  assert.ok(find((node) => node.props.className === "dssm-detail-path" && node.children.includes(t("create.globalTarget"))), "创建位置固定展示全局 DSH");
+  for (const [key, value] of [["name", "new-global"], ["description", "description"], ["body", "body"]]) {
+    find((node) => node.props.placeholder === t("create." + key + ".placeholder")).props.onChange({ target: { value } }); render();
+  }
+  nodes().filter((node) => node.type === "button" && node.children.includes(t("btn.create.now"))).at(-1).props.onClick();
+  await new Promise((resolve) => setImmediate(resolve)); render();
+  assert.ok(toggleRequest.url.endsWith("/create"));
+  assert.equal(toggleRequest.body.root, "dsh", "项目页创建也只提交全局 DSH 目标");
+  create.props.onClick(); render();
+  await selectSession(undefined);
+  assert.equal(find((node) => node.props.role === "dialog"), undefined, "会话切换关闭旧项目创建表单");
+  assert.equal(groups().length, 0, "无当前会话不回退其他项目");
+  assert.ok(find((node) => node.children.includes(t("project.empty"))), "无当前项目显示空状态");
+  assert.equal(find((node) => node.type === "button" && node.children.includes(t("btn.create"))).props.disabled, false, "无当前项目仍可创建全局技能");
+  let resolveOld;
+  globalThis.fetch = async (_, options) => {
+    const snapshot = { data: sessionData(options) };
+    if (options?.headers?.["x-dsh-skills-session"] === "session-a") await new Promise((resolve) => { resolveOld = resolve; });
+    return { ok: true, json: async () => snapshot };
+  };
+  await selectSession("session-a");
+  await selectSession("session-b");
+  assert.ok(rows().includes("project-b"));
+  resolveOld(); await new Promise((resolve) => setImmediate(resolve)); render();
+  assert.ok(rows().includes("project-b") && !rows().includes("project-a"), "旧会话的慢响应不会覆盖当前会话");
+  console.log("当前会话绑定、Tab、项目隔离、筛选记忆和创建目标交互回归通过");
 } finally { globalThis.fetch = originalFetch; }

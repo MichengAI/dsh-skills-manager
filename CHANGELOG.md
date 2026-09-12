@@ -4,11 +4,12 @@
 
 The five most recent published versions are listed below.
 
-## Unreleased
+## 0.1.49 - 2026-09-12
 
-- Unify skill precedence: project sources take priority over global sources, and the manager and runtime select the same copy.
-- Enable and disable copies independently. Disabling a project copy allows another enabled copy to take over; the skill is blocked only when all copies are disabled, and disabled rows identify the source taking over.
-- Move Trash to its own tab alongside Global / Project, with a count when nonempty and direct restore actions. Label root-level `skills/` as “Project Skills” while preserving existing toggle settings.
+- Add Copilot support for global `~/.copilot/skills` and project `.github/skills`, and expand project sources for common agents. The project tab follows only the current session; direct project-management API calls must include its ID in `x-dsh-skills-session`.
+- Prioritize project copies over global copies and toggle each source independently. Another enabled copy can take over when one is disabled, with the active source identified in the UI; invocation is blocked only when all copies are disabled.
+- Give Global, Project, and Trash separate tabs, group skills into collapsible sources, hide long descriptions, and remove redundant information. Creation and import always save to global DSH; generic project `skills/` directories use a neutral source label.
+- Fix update buttons and dialogs not following language changes, and align Trash date formatting and import-warning separators with the UI language.
 
 ## 0.1.48 - 2026-09-11
 
@@ -30,7 +31,3 @@ The five most recent published versions are listed below.
 - Stop scanning resources inside ordinary skill bundles and skip `node_modules`, while retaining nested discovery beside a root skill. Hide overlapping project Agent roots so they cannot bypass user disable policies.
 - Read-only user and project Agent sources now discover nested skills and follow external directory symlinks and Windows junctions by default, including linked roots. Discovery has cycle, depth, and entry limits.
 - Keep list, detail, provider, and local enable/disable policies consistent across differently named aliases. Writable DSH roots and import/delete safeguards remain unchanged.
-
-## 0.1.44 - 2026-09-09
-
-- Unified settings headings, descriptions, and action layouts; maintenance controls no longer squeeze titles or versions. The layout adapts to native DSH settings without Codex UI.

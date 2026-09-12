@@ -957,19 +957,19 @@ ok(
   "settings exposes an explicit refresh action for project file changes",
 );
 ok(
-  source.includes("h(SourceSelect, { value: form.root, label: t(\"create.target\"), options: createOptions"),
-  "create dialog lets the user choose a writable user or project DSH root",
+  source.includes('t("create.globalTarget")') && !source.includes("value: form.root"),
+  "create dialog displays a fixed global destination",
 );
 ok(
   source.includes('t("trash.source", { source: trashRootLabel(item) })'),
   "Trash identifies the original user or project source before restore",
 );
 ok(
-  source.includes("createRoots = roots.filter"),
-  "empty project roots remain available as first-Skill create destinations",
+  source.includes("createRoot = allRoots.find"),
+  "global creation stays available independently of the current project",
 );
 ok(
-  source.includes("canToggleSource(selectedRoot)") &&
+  source.includes("canToggleSource(root)") &&
     source.includes('root.kind !== "project-dsh"'),
   "source-level toggles are available for Agent sources on both tabs, except DSH roots",
 );
@@ -1016,8 +1016,8 @@ ok(
   "skill rows respond to the settings content width rather than only the viewport",
 );
 ok(
-  source.includes(".dssm-source-controls{display:flex"),
-  "source toggles stay beside the selected source path",
+  source.includes(".dssm-source-actions{display:flex"),
+  "source toggles stay in the collapsible source header",
 );
 ok(
   /role: "tablist"/.test(
@@ -1065,6 +1065,15 @@ ok(
   registerOptions !== null && registerOptions.icon === "skill",
   "settings.section registers the skill nav icon",
 );
+
+// 界面语言覆盖系统默认区域；多条警告使用对应语言的分隔符。
+for (const lang of ["zh", "en"]) {
+  const translator = (key, params = {}) => (DICT[lang][key] || key).replace(/\{(\w+)\}/g, (_, name) => String(params[name] ?? ""));
+  const date = "2026-09-12T13:04:05Z";
+  eq(bundle.formatTrashTime?.(translator, date), new Date(date).toLocaleString(lang === "zh" ? "zh-CN" : "en-US"), `${lang} trash time follows UI language`);
+  const result = summarizeImportResult(translator, { imported: [{ name: "alpha", warnings: ["first", "second"] }] });
+  ok(result.text.includes(lang === "zh" ? "first；second" : "first; second"), `${lang} warning separator follows UI language`);
+}
 
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);
