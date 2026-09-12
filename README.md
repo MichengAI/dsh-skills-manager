@@ -23,8 +23,8 @@
 
 Bring skills from your computer and projects into one DSH management page. Find skills, read their contents, control availability, and create or import your own.
 
-- **Reuse existing skills**: discover user skills from `.agents`, CC Switch, Codex, Claude, Gemini, OpenCode, and Cursor.
-- **Organize by project**: browse DSH and `.agents` skills from active projects, with source filters and search.
+- **Reuse existing skills**: discover user skills from `.agents`, CC Switch, Codex, Claude, Gemini, OpenCode, Cursor, Copilot, Windsurf, Trae, OpenClaw, Roo, and CodeBuddy.
+- **Organize by project**: use the Global / Project tabs to browse DSH, `.agents`, `.github` (Copilot), and other Agent directories in active projects, then filter by source or status.
 - **Toggle availability**: enabling or disabling a skill changes its availability in DSH without editing source files.
 - **Read before using**: inspect the body, source information, format diagnostics, and duplicate-name notices.
 - **Add your own skills**: create user or project skills in Settings, or import ZIP archives, skill folders, and `SKILL.md` files.
@@ -32,7 +32,7 @@ Bring skills from your computer and projects into one DSH management page. Find 
 
 ## Screenshots
 
-Browse by source or search in **Settings → Skills**. External Agent sources are made available through manager policy while their files stay read-only:
+Browse global or project skills in **Settings → Skills**. External Agent sources are made available through manager policy while their files stay read-only:
 
 ![Skills Manager source-first settings page](assets/screenshots/skills-manager-v2-preview.png)
 
@@ -103,7 +103,7 @@ Open **Settings → Skills**, then use the panel as follows:
 
 | Goal | Action | Scope |
 | --- | --- | --- |
-| Search or filter | Narrow by source, name, or description. | All sources |
+| Search or filter | Choose the global or project scope first, then narrow by source, invocation status, name, or description. | Current scope |
 | Inspect details | Review body, frontmatter, path, format diagnostics, and duplicate shadowing. | All sources |
 | Enable or disable | Update manager-local invocation policy without modifying the source Skill file. | All valid Skills in user and active-project sources |
 | Create or import | Choose a user or active project DSH destination when creating in Settings; imports remain user-level. | `$DSH_HOME/skills`, active `<project>/.dsh/skills` for creation |
@@ -122,20 +122,20 @@ Escape closes only the frontmost upload or confirmation dialog and leaves Settin
 | `$DSH_AGENTS_HOME\skills` | Yes | Manager state only | No | No |
 | `~\.cc-switch\skills` | Yes, enabled by default | Manager state only | No | No |
 | `%USERPROFILE%\.cursor\skills` (or `$DSH_CURSOR_HOME\skills`) | Yes | Manager state only | No | No |
-| `~/.codex/skills`, `~/.claude/skills`, `~/.gemini/skills`, `~/.config/opencode/skills` | Yes | Manager state only | No | No |
+| `~/.codex/skills`, `~/.claude/skills`, `~/.gemini/skills`, `~/.config/opencode/skills`, `~/.copilot/skills`, `~/.codeium/windsurf/skills`, `~/.windsurf/skills`, `~/.trae/skills`, `~/.trae-cn/skills`, `~/.openclaw/skills`, `~/.clawdbot/skills`, `~/.roo/skills`, `~/.codebuddy/skills` | Yes | Manager state only | No | No |
 | `<project>/.dsh/skills` | Yes, for active Session workspaces | Manager state only | Create in Settings | Moves to Trash and restores to the original project |
-| `<project>/.agents/skills` | Yes, for active Session workspaces | Manager state only | No | No |
+| `<project>/.agents/skills`, `<project>/.github/skills`, `<project>/.codex/skills`, `<project>/.claude/skills`, `<project>/.gemini/skills`, `<project>/.opencode/skills`, `<project>/.cursor/skills`, `<project>/.windsurf/skills`, `<project>/.trae/skills`, `<project>/.trae-cn/skills`, `<project>/.openclaw/skills`, `<project>/.roo/skills`, `<project>/.codebuddy/skills` | Yes, for active Session workspaces | Manager state only | No | No |
 
 - Enable, disable, and delete accept only one ordinary skill-name path segment.
 - Project roots are derived only from active Session `cwd` values; client requests carry an opaque source key and cannot nominate an arbitrary workspace path.
-- Project sources follow DSH's nearest-`.git` root convention and rank order (`project-dsh` 100 before `project-agents` 200). The manager re-scans for each state/detail request. Explicit project policy is enforced by workspace-scoped rank 99/199 overlays; user DSH policy uses rank 399. With no override, DSH's official provider remains the owner. Toggle writes are limited to manager state; project file writes occur only for explicit create/Trash/restore actions under `.dsh/skills`.
+- Project sources follow DSH's nearest-`.git` root convention and rank order (`project-dsh` 100, `project-agents` 200, then other read-only project sources 210–310). The manager re-scans for each state/detail request. Explicit project policy is enforced by workspace-scoped rank overlays; user DSH policy uses rank 399. With no override, DSH's official provider remains the owner. Toggle writes are limited to manager state; project file writes occur only for explicit create/Trash/restore actions under `.dsh/skills`.
 - Trash falls back to copy-then-hide when a project and `$DSH_HOME` are on different volumes; restore uses the same guarded cross-volume path in reverse.
 - Project Trash entries retain their original opaque source identity. Restore is allowed only while that original project is still represented by an active Session workspace; the client cannot nominate a replacement path.
 - Project writes reject linked `.dsh` or `.dsh/skills` directories so a repository cannot redirect creation, deletion, or restore outside its own project root.
 - User-level read-only and project Agent sources recursively discover `SKILL.md` by default. Skill directories, roots, and parent directories may link to external locations through symlinks or Windows junctions without an opt-in or allowlist. Real-path deduplication and manager-local toggles preserve read-only sources. Skill-file symlinks are ignored, cycles terminate, and scans have depth and size limits. Writable DSH roots, imports, and deletion retain their existing boundaries.
 - Directories containing `SKILL.md` are bundle leaves; their resources and `node_modules` are not traversed. A root-level `SKILL.md` can still coexist with nested skills. Project Agent roots that overlap user skill roots by real path are hidden to preserve user disable policies.
 - Rows and summaries say **Enabled/Disabled**, not **Loaded**: these labels describe invocation policy, while full Skill bodies are loaded on demand by DSH. Use Refresh after IDE, Git, or shell changes; the official provider remains responsible for project catalog watching and invalidation.
-- Empty project roots stay out of the main source list to reduce noise, but remain selectable in Create Skill so the first project Skill can still be created. Project DSH supports per-Skill toggles only, not a source-wide switch.
+- Missing read-only project sources stay out of the list; an empty project DSH root remains a Create Skill destination so the first project skill can still be created. Project DSH supports per-Skill toggles only, not a source-wide switch.
 - Replacements copy to a temporary sibling path first and keep the original until that succeeds.
 - Every endpoint, including GET `/state`, accepts only a loopback `Host` or a canonical `host[:port]` that the DSH Web runtime already trusts through its LAN bind and `--trusted-host`; unknown hosts still receive 403.
 - Browser requests must also carry a same-origin `Origin` when present and must not be marked cross-site; write endpoints continue to require JSON and the DSH client request marker.

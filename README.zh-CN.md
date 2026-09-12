@@ -23,8 +23,8 @@
 
 把散落在本机和项目中的 Agent 技能集中到 DSH 管理。在同一个页面里查找技能、查看内容、控制启停，也能创建或导入自己的技能。
 
-- **复用已有技能**：发现 `.agents`、CC Switch、Codex、Claude、Gemini、OpenCode 和 Cursor 的用户级技能。
-- **按项目整理**：展示活动项目中的 DSH 与 `.agents` 技能，按来源搜索和筛选。
+- **复用已有技能**：发现 `.agents`、CC Switch、Codex、Claude、Gemini、OpenCode、Cursor、Copilot、Windsurf、Trae、OpenClaw、Roo 和 CodeBuddy 的用户级技能。
+- **按项目整理**：用「全局技能 / 项目技能」页签查看活动项目中的 DSH、`.agents`、`.github`（Copilot）及其他 Agent 目录，并按来源、状态搜索。
 - **切换启停**：只改变 DSH 中的调用策略，不改动来源技能文件。
 - **查看技能内容**：阅读正文、来源信息、格式诊断和重名提示。
 - **添加自己的技能**：在设置页创建用户级或项目级技能，或导入 ZIP、技能文件夹及 `SKILL.md`。
@@ -32,7 +32,7 @@
 
 ## 界面预览
 
-在「设置 → 技能」中按来源管理 DSH 与其他本机 Agent 的技能，启停不会改动来源技能文件：
+在「设置 → 技能」中按全局或项目作用域管理本机 Agent 技能，启停不会改动来源技能文件：
 
 ![按来源管理技能的设置页面](assets/screenshots/skills-manager-v2-preview.png)
 
@@ -103,7 +103,7 @@ dsh --profile web --dump-config
 
 | 目标 | 操作 | 范围 |
 | --- | --- | --- |
-| 搜索或筛选 | 按来源、名称或简介收窄列表。 | 全部来源 |
+| 搜索或筛选 | 先选择全局或项目作用域，再按来源、调用状态、名称或简介收窄列表。 | 当前作用域 |
 | 查看详情与诊断 | 查看正文、frontmatter、源文件路径、格式问题和重名遮蔽。 | 全部来源 |
 | 启用或停用 | 只更新 manager 本地调用策略，不修改来源 Skill 文件。 | 全部用户级来源与活动项目来源中的有效 Skill |
 | 创建或导入 | 在设置页创建时选择用户 DSH 或活动项目 DSH；导入仍为用户级。 | `$DSH_HOME\skills`，创建可选活动 `<project>/.dsh/skills` |
@@ -122,20 +122,20 @@ dsh --profile web --dump-config
 | `$DSH_AGENTS_HOME\skills` | 支持 | 仅写 manager 状态 | 不支持 | 不支持 |
 | `~\.cc-switch\skills` | 支持，默认开启 | 仅写 manager 状态 | 不支持 | 不支持 |
 | `%USERPROFILE%\.cursor\skills`（或 `$DSH_CURSOR_HOME\skills`） | 支持 | 仅写 manager 状态 | 不支持 | 不支持 |
-| `~/.codex/skills`、`~/.claude/skills`、`~/.gemini/skills`、`~/.config/opencode/skills` | 支持 | 仅写 manager 状态 | 不支持 | 不支持 |
+| `~/.codex/skills`、`~/.claude/skills`、`~/.gemini/skills`、`~/.config/opencode/skills`、`~/.copilot/skills`、`~/.codeium/windsurf/skills`、`~/.windsurf/skills`、`~/.trae/skills`、`~/.trae-cn/skills`、`~/.openclaw/skills`、`~/.clawdbot/skills`、`~/.roo/skills`、`~/.codebuddy/skills` | 支持 | 仅写 manager 状态 | 不支持 | 不支持 |
 | `<project>/.dsh/skills` | 支持活动 Session 工作区 | 仅写 manager 状态 | 设置页支持创建 | 进入回收站并恢复到原项目 |
-| `<project>/.agents/skills` | 支持活动 Session 工作区 | 仅写 manager 状态 | 不支持 | 不支持 |
+| `<project>/.agents/skills`、`<project>/.github/skills`、`<project>/.codex/skills`、`<project>/.claude/skills`、`<project>/.gemini/skills`、`<project>/.opencode/skills`、`<project>/.cursor/skills`、`<project>/.windsurf/skills`、`<project>/.trae/skills`、`<project>/.trae-cn/skills`、`<project>/.openclaw/skills`、`<project>/.roo/skills`、`<project>/.codebuddy/skills` | 支持活动 Session 工作区 | 仅写 manager 状态 | 不支持 | 不支持 |
 
 - 启用、停用和删除只接受单个普通技能名称，目录穿越名称会被拒绝。
 - 项目根只从活动 Session 的 `cwd` 推导；客户端只提交不透明来源 key，不能指定任意工作区路径。
-- 项目来源遵循 DSH 最近 `.git` 项目根和固定优先级（`project-dsh` 100、`project-agents` 200）。管理器每次读取状态或详情时重新扫描；显式项目策略通过 workspace 作用域 rank 99/199 覆盖候选执行，用户 DSH 策略使用 rank 399；没有覆盖时仍由 DSH 官方 provider 负责。启停只写 manager 状态，项目文件写入仅发生在用户明确执行 `.dsh/skills` 创建、回收或恢复时。
+- 项目来源遵循 DSH 最近 `.git` 项目根和固定优先级（`project-dsh` 100、`project-agents` 200，其余只读项目来源 210–310）。管理器每次读取状态或详情时重新扫描；显式项目策略通过 workspace 作用域 rank 覆盖候选执行，用户 DSH 策略使用 rank 399；没有覆盖时仍由 DSH 官方 provider 负责。启停只写 manager 状态，项目文件写入仅发生在用户明确执行 `.dsh/skills` 创建、回收或恢复时。
 - 当项目与 `$DSH_HOME` 位于不同磁盘时，回收站会降级为“复制后在源盘原子隐藏”；恢复使用反向的同一安全流程。
 - 项目回收站条目保存原始不透明来源身份。仅当原项目仍由活动 Session 工作区提供时才允许恢复；客户端不能指定替代路径。
 - 项目写入会拒绝链接形式的 `.dsh` 或 `.dsh/skills` 目录，避免仓库把创建、删除或恢复重定向到项目根之外。
 - 用户级只读来源与项目 Agent 来源默认递归发现 `SKILL.md`，允许技能目录、技能根及其父目录通过软链接或 Windows junction 指向外部目录，无需开关或目录白名单；按真实路径去重，启停只写 manager 状态。忽略 `SKILL.md` 文件链接，限制扫描深度和数量并终止循环；可写 DSH 与导入、删除仍保留原有边界。
 - 普通技能目录发现 `SKILL.md` 后作为 bundle 叶子，不再扫描内部资源，并跳过 `node_modules`；扫描根自身的 `SKILL.md` 仍可与嵌套技能并存。项目 Agent 根与用户技能根真实路径重叠时隐藏，避免绕过用户停用策略。
 - 列表和摘要统一使用“已启用/已停用”，不再使用“已加载”：这里描述的是调用策略，完整 Skill 正文仍由 DSH 按需加载。IDE、Git 或 shell 改动后可点击“刷新”；项目 catalog 的 watcher 与 invalidation 仍由官方 provider 负责。
-- 没有 Skill 的项目根不会出现在主来源列表中，但仍保留在“创建技能”的目标选择中，确保可以创建第一个项目 Skill。项目 DSH 只提供逐 Skill 启停，不提供整个项目来源总开关。
+- 不存在的只读项目来源不会出现在列表中；空的项目 DSH 仍可作为“创建技能”目标，以便写入第一条项目技能。项目 DSH 只提供逐 Skill 启停，不提供整个项目来源总开关。
 - 覆盖前先复制到同目录临时路径；复制成功前不会改动现有技能。
 - 全部接口（含 GET `/state`）只接受 loopback `Host`，或 DSH Web runtime 已通过 LAN 绑定和 `--trusted-host` 明确信任的 `host[:port]`；未知 Host 继续返回 403。
 - 浏览器请求还必须满足同源 `Origin` 且不能标记为 cross-site；写入接口继续要求 JSON 与 DSH 客户端请求标记。

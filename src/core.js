@@ -2,7 +2,7 @@
 //
 // 覆盖 DSH 用户级与活动 Session 项目级技能根：
 //   - 用户根目录：~/.dsh/skills 与常见 Agent 用户目录
-//   - 项目根目录：<project>/.dsh/skills（可启停、创建、回收）、<project>/.agents/skills（本地策略启停、源文件只读）
+//   - 项目根目录：DSH 可创建、回收；公共 Agent 与各应用目录支持本地策略启停，源文件只读
 //   - 条目形态：<root>/<name>/SKILL.md（bundle）或 <root>/<name>.md（flat），只读来源递归发现，可写来源只扫一层
 //   - 前端展示 name、description 与启停状态，不做格式检查或自动修复
 //
@@ -30,7 +30,27 @@ import {
 } from "./readonly-discovery.js";
 
 const KEBAB_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-const PROJECT_ROOT_KEY_RE = /^project-(?:dsh|agents):[a-f0-9]{16}$/;
+// 项目来源集中定义，路径校验、策略身份和展示共用，避免新增目录只可见却不可加载。
+const PROJECT_SOURCES = [
+  { key: "dsh", directory: ".dsh", localeKey: "projectDsh", label: "Project DSH", rank: 100, mutable: true, native: true },
+  { key: "agents", directory: ".agents", localeKey: "projectAgents", label: "Project Agent", rank: 200, native: true },
+  { key: "copilot", directory: ".github", localeKey: "copilot", label: "Copilot", rank: 210 },
+  { key: "codex", directory: ".codex", localeKey: "codex", label: "Codex", rank: 220 },
+  { key: "claude", directory: ".claude", localeKey: "claude", label: "Claude", rank: 230 },
+  { key: "gemini", directory: ".gemini", localeKey: "gemini", label: "Gemini", rank: 240 },
+  { key: "opencode", directory: ".opencode", localeKey: "opencode", label: "OpenCode", rank: 250 },
+  { key: "cursor", directory: ".cursor", localeKey: "cursor", label: "Cursor", rank: 260 },
+  { key: "windsurf", directory: ".windsurf", localeKey: "windsurf", label: "Windsurf", rank: 270 },
+  { key: "trae", directory: ".trae", localeKey: "trae", label: "Trae", rank: 280 },
+  { key: "trae-cn", directory: ".trae-cn", localeKey: "traeCn", label: "Trae CN", rank: 285 },
+  { key: "openclaw", directory: ".openclaw", localeKey: "openclaw", label: "OpenClaw", rank: 290 },
+  { key: "roo", directory: ".roo", localeKey: "roo", label: "Roo", rank: 300 },
+  { key: "codebuddy", directory: ".codebuddy", localeKey: "codebuddy", label: "CodeBuddy", rank: 310 },
+];
+const PROJECT_ROOT_KEY_RE = new RegExp(`^project-(?:${PROJECT_SOURCES.map((source) => source.key).join("|")}):[a-f0-9]{16}$`);
+function projectSourceDefinition(kind) {
+  return PROJECT_SOURCES.find((source) => `project-${source.key}` === kind);
+}
 const USER_DSH_POLICY_RANK = 399;
 const WINDOWS_DEVICE_NAME_RE =
   /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?$/i;
@@ -167,6 +187,107 @@ export function userRoots() {
       native: false,
       rank: 560,
     },
+    {
+      key: "copilot",
+      path: join(process.env.DSH_COPILOT_HOME || join(homedir(), ".copilot"), "skills"),
+      label: "Copilot",
+      mutable: false,
+      toggleable: true,
+      native: false,
+      rank: 570,
+    },
+    {
+      key: "windsurf",
+      path: join(
+        process.env.DSH_WINDSURF_HOME || join(homedir(), ".codeium", "windsurf"),
+        "skills",
+      ),
+      label: "Windsurf",
+      mutable: false,
+      toggleable: true,
+      native: false,
+      rank: 580,
+    },
+    {
+      key: "windsurf-user",
+      localeKey: "windsurfUser",
+      path: join(
+        process.env.DSH_WINDSURF_USER_HOME || join(homedir(), ".windsurf"),
+        "skills",
+      ),
+      label: "Windsurf 主目录",
+      mutable: false,
+      toggleable: true,
+      native: false,
+      rank: 585,
+    },
+    {
+      key: "trae",
+      path: join(process.env.DSH_TRAE_HOME || join(homedir(), ".trae"), "skills"),
+      label: "Trae",
+      mutable: false,
+      toggleable: true,
+      native: false,
+      rank: 590,
+    },
+    {
+      key: "trae-cn",
+      localeKey: "traeCn",
+      path: join(
+        process.env.DSH_TRAE_CN_HOME || join(homedir(), ".trae-cn"),
+        "skills",
+      ),
+      label: "Trae 国内版",
+      mutable: false,
+      toggleable: true,
+      native: false,
+      rank: 595,
+    },
+    {
+      key: "openclaw",
+      path: join(
+        process.env.DSH_OPENCLAW_HOME || join(homedir(), ".openclaw"),
+        "skills",
+      ),
+      label: "OpenClaw",
+      mutable: false,
+      toggleable: true,
+      native: false,
+      rank: 600,
+    },
+    {
+      key: "clawdbot",
+      path: join(
+        process.env.DSH_CLAWDBOT_HOME || join(homedir(), ".clawdbot"),
+        "skills",
+      ),
+      label: "OpenClaw 旧目录",
+      mutable: false,
+      toggleable: true,
+      native: false,
+      rank: 605,
+    },
+    {
+      key: "roo",
+      path: join(process.env.DSH_ROO_HOME || join(homedir(), ".roo"), "skills"),
+      label: "Roo",
+      mutable: false,
+      toggleable: true,
+      native: false,
+      rank: 610,
+    },
+    {
+      key: "codebuddy",
+      path: join(
+        process.env.DSH_CODEBUDDY_HOME || join(homedir(), ".codebuddy"),
+        "skills",
+      ),
+      label: "CodeBuddy",
+      mutable: false,
+      toggleable: true,
+      native: false,
+      rank: 620,
+    },
   ];
 }
 
@@ -200,11 +321,13 @@ async function nearestProjectRoot(cwd) {
 
 async function projectSourceSafe(definition) {
   // 只读来源允许目录链接，但重叠来源会绕过用户根的停用策略。
-  if (definition.kind === "project-agents")
+  const source = projectSourceDefinition(definition.kind);
+  if (!source) return false;
+  if (!source.mutable)
     return !(await overlapsUserSkillRoot(definition.path));
   const container = join(
     definition.projectRoot,
-    definition.kind === "project-dsh" ? ".dsh" : ".agents",
+    source.directory,
   );
   for (const path of [container, definition.path]) {
     const st = await lstatOrNull(path);
@@ -259,30 +382,20 @@ export async function projectRoots(projectCwds = [], diagnostics) {
       projectName: basename(project.root) || project.root,
       workspaceCwds: [...project.cwds].sort(),
     };
-    const candidates = [
-      {
-        ...common,
-        key: `project-dsh:${id}`,
-        kind: "project-dsh",
-        localeKey: "projectDsh",
-        path: join(project.root, ".dsh", "skills"),
-        label: "Project DSH",
-        rank: 100,
-        mutable: true,
-        toggleable: true,
-      },
-      {
-        ...common,
-        key: `project-agents:${id}`,
-        kind: "project-agents",
-        localeKey: "projectAgents",
-        path: join(project.root, ".agents", "skills"),
-        label: "Project Agent",
-        rank: 200,
-        toggleable: true,
-      },
-    ];
+    const candidates = PROJECT_SOURCES.map((source) => ({
+      ...common,
+      key: `project-${source.key}:${id}`,
+      kind: `project-${source.key}`,
+      localeKey: source.localeKey,
+      path: join(project.root, source.directory, "skills"),
+      label: source.label,
+      rank: source.rank,
+      mutable: source.mutable === true,
+      native: source.native === true,
+      toggleable: true,
+    }));
     for (const candidate of candidates) {
+      if (!candidate.native && !(await lstatOrNull(candidate.path))) continue;
       if (await projectSourceSafe(candidate)) roots.push(candidate);
     }
   }
@@ -1132,48 +1245,18 @@ function migrateManagerStateDocument(value) {
     value.version !== 1
   )
     return value;
-  if (
-    value.sources &&
-    typeof value.sources === "object" &&
-    !Array.isArray(value.sources) &&
-    value.sources.ccswitch === undefined
-  )
-    value.sources.ccswitch = true;
-  if (
-    value.disabledSkills &&
-    typeof value.disabledSkills === "object" &&
-    !Array.isArray(value.disabledSkills) &&
-    value.disabledSkills.ccswitch === undefined
-  )
-    value.disabledSkills.ccswitch = [];
-  if (
-    value.enabledSkills &&
-    typeof value.enabledSkills === "object" &&
-    !Array.isArray(value.enabledSkills) &&
-    value.enabledSkills.ccswitch === undefined
-  )
-    value.enabledSkills.ccswitch = [];
-  if (
-    value.sources &&
-    typeof value.sources === "object" &&
-    !Array.isArray(value.sources) &&
-    value.sources.cursor === undefined
-  )
-    value.sources.cursor = true;
-  if (
-    value.disabledSkills &&
-    typeof value.disabledSkills === "object" &&
-    !Array.isArray(value.disabledSkills) &&
-    value.disabledSkills.cursor === undefined
-  )
-    value.disabledSkills.cursor = [];
-  if (
-    value.enabledSkills &&
-    typeof value.enabledSkills === "object" &&
-    !Array.isArray(value.enabledSkills) &&
-    value.enabledSkills.cursor === undefined
-  )
-    value.enabledSkills.cursor = [];
+  for (const root of userRoots()) {
+    for (const field of ["sources", "disabledSkills", "enabledSkills"]) {
+      if (root.key === "dsh" && field === "sources") continue;
+      if (
+        value[field] &&
+        typeof value[field] === "object" &&
+        !Array.isArray(value[field]) &&
+        value[field][root.key] === undefined
+      )
+        value[field][root.key] = field === "sources" ? true : [];
+    }
+  }
   return value;
 }
 
@@ -1336,9 +1419,9 @@ async function checkedPolicyRootDefinition(root) {
       ? canonical
       : null;
   }
+  const source = projectSourceDefinition(definition.kind);
   const validProjectRoot =
-    (definition.kind === "project-dsh" ||
-      definition.kind === "project-agents") &&
+    source &&
     PROJECT_ROOT_KEY_RE.test(definition.key) &&
     typeof definition.projectRoot === "string" &&
     isAbsolute(definition.projectRoot) &&
@@ -1348,7 +1431,7 @@ async function checkedPolicyRootDefinition(root) {
       resolve(
         join(
           definition.projectRoot,
-          definition.kind === "project-dsh" ? ".dsh" : ".agents",
+          source.directory,
           "skills",
         ),
       );

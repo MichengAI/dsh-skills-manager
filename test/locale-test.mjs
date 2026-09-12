@@ -455,7 +455,7 @@ eq(
 );
 eq(
   visibleSkillRoots([
-    { key: "project-empty", scope: "project", skills: [] },
+    { key: "project-empty", scope: "project", exists: false, skills: [] },
     { key: "project-used", scope: "project", skills: [{ name: "demo" }] },
     { key: "codex", scope: "user", skills: [] },
   ])
@@ -464,7 +464,7 @@ eq(
     })
     .join(","),
   "project-used,codex",
-  "main source list hides only empty project roots and keeps empty user sources",
+  "main list hides absent read-only roots",
 );
 
 const parseApiResponse = bundle.parseApiResponse;
@@ -692,8 +692,14 @@ eq(
   "fixed user source labels remain unchanged",
 );
 ok(
-  DICT.zh["root.projectDsh"] && DICT.en["root.projectAgents"],
-  "project DSH and Agent sources are localized in both languages",
+  DICT.zh["root.projectDsh"] && DICT.en["root.projectAgents"] && DICT.zh["root.copilot"] && DICT.en["root.copilot"] &&
+    DICT.zh["root.windsurf"] && DICT.en["root.windsurfUser"] && DICT.zh["root.traeCn"] && DICT.en["root.openclaw"] &&
+    DICT.zh["root.clawdbot"] && DICT.en["root.roo"] && DICT.zh["root.codebuddy"] && DICT.en["root.codebuddy"],
+  "project DSH, Agent, Copilot, and first-tier Agent sources are localized in both languages",
+);
+ok(
+  DICT.zh["scope.user"] && DICT.en["scope.project"] && DICT.zh["import.global"] && DICT.en["filter.status"],
+  "scope tabs, global import, and status filter are localized in both languages",
 );
 ok(
   DICT.zh["status.project"] && DICT.en["status.project"],
@@ -932,7 +938,7 @@ ok(
   "settings exposes an explicit refresh action for project file changes",
 );
 ok(
-  source.includes("h(SourceSelect, { value: form.root, options: createOptions"),
+  source.includes("h(SourceSelect, { value: form.root, label: t(\"create.target\"), options: createOptions"),
   "create dialog lets the user choose a writable user or project DSH root",
 );
 ok(
@@ -940,11 +946,11 @@ ok(
   "Trash identifies the original user or project source before restore",
 );
 ok(
-  source.includes("createRoots = allRoots.filter"),
+  source.includes("createRoots = roots.filter"),
   "empty project roots remain available as first-Skill create destinations",
 );
 ok(
-  source.includes('root.scope !== "project" && root.key !== "dsh"'),
+  source.includes('scope === "user" && selectedRoot.key !== "dsh"'),
   "project roots never expose the unsupported source-level toggle",
 );
 ok(
@@ -960,10 +966,10 @@ ok(
   "internal status styling also uses enabled terminology",
 );
 ok(
-  /h\(SourceSelect,\s*\{\s*value:\s*activeSource,\s*options(?:\s*:\s*options)?/.test(
+  /h\(SourceSelect,\s*\{\s*value:\s*activeSource,\s*label:\s*t\("filter.source"\),\s*options(?:\s*:\s*options)?/.test(
     source,
   ),
-  "a selected project source that becomes empty falls back to All Sources",
+  "source selector uses the validated source key",
 );
 ok(
   !source.includes('setModal("browse")'),
@@ -990,14 +996,14 @@ ok(
   "skill rows respond to the settings content width rather than only the viewport",
 );
 ok(
-  source.includes(".dssm-source-head{box-sizing:border-box"),
-  "source toggles stay inside narrow settings cards",
+  source.includes(".dssm-source-controls{display:flex"),
+  "source toggles stay beside the selected source path",
 );
 ok(
-  /var es = react\.useState\(\{\}\), expanded = es\[0\], setExpanded = es\[1\];/.test(
+  /role: "tablist"/.test(
     source,
   ),
-  "settings starts with every skill source collapsed",
+  "settings separates global and project skills using tabs",
 );
 
 let registerOptions = null;

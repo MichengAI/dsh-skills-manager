@@ -159,6 +159,26 @@ eq(
   560,
   "Cursor source ranks after the existing app-specific roots",
 );
+const firstTierUserRoots = {
+  windsurf: join(testUserHome, ".codeium", "windsurf", "skills"),
+  "windsurf-user": join(testUserHome, ".windsurf", "skills"),
+  trae: join(testUserHome, ".trae", "skills"),
+  "trae-cn": join(testUserHome, ".trae-cn", "skills"),
+  openclaw: join(testUserHome, ".openclaw", "skills"),
+  clawdbot: join(testUserHome, ".clawdbot", "skills"),
+  roo: join(testUserHome, ".roo", "skills"),
+  codebuddy: join(testUserHome, ".codebuddy", "skills"),
+};
+for (const [key, expected] of Object.entries(firstTierUserRoots)) {
+  const definition = userRoots().find((root) => root.key === key);
+  ok(
+    definition &&
+      definition.path === expected &&
+      definition.mutable === false &&
+      definition.toggleable === true,
+    `userRoots exposes the read-only ${key} Skills storage`,
+  );
+}
 
 // Linux 同样必须拒绝 Windows 保留设备名；Windows 无法创建这类来源，故仅在可创建的系统上做端到端断言。
 if (process.platform !== "win32") {
@@ -327,25 +347,26 @@ ok(
   "search field follows the source-first filter layout",
 );
 ok(
-  clientSource.includes('className: "dssm-sources"'),
-  "settings panel renders source-first skill groups",
+  clientSource.includes('role: "tablist"') &&
+    clientSource.includes('className: "dssm-sources"'),
+  "settings panel separates scopes and renders a skill list",
 );
 ok(
   clientSource.includes('"root.ccswitch": "CC Switch"') &&
-    clientSource.includes('"root.cursor": "Cursor"'),
-  "settings panel localizes the CC Switch and Cursor sources in both dictionaries",
+    clientSource.includes('"root.cursor": "Cursor"') &&
+    clientSource.includes('"root.copilot": "Copilot"') &&
+    clientSource.includes('"root.windsurf": "Windsurf"') &&
+    clientSource.includes('"root.traeCn": "Trae CN"') &&
+    clientSource.includes('"root.codebuddy": "CodeBuddy"'),
+  "settings panel localizes the CC Switch, Copilot, Cursor, and first-tier Agent sources in both dictionaries",
 );
 ok(
-  clientSource.includes('className: "dssm-select-trigger"'),
-  "category filter uses the styled custom select",
+  clientSource.includes('"aria-label": props.label'),
+  "category filter exposes an accessible label",
 );
 ok(
-  clientSource.includes(".dssm-select-menu{"),
-  "custom select menu uses design tokens instead of native chrome",
-);
-ok(
-  !/h\(\s*"select"/.test(clientSource),
-  "category filter does not use a native select",
+  /h\(\s*"select"/.test(clientSource),
+  "category filter uses native keyboard selection",
 );
 const packageJson = JSON.parse(
   await readFile(new URL("../package.json", import.meta.url), "utf8"),
@@ -3373,8 +3394,8 @@ try {
 const snap = await state();
 eq(
   snap.roots.length,
-  8,
-  "state returns DSH, CC Switch, Cursor, and common Agent roots",
+  17,
+  "state returns DSH, CC Switch, Copilot, Cursor, first-tier Agents, and common Agent roots",
 );
 ok(
   snap.roots.some((root) => root.key === "ccswitch"),
