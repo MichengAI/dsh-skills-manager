@@ -34,12 +34,12 @@ for (const [file, pattern, line] of [
   [
     "README.md",
     /^- Plugin `[^`]+` is tested with DeepSeek Harness .*$/m,
-    `- Plugin \`${manifest.version}\` is tested with DeepSeek Harness ${supportedHosts.map((v) => "`" + v + "`").join(", ")}. Development dependencies remain pinned to \`${developmentHost}\`; other Host versions are not implicitly supported.`,
+    `- Plugin \`${manifest.version}\` is tested with DeepSeek Harness ${supportedHosts.map((v) => "`" + v + "`").join(", ")}.`,
   ],
   [
     "README.zh-CN.md",
     /^- `[^`]+` 已验证兼容 DeepSeek Harness .*$/m,
-    `- \`${manifest.version}\` 已验证兼容 DeepSeek Harness ${supportedHosts.map((v) => "`" + v + "`").join("、")}；开发依赖固定使用 \`${developmentHost}\`，不自动声明支持其他版本。`,
+    `- \`${manifest.version}\` 已验证兼容 DeepSeek Harness ${supportedHosts.map((v) => "`" + v + "`").join("、")}。`,
   ],
 ]) {
   const url = new URL("../" + file, import.meta.url);

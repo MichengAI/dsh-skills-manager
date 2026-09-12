@@ -21,28 +21,92 @@
 
 ## Features
 
-Bring skills from your computer and projects into one DSH management page. Find skills, read their contents, control availability, and create or import your own.
+Bring skills from your computer and projects into DSH without switching between Agent folders.
 
-- **Reuse existing skills**: discover user skills from `.agents`, CC Switch, Codex, Claude, Gemini, OpenCode, Cursor, Copilot, Windsurf, Trae, OpenClaw, Roo, and CodeBuddy.
-- **Organize by project**: use the Global / Project tabs to browse DSH, `.agents`, `.github` (Copilot), and other Agent directories in active projects, then filter by source or status.
-- **Toggle availability**: enabling or disabling a skill changes its availability in DSH without editing source files.
-- **Read before using**: inspect the body, source information, format diagnostics, and duplicate-name notices.
-- **Add your own skills**: create user or project skills in Settings, or import ZIP archives, skill folders, and `SKILL.md` files.
-- **Recover deleted skills**: the dedicated Trash tab sits alongside Global / Project, shows the pending count, and lets you restore skills or confirm permanent deletion.
+- **Manage in one place**: browse collapsible source groups, search, read, and toggle skills.
+- **Global and project skills**: the project tab follows the current session, with project copies taking priority over global copies.
+- **Reuse existing skills**: supports Codex, Claude Code, Copilot, and other agents without modifying their source files when toggled.
+- **Create and import**: create a skill or import ZIP archives, folders, and `SKILL.md` files into global DSH.
+- **Recover deleted skills**: DSH skills go to Trash first, so accidental deletions can be restored.
 
 ## Screenshots
 
-Switch between Global skills, Project skills, and Trash in **Settings → Skills**. External Agent source files remain read-only:
+Skill management:
 
-![Skills manager with a dedicated Trash tab](assets/screenshots/skills-manager-v2-preview.png)
+![Full skill management view](assets/screenshots/skills-manager-v2-preview.png)
 
-Open any skill to inspect its source path, diagnostics, Markdown body, and parsed frontmatter:
+Read a skill:
 
-![Skill details and diagnostics](assets/screenshots/skill-detail.png)
+![Skill details](assets/screenshots/skill-detail.png)
 
-Moving a DSH-local skill to Trash requires confirmation and remains recoverable until it is permanently deleted:
+Confirm before moving to Trash:
 
-![Move a skill to Trash confirmation](assets/screenshots/delete-plugin.png)
+![Move to Trash confirmation](assets/screenshots/delete-plugin.png)
+
+*These full screenshots show an earlier version. The current version adds Global, Project, and Trash tabs.*
+
+## Installation
+
+Requires a working DeepSeek Harness installation. The commands below use the `web` profile; replace it with yours if needed.
+
+### Ask an agent to install it
+
+Send this to an agent that can use your local terminal:
+
+```text
+Install the latest @michengai/dsh-skills-manager into my DSH web profile using the official npm registry. Confirm installation and explain how to reload DSH.
+```
+
+### Install manually
+
+```powershell
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
+dsh plugin --profile web add @michengai/dsh-skills-manager@latest --registry=https://registry.npmjs.org/
+```
+
+Restart DSH, refresh the page, and open **Settings → Skills**. To update, select **Check for updates** or run the installation command again.
+
+- Plugin `0.1.50` is tested with DeepSeek Harness `0.1.0-rc.8`, `0.1.1-rc.2`, `0.1.2-rc.1`, `0.1.5-rc.1`, `0.1.5-rc.2`.
+
+## Usage
+
+| What you want to do | How |
+| --- | --- |
+| Find a skill | Choose Global or Project, expand a source group, or use search and filters. |
+| Read its contents | Select **View details** for the skill body and source information. |
+| Enable or disable | Toggle the skill switch. This affects DSH without editing source files. |
+| Add a skill | Select **Create skill** or **Import into global DSH**. |
+| Recover a deletion | Open **Trash** and restore. For project skills, return to a session in the original project first. |
+
+- **Current project only**: Git repositories use the nearest Git root. Other folders use the current session working directory; no `git init` required.
+- **Independent copies**: disabling a project copy allows another enabled copy to take over, and the panel identifies the active source. Disable all copies to turn the skill off completely.
+- **File management**: only DSH skills can move to Trash. Other Agent skills can be viewed and toggled. Creation and import always save to global DSH.
+
+## Supported Agent directories
+
+`~` means your home directory; `<project>` is the current session project root. These are default paths; configured DSH directory variables take precedence.
+
+| Source | Global directory | Project directory |
+| --- | --- | --- |
+| DSH | `~/.dsh/skills` | `<project>/.dsh/skills` |
+| Shared Agent | `~/.agents/skills` | `<project>/.agents/skills` |
+| CC Switch | `~/.cc-switch/skills` | — |
+| Codex | `~/.codex/skills` | `<project>/.codex/skills` |
+| Claude Code | `~/.claude/skills` | `<project>/.claude/skills` |
+| Gemini | `~/.gemini/skills` | `<project>/.gemini/skills` |
+| OpenCode | `~/.config/opencode/skills` | `<project>/.opencode/skills` |
+| Cursor | `~/.cursor/skills` | `<project>/.cursor/skills` |
+| Copilot | `~/.copilot/skills` | `<project>/.github/skills` |
+| Windsurf | `~/.codeium/windsurf/skills`<br>`~/.windsurf/skills` | `<project>/.windsurf/skills` |
+| Trae | `~/.trae/skills` | `<project>/.trae/skills` |
+| Trae CN | `~/.trae-cn/skills` | `<project>/.trae-cn/skills` |
+| OpenClaw / Clawdbot | `~/.openclaw/skills`<br>`~/.clawdbot/skills` | — |
+| Roo | `~/.roo/skills` | `<project>/.roo/skills` |
+| CodeBuddy | `~/.codebuddy/skills` | `<project>/.codebuddy/skills` |
+| Project Skills | — | `<project>/skills` |
+
+The generic `<project>/skills` directory is labeled **Project Skills** and also supports OpenClaw workspace skills. Missing external source directories are not shown.
 
 ## DSH product ecosystem
 
@@ -59,157 +123,12 @@ For a ready-to-use workbench, download [DSH Codex Desktop](https://github.com/Mi
 | [BTW](https://github.com/MichengAI/dsh-btw) | Ask side questions without interrupting the main task |
 | [Simplify](https://github.com/MichengAI/dsh-simplify) | Use /simplify to improve code within your Git changes |
 
-## Prerequisites
+## Feedback and contributions
 
-- A working DeepSeek Harness Web installation with `dsh` available in PowerShell.
-- Examples use the `web` profile; replace it with the target profile.
-- Plugin `0.1.50` is tested with DeepSeek Harness `0.1.0-rc.8`, `0.1.1-rc.2`, `0.1.2-rc.1`, `0.1.5-rc.1`, `0.1.5-rc.2`. Development dependencies remain pinned to `0.1.5-rc.2`; other Host versions are not implicitly supported.
-- Source installation and development require Node.js `^22.19.0 || >=24.0.0`. npm installation does not require running `npm install` in an arbitrary directory.
+[Open an issue](https://github.com/MichengAI/dsh-skills-manager/issues) for bugs or suggestions. Include your DSH and plugin versions, reproduction steps, and a full screenshot for UI issues.
 
-## Installation
-
-The installation commands below use the official npm registry.
-
-### Ask an agent to install it (recommended)
-
-Send the prompt below to any agent that can run terminal commands on your computer. Replace `web` with your actual profile. Once installed, use the plugin in DSH.
-
-```text
-Install the DSH plugin @michengai/dsh-skills-manager into my local web profile by running: dsh plugin --profile web add @michengai/dsh-skills-manager@latest --registry=https://registry.npmjs.org/. Then run dsh --profile web --dump-config, confirm the configuration includes skills-manager, and explain how to reload DSH and start using the plugin.
-```
-
-### Install the latest package from the official npm registry
-
-Run this from any PowerShell directory:
-
-```powershell
-[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-$OutputEncoding = [System.Text.Encoding]::UTF8
-dsh plugin --profile web add @michengai/dsh-skills-manager@latest --registry=https://registry.npmjs.org/
-dsh --profile web --dump-config
-```
-
-To pin a release, replace `@latest` with a version such as `@0.1.25`.
-
-The configuration output should contain `skills-manager`. Restart DSH Web and hard-refresh the browser. Do not copy client files manually: `dsh plugin add` also applies `cordis.patch.yml`.
-
-## Updates
-
-The settings title shows the installed version and a **Check for updates** button. When a newer release is available, **Update automatically** runs only when the DSH CLI or Desktop update service is available; otherwise, the dialog provides a profile-specific manual command to copy and run.
-
-## Usage
-
-Open **Settings → Skills**, then use the panel as follows:
-
-| Goal | Action | Scope |
-| --- | --- | --- |
-| Search or filter | Choose the global or project scope first, then narrow by source, invocation status, name, or description. | Current scope |
-| Inspect details | Review body, frontmatter, path, format diagnostics, and duplicate shadowing. | All sources |
-| Enable or disable | Update manager-local invocation policy without modifying the source Skill file. | All valid Skills in user and active-project sources |
-| Create or import | Both Settings creation and import always save to global DSH. | `$DSH_HOME/skills` |
-| Create from conversation | Let an Agent call `create_skill`; DSH asks for approval before writing. | `$DSH_HOME/skills` |
-| Delete and recover | Move to Trash, restore to the original source, or permanently delete in a second step. | User and active-project DSH skills |
-
-> Toggling never changes a source Skill file; only user or project DSH skills can move to Trash.
-
-Escape closes only the frontmost upload or confirmation dialog and leaves Settings open.
-
-## Permissions and safety limits
-
-| Directory | View/load | Enable or disable | Create/import | Delete |
-| --- | --- | --- | --- | --- |
-| `$DSH_HOME\skills` | Yes | Manager state only | Yes | Moves to Trash |
-| `$DSH_AGENTS_HOME\skills` | Yes | Manager state only | No | No |
-| `~\.cc-switch\skills` | Yes, enabled by default | Manager state only | No | No |
-| `%USERPROFILE%\.cursor\skills` (or `$DSH_CURSOR_HOME\skills`) | Yes | Manager state only | No | No |
-| `~/.codex/skills`, `~/.claude/skills`, `~/.gemini/skills`, `~/.config/opencode/skills`, `~/.copilot/skills`, `~/.codeium/windsurf/skills`, `~/.windsurf/skills`, `~/.trae/skills`, `~/.trae-cn/skills`, `~/.openclaw/skills`, `~/.clawdbot/skills`, `~/.roo/skills`, `~/.codebuddy/skills` | Yes | Manager state only | No | No |
-| `<project>/.dsh/skills` | Yes, for active Session workspaces | Manager state only | No project creation in Settings | Moves to Trash and restores to the original project |
-| `<project>/.agents/skills`, `<project>/.github/skills`, `<project>/.codex/skills`, `<project>/.claude/skills`, `<project>/.gemini/skills`, `<project>/.opencode/skills`, `<project>/.cursor/skills`, `<project>/.windsurf/skills`, `<project>/.trae/skills`, `<project>/.trae-cn/skills`, `<project>/skills`, `<project>/.roo/skills`, `<project>/.codebuddy/skills` | Yes, for active Session workspaces | Manager state only | No | No |
-
-- Enable, disable, and delete accept only one ordinary skill-name path segment.
-- `<project>/skills` is labeled “Project Skills”: it supports OpenClaw workspace skills without assuming Agent ownership. Existing toggle policies remain compatible.
-- The project tab follows the current session without a project selector. Requests carry its ID in `x-dsh-skills-session`; the server derives project roots only from that session’s `cwd`. Missing or unknown sessions never fall back to other sessions, and clients cannot nominate an arbitrary workspace path.
-- Enable/disable applies only to the selected source copy. The highest-priority copy not disabled in the manager is used: disabling a project copy falls back to another enabled project copy or a global copy. Disabling a global copy does not disable project copies. Only when all copies are disabled does the manager block the skill. Disabled rows identify the global or project source currently taking over; frontmatter invocation restrictions remain enforced.
-- Project sources follow DSH's nearest-`.git` root convention (falling back to the current Session cwd when no `.git` ancestor exists) and rank order (`project-dsh` 100, `project-agents` 200, then other project sources 210–320, then user DSH 400, shared Agents 450, and other user sources 500–640). The manager re-scans for each state/detail request. Explicit project policy is enforced by workspace-scoped rank overlays; user DSH policy uses rank 399. With no override, DSH's official provider remains the owner. Toggle writes are limited to manager state; project file writes occur only for explicit create/Trash/restore actions under `.dsh/skills`.
-- Trash falls back to copy-then-hide when a project and `$DSH_HOME` are on different volumes; restore uses the same guarded cross-volume path in reverse.
-- Project Trash entries retain their original opaque source identity. Restore is allowed only when the original project matches the current session’s project; the client cannot nominate a replacement path.
-- Project writes reject linked `.dsh` or `.dsh/skills` directories so a repository cannot redirect creation, deletion, or restore outside its own project root.
-- User-level read-only and project Agent sources recursively discover `SKILL.md` by default. Skill directories, roots, and parent directories may link to external locations through symlinks or Windows junctions without an opt-in or allowlist. Real-path deduplication and manager-local toggles preserve read-only sources. Skill-file symlinks are ignored, cycles terminate, and scans have depth and size limits. Writable DSH roots, imports, and deletion retain their existing boundaries.
-- Directories containing `SKILL.md` are bundle leaves; their resources and `node_modules` are not traversed. A root-level `SKILL.md` can still coexist with nested skills. Project Agent roots that overlap user skill roots by real path are hidden to preserve user disable policies.
-- Rows and summaries say **Enabled/Disabled**, not **Loaded**: these labels describe invocation policy, while full Skill bodies are loaded on demand by DSH. Use Refresh after IDE, Git, or shell changes; the official provider remains responsible for project catalog watching and invalidation.
-- Missing read-only project sources stay out of the list; empty project DSH roots remain visible, while Settings creation and import always target global DSH. Project DSH supports per-Skill toggles only, not a source-wide switch.
-- Replacements copy to a temporary sibling path first and keep the original until that succeeds.
-- Every endpoint, including GET `/state`, accepts only a loopback `Host` or a canonical `host[:port]` that the DSH Web runtime already trusts through its LAN bind and `--trusted-host`; unknown hosts still receive 403.
-- Browser requests must also carry a same-origin `Origin` when present and must not be marked cross-site; write endpoints continue to require JSON and the DSH client request marker.
-- Import accepts the local path selected by the user. The Host trust fence prevents DNS rebinding but is not authentication; reverse-proxy and LAN deployments still need authentication, a VPN, or network access controls.
-
-## Secondary development
-
-### Install from source
-
-Use this for debugging or unpublished changes. The cloned directory becomes the plugin source path:
-
-```powershell
-[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-$OutputEncoding = [System.Text.Encoding]::UTF8
-Set-Location D:\Repository\deepseek-harness-plugin
-git clone https://github.com/MichengAI/dsh-skills-manager.git
-Set-Location .\dsh-skills-manager
-npm install
-npm test
-dsh plugin --profile web add .
-dsh --profile web --dump-config
-```
-
-Restart DSH Web and hard-refresh the browser. `dsh plugin ... add .` reads the package metadata and `cordis.patch.yml`; do not install by copying `lib` directly.
-
-Runtime source is maintained under `src`; `lib` is generated by `npm run build` and published with the npm package. Change `src`, never `lib` directly.
-
-- [src\core.js](src/core.js): file-operation, permission, and import boundary core.
-- [src\index.js](src/index.js): host service and local skill file operations.
-- [src\client.js](src/client.js): Settings page, upload, and confirmation interactions.
-- [scripts\build.mjs](scripts/build.mjs): produces Host and browser `lib` artifacts.
-- `test\core-test.mjs`: file-operation, permission, and import boundary tests.
-- `test\locale-test.mjs`: UI locale tests.
-
-After changing the runtime source, test, inspect package contents, and install from the local directory:
-
-```powershell
-[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-$OutputEncoding = [System.Text.Encoding]::UTF8
-npm test
-npm run verify
-dsh plugin --profile web add .
-```
-
-Preserve path validation, temporary-copy replacement, and shared-skill read-only behavior when changing file-mutation code.
-
-## Validation
-
-```powershell
-[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-$OutputEncoding = [System.Text.Encoding]::UTF8
-npm test
-npm run verify
-```
-
-`prepublishOnly` runs the complete `verify` gate before publishing: build, tests, package inspection, and generated-artifact synchronization.
+Source code lives in `src`. Contributions are welcome.
 
 ## License
 
-Licensed under [Apache License 2.0](LICENSE).
-
-## Host compatibility regression
-
-`scripts/hosts.mjs` defines supported hosts; contract tests check package peer and development dependencies against it. Tests cover matching official component versions, not mixed versions or unlisted alpha/RC releases.
-
-```powershell
-[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-$OutputEncoding = [System.Text.Encoding]::UTF8
-pnpm run test:compat
-pnpm run test:compat 0.1.5-rc.2 --keep
-```
-
-Without arguments, all hosts run sequentially. `--keep` retains the sandbox; `--serve` keeps the Host available for manual browser checks. Successful runs clean up by default; failures retain diagnostics. Compact evidence always goes to `.compat-results/`. npm and the project's pnpm must be available on PATH. The manual GitHub Actions compatibility workflow runs a Windows matrix and uploads evidence. It covers real Host APIs and Agent skill policies, not complete UI or external-model end-to-end testing.
-
-To change supported hosts, edit `scripts/hosts.mjs`, run `node scripts/sync-hosts.mjs --write`, update the lockfile, and run the compatibility matrix. `verify` rejects metadata and README drift.
+[Apache License 2.0](LICENSE)
