@@ -140,7 +140,7 @@ ok(
 );
 eq(
   ccswitchDefinition && ccswitchDefinition.rank,
-  510,
+  500,
   "CC Switch source ranks after shared Agents and before app-specific roots",
 );
 const cursorDefinition = userRoots().find((root) => root.key === "cursor");
@@ -156,7 +156,7 @@ ok(
 );
 eq(
   cursorDefinition && cursorDefinition.rank,
-  560,
+  550,
   "Cursor source ranks after the existing app-specific roots",
 );
 const firstTierUserRoots = {
@@ -831,7 +831,7 @@ ok(
 );
 eq(
   codexCandidate.rank,
-  520,
+  510,
   "Codex provider rank stays below native DSH and public Agents",
 );
 const loadedCodex = await getProviderSkill(codexCandidate);
@@ -855,7 +855,7 @@ ok(
 );
 eq(
   cursorCandidate && cursorCandidate.rank,
-  560,
+  550,
   "Cursor provider rank follows the existing external sources",
 );
 await setSkillEnabled(cursorRoot, "cursor-review", false);
@@ -4056,13 +4056,13 @@ try {
   );
   eq(
     mergedDisabled?.source,
-    "user-dsh",
-    "禁用 DSH 赢家后仍由它阻断较低优先级来源",
+    "agent-agents",
+    "停用 DSH 副本后选择仍启用的公共 Agent 副本",
   );
   ok(
-    mergedDisabled?.invocation.modelInvocable === false &&
-      mergedDisabled?.invocation.userInvocable === false,
-    "禁用赢家不会回流到启用的外部副本",
+    mergedDisabled?.invocation.modelInvocable === true &&
+      mergedDisabled?.invocation.userInvocable === true,
+    "停用只影响对应副本，其他来源继续可调用",
   );
 
   const duplicateProject = join(tmp, "issue-nine-project");
@@ -4126,7 +4126,7 @@ try {
   const outsideCandidates = (
     await listProviderCandidates({ cwd: noGitWorkspace })
   ).filter((candidate) => candidate.name === duplicateName);
-  eq(outsideCandidates[0]?.source, "user-dsh", "其他工作区不继承项目同名赢家");
+  eq(outsideCandidates[0]?.source, "agent-agents", "其他工作区不继承项目同名赢家");
   await makeSkill(
     join(secondProject, ".agents", "skills"),
     "independent-copy",
@@ -4153,13 +4153,29 @@ try {
   eq(
     disabledProjectCandidates.length,
     1,
-    "禁用项目赢家后不输出低优先级同名副本",
+    "停用项目副本后仍只输出一个实际赢家",
   );
   ok(
-    disabledProjectCandidates[0]?.invocation.modelInvocable === false &&
-      disabledProjectCandidates[0]?.invocation.userInvocable === false,
-    "禁用项目赢家保持双通道阻断",
+    disabledProjectCandidates[0]?.source === "agent-agents" &&
+      disabledProjectCandidates[0]?.invocation.modelInvocable === true &&
+      disabledProjectCandidates[0]?.invocation.userInvocable === true,
+    "项目副本全部停用后回退到启用的全局副本",
   );
+  const mergedFallback = await mergedSkillCandidate(
+    duplicateName,
+    [nativeDshCandidate],
+    [{ ...nativeDshCandidate, source: "project-dsh", rank: 100 }],
+    disabledProjectCandidates,
+  );
+  eq(mergedFallback?.source, "agent-agents", "宿主原生项目候选不能抢回已停用项目副本");
+  eq((await getProviderSkill(mergedFallback, { cwd: duplicateProject }))?.content, "公共 Agent 正文", "回退加载全局正文");
+  await setSourceEnabled("agents", false);
+  await setSourceEnabled("codex", false);
+  const allDisabled = (await listProviderCandidates({ cwd: duplicateProject })).filter((c) => c.name === duplicateName);
+  const mergedAllDisabled = await mergedSkillCandidate(duplicateName, [nativeDshCandidate], [{ ...nativeDshCandidate, source: "project-dsh", rank: 100 }], allDisabled);
+  ok(mergedAllDisabled?.invocation.modelInvocable === false && mergedAllDisabled?.invocation.userInvocable === false, "全部副本停用后阻断原生扫描恢复调用");
+  await setSourceEnabled("agents", true);
+  await setSourceEnabled("codex", true);
   await makeSkill(
     dshRoot,
     "issue-nine-unique",
@@ -4198,10 +4214,10 @@ try {
   );
   eq(externalCandidates.length, 1, "没有 DSH 副本时同样只保留外部同名赢家");
   ok(
-    externalCandidates[0]?.source === "agent-agents" &&
-      externalCandidates[0]?.invocation.modelInvocable === false &&
-      externalCandidates[0]?.invocation.userInvocable === false,
-    "外部赢家来源停用后不回流到启用的 Codex 副本",
+    externalCandidates[0]?.source === "agent-codex" &&
+      externalCandidates[0]?.invocation.modelInvocable === true &&
+      externalCandidates[0]?.invocation.userInvocable === true,
+    "停用公共来源后启用的 Codex 副本可继续调用",
   );
   await makeSkill(
     dshRoot,

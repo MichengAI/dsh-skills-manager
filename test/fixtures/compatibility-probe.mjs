@@ -45,6 +45,7 @@ export function apply(ctx) {
                             list,
                             skill,
                             local: await registry.get("compat-local", options),
+                            scoped: await registry.get("compat-scoped", options),
                         }),
                     );
                 } catch (error) {

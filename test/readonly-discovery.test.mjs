@@ -212,12 +212,9 @@ try {
     "external-review 正文",
   );
   await core.setSkillEnabled(projectRoot, "review", false);
-  assert.equal(
-    (await core.listProviderCandidates({ cwd: project })).find(
-      (e) => e.name === "external-review",
-    ).invocation.userInvocable,
-    false,
-  );
+  const fallback = (await core.listProviderCandidates({ cwd: project })).find((e) => e.name === "external-review");
+  assert.equal(fallback.invocation.userInvocable, true, "停用项目链接入口不影响全局入口");
+  assert.notEqual(fallback.source, "project-agents");
   assert.equal(
     (await core.deleteSkill(projectRoot, "review")).code,
     "error.root.readonly",

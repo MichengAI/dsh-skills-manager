@@ -114,15 +114,64 @@ try {
   await skill(join(dsh.path, "shared"), "shared");
   await skill(join(project, ".github", "skills", "shared"), "shared");
   const dshWinner = (await core.listProviderCandidates({ cwd: project })).find((c) => c.name === "shared");
-  assert.equal(dshWinner.source, "user-dsh", "只读项目 Agent 不能顶掉用户 DSH 同名技能");
+  assert.equal(dshWinner.source, "project-copilot", "项目 Agent 优先于用户 DSH 同名技能");
   await skill(join(copilot.path, "same"), "same-name");
   await skill(join(project, ".github", "skills", "same"), "same-name");
   const winner = (await core.listProviderCandidates({ cwd: project })).find((c) => c.name === "same-name");
-  assert.equal(winner.source, "project-copilot", "项目 Copilot 仍可覆盖其他用户 Agent 的同名副本");
+  assert.equal(winner.source, "project-copilot", "项目 Agent 优先于全局来源");
   const root = (await core.projectRoots([project])).find((r) => r.kind === "project-copilot");
-  assert.ok(root.rank > 400, "只读项目 Agent rank 低于用户 DSH");
+  const projectSources = (await core.projectRoots([project])).filter((r) => !r.native);
+  const userRanks = core.userRoots().map((r) => r.rank);
+  assert.equal(new Set(projectSources.map((r) => r.rank)).size, projectSources.length, "项目来源 rank 唯一");
+  assert.ok(projectSources.every((r) => r.rank < Math.min(...userRanks)), "新增项目来源全部排在用户来源之前");
+  // 覆盖全部项目来源与全部用户来源的同名竞争，包括此前跨 Agent 的 10 组同分。
+  for (const userRoot of core.userRoots()) {
+    const name = `collision-${userRoot.key}`;
+    await skill(join(userRoot.path, name), name);
+    for (const projectRoot of projectSources) await skill(join(projectRoot.path, name), name);
+  }
+  const collisionState = await core.state({ projectCwds: [project] });
+  const candidates = await core.listProviderCandidates({ cwd: project });
+  for (const userRoot of core.userRoots()) {
+    const name = `collision-${userRoot.key}`;
+    const candidate = candidates.find((c) => c.name === name);
+    assert.equal(candidate.locator.rootKey, projectSources[0].key, "Provider 选择最高优先级项目副本");
+    for (const projectRoot of projectSources) {
+      const view = collisionState.roots.find((r) => r.key === projectRoot.key).skills.find((s) => s.name === name);
+      if (projectRoot.key === candidate.locator.rootKey) assert.equal(view.winner, true);
+      else {
+        assert.equal(view.shadowedBy.root, candidate.locator.rootKey, "项目 UI 与 Provider 的赢家一致");
+        assert.notEqual(view.winner, true, "被覆盖项目副本不得标为赢家");
+      }
+    }
+    await core.setSkillEnabled(userRoot, name, false);
+    const disabled = (await core.listProviderCandidates({ cwd: project })).find((c) => c.name === name);
+    assert.equal(disabled.locator.rootKey, projectSources[0].key, "停用全局副本不影响项目赢家");
+    assert.equal(disabled.invocation.modelInvocable, true);
+    await core.setSkillEnabled(userRoot, name, true);
+  }
+  // 项目各副本分别停用后逐级回退，最终使用全局副本；全部停用才阻断调用。
+  const cascadeName = "collision-codex";
+  const globalCodex = core.userRoots().find((r) => r.key === "codex");
+  for (let i = 0; i < projectSources.length; i++) {
+    const disabledRoot = projectSources[i];
+    await core.setSkillEnabled(disabledRoot, cascadeName, false);
+    const next = (await core.listProviderCandidates({ cwd: project })).find((c) => c.name === cascadeName);
+    assert.equal(next.locator.rootKey, projectSources[i + 1]?.key ?? globalCodex.key);
+    assert.equal(next.invocation.modelInvocable, true);
+    const view = (await core.state({ projectCwds: [project] })).roots.find((r) => r.key === disabledRoot.key).skills.find((s) => s.name === cascadeName);
+    assert.equal(view.enabled, false, "已停用副本保持停用状态");
+    assert.equal(view.shadowedBy, undefined, "已停用副本不标为被覆盖");
+    assert.notEqual(view.winner, true);
+  }
+  await core.setSkillEnabled(globalCodex, cascadeName, false);
+  assert.equal((await core.listProviderCandidates({ cwd: project })).find((c) => c.name === cascadeName).invocation.modelInvocable, false);
+  await core.setSkillEnabled(globalCodex, cascadeName, true);
+  assert.equal((await core.listProviderCandidates({ cwd: project })).find((c) => c.name === cascadeName).locator.rootKey, globalCodex.key);
+  await core.setSkillEnabled(projectSources[0], cascadeName, true);
+  assert.equal((await core.listProviderCandidates({ cwd: project })).find((c) => c.name === cascadeName).locator.rootKey, projectSources[0].key);
   await core.setSkillEnabled(root, "same", false);
-  assert.equal((await core.listProviderCandidates({ cwd: project })).find((c) => c.name === "same-name").invocation.modelInvocable, false, "禁用赢家不回流全局副本");
+  assert.equal((await core.listProviderCandidates({ cwd: project })).find((c) => c.name === "same-name").invocation.modelInvocable, true, "停用项目副本后全局副本继续生效");
   assert.equal((await core.listProviderCandidates({ cwd: other })).find((c) => c.name === "same-name").invocation.modelInvocable, true);
   await core.setSkillEnabled(root, "same", true);
   assert.equal((await core.setSourceEnabled(root.key, false, undefined, { projectCwds: [project] })).enabled, false);
@@ -145,7 +194,8 @@ try {
   assert.equal(typeof afterDisable.summary.disabled, "number");
   assert.equal(typeof afterDisable.summary.issues, "number");
   const openclawRoot = afterDisable.roots.find((r) => r.kind === "project-openclaw");
-  assert.equal(openclawRoot.path, join(project, "skills"), "OpenClaw 使用官方 workspace/skills 目录");
+  assert.equal(openclawRoot.path, join(project, "skills"), "通用项目 Skills 保留 workspace/skills 目录");
+  assert.equal(openclawRoot.localeKey, "projectSkills", "根目录 skills 使用中性显示名称，保留策略 key 兼容性");
   console.log("项目来源、Copilot 迁移与加载回归通过");
 } finally {
   await rm(temp, { recursive: true, force: true });

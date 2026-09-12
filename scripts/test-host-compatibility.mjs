@@ -292,6 +292,13 @@ try {
     join(local, "SKILL.md"),
     original.replaceAll("compat-external", "compat-local"),
   );
+  // 同名项目与全局正文分开，验证停用一个副本不会停用其他来源。
+  const projectScoped = join(workspace, ".dsh", "skills", "compat-scoped");
+  const globalScoped = join(env.DSH_HOME, "skills", "compat-scoped");
+  for (const [path, body] of [[projectScoped, "PROJECT_BODY"], [globalScoped, "GLOBAL_BODY"]]) {
+    await mkdir(path, { recursive: true });
+    await writeFile(join(path, "SKILL.md"), `---\nname: compat-scoped\ndescription: 作用域回退测试\n---\n${body}\n`);
+  }
   host = spawn(
     process.execPath,
     [
@@ -399,6 +406,30 @@ try {
   report.checks.push(
     "活动 Agent 停用后模型与用户调用策略刷新、恢复启用、源文件不变",
   );
+  const scopedState = await request("/api/dsh-skills-manager/state");
+  const projectRoot = scopedState.data.roots.find((item) => item.kind === "project-dsh" && item.path === join(workspace, ".dsh", "skills"));
+  assert(projectRoot, "真实 Agent 的项目来源可管理");
+  assert.equal(snapshot.scoped.content, "PROJECT_BODY");
+  async function toggleScoped(root, enabled) {
+    await request(`/api/dsh-skills-manager/${enabled ? "enable" : "disable"}`, { root, name: "compat-scoped" });
+    return probe();
+  }
+  snapshot = await toggleScoped(projectRoot.key, false);
+  assert.equal(snapshot.scoped.content, "GLOBAL_BODY", "项目停用后宿主采用全局正文");
+  assert.equal(snapshot.scoped.invocation.modelInvocable, true);
+  const fallbackState = await request("/api/dsh-skills-manager/state");
+  const disabledProject = fallbackState.data.roots.find((r) => r.key === projectRoot.key).skills.find((s) => s.name === "compat-scoped");
+  assert.equal(disabledProject.enabled, false);
+  assert.equal(disabledProject.shadowedBy, undefined);
+  snapshot = await toggleScoped("dsh", false);
+  assert.equal(snapshot.scoped.invocation.modelInvocable, false, "全部停用才阻断调用");
+  assert.equal(snapshot.scoped.invocation.userInvocable, false);
+  snapshot = await toggleScoped(projectRoot.key, true);
+  assert.equal(snapshot.scoped.content, "PROJECT_BODY");
+  assert.equal(snapshot.scoped.invocation.modelInvocable, true, "全局停用不影响项目恢复");
+  snapshot = await toggleScoped("dsh", true);
+  assert.equal(snapshot.scoped.content, "PROJECT_BODY");
+  report.checks.push("项目优先、项目停用后全局回退、全部停用阻断、分别恢复及 UI 状态一致");
   report.passed = true;
   await writeFile(
     join(sandbox, "result.json"),

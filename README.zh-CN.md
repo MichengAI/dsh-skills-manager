@@ -28,13 +28,13 @@
 - **切换启停**：只改变 DSH 中的调用策略，不改动来源技能文件。
 - **查看技能内容**：阅读正文、来源信息、格式诊断和重名提示。
 - **添加自己的技能**：在设置页创建用户级或项目级技能，或导入 ZIP、技能文件夹及 `SKILL.md`。
-- **找回误删的技能**：DSH 技能删除后先进入回收站，可恢复到原位置。
+- **找回误删的技能**：回收站与全局／项目技能同级显示为独立 Tab，带待处理数量，可直接恢复或确认永久删除。
 
 ## 界面预览
 
-在「设置 → 技能」中按全局或项目作用域管理本机 Agent 技能，启停不会改动来源技能文件：
+在「设置 → 技能」中切换全局技能、项目技能和回收站；启停不会改动来源技能文件：
 
-![按来源管理技能的设置页面](assets/screenshots/skills-manager-v2-preview.png)
+![技能管理与独立回收站 Tab](assets/screenshots/skills-manager-v2-preview.png)
 
 打开任意技能可查看来源路径、诊断结果、Markdown 正文与解析后的 frontmatter：
 
@@ -127,8 +127,10 @@ dsh --profile web --dump-config
 | `<project>/.agents/skills`、`<project>/.github/skills`、`<project>/.codex/skills`、`<project>/.claude/skills`、`<project>/.gemini/skills`、`<project>/.opencode/skills`、`<project>/.cursor/skills`、`<project>/.windsurf/skills`、`<project>/.trae/skills`、`<project>/.trae-cn/skills`、`<project>/skills`、`<project>/.roo/skills`、`<project>/.codebuddy/skills` | 支持活动 Session 工作区 | 仅写 manager 状态 | 不支持 | 不支持 |
 
 - 启用、停用和删除只接受单个普通技能名称，目录穿越名称会被拒绝。
+- 根目录 `<project>/skills` 显示为“项目 Skills”，可兼容 OpenClaw workspace 技能，但不据此判断所属 Agent；现有启停策略保持兼容。
 - 项目根只从活动 Session 的 `cwd` 推导；客户端只提交不透明来源 key，不能指定任意工作区路径。
-- 项目来源遵循 DSH 最近 `.git` 项目根和固定优先级（`project-dsh` 100、`project-agents` 200，其余只读项目来源 500–600，低于用户 DSH 399/400）。管理器每次读取状态或详情时重新扫描；显式项目策略通过 workspace 作用域 rank 覆盖候选执行，用户 DSH 策略使用 rank 399；没有覆盖时仍由 DSH 官方 provider 负责。启停只写 manager 状态，项目文件写入仅发生在用户明确执行 `.dsh/skills` 创建、回收或恢复时。
+- 启停仅影响所选来源的副本。管理器在未被停用的副本中按优先级选择：停用项目副本后可使用其他已启用项目副本或全局副本；停用全局副本不影响项目副本。全部副本停用时才阻断该技能；frontmatter 自带的调用限制仍然生效。
+- 项目来源遵循 DSH 最近 `.git` 项目根和固定优先级（`project-dsh` 100、`project-agents` 200，其余项目来源 210–320，之后为全局 DSH 400、公共 Agent 450、其他全局来源 500–640）。管理器每次读取状态或详情时重新扫描；显式项目策略通过 workspace 作用域 rank 覆盖候选执行，用户 DSH 策略使用 rank 399；没有覆盖时仍由 DSH 官方 provider 负责。启停只写 manager 状态，项目文件写入仅发生在用户明确执行 `.dsh/skills` 创建、回收或恢复时。
 - 当项目与 `$DSH_HOME` 位于不同磁盘时，回收站会降级为“复制后在源盘原子隐藏”；恢复使用反向的同一安全流程。
 - 项目回收站条目保存原始不透明来源身份。仅当原项目仍由活动 Session 工作区提供时才允许恢复；客户端不能指定替代路径。
 - 项目写入会拒绝链接形式的 `.dsh` 或 `.dsh/skills` 目录，避免仓库把创建、删除或恢复重定向到项目根之外。

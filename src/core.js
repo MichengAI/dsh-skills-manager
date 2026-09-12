@@ -31,23 +31,36 @@ import {
 
 const KEBAB_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 // 项目来源集中定义，路径校验、策略身份和展示共用，避免新增目录只可见却不可加载。
-const PROJECT_SOURCES = [
+// 两种作用域共用 Agent 顺序；兼容目录紧跟主目录，通用项目目录最后补充。
+const EXTERNAL_SOURCE_ORDER = [
+  "ccswitch", "codex", "claude", "gemini", "opencode", "cursor", "copilot",
+  "windsurf", "windsurf-user", "trae", "trae-cn", "openclaw", "clawdbot",
+  "roo", "codebuddy", "projectSkills",
+];
+function rankSources(sources, startRank) {
+  const order = (root) => EXTERNAL_SOURCE_ORDER.indexOf(root.localeKey === "projectSkills" ? "projectSkills" : root.key);
+  const external = sources.filter((root) => !root.native).sort((a, b) => order(a) - order(b));
+  const ranks = new Map(external.map((root, index) => [root.key, startRank + index * 10]));
+  return sources.map((root) => ({ ...root, rank: root.native ? root.rank : ranks.get(root.key) }))
+    .sort((a, b) => a.rank - b.rank);
+}
+const PROJECT_SOURCES = rankSources([
   { key: "dsh", directory: ".dsh", localeKey: "projectDsh", label: "Project DSH", rank: 100, mutable: true, native: true },
   { key: "agents", directory: ".agents", localeKey: "projectAgents", label: "Project Agent", rank: 200, native: true },
-  // 只读项目 Agent 排在用户 DSH（399/400）之后，避免仓库自带目录默认顶掉用户技能。
-  { key: "copilot", directory: ".github", localeKey: "copilot", label: "Copilot", rank: 500 },
-  { key: "codex", directory: ".codex", localeKey: "codex", label: "Codex", rank: 510 },
-  { key: "claude", directory: ".claude", localeKey: "claude", label: "Claude", rank: 520 },
-  { key: "gemini", directory: ".gemini", localeKey: "gemini", label: "Gemini", rank: 530 },
-  { key: "opencode", directory: ".opencode", localeKey: "opencode", label: "OpenCode", rank: 540 },
-  { key: "cursor", directory: ".cursor", localeKey: "cursor", label: "Cursor", rank: 550 },
-  { key: "windsurf", directory: ".windsurf", localeKey: "windsurf", label: "Windsurf", rank: 560 },
-  { key: "trae", directory: ".trae", localeKey: "trae", label: "Trae", rank: 570 },
-  { key: "trae-cn", directory: ".trae-cn", localeKey: "traeCn", label: "Trae CN", rank: 575 },
-  { key: "openclaw", directory: "", localeKey: "openclaw", label: "OpenClaw", rank: 580 },
-  { key: "roo", directory: ".roo", localeKey: "roo", label: "Roo", rank: 590 },
-  { key: "codebuddy", directory: ".codebuddy", localeKey: "codebuddy", label: "CodeBuddy", rank: 600 },
-];
+  // 保留原生项目 100/200；其余项目来源按统一 Agent 顺序生成 210–320。
+  { key: "copilot", directory: ".github", localeKey: "copilot", label: "Copilot" },
+  { key: "codex", directory: ".codex", localeKey: "codex", label: "Codex" },
+  { key: "claude", directory: ".claude", localeKey: "claude", label: "Claude" },
+  { key: "gemini", directory: ".gemini", localeKey: "gemini", label: "Gemini" },
+  { key: "opencode", directory: ".opencode", localeKey: "opencode", label: "OpenCode" },
+  { key: "cursor", directory: ".cursor", localeKey: "cursor", label: "Cursor" },
+  { key: "windsurf", directory: ".windsurf", localeKey: "windsurf", label: "Windsurf" },
+  { key: "trae", directory: ".trae", localeKey: "trae", label: "Trae" },
+  { key: "trae-cn", directory: ".trae-cn", localeKey: "traeCn", label: "Trae CN" },
+  { key: "openclaw", directory: "", localeKey: "projectSkills", label: "Project Skills" },
+  { key: "roo", directory: ".roo", localeKey: "roo", label: "Roo" },
+  { key: "codebuddy", directory: ".codebuddy", localeKey: "codebuddy", label: "CodeBuddy" },
+], 210);
 const PROJECT_ROOT_KEY_RE = new RegExp(
   `^project-(?:${[...PROJECT_SOURCES]
     .map((source) => source.key)
@@ -105,7 +118,7 @@ export function resolveAgentsHome() {
  * manager provider 以 450 接管公共 Agents（仍低于 DSH），其余来源依次排在其后。
  */
 export function userRoots() {
-  return [
+  return rankSources([
     {
       key: "dsh",
       path: join(resolveDshHome(), "skills"),
@@ -131,7 +144,6 @@ export function userRoots() {
       mutable: false,
       toggleable: true,
       native: false,
-      rank: 510,
     },
     {
       key: "codex",
@@ -143,7 +155,6 @@ export function userRoots() {
       mutable: false,
       toggleable: true,
       native: false,
-      rank: 520,
     },
     {
       key: "claude",
@@ -155,7 +166,6 @@ export function userRoots() {
       mutable: false,
       toggleable: true,
       native: false,
-      rank: 530,
     },
     {
       key: "gemini",
@@ -167,7 +177,6 @@ export function userRoots() {
       mutable: false,
       toggleable: true,
       native: false,
-      rank: 540,
     },
     {
       key: "opencode",
@@ -179,7 +188,6 @@ export function userRoots() {
       mutable: false,
       toggleable: true,
       native: false,
-      rank: 550,
     },
     {
       key: "cursor",
@@ -191,7 +199,6 @@ export function userRoots() {
       mutable: false,
       toggleable: true,
       native: false,
-      rank: 560,
     },
     {
       key: "copilot",
@@ -200,7 +207,6 @@ export function userRoots() {
       mutable: false,
       toggleable: true,
       native: false,
-      rank: 570,
     },
     {
       key: "windsurf",
@@ -212,7 +218,6 @@ export function userRoots() {
       mutable: false,
       toggleable: true,
       native: false,
-      rank: 580,
     },
     {
       key: "windsurf-user",
@@ -225,7 +230,6 @@ export function userRoots() {
       mutable: false,
       toggleable: true,
       native: false,
-      rank: 585,
     },
     {
       key: "trae",
@@ -234,7 +238,6 @@ export function userRoots() {
       mutable: false,
       toggleable: true,
       native: false,
-      rank: 590,
     },
     {
       key: "trae-cn",
@@ -247,7 +250,6 @@ export function userRoots() {
       mutable: false,
       toggleable: true,
       native: false,
-      rank: 595,
     },
     {
       key: "openclaw",
@@ -259,7 +261,6 @@ export function userRoots() {
       mutable: false,
       toggleable: true,
       native: false,
-      rank: 600,
     },
     {
       key: "clawdbot",
@@ -271,7 +272,6 @@ export function userRoots() {
       mutable: false,
       toggleable: true,
       native: false,
-      rank: 605,
     },
     {
       key: "roo",
@@ -280,7 +280,6 @@ export function userRoots() {
       mutable: false,
       toggleable: true,
       native: false,
-      rank: 610,
     },
     {
       key: "codebuddy",
@@ -292,9 +291,8 @@ export function userRoots() {
       mutable: false,
       toggleable: true,
       native: false,
-      rank: 620,
     },
-  ];
+  ], 500);
 }
 
 function projectIdentity(path) {
@@ -2643,14 +2641,14 @@ export async function skillDetail(key, name, options = {}) {
   };
 }
 
-/** 生成 manager provider 候选：保留禁用候选以阻止低优先级重名副本意外激活。 */
+/** 选择未停用的最高优先级副本；全部停用时输出阻断候选覆盖原生扫描。 */
 export async function listProviderCandidates(options = {}) {
   const policyResult = await readManagerState();
   const candidates = [];
   const user = userRoots();
   const userScans = await scanDeduplicatedRoots(user);
   const items = user.flatMap((root) =>
-    userScans.get(root.key).entries.map((entry) => ({ root, entry })),
+    userScans.get(root.key).entries.map((entry) => ({ root, entry, policy: effectiveSkillPolicy(policyResult, root, entry) })),
   );
   const cwd =
     options && typeof options.cwd === "string" ? options.cwd : undefined;
@@ -2658,16 +2656,17 @@ export async function listProviderCandidates(options = {}) {
     const roots = await projectRoots([cwd]);
     for (const root of roots) {
       const scanned = (await scanDeduplicatedRoots([root])).get(root.key);
-      for (const entry of scanned.entries) items.push({ root, entry });
+      for (const entry of scanned.entries) items.push({ root, entry, policy: effectiveSkillPolicy(policyResult, root, entry) });
     }
   }
   for (const group of groupLoadableSkillsByName(items).values()) {
-    const { root, entry } = group[0];
+    const { root, entry, policy } = selectSkillWinner(group);
     const project = root.scope === "project";
     const policyOnly = root.mutable;
-    const policy = effectiveSkillPolicy(policyResult, root, entry);
-    // 近作用域先于 rank 决胜；冲突时必须提供真正的赢家，避免预设原生副本回流。
-    // 禁用状态不参与选赢家，禁用赢家仍需阻断低优先级副本。
+    // 回退副本也必须覆盖组内更高优先级的原生条目，防止宿主重新选中已停用副本。
+    const overlayRank = group.length > 1
+      ? Math.min(...group.map((item) => Math.min(item.root.rank, item.entry.providerRank ?? item.root.rank))) - 1
+      : undefined;
     const needsOverlay =
       !policyOnly ||
       group.length > 1 ||
@@ -2688,11 +2687,11 @@ export async function listProviderCandidates(options = {}) {
         : root.key === "dsh"
           ? "user-dsh"
           : `agent-${root.key}`,
-      rank: project
+      rank: overlayRank ?? (project
         ? root.rank - 1
         : root.key === "dsh"
           ? USER_DSH_POLICY_RANK
-          : (entry.providerRank ?? root.rank),
+          : (entry.providerRank ?? root.rank)),
       locator: {
         rootKey: root.key,
         entryName: entry.name,
@@ -2780,7 +2779,14 @@ function canonicalSkillName(item) {
 /** 真实路径去重后按声明名分组；管理页与当前工作区 provider 共用来源优先级。 */
 function groupLoadableSkillsByName(items) {
   const groups = new Map();
-  for (const item of [...items].sort((a, b) => a.root.rank - b.root.rank)) {
+  // 同分时明确优先项目作用域，再按来源与条目标识决胜，不依赖调用方插入顺序。
+  const compareText = (a, b) => a < b ? -1 : a > b ? 1 : 0;
+  for (const item of [...items].sort((a, b) =>
+    a.root.rank - b.root.rank ||
+    Number(b.root.scope === "project") - Number(a.root.scope === "project") ||
+    compareText(a.root.key, b.root.key) ||
+    compareText(a.entry.name, b.entry.name),
+  )) {
     if (!item.entry.loadable) continue;
     const name = canonicalSkillName(item);
     const group = groups.get(name) || [];
@@ -2790,21 +2796,29 @@ function groupLoadableSkillsByName(items) {
   return groups;
 }
 
-function markWinners(items, options = {}) {
+// 只跳过 manager 明确停用的副本；frontmatter 的分通道限制和非法策略仍按原规则失败关闭。
+function isCopyDisabled(item) {
+  return !item.policy.sourceEnabled || item.policy.override === false;
+}
+function selectSkillWinner(group) {
+  return group.find((item) => !isCopyDisabled(item)) || group[0];
+}
+function markWinners(items) {
   const winners = new Map();
-  for (const [
-    canonicalName,
-    [winner, ...shadowed],
-  ] of groupLoadableSkillsByName(items)) {
+  for (const [canonicalName, group] of groupLoadableSkillsByName(items)) {
+    const winner = selectSkillWinner(group);
     winners.set(canonicalName, winner);
-    if (options.markShadowed !== false) {
-      for (const item of shadowed)
-        item.view.shadowedBy = {
-          root: winner.root.key,
-          name: winner.entry.name,
-        };
+    for (const item of group) {
+      delete item.view.winner;
+      delete item.view.shadowedBy;
+      delete item.view.enabled;
+      if (isCopyDisabled(item)) {
+        item.view.enabled = false;
+      } else if (item !== winner) {
+        item.view.shadowedBy = { root: winner.root.key, name: winner.entry.name };
+      }
     }
-    if (options.markWinner !== false) winner.view.winner = true;
+    if (!isCopyDisabled(winner)) winner.view.winner = true;
     winner.view.enabled = winner.policy.enabled;
     winner.view.canonicalName = canonicalName;
   }

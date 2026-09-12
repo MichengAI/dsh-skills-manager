@@ -723,7 +723,10 @@ eq(
 );
 eq(bundle.nextScopeTab("user", "ArrowLeft"), "user", "left arrow stays on the first tab");
 eq(bundle.nextScopeTab("user", "ArrowRight"), "project", "right arrow moves to the next tab");
-eq(bundle.nextScopeTab("project", "ArrowRight"), "project", "right arrow stays on the last tab");
+eq(bundle.nextScopeTab("project", "ArrowRight"), "trash", "right arrow opens the trash tab");
+eq(bundle.nextScopeTab("trash", "ArrowRight"), "trash", "right arrow stays on the last tab");
+eq(bundle.nextScopeTab("trash", "ArrowLeft"), "project", "left arrow returns to projects");
+eq(bundle.nextScopeTab("user", "End"), "trash", "End opens the last tab");
 eq(bundle.nextScopeTab("project", "Home"), "user", "Home moves to the first tab");
 ok(bundle.canToggleSource({ key: "copilot", toggleable: true }), "user Agent sources keep a source toggle");
 ok(bundle.canToggleSource({ key: "project-copilot:abc", kind: "project-copilot", toggleable: true }), "read-only project Agent sources expose a source toggle");

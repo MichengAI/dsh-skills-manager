@@ -28,13 +28,13 @@ Bring skills from your computer and projects into one DSH management page. Find 
 - **Toggle availability**: enabling or disabling a skill changes its availability in DSH without editing source files.
 - **Read before using**: inspect the body, source information, format diagnostics, and duplicate-name notices.
 - **Add your own skills**: create user or project skills in Settings, or import ZIP archives, skill folders, and `SKILL.md` files.
-- **Recover deleted skills**: DSH skills go to Trash first and can be restored to their original location.
+- **Recover deleted skills**: the dedicated Trash tab sits alongside Global / Project, shows the pending count, and lets you restore skills or confirm permanent deletion.
 
 ## Screenshots
 
-Browse global or project skills in **Settings → Skills**. External Agent sources are made available through manager policy while their files stay read-only:
+Switch between Global skills, Project skills, and Trash in **Settings → Skills**. External Agent source files remain read-only:
 
-![Skills Manager source-first settings page](assets/screenshots/skills-manager-v2-preview.png)
+![Skills manager with a dedicated Trash tab](assets/screenshots/skills-manager-v2-preview.png)
 
 Open any skill to inspect its source path, diagnostics, Markdown body, and parsed frontmatter:
 
@@ -127,8 +127,10 @@ Escape closes only the frontmost upload or confirmation dialog and leaves Settin
 | `<project>/.agents/skills`, `<project>/.github/skills`, `<project>/.codex/skills`, `<project>/.claude/skills`, `<project>/.gemini/skills`, `<project>/.opencode/skills`, `<project>/.cursor/skills`, `<project>/.windsurf/skills`, `<project>/.trae/skills`, `<project>/.trae-cn/skills`, `<project>/skills`, `<project>/.roo/skills`, `<project>/.codebuddy/skills` | Yes, for active Session workspaces | Manager state only | No | No |
 
 - Enable, disable, and delete accept only one ordinary skill-name path segment.
+- `<project>/skills` is labeled “Project Skills”: it supports OpenClaw workspace skills without assuming Agent ownership. Existing toggle policies remain compatible.
 - Project roots are derived only from active Session `cwd` values; client requests carry an opaque source key and cannot nominate an arbitrary workspace path.
-- Project sources follow DSH's nearest-`.git` root convention and rank order (`project-dsh` 100, `project-agents` 200, then other read-only project sources 500–600, below user DSH 399/400). The manager re-scans for each state/detail request. Explicit project policy is enforced by workspace-scoped rank overlays; user DSH policy uses rank 399. With no override, DSH's official provider remains the owner. Toggle writes are limited to manager state; project file writes occur only for explicit create/Trash/restore actions under `.dsh/skills`.
+- Enable/disable applies only to the selected source copy. The highest-priority copy not disabled in the manager is used: disabling a project copy falls back to another enabled project copy or a global copy. Disabling a global copy does not disable project copies. Only when all copies are disabled does the manager block the skill; frontmatter invocation restrictions remain enforced.
+- Project sources follow DSH's nearest-`.git` root convention and rank order (`project-dsh` 100, `project-agents` 200, then other project sources 210–320, then user DSH 400, shared Agents 450, and other user sources 500–640). The manager re-scans for each state/detail request. Explicit project policy is enforced by workspace-scoped rank overlays; user DSH policy uses rank 399. With no override, DSH's official provider remains the owner. Toggle writes are limited to manager state; project file writes occur only for explicit create/Trash/restore actions under `.dsh/skills`.
 - Trash falls back to copy-then-hide when a project and `$DSH_HOME` are on different volumes; restore uses the same guarded cross-volume path in reverse.
 - Project Trash entries retain their original opaque source identity. Restore is allowed only while that original project is still represented by an active Session workspace; the client cannot nominate a replacement path.
 - Project writes reject linked `.dsh` or `.dsh/skills` directories so a repository cannot redirect creation, deletion, or restore outside its own project root.

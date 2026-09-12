@@ -5,7 +5,7 @@ import { readFile } from "node:fs/promises";
 let definition, component, cursor = 0;
 const state = [], effects = [];
 const react = {
-  createElement: (type, props, ...children) => ({ type, props: props || {}, children: children.flat(Infinity).filter(Boolean) }),
+  createElement: (type, props, ...children) => ({ type, props: props || {}, children: children.flat(Infinity).filter((child) => child != null && typeof child !== "boolean") }),
   useState(initial) { const index = cursor++; if (!(index in state)) state[index] = initial; return [state[index], (next) => { state[index] = typeof next === "function" ? next(state[index]) : next; }]; },
   useRef(value) { const index = cursor++; return state[index] || (state[index] = { current: value }); },
   useEffect(effect) { const index = cursor++; if (!(index in state)) { state[index] = true; effects.push(effect); } },
@@ -70,6 +70,63 @@ try {
   change("选择项目", "/a");
   assert.deepEqual(rows(), [], "返回原项目保留搜索");
   change(t("search"), "");
+  const projectCopy = data.roots.find((r) => r.key === "a-copilot").skills[0];
+  projectCopy.shadowedBy = { root: "a-dsh", name: "project-a" };
+  render();
+  const shadowedSwitch = find((node) => node.props.role === "switch" && node.props["aria-label"] === t("skill.toggle") + " project-a");
+  assert.equal(shadowedSwitch.props.disabled, false, "被覆盖副本仍允许独立设置启停");
+  let toggleRequest;
+  globalThis.fetch = async (url, options) => {
+    if (options?.method === "POST") toggleRequest = { url, body: JSON.parse(options.body) };
+    return { ok: true, json: async () => ({ data }) };
+  };
+  shadowedSwitch.props.onClick();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.ok(toggleRequest.url.endsWith("/disable"));
+  assert.deepEqual(toggleRequest.body, { root: "a-copilot", name: "project-a" }, "只停用对应来源，不修改赢家策略");
+  delete projectCopy.shadowedBy;
+  render();
+  assert.equal(nodes().filter((node) => node.props.role === "tab").length, 3, "回收站与两个技能视图同级");
+  data.trash.push(
+    { id: "trash-a", name: "removed-a", deletedAt: "2026-09-12T00:00:00Z", root: { scope: "project", projectName: "A" } },
+    { id: "trash-b", name: "removed-b", deletedAt: "2026-09-12T00:00:00Z", root: { scope: "user" } },
+  );
+  globalThis.fetch = async (url, options) => {
+    if (options?.method === "POST") {
+      toggleRequest = { url, body: JSON.parse(options.body) };
+      data.trash = data.trash.filter((item) => item.id !== toggleRequest.body.id);
+    }
+    return { ok: true, json: async () => ({ data }) };
+  };
+  render(); tab("回收站");
+  assert.deepEqual(rows(), ["removed-a", "removed-b"], "回收站直接展示全局和项目条目");
+  assert.equal(find((node) => node.props["aria-label"] === t("search")), undefined, "回收站不显示技能筛选");
+  assert.equal(find((node) => node.props.className === "dssm-summary"), undefined);
+  assert.equal(find((node) => node.type === "button" && node.children.includes(t("btn.create"))), undefined);
+  assert.equal(find((node) => node.props.role === "tabpanel").props["aria-labelledby"], "dssm-tab-trash");
+  assert.equal(find((node) => node.props.className === "dssm-trash-count").children[0], 2);
+  find((node) => node.type === "button" && node.children.includes(t("btn.restore"))).props.onClick();
+  await new Promise((resolve) => setImmediate(resolve)); render();
+  assert.ok(toggleRequest.url.endsWith("/trash-restore"));
+  assert.deepEqual(toggleRequest.body, { id: "trash-a" });
+  assert.deepEqual(rows(), ["removed-b"]);
+  find((node) => node.type === "button" && node.children.includes(t("btn.delete.forever"))).props.onClick(); render();
+  assert.ok(find((node) => node.props.role === "dialog"), "永久删除仍需确认");
+  find((node) => node.type === "button" && node.children.includes(t("btn.cancel"))).props.onClick(); render();
+  assert.equal(find((node) => node.props.role === "dialog"), undefined, "取消后留在回收站 Tab");
+  assert.deepEqual(rows(), ["removed-b"]);
+  find((node) => node.type === "button" && node.children.includes(t("btn.delete.forever"))).props.onClick(); render();
+  nodes().filter((node) => node.type === "button" && node.children.includes(t("btn.delete.forever"))).at(-1).props.onClick();
+  await new Promise((resolve) => setImmediate(resolve)); render();
+  assert.ok(toggleRequest.url.endsWith("/trash-delete"));
+  assert.deepEqual(toggleRequest.body, { id: "trash-b" });
+  assert.equal(find((node) => node.props.role === "dialog"), undefined);
+  assert.ok(find((node) => node.props.className === "dssm-empty" && node.children.includes(t("trash.empty"))));
+  assert.equal(find((node) => node.props.className === "dssm-trash-count").children[0], 0);
+  tab("全局技能");
+  assert.deepEqual(rows(), ["global-two"], "经过回收站仍保留全局筛选");
+  tab("项目技能");
+  assert.deepEqual(rows(), ["project-a"], "经过回收站仍保留所选项目与筛选");
   const create = find((node) => node.type === "button" && node.children.includes(t("btn.create")));
   assert.equal(create.props.disabled, false, "空项目 DSH 仍支持创建");
   create.props.onClick(); render();
