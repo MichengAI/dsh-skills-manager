@@ -44,7 +44,7 @@ const PROJECT_SOURCES = [
   { key: "windsurf", directory: ".windsurf", localeKey: "windsurf", label: "Windsurf", rank: 560 },
   { key: "trae", directory: ".trae", localeKey: "trae", label: "Trae", rank: 570 },
   { key: "trae-cn", directory: ".trae-cn", localeKey: "traeCn", label: "Trae CN", rank: 575 },
-  { key: "openclaw", directory: ".openclaw", localeKey: "openclaw", label: "OpenClaw", rank: 580 },
+  { key: "openclaw", directory: "", localeKey: "openclaw", label: "OpenClaw", rank: 580 },
   { key: "roo", directory: ".roo", localeKey: "roo", label: "Roo", rank: 590 },
   { key: "codebuddy", directory: ".codebuddy", localeKey: "codebuddy", label: "CodeBuddy", rank: 600 },
 ];
@@ -1231,6 +1231,10 @@ function validManagerStateDocument(value) {
     if (!Array.isArray(list) || list.some((name) => !validStateSkillName(name)))
       return false;
   }
+  // 项目来源键允许缺省（默认开启），但显式值必须与全局来源一样严格校验。
+  for (const [key, flag] of Object.entries(value.sources)) {
+    if (PROJECT_ROOT_KEY_RE.test(key) && typeof flag !== "boolean") return false;
+  }
   const enabledSkills = value.enabledSkills || {};
   for (const key of new Set([
     ...Object.keys(value.disabledSkills),
@@ -1252,16 +1256,18 @@ function migrateManagerStateDocument(value) {
     value.version !== 1
   )
     return value;
-  for (const root of userRoots()) {
+  // version 1 没有记录引入来源的版本，只有确曾新增的来源允许补缺。
+  // 原有 agents/codex/claude/gemini/opencode 字段缺失仍表示损坏配置。
+  const addedSources = ["ccswitch", "cursor", "copilot", "windsurf", "windsurf-user", "trae", "trae-cn", "openclaw", "clawdbot", "roo", "codebuddy"];
+  for (const key of addedSources) {
     for (const field of ["sources", "disabledSkills", "enabledSkills"]) {
-      if (root.key === "dsh" && field === "sources") continue;
       if (
         value[field] &&
         typeof value[field] === "object" &&
         !Array.isArray(value[field]) &&
-        value[field][root.key] === undefined
+        value[field][key] === undefined
       )
-        value[field][root.key] = field === "sources" ? true : [];
+        value[field][key] = field === "sources" ? true : [];
     }
   }
   return value;
@@ -2925,6 +2931,13 @@ export async function state(options = {}) {
       workspaceCwds: root.workspaceCwds,
     });
   }
+  // 保留既有 HTTP 摘要契约；页面可独立计算当前 Tab 的互斥状态统计。
+  result.summary = {
+    total: all.length,
+    enabled: all.filter((item) => item.view.enabled === true).length,
+    disabled: all.filter((item) => item.entry.loadable && item.policy.enabled === false).length,
+    issues: all.reduce((count, item) => count + item.entry.diagnostics.length + (item.view.shadowedBy ? 1 : 0), 0),
+  };
   return result;
 }
 

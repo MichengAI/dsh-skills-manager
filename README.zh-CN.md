@@ -124,7 +124,7 @@ dsh --profile web --dump-config
 | `%USERPROFILE%\.cursor\skills`（或 `$DSH_CURSOR_HOME\skills`） | 支持 | 仅写 manager 状态 | 不支持 | 不支持 |
 | `~/.codex/skills`、`~/.claude/skills`、`~/.gemini/skills`、`~/.config/opencode/skills`、`~/.copilot/skills`、`~/.codeium/windsurf/skills`、`~/.windsurf/skills`、`~/.trae/skills`、`~/.trae-cn/skills`、`~/.openclaw/skills`、`~/.clawdbot/skills`、`~/.roo/skills`、`~/.codebuddy/skills` | 支持 | 仅写 manager 状态 | 不支持 | 不支持 |
 | `<project>/.dsh/skills` | 支持活动 Session 工作区 | 仅写 manager 状态 | 设置页支持创建 | 进入回收站并恢复到原项目 |
-| `<project>/.agents/skills`、`<project>/.github/skills`、`<project>/.codex/skills`、`<project>/.claude/skills`、`<project>/.gemini/skills`、`<project>/.opencode/skills`、`<project>/.cursor/skills`、`<project>/.windsurf/skills`、`<project>/.trae/skills`、`<project>/.trae-cn/skills`、`<project>/.openclaw/skills`、`<project>/.roo/skills`、`<project>/.codebuddy/skills` | 支持活动 Session 工作区 | 仅写 manager 状态 | 不支持 | 不支持 |
+| `<project>/.agents/skills`、`<project>/.github/skills`、`<project>/.codex/skills`、`<project>/.claude/skills`、`<project>/.gemini/skills`、`<project>/.opencode/skills`、`<project>/.cursor/skills`、`<project>/.windsurf/skills`、`<project>/.trae/skills`、`<project>/.trae-cn/skills`、`<project>/skills`、`<project>/.roo/skills`、`<project>/.codebuddy/skills` | 支持活动 Session 工作区 | 仅写 manager 状态 | 不支持 | 不支持 |
 
 - 启用、停用和删除只接受单个普通技能名称，目录穿越名称会被拒绝。
 - 项目根只从活动 Session 的 `cwd` 推导；客户端只提交不透明来源 key，不能指定任意工作区路径。

@@ -63,6 +63,14 @@ try {
   assert.equal(migrated.state.sources["trae-cn"], true, "迁移补齐 Trae 国内版");
   assert.equal(migrated.state.sources.clawdbot, true, "迁移补齐 OpenClaw 旧目录");
   assert.equal(migrated.state.sources.codebuddy, true, "迁移补齐 CodeBuddy");
+  for (const field of ["sources", "disabledSkills"]) {
+    const broken = structuredClone(migrated.state);
+    delete broken[field].agents;
+    await writeFile(core.managerStatePath(), JSON.stringify(broken), "utf8");
+    assert.equal((await core.readManagerState()).writable, false, `旧来源 ${field} 缺失必须失败关闭`);
+    assert.equal(await readFile(core.managerStatePath(), "utf8"), JSON.stringify(broken), "读取不能覆盖损坏状态");
+  }
+  await writeFile(core.managerStatePath(), JSON.stringify(migrated.state), "utf8");
   const project = join(temp, "project"), other = join(temp, "other");
   await mkdir(join(project, ".git"), { recursive: true });
   await mkdir(join(other, ".git"), { recursive: true });
@@ -76,7 +84,7 @@ try {
     windsurf: ".windsurf",
     trae: ".trae",
     "trae-cn": ".trae-cn",
-    openclaw: ".openclaw",
+    openclaw: "",
     roo: ".roo",
     codebuddy: ".codebuddy",
   };
@@ -120,8 +128,24 @@ try {
   assert.equal((await core.setSourceEnabled(root.key, false, undefined, { projectCwds: [project] })).enabled, false);
   assert.equal((await core.readManagerState()).state.sources[root.key], false);
   assert.equal((await core.listProviderCandidates({ cwd: project })).find((c) => c.name === "project-copilot").invocation.modelInvocable, false, "项目来源总开关写入 manager 状态");
+  const validState = (await core.readManagerState()).state;
+  for (const invalid of ["false", 0, null, {}, []]) {
+    const broken = structuredClone(validState);
+    broken.sources[root.key] = invalid;
+    await writeFile(core.managerStatePath(), JSON.stringify(broken), "utf8");
+    assert.equal((await core.readManagerState()).writable, false, "非法项目来源开关失败关闭");
+    assert.equal((await core.listProviderCandidates({ cwd: project })).find((c) => c.name === "project-copilot").invocation.modelInvocable, false);
+    assert.equal((await core.setSourceEnabled(root.key, true, undefined, { projectCwds: [project] })).code, "error.state.invalid");
+  }
+  await writeFile(core.managerStatePath(), JSON.stringify(validState), "utf8");
   const afterDisable = await core.state({ projectCwds: [project] });
   assert.equal(afterDisable.roots.find((item) => item.key === root.key).enabled, false);
+  assert.equal(afterDisable.summary.total, afterDisable.roots.reduce((count, r) => count + r.skills.length, 0));
+  assert.equal(afterDisable.summary.enabled, afterDisable.roots.flatMap((r) => r.skills).filter((skill) => skill.enabled === true).length);
+  assert.equal(typeof afterDisable.summary.disabled, "number");
+  assert.equal(typeof afterDisable.summary.issues, "number");
+  const openclawRoot = afterDisable.roots.find((r) => r.kind === "project-openclaw");
+  assert.equal(openclawRoot.path, join(project, "skills"), "OpenClaw 使用官方 workspace/skills 目录");
   console.log("项目来源、Copilot 迁移与加载回归通过");
 } finally {
   await rm(temp, { recursive: true, force: true });
