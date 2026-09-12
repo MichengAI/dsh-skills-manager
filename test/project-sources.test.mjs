@@ -34,6 +34,10 @@ async function skill(path, name) {
   return file;
 }
 try {
+  const source = await readFile(new URL("../src/core.js", import.meta.url), "utf8");
+  const rankSources = new Function(source.slice(source.indexOf("const EXTERNAL_SOURCE_ORDER"), source.indexOf("const PROJECT_SOURCES")) + "; return rankSources;")();
+  assert.throws(() => rankSources([{ key: "newcomer" }], 210), /newcomer/, "单个未知来源也必须明确报错");
+  assert.throws(() => rankSources([{ key: "codex" }, { key: "newcomer" }], 210), /newcomer/, "未知来源不能静默成为最高优先级");
   const firstTierUserKeys = [
     "copilot",
     "windsurf",
@@ -163,13 +167,27 @@ try {
     assert.equal(view.enabled, false, "已停用副本保持停用状态");
     assert.equal(view.shadowedBy, undefined, "已停用副本不标为被覆盖");
     assert.notEqual(view.winner, true);
+    assert.deepEqual(view.fallbackTo, { root: next.locator.rootKey, name: cascadeName, scope: i + 1 < projectSources.length ? "project" : "user" }, "回退提示来自当前项目实际赢家");
   }
   await core.setSkillEnabled(globalCodex, cascadeName, false);
   assert.equal((await core.listProviderCandidates({ cwd: project })).find((c) => c.name === cascadeName).invocation.modelInvocable, false);
+  for (const r of (await core.state({ projectCwds: [project] })).roots) {
+    for (const skill of r.skills.filter((s) => s.name === cascadeName)) assert.equal(skill.fallbackTo, undefined, "全部停用不提示接管");
+  }
   await core.setSkillEnabled(globalCodex, cascadeName, true);
   assert.equal((await core.listProviderCandidates({ cwd: project })).find((c) => c.name === cascadeName).locator.rootKey, globalCodex.key);
+  const restrictedPath = join(globalCodex.path, cascadeName, "SKILL.md");
+  const originalCopy = await readFile(restrictedPath, "utf8");
+  await writeFile(restrictedPath, "---\nname: " + cascadeName + "\ndescription: 受限副本\ndisable-model-invocation: true\nuser-invocable: false\n---\n受限正文", "utf8");
+  const currentPolicy = (await core.readManagerState()).state;
+  currentPolicy.enabledSkills[globalCodex.key] = currentPolicy.enabledSkills[globalCodex.key].filter((name) => name !== cascadeName);
+  await writeFile(core.managerStatePath(), JSON.stringify(currentPolicy), "utf8");
+  const restricted = await core.state({ projectCwds: [project] });
+  assert.equal(restricted.roots.find((r) => r.key === projectSources[0].key).skills.find((s) => s.name === cascadeName).fallbackTo, undefined, "回退目标不可调用时不提示接管");
+  await writeFile(restrictedPath, originalCopy, "utf8");
   await core.setSkillEnabled(projectSources[0], cascadeName, true);
   assert.equal((await core.listProviderCandidates({ cwd: project })).find((c) => c.name === cascadeName).locator.rootKey, projectSources[0].key);
+  assert.equal((await core.state({ projectCwds: [project] })).roots.find((r) => r.key === projectSources[0].key).skills.find((s) => s.name === cascadeName).fallbackTo, undefined, "项目恢复后移除旧接管提示");
   await core.setSkillEnabled(root, "same", false);
   assert.equal((await core.listProviderCandidates({ cwd: project })).find((c) => c.name === "same-name").invocation.modelInvocable, true, "停用项目副本后全局副本继续生效");
   assert.equal((await core.listProviderCandidates({ cwd: other })).find((c) => c.name === "same-name").invocation.modelInvocable, true);

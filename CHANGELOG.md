@@ -7,8 +7,8 @@ The five most recent published versions are listed below.
 ## Unreleased
 
 - Unify skill precedence: project sources take priority over global sources, and the manager and runtime select the same copy.
-- Enable and disable copies independently. Disabling a project copy allows another enabled copy to take over; the skill is blocked only when all copies are disabled.
-- Move Trash to its own tab alongside Global / Project, with a pending count and direct restore actions. Label root-level `skills/` as “Project Skills” while preserving existing toggle settings.
+- Enable and disable copies independently. Disabling a project copy allows another enabled copy to take over; the skill is blocked only when all copies are disabled, and disabled rows identify the source taking over.
+- Move Trash to its own tab alongside Global / Project, with a count when nonempty and direct restore actions. Label root-level `skills/` as “Project Skills” while preserving existing toggle settings.
 
 ## 0.1.48 - 2026-09-11
 

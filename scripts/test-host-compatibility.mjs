@@ -421,6 +421,7 @@ try {
   const disabledProject = fallbackState.data.roots.find((r) => r.key === projectRoot.key).skills.find((s) => s.name === "compat-scoped");
   assert.equal(disabledProject.enabled, false);
   assert.equal(disabledProject.shadowedBy, undefined);
+  assert.deepEqual(disabledProject.fallbackTo, { root: "dsh", name: "compat-scoped", scope: "user" }, "接管提示与宿主实际全局赢家一致");
   snapshot = await toggleScoped("dsh", false);
   assert.equal(snapshot.scoped.invocation.modelInvocable, false, "全部停用才阻断调用");
   assert.equal(snapshot.scoped.invocation.userInvocable, false);

@@ -27,7 +27,7 @@ try {
   new Function("window", await readFile(new URL("../lib/client.js", import.meta.url), "utf8"))({ __ModuleLoader__: { load(value) { definition = value; } } });
   const client = definition.factory((id) => id === "react" ? react : {});
   client.apply({ effect() {}, slots: { inject(name, fn) { fn(); }, register(options, fn) { component = fn; } } });
-  const t = (key) => client.DICT.zh[key] || key;
+  const t = (key, params = {}) => (client.DICT.zh[key] || key).replace(/\{(\w+)\}/g, (_, name) => String(params[name] ?? "{" + name + "}"));
   let tree;
   function render() { cursor = 0; tree = component({ t }); }
   function nodes(node = tree) {
@@ -85,6 +85,18 @@ try {
   assert.ok(toggleRequest.url.endsWith("/disable"));
   assert.deepEqual(toggleRequest.body, { root: "a-copilot", name: "project-a" }, "只停用对应来源，不修改赢家策略");
   delete projectCopy.shadowedBy;
+  projectCopy.enabled = false;
+  projectCopy.fallbackTo = { root: "copilot", name: "project-a", scope: "user" };
+  render();
+  assert.ok(find((node) => node.props.className === "dssm-note dssm-fallback" && node.children.includes("当前使用全局 Copilot 副本。")), "项目停用行显示全局接管来源");
+  assert.ok(find((node) => node.props.className === "dssm-status dssm-disabled" && node.children.includes("已停用")), "提示不改变副本的停用状态");
+  projectCopy.fallbackTo = { root: "a-dsh", name: "project-a", scope: "project" };
+  render();
+  assert.ok(find((node) => node.props.className === "dssm-note dssm-fallback" && String(node.children[0]).includes("当前使用项目")));
+  delete projectCopy.fallbackTo;
+  render();
+  assert.equal(find((node) => node.props.className === "dssm-note dssm-fallback"), undefined, "无接管来源时不显示提示");
+  projectCopy.enabled = true;
   render();
   assert.equal(nodes().filter((node) => node.props.role === "tab").length, 3, "回收站与两个技能视图同级");
   data.trash.push(
@@ -122,7 +134,7 @@ try {
   assert.deepEqual(toggleRequest.body, { id: "trash-b" });
   assert.equal(find((node) => node.props.role === "dialog"), undefined);
   assert.ok(find((node) => node.props.className === "dssm-empty" && node.children.includes(t("trash.empty"))));
-  assert.equal(find((node) => node.props.className === "dssm-trash-count").children[0], 0);
+  assert.equal(find((node) => node.props.className === "dssm-trash-count"), undefined, "空回收站不显示数量徽标");
   tab("全局技能");
   assert.deepEqual(rows(), ["global-two"], "经过回收站仍保留全局筛选");
   tab("项目技能");
