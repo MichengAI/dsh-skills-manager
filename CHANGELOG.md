@@ -4,6 +4,13 @@
 
 ## Unreleased
 
+## 1.1.3 - 2026-09-24
+
+This release publishes the `0.1.7-rc.1` support. `1.1.1` and `1.1.2` were tagged but not published.
+
+- Compatibility installs pin Cordis plugins to the host's Cordis line, so older rc hosts still boot during release verification.
+- The README compatibility sentence now matches the package version.
+
 ## 1.1.2 - 2026-09-24
 
 This release publishes the `0.1.7-rc.1` support from 1.1.1. That tag was not published: newer Cordis plugins no longer match the Cordis `4.0.2` pin used by older rc hosts, so those hosts exited before the compatibility check could connect.
