@@ -4,15 +4,23 @@
 
 ## Unreleased
 
+## 1.1.1 - 2026-09-24
+
+This release supports DeepSeek Harness `0.1.7-rc.1` and no longer accepts alpha host versions.
+
+- Supported hosts are `0.1.0-rc.8`, `0.1.1-rc.2`, `0.1.2-rc.1`, `0.1.5-rc.1`, `0.1.5-rc.2`, and `0.1.7-rc.1`.
+- `0.1.6-alpha.1`, `0.1.6-alpha.2`, and `0.1.7-alpha.1` are no longer in the compatibility range.
+
 ## 1.1.0 - 2026-09-23
 
-- Add support for DeepSeek Harness `0.1.7-alpha.1` while retaining the seven previously supported versions.
-- Replace settings controls with Ant Design. Buttons, inputs, selects, tabs, switches, tags, and dialogs follow its default blue theme and the host light or dark scheme. The settings client is minified, and it uses the host’s single copy of React and React DOM. The unused host primitives peer is dropped.
-- Use Ant Design’s default-size round buttons for page actions. The GitHub, feedback, and update actions stay small and rectangular, and keep their icons. The update dialog is an Ant Design modal at its default position: the status sits on the latest-version row, and the manual command wraps instead of scrolling sideways. Escape closes only that dialog.
-- Keep the source and status menus at the width of their labels, and place search on the same row at the right. Escape closes an open filter or action menu and does not close the host settings page.
-- Render each skill source as an Ant Design Collapse and the skills inside it as a List. The skill description appears when hovering the name. The skill detail dialog matches the repository detail: the name, a description paragraph, the source path, and one read-only body.
-- Place each skill switch at the right edge of its row so it lines up with the source switch. The enabled and disabled labels are omitted beside that switch. Shadowed and invalid skills still show their status.
-- Remove unused skill-table, row-grid, and action-menu styles. Dialogs stay at Ant Design’s default position.
+This release rebuilds **Settings → Skills** and adds DeepSeek Harness `0.1.7-alpha.1`, while keeping the seven earlier supported versions.
+
+- The page follows the host light or dark theme, with the usual blue controls.
+- Refresh, create, and import use round buttons. GitHub, feedback, and check for updates stay small and keep their icons.
+- Source and status are compact dropdowns, with search on the same row at the right. Escape closes an open filter or More menu without closing Settings.
+- Skills are grouped by source and can be collapsed. Hover a name to read its description. Skill detail matches repository detail: name, description, file path, and a read-only body.
+- The enable switch sits at the right of each row. Enabled and disabled labels next to it are gone; shadowed and invalid skills still show a status.
+- Check for updates opens a normal dialog, not a centered one. Status sits next to the latest version, and the manual command wraps. Escape closes only that dialog.
 
 ## 1.0.1 - 2026-09-21
 

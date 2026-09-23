@@ -14,12 +14,12 @@
   [![npm package](https://img.shields.io/npm/v/%40michengai%2Fdsh-skills-manager.svg?label=npm%20package)](https://www.npmjs.com/package/@michengai/dsh-skills-manager)
   [![npm downloads](https://img.shields.io/npm/dt/%40michengai%2Fdsh-skills-manager.svg?label=npm%20downloads)](https://www.npmjs.com/package/@michengai/dsh-skills-manager)
   [![DSH Web Plugin](https://img.shields.io/badge/DSH%20Web-Plugin-0f766e.svg)](https://github.com/MichengAI/dsh-skills-manager)
-  [![DSH supported through 0.1.7-alpha.1](https://img.shields.io/badge/DSH-up%20to%200.1.7--alpha.1-2563eb.svg)](#installation)
+  [![DSH supported through 0.1.7-rc.1](https://img.shields.io/badge/DSH-up%20to%200.1.7--rc.1-2563eb.svg)](#installation)
 </div>
 
 > DSH Skills Manager is a community-maintained DeepSeek Harness (DSH) plugin, not an official DeepSeek AI product.
 
-This README describes **1.1.0**. See the [changelog](CHANGELOG.md) and [release notes](https://github.com/MichengAI/dsh-skills-manager/releases/latest).
+This README describes **1.1.1**. See the [changelog](CHANGELOG.md) and [release notes](https://github.com/MichengAI/dsh-skills-manager/releases/latest).
 
 ## Features
 
@@ -71,7 +71,7 @@ dsh plugin --profile web add @michengai/dsh-skills-manager@latest --registry=htt
 
 Restart DSH, refresh the page, and open **Settings → Skills**. To update, select **Check for updates** or run the installation command again.
 
-- Plugin `1.1.0` is tested with DeepSeek Harness `0.1.0-rc.8`, `0.1.1-rc.2`, `0.1.2-rc.1`, `0.1.5-rc.1`, `0.1.5-rc.2`, `0.1.6-alpha.1`, `0.1.6-alpha.2`, `0.1.7-alpha.1`.
+- Plugin `1.1.1` is tested with DeepSeek Harness `0.1.0-rc.8`, `0.1.1-rc.2`, `0.1.2-rc.1`, `0.1.5-rc.1`, `0.1.5-rc.2`, `0.1.7-rc.1`.
 
 ## Usage
 

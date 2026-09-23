@@ -15,8 +15,11 @@ assert.equal(pinned.dependencies["@deepseek-ai/dsh-app-boot"], "0.1.6-alpha.1");
 assert.equal(pinned.peerDependencies["@deepseek-ai/dsh-base"], "0.1.6-alpha.1");
 assert.equal(pinned.dependencies.other, "^2");
 assert.equal(mixed.dependencies["@deepseek-ai/dsh-app-boot"], "^0.1.6-alpha.1");
-assert.equal(cordisPin("0.1.6-alpha.2"), "4.0.2");
-assert.equal(cordisPin("0.1.7-alpha.1"), "4.0.3");
+assert.equal(cordisPin("0.1.5-rc.2"), "4.0.2");
+assert.equal(cordisPin("0.1.7-rc.1"), "4.0.4");
+assert.equal(developmentHost, "0.1.7-rc.1");
+assert.deepEqual(supportedHosts, ["0.1.0-rc.8", "0.1.1-rc.2", "0.1.2-rc.1", "0.1.5-rc.1", "0.1.5-rc.2", "0.1.7-rc.1"]);
+assert.equal(supportedHosts.some((version) => version.includes("alpha")), false);
 assert.deepEqual(parseOptions(["--keep"]).versions, supportedHosts);
 assert.equal(parseOptions(["--keep", supportedHosts[0]]).keep, true);
 assert.deepEqual(parseOptions([supportedHosts[0], "--keep"]).versions, [supportedHosts[0]]);
@@ -33,6 +36,7 @@ assertHostPeers(manifest.peerDependencies);
 for (const [name, range] of Object.entries(manifest.peerDependencies)) {
   if (name.startsWith("@deepseek-ai/dsh-")) assert.equal(range, peerRange, name);
 }
+assert.equal(manifest.devDependencies["@deepseek-ai/cordis"], "4.0.4");
 for (const [name, version] of Object.entries(manifest.devDependencies)) {
   if (name.startsWith("@deepseek-ai/dsh-")) assert.equal(version, developmentHost, name);
 }

@@ -1,6 +1,6 @@
-// 0.1.7-alpha.1 依赖 Cordis ^4.0.3；更早的已验证宿主继续锁定 4.0.2。
+// 0.1.7-rc.1 依赖 Cordis ~4.0.4；更早的已验证 rc 宿主继续锁定 4.0.2。
 const CORDIS_PINS = Object.freeze({
-  "0.1.7-alpha.1": "4.0.3",
+  "0.1.7-rc.1": "4.0.4",
 });
 
 export function cordisPin(hostVersion) {
