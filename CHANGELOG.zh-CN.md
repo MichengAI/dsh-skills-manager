@@ -4,6 +4,13 @@
 
 ## 未发布
 
+## 1.1.2 - 2026-09-24
+
+这次发布 1.1.1 里的 `0.1.7-rc.1` 支持。那个标签没有发到 npm：旧 rc 宿主把 Cordis 钉在 `4.0.2`，而更新的 Cordis 插件已经不接受这个版本，宿主在兼容检查连上之前就退出了。
+
+- 兼容安装现在把 `cordis-plugin-group`、`cordis-plugin-hmr`、`cordis-plugin-include`、`cordis-plugin-loader`、`cordis-plugin-timer` 锁定到宿主对应的 Cordis 版本。
+- 支持的宿主仍是 `0.1.0-rc.8`、`0.1.1-rc.2`、`0.1.2-rc.1`、`0.1.5-rc.1`、`0.1.5-rc.2`、`0.1.7-rc.1`。
+
 ## 1.1.1 - 2026-09-24
 
 这次支持 DeepSeek Harness `0.1.7-rc.1`，不再接受 alpha 宿主版本。

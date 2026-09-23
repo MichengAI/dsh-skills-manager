@@ -27,7 +27,7 @@ import assert from "node:assert/strict";
 import { supportedHosts as supported } from "./hosts.mjs";
 import { parseOptions, usage } from "./compatibility-options.mjs";
 import { resolveTempRoot, sameExistingPath } from "./compat-paths.mjs";
-import { cordisPin, pinHostDependencies } from "./compat-dependencies.mjs";
+import { hostCordisOverrides, pinHostDependencies } from "./compat-dependencies.mjs";
 let options;
 try {
   options = parseOptions(process.argv.slice(2));
@@ -221,7 +221,7 @@ try {
   // 旧版宿主的 peer 图会使 npm 11 长时间解析；使用项目规定的 pnpm，并统一官方版本。
   await writeFile(
     join(sandbox, "pnpm-workspace.yaml"),
-    `autoInstallPeers: true\nstrictPeerDependencies: false\noverrides:\n  '@deepseek-ai/cordis': '${cordisPin(version)}'\n`,
+    `autoInstallPeers: true\nstrictPeerDependencies: false\noverrides:\n${Object.entries(hostCordisOverrides(version)).map(([name, pinned]) => `  '${name}': '${pinned}'`).join("\n")}\n`,
   );
   await writeFile(join(sandbox, ".pnpmfile.cjs"),
     `const pinHostDependencies = ${pinHostDependencies.toString()};\nmodule.exports = { hooks: { readPackage: pkg => pinHostDependencies(pkg, ${JSON.stringify(version)}) } };\n`, "utf8");

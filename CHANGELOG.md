@@ -4,6 +4,13 @@
 
 ## Unreleased
 
+## 1.1.2 - 2026-09-24
+
+This release publishes the `0.1.7-rc.1` support from 1.1.1. That tag was not published: newer Cordis plugins no longer match the Cordis `4.0.2` pin used by older rc hosts, so those hosts exited before the compatibility check could connect.
+
+- Compatibility installs now pin `cordis-plugin-group`, `cordis-plugin-hmr`, `cordis-plugin-include`, `cordis-plugin-loader`, and `cordis-plugin-timer` to the host's Cordis line.
+- Supported hosts remain `0.1.0-rc.8`, `0.1.1-rc.2`, `0.1.2-rc.1`, `0.1.5-rc.1`, `0.1.5-rc.2`, and `0.1.7-rc.1`.
+
 ## 1.1.1 - 2026-09-24
 
 This release supports DeepSeek Harness `0.1.7-rc.1` and no longer accepts alpha host versions.
