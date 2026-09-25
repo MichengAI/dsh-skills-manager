@@ -1,7 +1,8 @@
-// 0.1.7-rc.1 依赖 Cordis ~4.0.4；更早的已验证 rc 宿主继续锁定 4.0.2。
+// 0.1.7-rc.1 与 0.1.7-rc.2 都依赖 Cordis ~4.0.4；更早的已验证 rc 宿主继续锁定 4.0.2。
 // 官方 Cordis 插件的最新版只接受 ~4.0.4。旧宿主若让它们浮动，HMR 服务不会注册，补丁监听会直接退出。
 const CORDIS_PINS = Object.freeze({
   "0.1.7-rc.1": "4.0.4",
+  "0.1.7-rc.2": "4.0.4",
 });
 const CORDIS_PLUGIN_PINS = Object.freeze({
   "4.0.2": {

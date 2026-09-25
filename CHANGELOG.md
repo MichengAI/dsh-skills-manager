@@ -4,6 +4,10 @@
 
 ## Unreleased
 
+## 1.1.4 - 2026-09-25
+
+This release supports DeepSeek Harness `0.1.7-rc.2`. Previously supported versions remain available.
+
 ## 1.1.3 - 2026-09-24
 
 This release publishes the `0.1.7-rc.1` support. `1.1.1` and `1.1.2` were tagged but not published.
