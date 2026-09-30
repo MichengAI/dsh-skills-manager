@@ -36,7 +36,7 @@ const KEBAB_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const EXTERNAL_SOURCE_ORDER = [
   "ccswitch", "codex", "claude", "gemini", "opencode", "cursor", "copilot",
   "windsurf", "windsurf-user", "trae", "trae-cn", "openclaw", "clawdbot",
-  "roo", "codebuddy", "projectSkills",
+  "roo", "codebuddy", "workbuddy", "qoder", "qoder-cn", "lingma", "projectSkills",
 ];
 function rankSources<T extends {key: string; native?: boolean; rank?: number; localeKey?: string}>(sources: T[], startRank: number) {
   const order = (root: T) => EXTERNAL_SOURCE_ORDER.indexOf(root.localeKey === "projectSkills" ? "projectSkills" : root.key);
@@ -67,6 +67,10 @@ const PROJECT_SOURCES = rankSources([
   { key: "openclaw", directory: "", localeKey: "projectSkills", label: "Project Skills" },
   { key: "roo", directory: ".roo", localeKey: "roo", label: "Roo" },
   { key: "codebuddy", directory: ".codebuddy", localeKey: "codebuddy", label: "CodeBuddy" },
+  { key: "workbuddy", directory: ".workbuddy", localeKey: "workbuddy", label: "WorkBuddy" },
+  // Qoder CN CLI 的项目技能也写在 .qoder/skills，与国际版 Qoder 共用。
+  { key: "qoder", directory: ".qoder", localeKey: "qoder", label: "Qoder" },
+  { key: "lingma", directory: ".lingma", localeKey: "lingma", label: "Qoder CN" },
 ], 210);
 const PROJECT_ROOT_KEY_RE = new RegExp(
   `^project-(?:${[...PROJECT_SOURCES]
@@ -295,6 +299,48 @@ export function userRoots(): SkillRoot[] {
         "skills",
       ),
       label: "CodeBuddy",
+      mutable: false,
+      toggleable: true,
+      native: false,
+    },
+    {
+      key: "workbuddy",
+      localeKey: "workbuddy",
+      path: join(
+        process.env.DSH_WORKBUDDY_HOME || join(homedir(), ".workbuddy"),
+        "skills",
+      ),
+      label: "WorkBuddy",
+      mutable: false,
+      toggleable: true,
+      native: false,
+    },
+    {
+      key: "qoder",
+      localeKey: "qoder",
+      path: join(process.env.DSH_QODER_HOME || join(homedir(), ".qoder"), "skills"),
+      label: "Qoder",
+      mutable: false,
+      toggleable: true,
+      native: false,
+    },
+    {
+      key: "qoder-cn",
+      localeKey: "qoderCn",
+      path: join(
+        process.env.DSH_QODER_CN_HOME || join(homedir(), ".qoder-cn"),
+        "skills",
+      ),
+      label: "Qoder CN CLI",
+      mutable: false,
+      toggleable: true,
+      native: false,
+    },
+    {
+      key: "lingma",
+      localeKey: "lingma",
+      path: join(process.env.DSH_LINGMA_HOME || join(homedir(), ".lingma"), "skills"),
+      label: "Qoder CN",
       mutable: false,
       toggleable: true,
       native: false,
@@ -1268,7 +1314,7 @@ function migrateManagerStateDocument(value: ManagerState) {
     return value;
   // version 1 没有记录引入来源的版本，只有确曾新增的来源允许补缺。
   // 原有 agents/codex/claude/gemini/opencode 字段缺失仍表示损坏配置。
-  const addedSources = ["ccswitch", "cursor", "copilot", "windsurf", "windsurf-user", "trae", "trae-cn", "openclaw", "clawdbot", "roo", "codebuddy"];
+  const addedSources = ["ccswitch", "cursor", "copilot", "windsurf", "windsurf-user", "trae", "trae-cn", "openclaw", "clawdbot", "roo", "codebuddy", "workbuddy", "qoder", "qoder-cn", "lingma"];
   for (const key of addedSources) {
     for (const field of ["sources", "disabledSkills", "enabledSkills"] as const) {
       if (

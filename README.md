@@ -19,7 +19,7 @@
 
 > DSH Skills Manager is a community-maintained DeepSeek Harness (DSH) plugin, not an official DeepSeek AI product.
 
-This README describes **1.1.7**. See the [changelog](CHANGELOG.md) and [release notes](https://github.com/MichengAI/dsh-skills-manager/releases/latest).
+This README describes **1.1.8**. See the [changelog](CHANGELOG.md) and [release notes](https://github.com/MichengAI/dsh-skills-manager/releases/latest).
 
 ## Features
 
@@ -71,7 +71,7 @@ dsh plugin --profile web add @michengai/dsh-skills-manager@latest --registry=htt
 
 Restart DSH, refresh the page, and open **Settings → Skills**. To update, select **Check for updates** or run the installation command again.
 
-- Plugin `1.1.7` is tested with DeepSeek Harness `0.1.2-rc.1`, `0.1.5-rc.1`, `0.1.5-rc.2`, `0.1.5-rc.3`, `0.1.7-rc.1`, `0.1.7-rc.2`, `0.2.0-rc.1`, `0.2.0-rc.2`.
+- Plugin `1.1.8` is tested with DeepSeek Harness `0.1.2-rc.1`, `0.1.5-rc.1`, `0.1.5-rc.2`, `0.1.5-rc.3`, `0.1.7-rc.1`, `0.1.7-rc.2`, `0.2.0-rc.1`, `0.2.0-rc.2`.
 
 ## Usage
 
@@ -118,9 +118,13 @@ Restart DSH, refresh the page, and open **Settings → Skills**. To update, sele
 | OpenClaw / Clawdbot | `~/.openclaw/skills`<br>`~/.clawdbot/skills` | — |
 | Roo | `~/.roo/skills` | `<project>/.roo/skills` |
 | CodeBuddy | `~/.codebuddy/skills` | `<project>/.codebuddy/skills` |
+| WorkBuddy | `~/.workbuddy/skills` | `<project>/.workbuddy/skills` |
+| Qoder | `~/.qoder/skills` | `<project>/.qoder/skills` |
+| Qoder CN CLI | `~/.qoder-cn/skills` | — |
+| Qoder CN | `~/.lingma/skills` | `<project>/.lingma/skills` |
 | Project Skills | — | `<project>/skills` |
 
-The generic `<project>/skills` directory is labeled **Project Skills** and also supports OpenClaw workspace skills. Missing external source directories are not shown.
+The generic `<project>/skills` directory is labeled **Project Skills** and also supports OpenClaw workspace skills. Qoder CN CLI project skills use `<project>/.qoder/skills` and appear as Qoder. Qoder CN IDE uses the Lingma directories. Missing external source directories are not shown.
 
 ## DSH product ecosystem
 

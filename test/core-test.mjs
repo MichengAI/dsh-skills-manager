@@ -169,6 +169,10 @@ const firstTierUserRoots = {
   clawdbot: join(testUserHome, ".clawdbot", "skills"),
   roo: join(testUserHome, ".roo", "skills"),
   codebuddy: join(testUserHome, ".codebuddy", "skills"),
+  workbuddy: join(testUserHome, ".workbuddy", "skills"),
+  qoder: join(testUserHome, ".qoder", "skills"),
+  "qoder-cn": join(testUserHome, ".qoder-cn", "skills"),
+  lingma: join(testUserHome, ".lingma", "skills"),
 };
 for (const [key, expected] of Object.entries(firstTierUserRoots)) {
   const definition = userRoots().find((root) => root.key === key);
@@ -352,7 +356,11 @@ ok(
     clientSource.includes('"root.copilot": "Copilot"') &&
     clientSource.includes('"root.windsurf": "Windsurf"') &&
     clientSource.includes('"root.traeCn": "Trae CN"') &&
-    clientSource.includes('"root.codebuddy": "CodeBuddy"'),
+    clientSource.includes('"root.codebuddy": "CodeBuddy"') &&
+    clientSource.includes('"root.workbuddy": "WorkBuddy"') &&
+    clientSource.includes('"root.qoder": "Qoder"') &&
+    clientSource.includes('"root.qoderCn": "Qoder CN CLI"') &&
+    clientSource.includes('"root.lingma": "Qoder CN"'),
   "settings panel localizes the CC Switch, Copilot, Cursor, and first-tier Agent sources in both dictionaries",
 );
 ok(
@@ -3403,8 +3411,8 @@ try {
 const snap = await state();
 eq(
   snap.roots.length,
-  17,
-  "state returns DSH, CC Switch, Copilot, Cursor, first-tier Agents, and common Agent roots",
+  21,
+  "state returns DSH, CC Switch, Copilot, Cursor, first-tier Agents, WorkBuddy, Qoder, and common Agent roots",
 );
 ok(
   snap.roots.some((root) => root.key === "ccswitch"),

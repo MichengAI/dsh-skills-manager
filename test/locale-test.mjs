@@ -684,7 +684,9 @@ eq(
 ok(
   DICT.zh["root.projectDsh"] && DICT.en["root.projectAgents"] && DICT.zh["root.copilot"] && DICT.en["root.copilot"] &&
     DICT.zh["root.windsurf"] && DICT.en["root.windsurfUser"] && DICT.zh["root.traeCn"] && DICT.en["root.openclaw"] &&
-    DICT.zh["root.clawdbot"] && DICT.en["root.roo"] && DICT.zh["root.codebuddy"] && DICT.en["root.codebuddy"],
+    DICT.zh["root.clawdbot"] && DICT.en["root.roo"] && DICT.zh["root.codebuddy"] && DICT.en["root.codebuddy"] &&
+    DICT.zh["root.workbuddy"] && DICT.en["root.workbuddy"] &&
+    DICT.zh["root.qoder"] && DICT.en["root.qoderCn"] && DICT.zh["root.lingma"] && DICT.en["root.lingma"],
   "project DSH, Agent, Copilot, and first-tier Agent sources are localized in both languages",
 );
 ok(

@@ -4,6 +4,11 @@
 
 ## 未发布
 
+## 1.1.8 - 2026-09-30
+
+- 识别 WorkBuddy 技能目录 `~/.workbuddy/skills` 和 `<project>/.workbuddy/skills`。
+- 识别 Qoder（`~/.qoder/skills`、`<project>/.qoder/skills`）、Qoder CN CLI（`~/.qoder-cn/skills`）和 Qoder CN IDE（`~/.lingma/skills`、`<project>/.lingma/skills`）。Qoder CN CLI 的项目技能使用共用的 Qoder 项目目录。
+
 ## 1.1.7 - 2026-09-30
 
 - 从仓库安装技能时，会写入与手动开启相同的启用策略。安装后无需再关闭并重新开启，斜杠菜单即可调用；说明文字不被宿主 YAML 解析器接受时也同样生效。

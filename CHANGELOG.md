@@ -4,6 +4,11 @@
 
 ## Unreleased
 
+## 1.1.8 - 2026-09-30
+
+- Recognize WorkBuddy skills in `~/.workbuddy/skills` and `<project>/.workbuddy/skills`.
+- Recognize Qoder (`~/.qoder/skills`, `<project>/.qoder/skills`), Qoder CN CLI (`~/.qoder-cn/skills`), and Qoder CN IDE (`~/.lingma/skills`, `<project>/.lingma/skills`). Qoder CN CLI project skills use the shared Qoder project directory.
+
 ## 1.1.7 - 2026-09-30
 
 - Installing a skill from a repository now records the same explicit enable policy as turning the switch on. The skill appears in the slash menu immediately, including when its description is not accepted by the host YAML parser.
