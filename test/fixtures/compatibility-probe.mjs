@@ -46,6 +46,7 @@ export function apply(ctx) {
                             skill,
                             local: await registry.get("compat-local", options),
                             scoped: await registry.get("compat-scoped", options),
+                            installed: await registry.get("repo-slash", options),
                         }),
                     );
                 } catch (error) {

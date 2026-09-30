@@ -12,7 +12,7 @@ process.env.USERPROFILE = join(sandbox, "user");
 const { parseRepositoryInput, decodeRepositoryArchive, createRepositoryManager } = await import("../lib/repositories.js");
 let sha = "a".repeat(40);
 const doc = (name, description = "测试技能") => strToU8(`---\nname: ${name}\ndescription: ${description}\n---\n技能正文\n`);
-let archive = zipSync({ "repo-main/skills/pdf/SKILL.md": doc("pdf"), "repo-main/skills/pdf/references/help.txt": strToU8("参考资料"), "repo-main/skills/docx/SKILL.md": doc("docx") });
+let archive = zipSync({ "repo-main/skills/pdf/SKILL.md": doc("pdf", "Use when: reviewing files"), "repo-main/skills/pdf/references/help.txt": strToU8("参考资料"), "repo-main/skills/docx/SKILL.md": doc("docx") });
 let broken = false;
 const requested = [];
 const fetchImpl = async (url, options) => {
@@ -50,6 +50,12 @@ try {
   const requestsBeforeInstall = requested.length;
   const installed = await manager.install({ id: added.id, path: "skills/pdf" });
   assert.equal(requested.length, requestsBeforeInstall, "安装复用已验证缓存，不重新下载移动中的分支");
+  const enabledPolicy = JSON.parse(await readFile(join(process.env.DSH_HOME, "skills-manager/state.json"), "utf8"));
+  assert.ok(enabledPolicy.enabledSkills.dsh.includes("pdf"), "仓库安装写入显式启用策略，而不是只在界面上显示为开启");
+  const { listProviderCandidates } = await import("../lib/core.js");
+  const installedCandidate = (await listProviderCandidates()).find((candidate) => candidate.name === "pdf");
+  assert.equal(installedCandidate?.invocation.userInvocable, true, "安装后的技能进入斜杠菜单覆盖项");
+  assert.equal(installedCandidate?.invocation.modelInvocable, true, "安装后的技能同时允许模型调用");
   archive = originalArchive;
   const restartManager = createRepositoryManager({ fetchImpl: async () => { throw new Error("不应请求网络"); } });
   const cacheFile = join(process.env.DSH_HOME, "skills-manager/repository-cache", `${added.id}-${list.repositories[0].commit}.zip`);
@@ -89,7 +95,7 @@ try {
   assert.equal((await manager.list()).repositories[0].skills.find((s) => s.name === "pdf").status, "installed");
   await assert.rejects(manager.install({ id: added.id, path: "skills/pdf" }), /同名|安装/);
   sha = "b".repeat(40);
-  archive = zipSync({ "repo-main/skills/pdf/SKILL.md": doc("pdf"), "repo-main/skills/pdf/references/help.txt": strToU8("新版资料"), "repo-main/skills/docx/SKILL.md": doc("docx") });
+  archive = zipSync({ "repo-main/skills/pdf/SKILL.md": doc("pdf", "Use when: reviewing files"), "repo-main/skills/pdf/references/help.txt": strToU8("新版资料"), "repo-main/skills/docx/SKILL.md": doc("docx") });
   await manager.refresh({ id: added.id });
   assert.equal((await manager.list()).repositories[0].skills.find(s => s.name === "pdf").status, "update", "资源变化也提示更新");
   const preview = await manager.preview({ id: added.id, path: "skills/pdf" });

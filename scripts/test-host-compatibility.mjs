@@ -22,6 +22,8 @@ import {
   isAbsolute,
 } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { createHash } from "node:crypto";
+import { zipSync } from "fflate";
 import assert from "node:assert/strict";
 
 import { supportedHosts as supported } from "./hosts.mjs";
@@ -66,6 +68,40 @@ if (options.versions.length > 1) {
 const [version] = options.versions;
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const manifest = JSON.parse(await readFile(join(root, "package.json"), "utf8"));
+
+async function seedRepositoryInstall(home) {
+  const source = { owner: "example", name: "skills", ref: "main", subdirectory: "skills" };
+  const id = createHash("sha256").update(JSON.stringify(source)).digest("hex").slice(0, 24);
+  const document = "---\nname: repo-slash\ndescription: Use when: the slash menu must list a repository install\n---\nREPO_SLASH_BODY\n";
+  const documentBytes = Buffer.from(document);
+  const documentHash = createHash("sha256").update(documentBytes).digest("hex");
+  const zip = Buffer.from(zipSync({ "repo-main/skills/repo-slash/SKILL.md": documentBytes }));
+  const commit = createHash("sha256").update(zip).digest("hex");
+  const cache = join(home, "skills-manager", "repository-cache");
+  await mkdir(cache, { recursive: true });
+  await writeFile(join(cache, `${id}-${commit}.zip`), zip);
+  await writeFile(join(home, "skills-manager", "repositories.json"), JSON.stringify({
+    version: 1,
+    repositories: [{
+      ...source,
+      id,
+      skills: [{
+        path: "skills/repo-slash",
+        files: [{ path: "SKILL.md", hash: documentHash }],
+        name: "repo-slash",
+        description: "Use when: the slash menu must list a repository install",
+        body: "REPO_SLASH_BODY",
+        documentHash,
+        valid: true,
+      }],
+      commit,
+      refreshedAt: "2026-09-30T00:00:00.000Z",
+      error: null,
+    }],
+    installs: [],
+  }));
+  return { id, path: "skills/repo-slash" };
+}
 // 从 PATH 的实际 shim 或符号链接定位入口，不依赖 Node 安装位置。
 async function findTool(name) {
   for (const directory of (process.env.PATH || "").split(delimiter)) {
@@ -315,6 +351,7 @@ try {
     await mkdir(path, { recursive: true });
     await writeFile(join(path, "SKILL.md"), `---\nname: compat-scoped\ndescription: 作用域回退测试\n---\n${body}\n`);
   }
+  const repositoryInstall = await seedRepositoryInstall(env.DSH_HOME);
   host = spawn(
     process.execPath,
     [
@@ -463,6 +500,16 @@ try {
   assert.equal((await probe()).scoped.content, "PROJECT_BODY");
   await rm(join(workspace, ".git"), { recursive: true });
   report.checks.push("添加 Git 标记后项目身份和正文保持一致，移除后恢复非 Git 验收环境");
+  await request("/api/dsh-skills-manager/repositories/install", repositoryInstall);
+  snapshot = await probe();
+  const installedSkill = snapshot.list.find((skill) => skill.name === "repo-slash");
+  assert(installedSkill, "仓库安装后无需手动开关即可进入斜杠目录");
+  assert.equal(installedSkill.invocation.userInvocable, true);
+  assert.equal(installedSkill.invocation.modelInvocable, true);
+  assert(snapshot.installed?.content?.includes("REPO_SLASH_BODY"), "斜杠目录可以读取仓库安装正文");
+  const managerState = JSON.parse(await readFile(join(env.DSH_HOME, "skills-manager", "state.json"), "utf8"));
+  assert(managerState.enabledSkills.dsh.includes("repo-slash"), "仓库安装写入 enabledSkills");
+  report.checks.push("仓库安装写入启用策略，真实 Agent 斜杠目录可发现并读取");
   report.passed = true;
   await writeFile(
     join(sandbox, "result.json"),

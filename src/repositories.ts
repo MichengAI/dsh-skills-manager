@@ -4,7 +4,7 @@ import { promises as fs } from "node:fs";
 import { join } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import { unzipSync } from "fflate";
-import { managerHomePath, parseSkillDoc, importUploadedSkill, state, userRoots } from "./core.js";
+import { managerHomePath, parseSkillDoc, importUploadedSkill, setSkillEnabled, state, userRoots } from "./core.js";
 import { createRepositoryUpdater, fileIndex, signature, readSkillTree } from "./repository-updates.js";
 
 const LIMIT = 32 << 20;
@@ -300,13 +300,20 @@ export function createRepositoryManager({ fetchImpl = globalThis.fetch, log }: {
       const record = { id, path, source: { owner: repo.owner, name: repo.name, ref: repo.ref, subdirectory: repo.subdirectory }, name: skill.name, commit: repo.commit, complete: false, files: entries.map((e) => ({ path: e.path, hash: hash(Buffer.from(e.data, "base64")) })) };
       data.installs.push(record);
       await write(data);
+      let copied = false;
       try {
         const result = await importUploadedSkill({ name: skill.name, entries }, log, { conflict: "skip" });
         if (result.ok === false || !result.imported?.length) throw failure(result.error || "技能安装失败或遇到同名冲突", "error.repo.conflict");
+        copied = true;
+        // 界面默认显示已启用，但斜杠菜单只会收到显式启用覆盖项。安装完成后走与手动开启相同的策略写入。
+        const dsh = userRoots().find((root) => root.key === "dsh");
+        const enabled = await setSkillEnabled(dsh, skill.name, true, log);
+        if (enabled && typeof enabled === "object" && "ok" in enabled && enabled.ok === false) throw failure(enabled.error || "技能启用状态无法写入", enabled.code || "error.repo.enableState");
       } catch (caught) { const error = caught as CodedError;
         data.installs = data.installs.filter(item => item !== record);
         try { await write(data); }
         catch { throw failure("安装未完成且来源记录无法撤销，请恢复磁盘写入后检查技能目录", "error.repo.installState"); }
+        if (copied) await fs.rm(join(userRoots().find((root) => root.key === "dsh")!.path, skill.name), { recursive: true, force: true }).catch(() => undefined);
         throw error;
       }
       record.complete = true;

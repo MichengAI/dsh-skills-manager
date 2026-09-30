@@ -4,6 +4,10 @@
 
 ## Unreleased
 
+## 1.1.7 - 2026-09-30
+
+- Installing a skill from a repository now records the same explicit enable policy as turning the switch on. The skill appears in the slash menu immediately, including when its description is not accepted by the host YAML parser.
+
 ## 1.1.6 - 2026-09-30
 
 This release supports DeepSeek Harness `0.2.0-rc.2`. Previously supported versions remain available.
