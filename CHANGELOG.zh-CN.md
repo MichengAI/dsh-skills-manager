@@ -4,6 +4,10 @@
 
 ## 未发布
 
+## 1.1.9 - 2026-10-04
+
+- 修复插件卸载或重新激活后 `/api/dsh-skills-manager` 路由残留，导致启动时报 `duplicate prefix route`、技能设置面板无法使用的问题（#25）。路由现由 Cordis effect 显式管理，重启和启动失败时均正确释放。
+
 ## 1.1.8 - 2026-09-30
 
 - 识别 WorkBuddy 技能目录 `~/.workbuddy/skills` 和 `<project>/.workbuddy/skills`。

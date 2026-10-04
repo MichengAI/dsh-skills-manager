@@ -4,6 +4,10 @@
 
 ## Unreleased
 
+## 1.1.9 - 2026-10-04
+
+- Fix a stale `/api/dsh-skills-manager` route after plugin unload or reactivation that could fail startup with `duplicate prefix route` and leave the Skills settings panel unavailable (#25). The route now uses an explicit Cordis effect so restarts and failed startup release it correctly.
+
 ## 1.1.8 - 2026-09-30
 
 - Recognize WorkBuddy skills in `~/.workbuddy/skills` and `<project>/.workbuddy/skills`.

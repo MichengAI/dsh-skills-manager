@@ -382,7 +382,9 @@ function apply(ctx: HostContext) {
     });
   }
 
-  const route = ctx.webServer.register({
+  // Cordis can construct a plain function apply(), so its returned disposer
+  // is not collected. Own the route explicitly for restart and startup failure.
+  ctx.effect(() => ctx.webServer.register({
     kind: "prefix",
     path: "/api/dsh-skills-manager",
     handler: async (req, res) => {
@@ -495,8 +497,7 @@ function apply(ctx: HostContext) {
         });
       }
     },
-  });
-  return route;
+  }), "skills-manager: API route");
 }
 
 export { activeSessionCwds, apply, inject, name, notifyChatCatalog, registerAgentSkillProviders };

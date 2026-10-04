@@ -12,7 +12,12 @@ let interceptedDownload;
 globalThis.fetch = (url, options) => interceptedDownload && String(url).startsWith("https://codeload.github.com/") ? interceptedDownload() : nativeFetch(url, options);
 const { apply } = await import("../lib/index.js");
 let route;
-apply({ effect() {}, webRuntime: { trustedHosts: [] }, webServer: { register(value) { route = value; } } });
+apply({
+  effect(register) { return register(); },
+  skills: { registerProvider() { return () => {}; } },
+  webRuntime: { trustedHosts: [] },
+  webServer: { register(value) { if (value.kind === "prefix") route = value; return () => {}; } },
+});
 const server = createServer((req, res) => route.handler(req, res));
 await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
 const api = `http://127.0.0.1:${server.address().port}/api/dsh-skills-manager/repositories`;
