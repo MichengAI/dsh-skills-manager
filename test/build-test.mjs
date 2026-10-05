@@ -62,7 +62,8 @@ await ok(!(await readdir(new URL("../src/", import.meta.url))).some(name => name
 
 const projectRoot = new URL("../", import.meta.url);
 const ignoreRules = await readFile(new URL("../.gitignore", import.meta.url), "utf8");
-await ok(/^\/lib\/$/m.test(ignoreRules), "构建产物不再进入 Git 提交");
+const ignoresLib = ignoreRules.split(/\r?\n/u).some((line) => line === "lib" || line === "lib/" || line === "/lib/");
+await ok(manifest.scripts?.prepare === undefined && !ignoresLib, "GitHub installs do not depend on a blocked build script");
 await ok(manifest.scripts?.prepack === "npm run typecheck && npm run build", "打包前自动检查类型并生成产物");
 await ok(!manifest.scripts?.verify?.includes("check-generated.mjs"), "发布验证不再要求提交生成产物");
 await ok(manifest.scripts?.verify?.includes("pack-test.mjs"), "发布验证覆盖无产物的干净目录打包");

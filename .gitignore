@@ -1,5 +1,4 @@
 node_modules/
-/lib/
 *.log
 *.tgz
 .DS_Store

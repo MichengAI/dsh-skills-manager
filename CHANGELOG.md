@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+- Installing from GitHub now includes the compiled runtime, so no manual build is required.
+
 ## 1.1.9 - 2026-10-04
 
 - Fix a stale `/api/dsh-skills-manager` route after plugin unload or reactivation that could fail startup with `duplicate prefix route` and leave the Skills settings panel unavailable (#25). The route now uses an explicit Cordis effect so restarts and failed startup release it correctly.

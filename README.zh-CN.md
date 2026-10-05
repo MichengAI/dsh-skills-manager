@@ -51,7 +51,7 @@
 
 需要已安装并能正常运行 DeepSeek Harness。以下命令使用 `web` profile，请按实际环境替换。
 
-插件安装支持 npm registry 和本地构建的 `.tgz` 包，不支持直接以 Git/GitHub 依赖安装（例如 `github:MichengAI/dsh-skills-manager`）。从源码开发时，请先安装开发依赖并构建，再加载到 DSH。
+插件安装支持 npm registry、本地构建的 `.tgz` 包和 GitHub。GitHub 与 npm 都包含可直接运行的 `lib`。改动源码后，提交前请先运行构建。
 
 ### 让 Agent 帮你安装
 
@@ -148,7 +148,7 @@ dsh plugin --profile web add @michengai/dsh-skills-manager@latest --registry=htt
 
 遇到问题或有建议，欢迎[提交 Issue](https://github.com/MichengAI/dsh-skills-manager/issues)。请附上 DSH 与插件版本、复现步骤；界面问题可附完整截图。
 
-源码位于 `src`，使用严格 TypeScript，保留现有插件架构。开发时执行 `npm run typecheck` 检查类型，`npm run build` 生成运行产物，`npm run verify` 执行完整回归与打包验证。`lib` 不纳入 Git 提交；打包前会自动检查类型并构建，npm 安装包仍包含所需 JavaScript 产物。CI 在 Node.js 22.19.0 和 24 上执行完整验证，代码改动也会自动触发受支持宿主兼容矩阵。欢迎提交改进。
+源码位于 `src`，使用严格 TypeScript，保留现有插件架构。开发时执行 `npm run typecheck` 检查类型，`npm run build` 生成运行产物，`npm run verify` 执行完整回归与打包验证。GitHub 与 npm 都包含可直接运行的 `lib`。改动源码后，提交前请先运行构建。打包前仍会自动检查类型并构建，npm 安装包仍包含所需 JavaScript 产物。CI 在 Node.js 22.19.0 和 24 上执行完整验证，代码改动也会自动触发受支持宿主兼容矩阵。欢迎提交改进。
 
 从源码制作测试包时，使用项目固定版本的 pnpm 安装依赖，执行 `npm run verify`，再执行 `npm pack`。用 `dsh plugin --profile web add <package.tgz>` 安装生成的 `.tgz`，重启 DSH 并刷新页面。打包时不要使用 `--ignore-scripts`，否则会跳过构建钩子。
 

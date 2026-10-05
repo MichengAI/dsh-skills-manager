@@ -51,7 +51,7 @@ Skill repositories:
 
 Requires a working DeepSeek Harness installation. The commands below use the `web` profile; replace it with yours if needed.
 
-Supported plugin installation sources are the npm registry and a locally built `.tgz` package. Direct Git/GitHub dependency installation (such as `github:MichengAI/dsh-skills-manager`) is not supported. For source development, install development dependencies and build the project before loading it into DSH.
+Supported plugin installation sources are the npm registry, a locally built `.tgz` package, and GitHub. GitHub and npm both include a ready-to-run `lib`. After changing source, run the build before committing.
 
 ### Ask an agent to install it
 
@@ -148,7 +148,7 @@ For a desktop workbench, download [DSH Codex Desktop](https://github.com/Micheng
 
 [Open an issue](https://github.com/MichengAI/dsh-skills-manager/issues) for bugs or suggestions. Include your DSH and plugin versions, reproduction steps, and a full screenshot for UI issues.
 
-Source code lives in `src` and uses strict TypeScript while retaining the existing plugin architecture. Run `npm run typecheck` for type checks, `npm run build` to generate runtime files, and `npm run verify` for the full regression and package checks. `lib` is not tracked in Git; packing automatically checks types and builds the JavaScript files required by the npm package. CI runs full verification on Node.js 22.19.0 and 24, and code changes also trigger the supported-host compatibility matrix. Contributions are welcome.
+Source code lives in `src` and uses strict TypeScript while retaining the existing plugin architecture. Run `npm run typecheck` for type checks, `npm run build` to generate runtime files, and `npm run verify` for the full regression and package checks. GitHub and npm both include a ready-to-run `lib`. After changing source, run the build before committing. Packing still checks types and builds the JavaScript files required by the npm package. CI runs full verification on Node.js 22.19.0 and 24, and code changes also trigger the supported-host compatibility matrix. Contributions are welcome.
 
 To test a source checkout, install dependencies using the pinned pnpm version, run `npm run verify`, then run `npm pack`. Install the resulting `.tgz` with `dsh plugin --profile web add <package.tgz>`, restart DSH and refresh the page. Do not use `--ignore-scripts` when packing: it skips the build hook.
 
