@@ -4,6 +4,9 @@
 
 ## Unreleased
 
+## 1.1.10 - 2026-10-06
+
+- The installed-plugin list shows “Skills Manager” and a localized description instead of the package name. Titles and descriptions come from `meta.title` and `meta.description` in `locale/zh.json` and `locale/en.json`.
 - Installing from GitHub now includes the compiled runtime, so no manual build is required.
 
 ## 1.1.9 - 2026-10-04

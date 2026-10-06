@@ -4,6 +4,9 @@
 
 ## 未发布
 
+## 1.1.10 - 2026-10-06
+
+- 已安装插件列表显示「Skills Manager」和中文简介，不再只用包名。显示名来自 `locale/zh.json` 和 `locale/en.json` 的 `meta.title`、`meta.description`。
 - 从 GitHub 安装现在包含编译后的运行文件，不必再手动构建。
 
 ## 1.1.9 - 2026-10-04
