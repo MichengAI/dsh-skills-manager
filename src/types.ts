@@ -152,17 +152,32 @@ export interface Repository extends RepositorySource {
     refreshedAt: string | null;
     error: Diagnostic | null;
 }
+export type RepositoryRoot = 'dsh' | 'agents';
+export interface RepositoryDestination {
+    key: RepositoryRoot;
+    path: string;
+    label: string;
+    localeKey?: string;
+    available: boolean;
+    error?: Diagnostic;
+}
 export interface InstallSource extends RepositorySource {
+    root?: RepositoryRoot;
     id: string;
     path: string;
     commit: string | null;
 }
 export interface InstallRecord {
+    /** Missing in legacy records: defaults to DSH. */
+    root?: RepositoryRoot;
     id: string;
     path: string;
     name: string;
     commit: string | null;
     complete: boolean;
+    /** Retired ownership: retained only for explicit Trash restore. */
+    trashId?: string;
+    restoreFingerprint?: string;
     files: FileDigest[];
     source?: RepositorySource;
     backup?: {
@@ -182,6 +197,7 @@ export interface RepositoryInput {
     subdirectory?: string;
 }
 export interface SkillRequest {
+    root?: RepositoryRoot;
     id: string;
     path: string;
     rollback?: boolean;
@@ -208,6 +224,11 @@ export interface RenameOptions {
     delayMs?: number;
 }
 export interface MutationOptions extends ScopeOptions {
+    /** Internal repository operations only; never taken from HTTP request bodies. */
+    allowRepositoryRoot?: boolean;
+    repositoryEntryOnly?: boolean;
+    repositoryTrash?: { id: string; repository: { id: string; path: string } };
+    repositoryRestore?: boolean;
     root?: RootInput;
     renameOptions?: RenameOptions;
     conflict?: string;

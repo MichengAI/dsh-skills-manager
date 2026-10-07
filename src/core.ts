@@ -1,4 +1,4 @@
-import type { SkillRoot, RootInput, Diagnostic, OperationError, CodedError, Log, DiscoveredEntry, SkillEntry, ParsedSkill, Scan, ManagerState, PolicyResult, Policy, SkillItem, ViewItem, RootView, SkillView, ScopeOptions, MutationOptions, RenameOptions, UploadInput, CreateInput, ImportCandidate, ImportPending, ImportConflict, ImportFailure, ImportResult } from "./types.js";
+import type { SkillRoot, RepositoryDestination, RootInput, Diagnostic, OperationError, CodedError, Log, DiscoveredEntry, SkillEntry, ParsedSkill, Scan, ManagerState, PolicyResult, Policy, SkillItem, ViewItem, RootView, SkillView, ScopeOptions, MutationOptions, RenameOptions, UploadInput, CreateInput, ImportCandidate, ImportPending, ImportConflict, ImportFailure, ImportResult } from "./types.js";
 // dsh-skills-manager core —— 纯 Node 技能文件管理核心（仅 ZIP 解压使用 fflate，可独立单测）
 //
 // 覆盖 DSH 用户级与活动 Session 项目级技能根：
@@ -604,8 +604,15 @@ function rootByKey(key: string): SkillRoot | null | undefined {
 }
 
 /** 只允许用户 DSH 根，或由活动 Session 推导出的项目 DSH 根参与文件写入。 */
-function writableRootDefinition(root: RootInput) {
+function writableRootDefinition(root: RootInput, allowRepositoryRoot = false) {
   const definition = rootDefinition(root);
+  // 普通管理页仍只写 DSH。仓库安装只能额外写入已核对的公共 Agent 目录。
+  if (allowRepositoryRoot && definition?.key === "agents") {
+    const canonical = rootByKey("agents");
+    return canonical && resolve(definition.path) === resolve(canonical.path)
+      ? { ...canonical, mutable: true }
+      : null;
+  }
   if (!definition || definition.mutable !== true) return null;
   if (definition.key === "dsh")
     return resolve(definition.path) === resolve(dshRootPath())
@@ -625,8 +632,17 @@ function writableRootDefinition(root: RootInput) {
   return definition;
 }
 
-async function checkedWritableRootDefinition(root: RootInput): Promise<SkillRoot | OperationError | null | undefined> {
-  const definition = writableRootDefinition(root);
+async function checkedWritableRootDefinition(root: RootInput, allowRepositoryRoot = false): Promise<SkillRoot | OperationError | null | undefined> {
+  const definition = writableRootDefinition(root, allowRepositoryRoot);
+  if (definition && definition.scope !== "project" && allowRepositoryRoot) {
+    // 公共 Agent 的祖先目录也不能是链接，避免确认安装后写到配置路径之外。
+    for (let path = resolve(definition.path); ; path = dirname(path)) {
+      const st = await lstatOrNull(path);
+      if (st && (!st.isDirectory() || st.isSymbolicLink()))
+        return { ok: false, error: `技能目录不安全，拒绝写入: ${path}`, code: "error.root.unsafe", params: { path } };
+      if (dirname(path) === path) break;
+    }
+  }
   if (!definition || definition.scope !== "project") return definition;
   if (await overlapsUserSkillRoot(definition.path)) {
     return {
@@ -649,6 +665,20 @@ async function checkedWritableRootDefinition(root: RootInput): Promise<SkillRoot
     }
   }
   return definition;
+}
+
+/** 仓库可选的安装位置：全局 DSH，以及已配置的公共 Agent 目录。 */
+export async function repositoryDestinations(): Promise<RepositoryDestination[]> {
+  const result: RepositoryDestination[] = [];
+  for (const root of userRoots().filter(item => item.key === "dsh" || item.key === "agents")) {
+    let error: Diagnostic | undefined;
+    try {
+      const checked = await checkedWritableRootDefinition(root, true);
+      if (!checked || checked.ok === false) error = checked || { code: "error.root.unsafe", error: "技能安装位置不可用" };
+    } catch (caught) { const exception = caught as CodedError; error = { code: "error.root.unsafe", error: exception.message, params: { path: root.path } }; }
+    result.push({ key: root.key as RepositoryDestination['key'], path: resolve(root.path), label: root.label, localeKey: root.localeKey, available: !error, ...(error ? { error } : {}) });
+  }
+  return result;
 }
 
 /** 判断 child 是否与 parent 相同或位于其内部。跨盘符时 relative 会返回绝对路径。 */
@@ -1680,8 +1710,8 @@ async function publishTrashStage(stage: string, finalPath: string, metadata: Tra
 }
 
 function trashRootMetadata(definition: SkillRoot) {
-  if (definition.key === "dsh")
-    return { key: "dsh", scope: "user", label: definition.label };
+  if (definition.scope !== "project" && rootByKey(definition.key))
+    return { key: definition.key, scope: "user", label: definition.label, ...(definition.localeKey ? { localeKey: definition.localeKey } : {}) };
   return {
     key: definition.key,
     scope: "project",
@@ -1695,8 +1725,8 @@ function trashRootMetadata(definition: SkillRoot) {
 async function restoreRootDefinition(metadata: TrashMetadata, options: ScopeOptions = {}): Promise<SkillRoot | OperationError | null | undefined> {
   // version 1 entries predate scoped Trash and always belong to $DSH_HOME/skills.
   if (!metadata.root) return rootByKey("dsh");
-  if (metadata.root.scope === "user" && metadata.root.key === "dsh")
-    return rootByKey("dsh");
+  if (metadata.root.scope === "user" && rootByKey(metadata.root.key))
+    return checkedWritableRootDefinition(rootByKey(metadata.root.key), metadata.root.key !== "dsh");
   if (
     metadata.root.scope !== "project" ||
     metadata.root.kind !== "project-dsh" ||
@@ -1731,19 +1761,22 @@ async function restoreRootDefinition(metadata: TrashMetadata, options: ScopeOpti
 
 /** 把用户或活动项目的 DSH 根中的单个技能移入 manager-owned 回收站。 */
 export async function deleteSkill(root: RootInput, name: string, log?: Log, options: MutationOptions = {}) {
-  const definition = await checkedWritableRootDefinition(root);
+  const definition = await checkedWritableRootDefinition(root, options.allowRepositoryRoot === true);
   if (definition && definition.ok === false) return definition;
   if (!definition) return readonlyError("delete");
   const resolved = await resolveEntry(definition, name);
-  if (resolved === null)
+  if (resolved === null && !options.repositoryEntryOnly)
     return {
       ok: false,
       error: `技能不存在: ${name}`,
       code: "error.skill.notFound",
       params: { name },
     };
-  const targets = await safeExistingEntryPaths(definition.path, name);
-  const id = `${Date.now()}-${randomUUID()}`;
+  const targets = (await safeExistingEntryPaths(definition.path, name))
+    .filter(target => !options.repositoryEntryOnly || target.fileName === name);
+  if (!targets.length) return { ok: false, error: `技能不存在: ${name}`, code: "error.skill.notFound", params: { name } };
+  const id = options.repositoryTrash?.id || `${Date.now()}-${randomUUID()}`;
+  if (!/^\d+-[a-f0-9-]{36}$/.test(id)) throw codedError("回收站条目编号非法", "error.trash.invalid", { id });
   const trashRoot = trashRootPath();
   const stage = join(trashRoot, `.stage-${randomUUID()}`);
   const finalPath = join(trashRoot, id);
@@ -1771,6 +1804,7 @@ export async function deleteSkill(root: RootInput, name: string, log?: Log, opti
       deletedAt: new Date().toISOString(),
       entries: moved.map((item) => item.fileName),
       root: trashRootMetadata(definition),
+      ...(options.repositoryTrash ? { repository: options.repositoryTrash.repository } : {}),
     };
     await fs.writeFile(
       join(stage, "metadata.json"),
@@ -1865,6 +1899,7 @@ export async function restoreTrash(id: string, log?: Log, options: MutationOptio
   await fs.mkdir(root, { recursive: true });
   const itemRoot = join(trashRootPath(), id);
   const moved = [];
+  let committed = false;
   try {
     for (const fileName of metadata.entries) {
       const source = join(itemRoot, fileName);
@@ -1877,10 +1912,16 @@ export async function restoreTrash(id: string, log?: Log, options: MutationOptio
       await movePathWithFallback(source, destination, options.renameOptions);
       moved.push({ source, destination });
     }
-    await fs.rm(itemRoot, { recursive: true, force: true });
+    if (options.repositoryRestore) {
+      // Atomic success receipt: deleting a Trash entry is NOT evidence that its
+      // files were restored. Keep this hidden receipt until provenance commits.
+      await fs.rename(itemRoot, join(trashRootPath(), `.restored-${id}`));
+    } else await fs.rm(itemRoot, { recursive: true, force: true });
+    committed = true;
     if (log) log("restore", `从回收站恢复 ${metadata.name} -> ${root}`);
     return { id, name: metadata.name, root: trashRootMetadata(definition) };
   } catch (caught) { const error = caught as CodedError;
+    if (committed) throw error;
     for (const item of moved.reverse())
       await movePathWithFallback(
         item.destination,
@@ -2159,7 +2200,11 @@ async function replaceWithCopy(source: string, dest: string, isDir: boolean, exi
  * 成功返回 { kind, imported, skipped, failed }；失败返回 { ok:false, error }。
  */
 export async function importSkill(source: string, log?: Log, options: MutationOptions = {}): Promise<ImportResult> {
-  const targetRoot = dshRootPath();
+  const requestedRoot = Object.prototype.hasOwnProperty.call(options, "root") ? options.root : rootByKey("dsh");
+  const definition = await checkedWritableRootDefinition(requestedRoot, options.allowRepositoryRoot === true);
+  if (definition && definition.ok === false) return definition;
+  if (!definition) return readonlyError("create");
+  const targetRoot = definition.path;
   const conflict = options.conflict === "overwrite" ? "overwrite" : "skip";
   const dryRun = options.dryRun === true;
 
@@ -3027,4 +3072,4 @@ export type ProviderCandidate = Awaited<ReturnType<typeof listProviderCandidates
 type SourceAnalysis = ({kind: "none"} & Diagnostic) | ({kind: "single"; skillFile: string} & ImportCandidate) | {kind: "batch"; rawName: string; source: string; isDir: boolean};
 type MetadataEntry = DiscoveredEntry & {name: string; providerRank?: number; policyAliases?: {rootKey: string; name: string}[]};
 interface MetadataScan {exists: boolean; entries: MetadataEntry[]; truncated?: boolean}
-interface TrashMetadata { id: string; name: string; deletedAt: string; root?: {key: string; scope: string; label: string; projectRoot?: string; projectName?: string; kind?: string}; entries: string[] }
+interface TrashMetadata { id: string; name: string; deletedAt: string; repository?: {id: string; path: string}; root?: {key: string; scope: string; label: string; localeKey?: string; projectRoot?: string; projectName?: string; kind?: string}; entries: string[] }

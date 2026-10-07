@@ -289,7 +289,7 @@ import { antdLocaleFromDocument } from "./antd-locale.js";
       var roots = scope === "trash" ? [] : scopeSkillRoots(allRoots, scope, activeProject), activeSource = roots.some(function (root) { return root.key === source; }) ? source : "";
       var createRoot = allRoots.find(function (root) { return root.key === "dsh" && root.mutable === true; });
       function openCreate() { if (!createRoot) return; setForm(Object.assign({}, form, { root: "dsh" })); setModal("create"); }
-      function trashRootLabel(item: TrashItem) { return item.root && item.root.scope === "project" ? t("root.projectDsh") + " · " + (item.root.projectName || item.root.projectRoot) : t("root.dsh"); }
+      function trashRootLabel(item: TrashItem) { return item.root && item.root.scope === "project" ? t("root.projectDsh") + " · " + (item.root.projectName || item.root.projectRoot) : translateOrFallback(t, "root." + (item.root?.localeKey || item.root?.key || "dsh"), item.root?.label || t("root.dsh")); }
       var options = [{ value: "", label: t("filter.all") }].concat(roots.map(function (root) { return { value: root.key, label: t("filter.option", { name: rootDisplayName(t, root), count: root.skills.length }) }; }));
 
       function renderFallback(skill: SkillView) {

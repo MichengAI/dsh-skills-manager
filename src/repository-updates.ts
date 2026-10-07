@@ -1,5 +1,5 @@
 import type { CodedError } from "./types.js";
-import type { Archive, FileDigest, RepositoryDependencies, SkillRequest, InstallSource } from "./types.js";
+import type { Archive, FileDigest, RepositoryDependencies, SkillRequest, InstallSource, RepositoryRoot } from "./types.js";
 // 仓库更新使用完整文件摘要预览和目录切换，保留备份，不执行下载内容。
 import { promises as fs } from "node:fs";
 import { join, dirname } from "node:path";
@@ -7,6 +7,15 @@ import { createHash, randomUUID } from "node:crypto";
 import { managerHomePath, userRoots } from "./core.js";
 
 const hash = (bytes: string | Uint8Array) => createHash("sha256").update(bytes).digest("hex");
+const repositoryInstallKeys = new Set(["dsh", "agents"]);
+/** 只解析 DSH 与公共 Agent。缺省和旧记录都属于 DSH。 */
+export function repositoryInstallRoot(key: unknown = "dsh") {
+  const normalized = key === undefined ? "dsh" : key;
+  if (typeof normalized !== "string" || !repositoryInstallKeys.has(normalized)) throw failure("技能安装位置无效");
+  const root = userRoots().find(item => item.key === normalized);
+  if (!root) throw failure("技能安装位置无效");
+  return { ...root, key: root.key as RepositoryRoot };
+}
 export const fileIndex = (entries: Archive) => Object.entries(entries!).map(([path, bytes]) => ({ path, hash: hash(bytes) })).sort((a, b) => a.path.localeCompare(b.path, "en"));
 export const signature = (files: FileDigest[]) => hash(JSON.stringify([...files].map(({ path, hash }) => ({ path, hash })).sort((a, b) => a.path.localeCompare(b.path, "en"))));
 function failure(message: string, code = "error.repo.invalid") { return Object.assign(new Error(message), { code, statusCode: 400 }); }
@@ -48,14 +57,14 @@ function changesBetween(before: FileDigest[], after: FileDigest[]) {
 export function createRepositoryUpdater({ read, write, repository, download, serialize, parseRepositoryInput }: RepositoryDependencies) {
   async function prepare(input: SkillRequest, includeArchive = false) {
     const { id, path } = input, data = await read();
-    const record = data.installs.find(i => i.id === id && i.path === path && i.complete);
+    const record = data.installs.find(i => i.id === id && i.path === path && i.complete && !i.trashId);
     if (!record) throw failure("没有可追溯的安装记录，不能在线更新");
-    const target = join(userRoots().find(r => r.key === "dsh")!.path, record.name);
+    const target = join(repositoryInstallRoot(record.root).path, record.name);
     const current = fileIndex(await readSkillTree(target));
     let entries: Archive | undefined, next: FileDigest[], commit: string | null;
     if (input.rollback === true) {
       const backup = record.backup!;
-      if (!/^[a-f0-9-]{36}$/.test(backup?.key || "") || backup.record?.name !== record.name || backup.record?.id !== id || backup.record?.path !== path || !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(backup.record?.commit || "") || !Array.isArray(backup.record?.files)) throw failure("没有有效的上一版备份");
+      if (!/^[a-f0-9-]{36}$/.test(backup?.key || "") || backup.record?.name !== record.name || backup.record?.id !== id || backup.record?.path !== path || (backup.record.root || "dsh") !== (record.root || "dsh") || !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(backup.record?.commit || "") || !Array.isArray(backup.record?.files)) throw failure("没有有效的上一版备份");
       entries = await readSkillTree(join(managerHomePath(), "repository-backups", backup.key)); next = fileIndex(entries);
       if (signature(next) !== backup.fingerprint) throw failure("备份内容已变化，拒绝回退");
       commit = backup.record.commit;
@@ -69,7 +78,7 @@ export function createRepositoryUpdater({ read, write, repository, download, ser
         if (signature(fileIndex(entries)) !== signature(next)) throw failure("下载内容与预览版本不同，请重新检查更新");
       }
     }
-    const token = hash(JSON.stringify({ id, path, commit, current, next, rollback: input.rollback === true }));
+    const token = hash(JSON.stringify({ id, path, root: record.root || "dsh", commit, current, next, rollback: input.rollback === true }));
     return { data, record, target, entries, next, current, token, commit, localModified: signature(current) !== signature(record.files), changes: changesBetween(current, next) };
   }
   async function replace(input: SkillRequest, rollback = false) {
@@ -110,11 +119,11 @@ export function createRepositoryUpdater({ read, write, repository, download, ser
   }
   async function sources() {
     const data = await read(), result: Record<string, InstallSource> = Object.create(null);
-    for (const record of data.installs.filter(i => i.complete)) {
+    for (const record of data.installs.filter(i => i.complete && !i.trashId)) {
       const source = record.source || data.repositories.find(r => r.id === record.id);
       if (!source) continue;
       const parsed = parseRepositoryInput({ url: `${source.owner}/${source.name}`, ref: source.ref, subdirectory: source.subdirectory });
-      result[record.name] = { ...parsed, id: record.id, path: record.path, commit: record.commit };
+      result[record.name] = { ...parsed, id: record.id, path: record.path, commit: record.commit, root: record.root || "dsh" };
     }
     return result;
   }

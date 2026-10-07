@@ -16,7 +16,6 @@ import {
   setSkillEnabled,
   setSourceEnabled,
   deleteSkill,
-  restoreTrash,
   permanentlyDeleteTrash,
   importSkill,
   importUploadedSkill,
@@ -397,7 +396,10 @@ function apply(ctx: HostContext) {
         const snapshot = await state(projectOptions());
         try {
           const sources = await repositories.sources();
-          for (const root of snapshot.roots) if (root.key === "dsh") for (const skill of root.skills || []) skill.installSource = sources[skill.name] || null;
+          for (const root of snapshot.roots) for (const skill of root.skills || []) {
+            const source = sources[skill.name];
+            skill.installSource = source && (source.root || "dsh") === root.key ? source : null;
+          }
         } catch (caught) { const error = caught as CodedError; snapshot.warnings.push({ code: "error.repo.state", error: error.message }); }
         return snapshot;
       };
@@ -448,6 +450,8 @@ function apply(ctx: HostContext) {
               return run(res, () => repositories.detail(body));
             case "/api/dsh-skills-manager/repositories/install":
               return run(res, () => repositories.install(body), afterWrite);
+            case "/api/dsh-skills-manager/repositories/uninstall":
+              return run(res, () => repositories.uninstall(body), afterWrite);
             case "/api/dsh-skills-manager/repositories/preview":
               return run(res, () => repositories.preview(body));
             case "/api/dsh-skills-manager/repositories/update":
@@ -465,7 +469,7 @@ function apply(ctx: HostContext) {
             case "/api/dsh-skills-manager/delete":
               return run(res, async () => deleteSkill(await requestRoot(String(body.root || "dsh")), String(body.name || ""), log), afterWrite);
             case "/api/dsh-skills-manager/trash-restore":
-              return run(res, () => restoreTrash(String(body.id || ""), log, projectOptions()), afterWrite);
+              return run(res, () => repositories.restoreTrash(String(body.id || ""), projectOptions()), afterWrite);
             case "/api/dsh-skills-manager/trash-delete":
               return run(res, () => permanentlyDeleteTrash(String(body.id || ""), log));
             case "/api/dsh-skills-manager/detail":
