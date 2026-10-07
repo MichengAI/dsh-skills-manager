@@ -1,4 +1,4 @@
-// Exercise both configured roots without touching any real agent skills.
+// Exercise every configured global root without touching any real agent skills.
 import assert from "node:assert/strict";
 import { promises as fs } from "node:fs";
 import { tmpdir } from "node:os";
@@ -8,7 +8,9 @@ import { zipSync, strToU8 } from "fflate";
 const sandbox = await fs.mkdtemp(join(await fs.realpath(tmpdir()), "dssm-targets-"));
 process.env.DSH_HOME = join(sandbox, "dsh");
 process.env.DSH_AGENTS_HOME = join(sandbox, "agents");
-process.env.USERPROFILE = join(sandbox, "user");
+process.env.HOME = process.env.USERPROFILE = join(sandbox, "user");
+for (const agent of ['CODEX', 'CLAUDE', 'GEMINI', 'OPENCODE', 'CURSOR', 'COPILOT', 'WINDSURF', 'WINDSURF_USER', 'TRAE', 'TRAE_CN', 'OPENCLAW', 'CLAWDBOT', 'ROO', 'CODEBUDDY', 'WORKBUDDY', 'QODER', 'QODER_CN', 'LINGMA'])
+  process.env[`DSH_${agent}_HOME`] = join(sandbox, `configured-${agent.toLowerCase()}`);
 const { createRepositoryManager } = await import("../lib/repositories.js");
 const { userRoots, state, listTrash, permanentlyDeleteTrash, deleteSkill, importUploadedSkill } = await import("../lib/core.js");
 const doc = name => strToU8(`---\nname: ${name}\ndescription: Test install destinations\n---\nTest instructions\n`);
@@ -17,6 +19,10 @@ const snapshot = text => zipSync({
   "root/shared/SKILL.md": doc("shared-demo"), "root/shared/resources/help.txt": strToU8(text),
   "root/default/SKILL.md": doc("default-demo"), "root/blocked/SKILL.md": doc("blocked-demo"),
   "root/concurrent/SKILL.md": doc("concurrent-demo"),
+  ...Object.fromEntries(userRoots().flatMap(({ key }) => [
+    [`root/locations/${key}/SKILL.md`, doc(`location-${key}`)],
+    [`root/locations/${key}/resources/help.txt`, strToU8(text)],
+  ])),
 });
 archive = snapshot("v1");
 const manager = createRepositoryManager({ fetchImpl: async () => new Response(archive) });
@@ -28,7 +34,17 @@ try {
   const repo = await manager.add({ url: "example/targets" });
   await manager.refresh({ id: repo.id });
   const skill = async name => (await manager.list()).repositories[0].skills.find(item => item.name === name);
-  for (const invalid of [null, "claude", "../agents", "/tmp/skills", {}, false])
+  const destinations = (await manager.list()).installRoots;
+  assert.equal(destinations.length, 21);
+  assert.deepEqual(destinations.map(item => item.key), userRoots().map(item => item.key));
+  for (const destination of destinations) {
+    assert.ok(destination.path.startsWith(sandbox + '/'), 'every test root is isolated from real agent skills');
+    assert.equal(destination.available, true);
+  }
+  assert.equal(destinations.find(item => item.key === 'codex').path, join(process.env.DSH_CODEX_HOME, 'skills'));
+  assert.equal(destinations.find(item => item.key === 'claude').path, join(process.env.DSH_CLAUDE_HOME, 'skills'));
+  assert.equal(await exists(process.env.DSH_CODEX_HOME), false, 'listing destinations never creates an agent directory');
+  for (const invalid of [null, "unknown-agent", "project-claude:abc", "../agents", "/tmp/skills", {}, false, '__proto__'])
     await assert.rejects(manager.install({ id: repo.id, path: "shared", root: invalid }), error => error.code === "error.repo.invalid");
   await assert.rejects(manager.uninstall({ id: repo.id, path: "shared" }), /安装记录/);
 
@@ -135,6 +151,64 @@ try {
   await fs.unlink(link);
   assert.equal(await fs.readFile(join(outside, "important.txt"), "utf8"), "do not delete");
 
+  // Every recognized global destination supports the same tracked lifecycle.
+  for (const destination of destinations) {
+    const key = destination.key, path = `locations/${key}`, name = `location-${key}`;
+    const installedPath = join(destination.path, name);
+    archive = snapshot('v1'); await manager.refresh({ id: repo.id });
+    const installed = await manager.install({ id: repo.id, path, root: key });
+    assert.equal(installed.root, destination.path);
+    assert.equal((await skill(name)).installedRoot, key);
+    assert.equal((await manager.sources())[name].root, key);
+    if (key !== 'dsh') {
+      assert.equal((await state()).roots.find(item => item.key === key).mutable, false);
+      assert.equal((await deleteSkill(root(key), name)).ok, false, 'general external deletion remains denied');
+      const denied = await importUploadedSkill({ name: `untracked-${key}`, entries: [{ path: 'SKILL.md', data: Buffer.from(doc(`untracked-${key}`)).toString('base64') }] }, undefined, { root: root(key) });
+      assert.equal(denied.ok, false, 'generic import cannot write a repository-only destination');
+    }
+    archive = snapshot('v2'); await manager.refresh({ id: repo.id });
+    const preview = await manager.preview({ id: repo.id, path });
+    await manager.update({ id: repo.id, path, root: 'dsh', token: preview.token });
+    assert.equal(await fs.readFile(join(installedPath, 'resources/help.txt'), 'utf8'), 'v2');
+    const rollback = await manager.preview({ id: repo.id, path, rollback: true });
+    await manager.rollback({ id: repo.id, path, token: rollback.token });
+    assert.equal(await fs.readFile(join(installedPath, 'resources/help.txt'), 'utf8'), 'v1');
+    await fs.writeFile(join(installedPath, 'local.txt'), 'preserve destination-local edits');
+    const trashed = await manager.uninstall({ id: repo.id, path, root: 'unknown-agent' });
+    assert.equal(trashed.root.scope, 'user'); assert.equal(trashed.root.key, key);
+    if (destination.localeKey) assert.equal(trashed.root.localeKey, destination.localeKey);
+    assert.equal(await exists(installedPath), false);
+    await fs.mkdir(installedPath);
+    await fs.writeFile(join(installedPath, 'SKILL.md'), doc(name));
+    await fs.writeFile(join(installedPath, 'unrelated.txt'), 'external replacement');
+    assert.equal((await skill(name)).canUninstall, false);
+    await assert.rejects(manager.uninstall({ id: repo.id, path }), /安装记录/);
+    await assert.rejects(manager.preview({ id: repo.id, path }), /安装记录/);
+    assert.equal((await restoreTrash(trashed.id)).code, 'error.trash.conflict');
+    assert.equal(await fs.realpath(installedPath), join(await fs.realpath(destination.path), name));
+    await fs.rm(installedPath, { recursive: true });
+    await restoreTrash(trashed.id);
+    assert.equal((await skill(name)).canUninstall, true);
+    assert.equal(await fs.readFile(join(installedPath, 'local.txt'), 'utf8'), 'preserve destination-local edits');
+    assert.equal((await manager.sources())[name].root, key);
+    const removedAgain = await manager.uninstall({ id: repo.id, path });
+    await permanentlyDeleteTrash(removedAgain.id);
+    assert.equal((await skill(name)).canUninstall, false);
+  }
+
+  // A symlink in a distant ancestor must not redirect a nested agent home.
+  const originalCodexHome = process.env.DSH_CODEX_HOME;
+  const redirectParent = join(sandbox, 'redirect-parent');
+  await fs.symlink(outside, redirectParent);
+  process.env.DSH_CODEX_HOME = join(redirectParent, 'nested-codex');
+  try {
+    assert.equal((await manager.list()).installRoots.find(item => item.key === 'codex').available, false);
+    await assert.rejects(manager.install({ id: repo.id, path: 'locations/codex', root: 'codex' }));
+    assert.equal(await exists(join(outside, 'nested-codex/skills/location-codex')), false);
+    const forged = await deleteSkill({ ...root('claude'), path: outside, mutable: true }, 'important', undefined, { allowRepositoryRoot: true });
+    assert.equal(forged.ok, false, 'even internal opt-in only accepts canonical root paths');
+  } finally { process.env.DSH_CODEX_HOME = originalCodexHome; }
+
   const legacy = await manager.install({ id: repo.id, path: "default" });
   assert.equal(legacy.root, root("dsh").path);
   const stored = JSON.parse(await fs.readFile(stateFile, "utf8"));
@@ -216,7 +290,7 @@ try {
   await fs.writeFile(stateFile, JSON.stringify(invalidState));
   await assert.rejects(manager.list(), error => error.code === "error.repo.state");
   await fs.writeFile(stateFile, validState);
-  console.log("Install targets, Shared Agent updates/rollback, uninstall/Trash restore, legacy compatibility and security boundaries passed");
+  console.log("All 21 global install destinations, update/rollback, tracked uninstall/Trash restore, legacy compatibility and security boundaries passed");
 } finally {
   assert.equal(await fs.realpath(sandbox), sandbox);
   await fs.rm(sandbox, { recursive: true, force: true });

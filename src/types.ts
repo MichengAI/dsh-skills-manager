@@ -152,7 +152,15 @@ export interface Repository extends RepositorySource {
     refreshedAt: string | null;
     error: Diagnostic | null;
 }
-export type RepositoryRoot = 'dsh' | 'agents';
+export type RepositoryRoot = 'dsh' | 'agents' | 'ccswitch' | 'codex' | 'claude' | 'gemini' | 'opencode' | 'cursor' | 'copilot' | 'windsurf' | 'windsurf-user' | 'trae' | 'trae-cn' | 'openclaw' | 'clawdbot' | 'roo' | 'codebuddy' | 'workbuddy' | 'qoder' | 'qoder-cn' | 'lingma';
+export interface RepositoryDestination {
+    key: RepositoryRoot;
+    path: string;
+    label: string;
+    localeKey?: string;
+    available: boolean;
+    error?: Diagnostic;
+}
 export interface InstallSource extends RepositorySource {
     root?: RepositoryRoot;
     id: string;
@@ -217,7 +225,7 @@ export interface RenameOptions {
 }
 export interface MutationOptions extends ScopeOptions {
     /** Internal repository operations only; never taken from HTTP request bodies. */
-    allowSharedAgent?: boolean;
+    allowRepositoryRoot?: boolean;
     repositoryEntryOnly?: boolean;
     repositoryTrash?: { id: string; repository: { id: string; path: string } };
     repositoryRestore?: boolean;

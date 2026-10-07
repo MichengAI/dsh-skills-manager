@@ -1,4 +1,4 @@
-import type { SkillRoot, RootInput, Diagnostic, OperationError, CodedError, Log, DiscoveredEntry, SkillEntry, ParsedSkill, Scan, ManagerState, PolicyResult, Policy, SkillItem, ViewItem, RootView, SkillView, ScopeOptions, MutationOptions, RenameOptions, UploadInput, CreateInput, ImportCandidate, ImportPending, ImportConflict, ImportFailure, ImportResult } from "./types.js";
+import type { SkillRoot, RepositoryDestination, RootInput, Diagnostic, OperationError, CodedError, Log, DiscoveredEntry, SkillEntry, ParsedSkill, Scan, ManagerState, PolicyResult, Policy, SkillItem, ViewItem, RootView, SkillView, ScopeOptions, MutationOptions, RenameOptions, UploadInput, CreateInput, ImportCandidate, ImportPending, ImportConflict, ImportFailure, ImportResult } from "./types.js";
 // dsh-skills-manager core —— 纯 Node 技能文件管理核心（仅 ZIP 解压使用 fflate，可独立单测）
 //
 // 覆盖 DSH 用户级与活动 Session 项目级技能根：
@@ -604,13 +604,13 @@ function rootByKey(key: string): SkillRoot | null | undefined {
 }
 
 /** 只允许用户 DSH 根，或由活动 Session 推导出的项目 DSH 根参与文件写入。 */
-function writableRootDefinition(root: RootInput, allowSharedAgent = false) {
+function writableRootDefinition(root: RootInput, allowRepositoryRoot = false) {
   const definition = rootDefinition(root);
-  // Shared Agent remains read-only in the general manager. Only repository
-  // operations opt in, using the configured global root, never arbitrary paths.
-  if (allowSharedAgent && definition?.key === "agents") {
-    const canonical = rootByKey("agents")!;
-    return resolve(definition.path) === resolve(canonical.path)
+  // External sources remain read-only in the general manager. Repository
+  // operations may opt into configured user roots, never arbitrary paths.
+  if (allowRepositoryRoot && definition && definition.scope !== "project") {
+    const canonical = rootByKey(definition.key);
+    return canonical && resolve(definition.path) === resolve(canonical.path)
       ? { ...canonical, mutable: true }
       : null;
   }
@@ -633,13 +633,17 @@ function writableRootDefinition(root: RootInput, allowSharedAgent = false) {
   return definition;
 }
 
-async function checkedWritableRootDefinition(root: RootInput, allowSharedAgent = false): Promise<SkillRoot | OperationError | null | undefined> {
-  const definition = writableRootDefinition(root, allowSharedAgent);
-  if (definition && definition.scope !== "project" && allowSharedAgent) {
-    for (const path of [dirname(definition.path), definition.path]) {
+async function checkedWritableRootDefinition(root: RootInput, allowRepositoryRoot = false): Promise<SkillRoot | OperationError | null | undefined> {
+  const definition = writableRootDefinition(root, allowRepositoryRoot);
+  if (definition && definition.scope !== "project" && allowRepositoryRoot) {
+    // Check all ancestors, including nested agent homes such as OpenCode.
+    // Missing directories can be created, but an ancestor link cannot redirect
+    // installation/restore outside the configured location.
+    for (let path = resolve(definition.path); ; path = dirname(path)) {
       const st = await lstatOrNull(path);
       if (st && (!st.isDirectory() || st.isSymbolicLink()))
         return { ok: false, error: `技能目录不安全，拒绝写入: ${path}`, code: "error.root.unsafe", params: { path } };
+      if (dirname(path) === path) break;
     }
   }
   if (!definition || definition.scope !== "project") return definition;
@@ -664,6 +668,20 @@ async function checkedWritableRootDefinition(root: RootInput, allowSharedAgent =
     }
   }
   return definition;
+}
+
+/** Configured filesystem destinations; never provider archives or project paths. */
+export async function repositoryDestinations(): Promise<RepositoryDestination[]> {
+  const result: RepositoryDestination[] = [];
+  for (const root of userRoots()) {
+    let error: Diagnostic | undefined;
+    try {
+      const checked = await checkedWritableRootDefinition(root, true);
+      if (!checked || checked.ok === false) error = checked || { code: "error.root.unsafe", error: "技能安装位置不可用" };
+    } catch (caught) { const exception = caught as CodedError; error = { code: "error.root.unsafe", error: exception.message, params: { path: root.path } }; }
+    result.push({ key: root.key as RepositoryDestination['key'], path: resolve(root.path), label: root.label, localeKey: root.localeKey, available: !error, ...(error ? { error } : {}) });
+  }
+  return result;
 }
 
 /** 判断 child 是否与 parent 相同或位于其内部。跨盘符时 relative 会返回绝对路径。 */
@@ -1695,8 +1713,8 @@ async function publishTrashStage(stage: string, finalPath: string, metadata: Tra
 }
 
 function trashRootMetadata(definition: SkillRoot) {
-  if (definition.key === "dsh" || definition.key === "agents")
-    return { key: definition.key, scope: "user", label: definition.label };
+  if (definition.scope !== "project" && rootByKey(definition.key))
+    return { key: definition.key, scope: "user", label: definition.label, ...(definition.localeKey ? { localeKey: definition.localeKey } : {}) };
   return {
     key: definition.key,
     scope: "project",
@@ -1710,8 +1728,8 @@ function trashRootMetadata(definition: SkillRoot) {
 async function restoreRootDefinition(metadata: TrashMetadata, options: ScopeOptions = {}): Promise<SkillRoot | OperationError | null | undefined> {
   // version 1 entries predate scoped Trash and always belong to $DSH_HOME/skills.
   if (!metadata.root) return rootByKey("dsh");
-  if (metadata.root.scope === "user" && (metadata.root.key === "dsh" || metadata.root.key === "agents"))
-    return checkedWritableRootDefinition(rootByKey(metadata.root.key), metadata.root.key === "agents");
+  if (metadata.root.scope === "user" && rootByKey(metadata.root.key))
+    return checkedWritableRootDefinition(rootByKey(metadata.root.key), metadata.root.key !== "dsh");
   if (
     metadata.root.scope !== "project" ||
     metadata.root.kind !== "project-dsh" ||
@@ -1746,7 +1764,7 @@ async function restoreRootDefinition(metadata: TrashMetadata, options: ScopeOpti
 
 /** 把用户或活动项目的 DSH 根中的单个技能移入 manager-owned 回收站。 */
 export async function deleteSkill(root: RootInput, name: string, log?: Log, options: MutationOptions = {}) {
-  const definition = await checkedWritableRootDefinition(root, options.allowSharedAgent === true);
+  const definition = await checkedWritableRootDefinition(root, options.allowRepositoryRoot === true);
   if (definition && definition.ok === false) return definition;
   if (!definition) return readonlyError("delete");
   const resolved = await resolveEntry(definition, name);
@@ -2186,7 +2204,7 @@ async function replaceWithCopy(source: string, dest: string, isDir: boolean, exi
  */
 export async function importSkill(source: string, log?: Log, options: MutationOptions = {}): Promise<ImportResult> {
   const requestedRoot = Object.prototype.hasOwnProperty.call(options, "root") ? options.root : rootByKey("dsh");
-  const definition = await checkedWritableRootDefinition(requestedRoot, options.allowSharedAgent === true);
+  const definition = await checkedWritableRootDefinition(requestedRoot, options.allowRepositoryRoot === true);
   if (definition && definition.ok === false) return definition;
   if (!definition) return readonlyError("create");
   const targetRoot = definition.path;
@@ -3057,4 +3075,4 @@ export type ProviderCandidate = Awaited<ReturnType<typeof listProviderCandidates
 type SourceAnalysis = ({kind: "none"} & Diagnostic) | ({kind: "single"; skillFile: string} & ImportCandidate) | {kind: "batch"; rawName: string; source: string; isDir: boolean};
 type MetadataEntry = DiscoveredEntry & {name: string; providerRank?: number; policyAliases?: {rootKey: string; name: string}[]};
 interface MetadataScan {exists: boolean; entries: MetadataEntry[]; truncated?: boolean}
-interface TrashMetadata { id: string; name: string; deletedAt: string; repository?: {id: string; path: string}; root?: {key: string; scope: string; label: string; projectRoot?: string; projectName?: string; kind?: string}; entries: string[] }
+interface TrashMetadata { id: string; name: string; deletedAt: string; repository?: {id: string; path: string}; root?: {key: string; scope: string; label: string; localeKey?: string; projectRoot?: string; projectName?: string; kind?: string}; entries: string[] }

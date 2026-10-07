@@ -8,7 +8,9 @@ import { zipSync, strToU8 } from "fflate";
 const temporary = await mkdtemp(join(tmpdir(), "dssm-repo-http-"));
 process.env.DSH_HOME = join(temporary, "home");
 process.env.DSH_AGENTS_HOME = join(temporary, "agents");
-process.env.USERPROFILE = join(temporary, "user");
+process.env.HOME = process.env.USERPROFILE = join(temporary, "user");
+process.env.DSH_CODEX_HOME = join(temporary, "configured-codex");
+process.env.DSH_CLAUDE_HOME = join(temporary, "configured-claude");
 const nativeFetch = globalThis.fetch;
 let interceptedDownload;
 globalThis.fetch = (url, options) => interceptedDownload && String(url).startsWith("https://codeload.github.com/") ? interceptedDownload() : nativeFetch(url, options);
@@ -71,6 +73,9 @@ try {
   const post = (action, payload) => fetch(api + '/' + action, { method: 'POST', headers, body: JSON.stringify(payload) });
   assert.equal((await post('refresh', { id })).status, 200);
   assert.equal((await post('install', { id, path: 'demo', root: '../escape' })).status, 400);
+  const destinations = (await (await fetch(api)).json()).data.installRoots;
+  assert.equal(destinations.find(root => root.key === 'codex').path, join(process.env.DSH_CODEX_HOME, 'skills'));
+  assert.equal(destinations.find(root => root.key === 'claude').path, join(process.env.DSH_CLAUDE_HOME, 'skills'));
   assert.equal((await post('install', { id, path: 'demo', root: 'agents' })).status, 200);
   const managerApi = api.replace(/\/repositories$/, '');
   const shared = (await (await fetch(managerApi + '/state')).json()).data.roots.find(root => root.key === 'agents');
@@ -84,6 +89,21 @@ try {
   assert.equal((await fetch(managerApi + '/trash-restore', { method: 'POST', headers, body: JSON.stringify({ id: trash.id }) })).status, 200);
   assert.equal((await (await fetch(api)).json()).data.repositories[0].skills[0].status, 'installed');
   assert.equal((await post('uninstall', { id, path: 'demo' })).status, 200);
+  for (const key of ['codex', 'claude']) {
+    assert.equal((await post('install', { id, path: 'demo', root: key })).status, 200);
+    const snapshot = (await (await fetch(managerApi + '/state')).json()).data;
+    const installedRoot = snapshot.roots.find(root => root.key === key);
+    assert.equal(installedRoot.mutable, false);
+    assert.equal(installedRoot.skills.find(skill => skill.name === 'http-demo').installSource.root, key);
+    assert.equal((await fetch(managerApi + '/delete', { method: 'POST', headers, body: JSON.stringify({ root: key, name: 'http-demo', allowRepositoryRoot: true, allowSharedAgent: true }) })).status, 400);
+    assert.equal((await post('uninstall', { id, path: 'demo', root: 'dsh' })).status, 200);
+    const deleted = (await (await fetch(managerApi + '/state')).json()).data.trash.find(item => item.root.key === key);
+    assert.equal(deleted.root.scope, 'user');
+    assert.equal((await fetch(managerApi + '/trash-restore', { method: 'POST', headers, body: JSON.stringify({ id: deleted.id }) })).status, 200);
+    assert.equal((await (await fetch(api)).json()).data.repositories[0].skills[0].installedRoot, key);
+    assert.equal((await post('uninstall', { id, path: 'demo' })).status, 200);
+  }
+  assert.equal((await post('install', { id, path: 'demo', root: join(process.env.DSH_CLAUDE_HOME, 'skills') })).status, 400, 'arbitrary paths are not installation keys');
   interceptedDownload = undefined;
   assert.equal((await fetch(api + "/remove", { method: "POST", headers, body: JSON.stringify({ id }) })).status, 200);
   assert.equal((await (await fetch(api)).json()).data.repositories.length, 0);

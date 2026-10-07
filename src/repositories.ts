@@ -4,7 +4,7 @@ import { promises as fs } from "node:fs";
 import { join } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import { unzipSync } from "fflate";
-import { managerHomePath, trashRootPath, listTrash, restoreTrash as restoreSkillTrash, parseSkillDoc, importUploadedSkill, deleteSkill, setSkillEnabled, state } from "./core.js";
+import { managerHomePath, repositoryDestinations, trashRootPath, listTrash, restoreTrash as restoreSkillTrash, parseSkillDoc, importUploadedSkill, deleteSkill, setSkillEnabled, state } from "./core.js";
 import { createRepositoryUpdater, fileIndex, signature, readSkillTree, repositoryInstallRoot } from "./repository-updates.js";
 
 const LIMIT = 32 << 20;
@@ -251,7 +251,7 @@ export function createRepositoryManager({ fetchImpl = globalThis.fetch, log }: {
         matched.set(record, signature(files) === signature(record.files));
       } catch { /* Missing or unsafe installed copies must not be deleted. */ }
     }
-    return { repositories: data.repositories.map((repo) => ({ ...repo, skills: repo.skills.map((skill) => {
+    return { installRoots: await repositoryDestinations(), repositories: data.repositories.map((repo) => ({ ...repo, skills: repo.skills.map((skill) => {
       const found = skills.some((s) => s.name.toLowerCase() === skill.name.toLowerCase() || s.declaredName?.toLowerCase() === skill.name.toLowerCase());
       const own = data.installs.some((i) => i.id === repo.id && i.path === skill.path && i.name === skill.name && matched.get(i));
       const { body, ...summary } = skill;
@@ -352,7 +352,7 @@ export function createRepositoryManager({ fetchImpl = globalThis.fetch, log }: {
       record.trashId = trashId;
       await write(data);
       try {
-        const result = await deleteSkill(root, record.name, log, { allowSharedAgent: true, repositoryEntryOnly: true, repositoryTrash: { id: trashId, repository: { id, path } } });
+        const result = await deleteSkill(root, record.name, log, { allowRepositoryRoot: true, repositoryEntryOnly: true, repositoryTrash: { id: trashId, repository: { id, path } } });
         if ("ok" in result && result.ok === false) throw failure(result.error, result.code);
         return result;
       } catch (error) {
@@ -374,12 +374,12 @@ export function createRepositoryManager({ fetchImpl = globalThis.fetch, log }: {
       if (!entries.some((e) => e.path === "SKILL.md")) throw failure("仓库技能内容已失效");
       // 先持久化来源意图；即使安装后进程退出，也能追溯安装的仓库和提交。
       data.installs = data.installs.filter((i) => i.name !== skill.name);
-      const record: InstallRecord = { id, path, root: root.key as "dsh" | "agents", source: { owner: repo.owner, name: repo.name, ref: repo.ref, subdirectory: repo.subdirectory }, name: skill.name, commit: repo.commit, complete: false, files: entries.map((e) => ({ path: e.path, hash: hash(Buffer.from(e.data, "base64")) })) };
+      const record: InstallRecord = { id, path, root: root.key, source: { owner: repo.owner, name: repo.name, ref: repo.ref, subdirectory: repo.subdirectory }, name: skill.name, commit: repo.commit, complete: false, files: entries.map((e) => ({ path: e.path, hash: hash(Buffer.from(e.data, "base64")) })) };
       data.installs.push(record);
       await write(data);
       let copied = false;
       try {
-        const result = await importUploadedSkill({ name: skill.name, entries }, log, { conflict: "skip", root, allowSharedAgent: true });
+        const result = await importUploadedSkill({ name: skill.name, entries }, log, { conflict: "skip", root, allowRepositoryRoot: true });
         if (result.ok === false || !result.imported?.length) throw failure(result.error || "技能安装失败或遇到同名冲突", "error.repo.conflict");
         copied = true;
         // 界面默认显示已启用，但斜杠菜单只会收到显式启用覆盖项。安装完成后走与手动开启相同的策略写入。

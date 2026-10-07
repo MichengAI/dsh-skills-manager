@@ -1,5 +1,5 @@
 import type { CodedError } from "./types.js";
-import type { Archive, FileDigest, RepositoryDependencies, SkillRequest, InstallSource } from "./types.js";
+import type { Archive, FileDigest, RepositoryDependencies, SkillRequest, InstallSource, RepositoryRoot } from "./types.js";
 // 仓库更新使用完整文件摘要预览和目录切换，保留备份，不执行下载内容。
 import { promises as fs } from "node:fs";
 import { join, dirname } from "node:path";
@@ -9,8 +9,9 @@ import { managerHomePath, userRoots } from "./core.js";
 const hash = (bytes: string | Uint8Array) => createHash("sha256").update(bytes).digest("hex");
 /** Resolve only configured global installation roots. Old records belong to DSH. */
 export function repositoryInstallRoot(key: unknown = "dsh") {
-  if (key !== "dsh" && key !== "agents") throw failure("技能安装位置无效");
-  return userRoots().find(root => root.key === key)!;
+  const root = typeof key === "string" ? userRoots().find(root => root.key === key) : undefined;
+  if (!root) throw failure("技能安装位置无效");
+  return { ...root, key: root.key as RepositoryRoot };
 }
 export const fileIndex = (entries: Archive) => Object.entries(entries!).map(([path, bytes]) => ({ path, hash: hash(bytes) })).sort((a, b) => a.path.localeCompare(b.path, "en"));
 export const signature = (files: FileDigest[]) => hash(JSON.stringify([...files].map(({ path, hash }) => ({ path, hash })).sort((a, b) => a.path.localeCompare(b.path, "en"))));
