@@ -4,6 +4,12 @@
 
 ## Unreleased
 
+## 1.1.13 - 2026-10-07
+
+- Repository installs can go to DSH skills or Shared Agent. Codex, Claude and other agent directories stay read-only.
+- Tracked repository copies can be uninstalled to Trash, including local edits. Restore keeps the original destination.
+- Thanks to @funk80rus (#26).
+
 ## 1.1.12 - 2026-10-07
 
 - Official Desktop can update this plugin in place. It no longer targets the web profile by mistake.
