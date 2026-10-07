@@ -4,6 +4,12 @@
 
 ## Unreleased
 
+## 1.1.11 - 2026-10-07
+
+- Official Desktop can update this plugin in place. It no longer targets the web profile by mistake.
+- A new version is marked with a warning color. Version numbers keep their normal color.
+- After updating, fully quit and reopen DSH Desktop.
+
 ## 1.1.10 - 2026-10-06
 
 - The installed-plugin list shows “Skills Manager” and a localized description instead of the package name. Titles and descriptions come from `meta.title` and `meta.description` in `locale/zh.json` and `locale/en.json`.

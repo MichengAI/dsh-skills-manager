@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 import { handlePluginUpdateEscape, manualPluginUpdateCommand } from '../src/plugin-update-model.ts'
-import { isDshCliEntry, isNewerVersion, isTrustedUpdateRequest, PLUGIN_UPDATE_HEADER } from '../src/plugin-updater.ts'
+import { isDshCliEntry, isNewerVersion, isTrustedUpdateRequest, PLUGIN_UPDATE_HEADER, resolveUpdateRuntime, shouldNotifyParent } from '../src/plugin-updater.ts'
 
 test('技能管理器独立更新只接受同源专用请求', () => {
   assert.equal(isNewerVersion('0.1.40', '0.1.41'), true)
@@ -11,7 +11,7 @@ test('技能管理器独立更新只接受同源专用请求', () => {
   assert.equal(isNewerVersion('0.1.0-rc.10', '0.1.0-rc.2'), false)
   assert.equal(isTrustedUpdateRequest({ headers: { [PLUGIN_UPDATE_HEADER]: '1', origin: 'http://localhost:3000', host: 'localhost:3000' }, socket: { remoteAddress: '::1' } }), true)
   assert.equal(isTrustedUpdateRequest({ headers: { origin: 'http://localhost:3000', host: 'localhost:3000' } }), false)
-  assert.equal(isTrustedUpdateRequest({ headers: { [PLUGIN_UPDATE_HEADER]: '1', host: 'localhost:3000' }, socket: { remoteAddress: '::1' } }), false)
+  assert.equal(isTrustedUpdateRequest({ headers: { [PLUGIN_UPDATE_HEADER]: '1', host: '127.0.0.1:19387' }, socket: { remoteAddress: '::1' } }), true)
   assert.equal(isTrustedUpdateRequest({ headers: { [PLUGIN_UPDATE_HEADER]: '1', origin: 'http://localhost:3000', host: 'localhost:3000' }, socket: { remoteAddress: '192.168.1.8' } }), false)
   assert.equal(manualPluginUpdateCommand('web', '@michengai/dsh-skills-manager', '0.1.41'), 'dsh plugin --profile web add @michengai/dsh-skills-manager@0.1.41 --registry=https://registry.npmjs.org/')
   assert.equal(isDshCliEntry('C:/tools/dsh/lib/bin.js', { name: '@deepseek-ai/dsh', bin: { dsh: 'lib/bin.js' } }, 'C:/tools/dsh'), true)
@@ -54,8 +54,31 @@ test('技能客户端与 Host 绑定自身更新入口', async () => {
   assert.doesNotMatch(updateUi, /mpi-overlay/)
   assert.doesNotMatch(updateModel, /settings\.includes\("Settings"\)/)
   assert.match(updateUi, /if \(version\.textContent !== versionLabel\)/)
+  assert.match(updateUi, /color: "#e8b15a"/)
   assert.match(updateModel, /payload\.latestCheckFailed/)
   assert.match(host, /endpoint: "\/api\/michengai\/dsh-skills-manager\/update"/)
-  assert.match(await readFile(new URL('../src/plugin-updater.ts', import.meta.url), 'utf8'), /const notifyParent = target\.desktopPnpm === void 0 && typeof process\.send === "function"/)
+  assert.match(await readFile(new URL('../src/plugin-updater.ts', import.meta.url), 'utf8'), /const notifyParent = shouldNotifyParent\(target\)/)
   assert.match(await readFile(new URL('../src/plugin-updater.ts', import.meta.url), 'utf8'), /isDshCliEntry/)
+})
+
+test('官方 Desktop 在线更新指向 desktop profile，且不通知父进程', () => {
+  const runtime = resolveUpdateRuntime({
+    get(name) {
+      if (name === 'profileContext') return {
+        name: 'desktop',
+        dir: 'D:\\profile\\desktop',
+        packageManager: { command: 'D:\\Tools\\DeepSeek Harness\\DeepSeek Harness.exe', args: ['--expose-internals', 'D:\\runtime\\pnpm.mjs'], env: { ELECTRON_RUN_AS_NODE: '1' } },
+      }
+      return undefined
+    },
+  }, {
+    argv: ['node', 'D:\\app\\dsh\\node_modules\\@deepseek-ai\\dsh-desktop-host\\lib\\index.js'],
+    env: {},
+    cwd: 'D:\\profile\\desktop',
+    homeDir: 'C:\\Users\\YUJIYU',
+  })
+  assert.equal(runtime.profileName, 'desktop')
+  assert.equal(runtime.canAutoUpdate, true)
+  assert.equal(runtime.officialDesktop, true)
+  assert.equal(shouldNotifyParent(runtime, () => {}), false)
 })

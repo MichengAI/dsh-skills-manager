@@ -112,4 +112,8 @@ export interface UpdateTarget {
     profileDir: string;
     cliEntry?: string;
     desktopPnpm?: Services['desktopPnpm'];
+    packageManager?: { command: string; args: readonly string[]; env?: NodeJS.ProcessEnv };
+    pluginManager?: { installBundle(spec: string): Promise<{ application?: string; error?: { message?: string }; packageResult?: { output?: string } }> };
+    officialDesktop: boolean;
+    canAutoUpdate: boolean;
 }
