@@ -4,8 +4,10 @@ import { createServer, request } from "node:http";
 import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { zipSync, strToU8 } from "fflate";
 const temporary = await mkdtemp(join(tmpdir(), "dssm-repo-http-"));
 process.env.DSH_HOME = join(temporary, "home");
+process.env.DSH_AGENTS_HOME = join(temporary, "agents");
 process.env.USERPROFILE = join(temporary, "user");
 const nativeFetch = globalThis.fetch;
 let interceptedDownload;
@@ -31,7 +33,7 @@ try {
     req.on("error", reject); req.end();
   });
   assert.equal(untrustedHostStatus, 403);
-  for (const action of ["add", "remove", "refresh", "detail", "install", "preview", "update", "rollback"]) {
+  for (const action of ["add", "remove", "refresh", "detail", "install", "uninstall", "preview", "update", "rollback"]) {
     assert.equal((await fetch(api + "/" + action, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" })).status, 403);
     assert.equal((await fetch(api + "/" + action, { method: "POST", headers: { ...headers, Origin: "https://evil.example" }, body: "{}" })).status, 403);
   }
@@ -50,9 +52,39 @@ try {
       new Promise((_, reject) => { timeout = setTimeout(() => reject(new Error("仓库下载阻塞了本地写操作")), 2000); }),
     ]);
     assert.equal(localResponse.status, 400, "本地参数校验无需等待远程下载");
+    clearTimeout(timeout);
+    const localApi = api.replace(/\/repositories$/, '');
+    const create = await originalFetch(localApi + '/create', { method: 'POST', headers, body: JSON.stringify({ name: 'ordinary-http', description: 'Ordinary DSH skill', body: 'Instructions' }) });
+    assert.equal(create.status, 200);
+    const deleted = await originalFetch(localApi + '/delete', { method: 'POST', headers, body: JSON.stringify({ root: 'dsh', name: 'ordinary-http' }) });
+    assert.equal(deleted.status, 200);
+    const trash = (await deleted.json()).data;
+    const restored = await Promise.race([
+      originalFetch(localApi + '/trash-restore', { method: 'POST', headers, body: JSON.stringify({ id: trash.id }) }),
+      new Promise((_, reject) => { timeout = setTimeout(() => reject(new Error('Ordinary restore waited behind repository download')), 2000); }),
+    ]);
+    assert.equal(restored.status, 200, 'ordinary restore bypasses the repository queue');
   } finally { clearTimeout(timeout); releaseDownload?.(); await refreshing; interceptedDownload = undefined; }
   assert.equal((await (await fetch(api)).json()).data.repositories.length, 1);
   assert.equal((await fetch(api + "/install", { method: "POST", headers, body: JSON.stringify({ id, path: "../escape" }) })).status, 400);
+  interceptedDownload = () => new Response(zipSync({ "root/demo/SKILL.md": strToU8("---\nname: http-demo\ndescription: HTTP test skill\n---\nInstructions\n") }));
+  const post = (action, payload) => fetch(api + '/' + action, { method: 'POST', headers, body: JSON.stringify(payload) });
+  assert.equal((await post('refresh', { id })).status, 200);
+  assert.equal((await post('install', { id, path: 'demo', root: '../escape' })).status, 400);
+  assert.equal((await post('install', { id, path: 'demo', root: 'agents' })).status, 200);
+  const managerApi = api.replace(/\/repositories$/, '');
+  const shared = (await (await fetch(managerApi + '/state')).json()).data.roots.find(root => root.key === 'agents');
+  assert.equal(shared.skills.find(skill => skill.name === 'http-demo').installSource.root, 'agents', 'global source metadata follows the installation destination');
+  assert.equal((await fetch(managerApi + '/delete', { method: 'POST', headers, body: JSON.stringify({ root: 'agents', name: 'http-demo', allowSharedAgent: true }) })).status, 400, 'request cannot opt into internal Shared Agent write permission');
+  const uninstall = await post('uninstall', { id, path: 'demo', root: 'dsh' });
+  assert.equal(uninstall.status, 200);
+  const trash = (await uninstall.json()).data;
+  assert.equal(trash.root.key, 'agents');
+  assert.equal((await (await fetch(api)).json()).data.repositories[0].skills[0].status, 'available');
+  assert.equal((await fetch(managerApi + '/trash-restore', { method: 'POST', headers, body: JSON.stringify({ id: trash.id }) })).status, 200);
+  assert.equal((await (await fetch(api)).json()).data.repositories[0].skills[0].status, 'installed');
+  assert.equal((await post('uninstall', { id, path: 'demo' })).status, 200);
+  interceptedDownload = undefined;
   assert.equal((await fetch(api + "/remove", { method: "POST", headers, body: JSON.stringify({ id }) })).status, 200);
   assert.equal((await (await fetch(api)).json()).data.repositories.length, 0);
   console.log("仓库 HTTP 接口、HEAD、跨站与写请求保护测试通过");

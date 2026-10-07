@@ -81,19 +81,21 @@ Restart DSH, refresh the page, and open **Settings → Skills**. To update, sele
 | Read its contents | Select **View details** for the skill body and source information. |
 | Enable or disable | Toggle the skill switch. This affects DSH without editing source files. |
 | Add a skill | Select **Create skill** or **Import into global DSH**. |
-| Install from a repository | Open **Repositories → Add repository**, enter a public GitHub URL, scan and install individual skills. |
+| Install from a repository | Open **Repositories → Add repository**, enter a public GitHub URL, scan, click **Install**, choose **DSH skills** or **Shared Agent**, and confirm. |
+| Uninstall a repository skill | Click the red **Uninstall** button and confirm. The installed folder and local edits move to **Trash**, and **Install** becomes available again. |
 | Update repository skills | Select **Refresh & check updates**, then **Review update** to inspect changes and confirm backup and update. |
 | Roll back an update | Select **Restore previous version** for a skill with a backup, preview and confirm. |
 | Recover a deletion | Open **Trash** and restore. For project skills, return to a session in the original project first. |
 
 - **Current project only**: Git repositories use the nearest Git root. Other folders use the current session working directory; no `git init` required.
 - **Independent copies**: disabling a project copy allows another enabled copy to take over, and the panel identifies the active source. Disable all copies to turn the skill off completely.
-- **File management**: only DSH skills can move to Trash. Other Agent skills can be viewed and toggled. Creation and import always save to global DSH.
+- **File management**: DSH skills can move to Trash from the general manager. Repository-installed Shared Agent skills can also be uninstalled from **Repositories**; unrelated external skills remain read-only. Creation and file import still save to global DSH.
+- **Restore**: retired repository provenance belongs to the specific Trash entry and is reactivated only by an explicit restore, including the destination and update/rollback history. A different same-name skill does not inherit repository management. Uninstalling a Shared Agent copy affects every agent using that folder.
 
 ### Repository boundaries
 
 - The header **Check for updates** updates the plugin itself. Repository **Refresh & check updates** checks skill contents without installing or replacing them; it shows animation, counts and the current repository.
-- Repository installation targets global DSH only. Public GitHub repositories are supported; private credentials and automatic updates are not. Removing a subscription keeps installed skills.
+- Repository installation offers global DSH or Shared Agent (`DSH_HOME` / `DSH_AGENTS_HOME` overrides are respected). Missing destinations in legacy records default to DSH. Updates and rollback follow the recorded destination. Public GitHub repositories are supported; private credentials and automatic updates are not. Removing a subscription keeps installed skills.
 - Archives are limited to 32 MiB, including when filtering by subdirectory. Failed scans preserve the previous catalog; corrupt caches require refresh.
 - Local edits require explicit confirmation before replacement. Historical backups are not automatically cleaned and consume additional disk space.
 

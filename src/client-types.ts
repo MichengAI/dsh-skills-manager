@@ -11,7 +11,7 @@ export type Detail = Success<Awaited<ReturnType<typeof skillDetail>>>;
 export type TrashItem = Awaited<ReturnType<typeof listTrash>>[number];
 type Manager = ReturnType<typeof createRepositoryManager>;
 export type RepositoryRoutes = {
-    [K in keyof Manager as K extends 'sources' | 'list' ? never : `/repositories/${K}`]: Awaited<ReturnType<Manager[K]>>;
+    [K in keyof Manager as K extends 'sources' | 'list' | 'restoreTrash' ? never : `/repositories/${K}`]: Awaited<ReturnType<Manager[K]>>;
 };
 export type ApiRoutes = RepositoryRoutes & {
     '/repositories': Awaited<ReturnType<Manager['list']>>;

@@ -42,7 +42,7 @@
   },
   "scripts": {
     "build": "node scripts/build.mjs",
-    "test": "npm run typecheck && npm run build && node test/build-test.mjs && node test/route-lifecycle.test.mjs && node test/repositories.test.mjs && node test/repository-ui.test.mjs && node test/theme-select.test.mjs && node test/host-fallback.test.mjs && node test/repository-routes.test.mjs && node test/core-test.mjs && node test/readonly-discovery.test.mjs && node test/project-sources.test.mjs && node test/locale-test.mjs && node --test test/plugin-updater.test.mjs && node test/plugin-update-locale.test.mjs && node test/client-scope.test.mjs && node test/compatibility-options-test.mjs",
+    "test": "npm run typecheck && npm run build && node test/build-test.mjs && node test/route-lifecycle.test.mjs && node test/repositories.test.mjs && node test/repository-install-targets.test.mjs && node test/repository-ui.test.mjs && node test/theme-select.test.mjs && node test/host-fallback.test.mjs && node test/repository-routes.test.mjs && node test/core-test.mjs && node test/readonly-discovery.test.mjs && node test/project-sources.test.mjs && node test/locale-test.mjs && node --test test/plugin-updater.test.mjs && node test/plugin-update-locale.test.mjs && node test/client-scope.test.mjs && node test/compatibility-options-test.mjs",
     "verify": "node scripts/sync-hosts.mjs && npm test && npm run pack:check && node test/pack-test.mjs",
     "pack:check": "npm pack --dry-run --json",
     "prepack": "npm run typecheck && npm run build",

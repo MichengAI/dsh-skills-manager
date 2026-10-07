@@ -1,11 +1,11 @@
-import type { Archive, Repository, RepositoryInput, RepositorySkill, RepositoryState, InstallRecord, Serialize, SkillRequest, Log, CodedError } from "./types.js";
+import type { Archive, Repository, RepositoryInput, RepositorySkill, RepositoryState, InstallRecord, Serialize, SkillRequest, Log, CodedError, MutationOptions } from "./types.js";
 // 公开 GitHub 仓库目录：直连归档下载服务、固定内容快照安装，不执行仓库代码。
 import { promises as fs } from "node:fs";
 import { join } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import { unzipSync } from "fflate";
-import { managerHomePath, parseSkillDoc, importUploadedSkill, setSkillEnabled, state, userRoots } from "./core.js";
-import { createRepositoryUpdater, fileIndex, signature, readSkillTree } from "./repository-updates.js";
+import { managerHomePath, trashRootPath, listTrash, restoreTrash as restoreSkillTrash, parseSkillDoc, importUploadedSkill, deleteSkill, setSkillEnabled, state } from "./core.js";
+import { createRepositoryUpdater, fileIndex, signature, readSkillTree, repositoryInstallRoot } from "./repository-updates.js";
 
 const LIMIT = 32 << 20;
 const hash = (bytes: string | Uint8Array) => createHash("sha256").update(bytes).digest("hex");
@@ -35,6 +35,9 @@ function validateStoredState(input: unknown): asserts input is RepositoryState {
   }
   for (const record of value.installs) {
     if (!record || typeof record.id !== "string" || typeof record.complete !== "boolean" || !Array.isArray(record.files) || !record.files.length || record.files.length > 1000 || !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(record.commit || "")) throw failure("仓库安装记录无效");
+    repositoryInstallRoot(record.root);
+    if (record.trashId !== undefined && (typeof record.trashId !== "string" || !/^\d+-[a-f0-9-]{36}$/.test(record.trashId))) throw failure("仓库回收记录无效");
+    if (record.restoreFingerprint !== undefined && (typeof record.restoreFingerprint !== "string" || !record.trashId || !/^[a-f0-9]{64}$/.test(record.restoreFingerprint))) throw failure("仓库恢复记录无效");
     safePath(record.path, true);
     safePath(record.name);
     if (record.name.includes("/")) throw failure("仓库安装名称无效");
@@ -196,23 +199,42 @@ export function createRepositoryManager({ fetchImpl = globalThis.fetch, log }: {
     }
     throw failure("仓库分支不存在");
   }
-  async function matches(record: InstallRecord) {
+  async function matches(record: InstallRecord, fingerprint = signature(record.files)) {
     try {
       safePath(record.name);
-      const dshPath = userRoots().find(root => root.key === "dsh")!.path;
+      const rootPath = repositoryInstallRoot(record.root).path;
       // 一次完整遍历同时检查链接、额外文件和内容变化，不能只检查已知文件。
-      return signature(fileIndex(await readSkillTree(join(dshPath, record.name)))) === signature(record.files);
+      return signature(fileIndex(await readSkillTree(join(rootPath, record.name)))) === fingerprint;
+    } catch { return false; }
+  }
+  async function hasRestoreReceipt(record: InstallRecord) {
+    try {
+      const receipt = join(trashRootPath(), `.restored-${record.trashId}`);
+      const directory = await fs.lstat(receipt), file = await fs.lstat(join(receipt, "metadata.json"));
+      if (!directory.isDirectory() || directory.isSymbolicLink() || !file.isFile() || file.isSymbolicLink() || file.size > 32 << 10) return false;
+      const metadata = JSON.parse(await fs.readFile(join(receipt, "metadata.json"), "utf8"));
+      return metadata.id === record.trashId && metadata.name === record.name && metadata.root?.scope === "user" && metadata.root.key === (record.root || "dsh") && metadata.repository?.id === record.id && metadata.repository.path === record.path && metadata.entries?.length === 1 && metadata.entries[0] === record.name;
     } catch { return false; }
   }
   async function recoverPending() {
     const data = await read(); let recovered = false;
-    for (const record of data.installs.filter(record => !record.complete)) {
+    const restoredIds: string[] = [];
+    for (const record of data.installs.filter(record => !record.complete && !record.trashId)) {
       if (await matches(record)) { record.complete = true; recovered = true; }
     }
-    // 仅恢复与安装意图完全相同的目录；保留任何本地修改，不删除或覆盖文件。
+    for (const record of data.installs.filter(record => record.trashId && record.restoreFingerprint)) {
+      // Intent or Trash absence alone cannot authorize a same-name replacement.
+      // Require the atomic successful-restore receipt and exact restored files.
+      if (await hasRestoreReceipt(record) && await matches(record, record.restoreFingerprint)) {
+        restoredIds.push(record.trashId!);
+        delete record.trashId; delete record.restoreFingerprint; recovered = true;
+      }
+    }
+    // 仅恢复与安装/恢复意图完全相同的目录；保留任何本地修改，不删除或覆盖文件。
     if (recovered) {
       try { await write(data); }
       catch { throw failure("技能文件已保留，但安装来源状态仍无法写入，请恢复磁盘写入后重试", "error.repo.installState"); }
+      for (const id of restoredIds) await fs.rm(join(trashRootPath(), `.restored-${id}`), { recursive: true, force: true }).catch(() => undefined);
     }
   }
   async function list() {
@@ -221,16 +243,24 @@ export function createRepositoryManager({ fetchImpl = globalThis.fetch, log }: {
     const skills = local.roots.flatMap((r) => r.skills || []);
     // 每次只读取一个目录，避免多个大技能并行读取使内存随安装数量增长。
     const matched = new Map<InstallRecord, boolean>();
-    for (const record of data.installs) matched.set(record, record.complete && await matches(record));
+    const present = new Set<InstallRecord>();
+    for (const record of data.installs.filter(record => record.complete && !record.trashId)) {
+      try {
+        const files = fileIndex(await readSkillTree(join(repositoryInstallRoot(record.root).path, record.name)));
+        present.add(record);
+        matched.set(record, signature(files) === signature(record.files));
+      } catch { /* Missing or unsafe installed copies must not be deleted. */ }
+    }
     return { repositories: data.repositories.map((repo) => ({ ...repo, skills: repo.skills.map((skill) => {
       const found = skills.some((s) => s.name.toLowerCase() === skill.name.toLowerCase() || s.declaredName?.toLowerCase() === skill.name.toLowerCase());
       const own = data.installs.some((i) => i.id === repo.id && i.path === skill.path && i.name === skill.name && matched.get(i));
-      const dsh = local.roots.find((r) => r.key === "dsh");
-      const inDsh = dsh?.skills.some((s) => s.name === skill.name);
       const { body, ...summary } = skill;
-      const record = data.installs.find(i => i.id === repo.id && i.path === skill.path && i.name === skill.name && i.complete);
-      const updateAvailable = !!record && !!skill.files && signature(record.files) !== signature(skill.files);
-      return { ...summary, updateAvailable, canRollback: !!record?.backup, tracked: !!record && !!inDsh, status: !skill.valid ? "invalid" : found ? own && inDsh ? updateAvailable ? "update" : "installed" : "conflict" : "available" };
+      const record = data.installs.find(i => i.id === repo.id && i.path === skill.path && i.name === skill.name && i.complete && !i.trashId);
+      const tracked = !!record && present.has(record);
+      const updateAvailable = tracked && !!skill.files && signature(record!.files) !== signature(skill.files);
+      return { ...summary, updateAvailable, canRollback: tracked && !!record?.backup, tracked,
+        installedRoot: tracked ? record!.root || "dsh" : null, canUninstall: tracked,
+        status: !skill.valid ? "invalid" : tracked ? own ? updateAvailable ? "update" : "installed" : "conflict" : found ? "conflict" : "available" };
     }) })) };
   }
   return {
@@ -284,7 +314,54 @@ export function createRepositoryManager({ fetchImpl = globalThis.fetch, log }: {
       if (!skill) throw failure("技能不在仓库列表中");
       return { ...skill, commit: repo.commit };
     },
-    install: ({ id, path }: SkillRequest) => serialize(async () => {
+    restoreTrash: async (id: string, options: MutationOptions = {}) => {
+      const metadata = (await listTrash()).find(item => item.id === id);
+      // Ordinary DSH/project Trash must neither read repository state nor wait
+      // behind a remote repository refresh.
+      if (!metadata?.repository) return restoreSkillTrash(id, log, options);
+      return serialize(async () => {
+        const metadata = (await listTrash()).find(item => item.id === id);
+        if (!metadata?.repository) return restoreSkillTrash(id, log, options);
+        const data = await read();
+        const record = data.installs.find(item => item.trashId === id && item.id === metadata.repository!.id && item.path === metadata.repository!.path);
+        if (!record) return restoreSkillTrash(id, log, options);
+        if (metadata.name !== record.name || metadata.root?.scope !== "user" || metadata.root.key !== (record.root || "dsh") || metadata.entries.length !== 1 || metadata.entries[0] !== record.name) throw failure("回收站来源与安装记录不一致");
+        // Journal the exact local edits being restored before moving any files.
+        record.restoreFingerprint = signature(fileIndex(await readSkillTree(join(trashRootPath(), id, record.name))));
+        await write(data);
+        const result = await restoreSkillTrash(id, log, { ...options, repositoryRestore: true });
+        if ("ok" in result && result.ok === false) {
+          delete record.restoreFingerprint; await write(data); return result;
+        }
+        delete record.trashId; delete record.restoreFingerprint;
+        try { await write(data); }
+        catch { throw failure("技能已恢复，来源状态等待校验；恢复磁盘写入后重新打开仓库页", "error.repo.installState"); }
+        await fs.rm(join(trashRootPath(), `.restored-${id}`), { recursive: true, force: true }).catch(() => undefined);
+        return result;
+      }, false);
+    },
+    uninstall: ({ id, path }: SkillRequest) => serialize(async () => {
+      const data = await read();
+      const record = data.installs.find(item => item.id === id && item.path === path && item.complete && !item.trashId);
+      if (!record) throw failure("没有可追溯的安装记录，不能卸载");
+      const root = repositoryInstallRoot(record.root);
+      const fingerprint = signature(fileIndex(await readSkillTree(join(root.path, record.name))));
+      const trashId = `${Date.now()}-${randomUUID()}`;
+      // Retire write authorization before moving the copy. History belongs to
+      // this Trash id, never to a future same-name external installation.
+      record.trashId = trashId;
+      await write(data);
+      try {
+        const result = await deleteSkill(root, record.name, log, { allowSharedAgent: true, repositoryEntryOnly: true, repositoryTrash: { id: trashId, repository: { id, path } } });
+        if ("ok" in result && result.ok === false) throw failure(result.error, result.code);
+        return result;
+      } catch (error) {
+        if (await matches(record, fingerprint)) { delete record.trashId; await write(data); }
+        throw error;
+      }
+    }),
+    install: ({ id, path, root: requestedRoot }: SkillRequest) => serialize(async () => {
+      const root = repositoryInstallRoot(requestedRoot);
       const data = await read(), repo = repository(data, id);
       const skill = repo.skills.find((s) => s.path === path);
       if (!skill || !skill.valid) throw failure("技能不存在或格式无效");
@@ -297,29 +374,28 @@ export function createRepositoryManager({ fetchImpl = globalThis.fetch, log }: {
       if (!entries.some((e) => e.path === "SKILL.md")) throw failure("仓库技能内容已失效");
       // 先持久化来源意图；即使安装后进程退出，也能追溯安装的仓库和提交。
       data.installs = data.installs.filter((i) => i.name !== skill.name);
-      const record = { id, path, source: { owner: repo.owner, name: repo.name, ref: repo.ref, subdirectory: repo.subdirectory }, name: skill.name, commit: repo.commit, complete: false, files: entries.map((e) => ({ path: e.path, hash: hash(Buffer.from(e.data, "base64")) })) };
+      const record: InstallRecord = { id, path, root: root.key as "dsh" | "agents", source: { owner: repo.owner, name: repo.name, ref: repo.ref, subdirectory: repo.subdirectory }, name: skill.name, commit: repo.commit, complete: false, files: entries.map((e) => ({ path: e.path, hash: hash(Buffer.from(e.data, "base64")) })) };
       data.installs.push(record);
       await write(data);
       let copied = false;
       try {
-        const result = await importUploadedSkill({ name: skill.name, entries }, log, { conflict: "skip" });
+        const result = await importUploadedSkill({ name: skill.name, entries }, log, { conflict: "skip", root, allowSharedAgent: true });
         if (result.ok === false || !result.imported?.length) throw failure(result.error || "技能安装失败或遇到同名冲突", "error.repo.conflict");
         copied = true;
         // 界面默认显示已启用，但斜杠菜单只会收到显式启用覆盖项。安装完成后走与手动开启相同的策略写入。
-        const dsh = userRoots().find((root) => root.key === "dsh");
-        const enabled = await setSkillEnabled(dsh, skill.name, true, log);
+        const enabled = await setSkillEnabled(root, skill.name, true, log);
         if (enabled && typeof enabled === "object" && "ok" in enabled && enabled.ok === false) throw failure(enabled.error || "技能启用状态无法写入", enabled.code || "error.repo.enableState");
       } catch (caught) { const error = caught as CodedError;
         data.installs = data.installs.filter(item => item !== record);
         try { await write(data); }
         catch { throw failure("安装未完成且来源记录无法撤销，请恢复磁盘写入后检查技能目录", "error.repo.installState"); }
-        if (copied) await fs.rm(join(userRoots().find((root) => root.key === "dsh")!.path, skill.name), { recursive: true, force: true }).catch(() => undefined);
+        if (copied) await fs.rm(join(root.path, skill.name), { recursive: true, force: true }).catch(() => undefined);
         throw error;
       }
       record.complete = true;
       try { await write(data); }
       catch { throw failure("技能文件已安装但来源状态未确认，请恢复磁盘写入后重新打开仓库页", "error.repo.installState"); }
-      return { name: skill.name, commit: repo.commit, root: userRoots().find((r) => r.key === "dsh")!.path };
+      return { name: skill.name, commit: repo.commit, root: root.path };
     }),
   };
 }
