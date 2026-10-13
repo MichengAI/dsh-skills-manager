@@ -37,15 +37,19 @@ Bring skills from your computer and projects into DSH without switching between 
 
 ## Screenshots
 
-Skill management:
+Global skills:
 
-![Full skill management view](assets/screenshots/skills-manager-v2-preview.webp)
+![Global skills management view](assets/screenshots/skills-manager-v2-preview.webp)
+
+Project skills:
+
+![Project skills management view](assets/screenshots/project-skills.webp)
 
 Skill repositories:
 
 ![Browse and install repository skills](assets/screenshots/skill-repositories.webp)
 
-*Screenshots show the pre-release 0.1.54 local build used to prepare 1.0.0. The final version adds refresh animation and progress feedback. Screenshots show only the feature panels, with real filenames and project directories cropped out of the background, and use lossless WebP.*
+*Screenshots show the 1.1.18 release featuring global skills, project skills, and skill repositories. Screenshots show only the core feature panels, with background whitespace and unneeded window chrome cropped out, and use lossless WebP.*
 
 ## Installation
 
@@ -105,25 +109,25 @@ Restart DSH, refresh the page, and open **Settings → Skills**. To update, sele
 
 | Source | Global directory | Project directory |
 | --- | --- | --- |
-| DSH | `~/.dsh/skills` | `<project>/.dsh/skills` |
-| Shared Agent | `~/.agents/skills` | `<project>/.agents/skills` |
-| CC Switch | `~/.cc-switch/skills` | — |
-| Codex | `~/.codex/skills` | `<project>/.codex/skills` |
-| Claude Code | `~/.claude/skills` | `<project>/.claude/skills` |
-| Gemini | `~/.gemini/skills` | `<project>/.gemini/skills` |
-| OpenCode | `~/.config/opencode/skills` | `<project>/.opencode/skills` |
-| Cursor | `~/.cursor/skills` | `<project>/.cursor/skills` |
-| Copilot | `~/.copilot/skills` | `<project>/.github/skills` |
-| Windsurf | `~/.codeium/windsurf/skills`<br>`~/.windsurf/skills` | `<project>/.windsurf/skills` |
-| Trae | `~/.trae/skills` | `<project>/.trae/skills` |
-| Trae CN | `~/.trae-cn/skills` | `<project>/.trae-cn/skills` |
-| OpenClaw / Clawdbot | `~/.openclaw/skills`<br>`~/.clawdbot/skills` | — |
-| Roo | `~/.roo/skills` | `<project>/.roo/skills` |
-| CodeBuddy | `~/.codebuddy/skills` | `<project>/.codebuddy/skills` |
-| WorkBuddy | `~/.workbuddy/skills` | `<project>/.workbuddy/skills` |
-| Qoder | `~/.qoder/skills` | `<project>/.qoder/skills` |
-| Qoder CN CLI | `~/.qoder-cn/skills` | — |
-| Qoder CN | `~/.lingma/skills` | `<project>/.lingma/skills` |
+| <img src="assets/brands/dsh.png" width="16" height="16" alt="DSH" valign="middle"> DSH | `~/.dsh/skills` | `<project>/.dsh/skills` |
+| <img src="assets/brands/agents.svg" width="16" height="16" alt="Shared Agent" valign="middle"> Shared Agent | `~/.agents/skills` | `<project>/.agents/skills` |
+| <img src="assets/brands/cc-switch.png" width="16" height="16" alt="CC Switch" valign="middle"> CC Switch | `~/.cc-switch/skills` | — |
+| <img src="assets/brands/codex.svg" width="16" height="16" alt="Codex" valign="middle"> Codex | `~/.codex/skills` | `<project>/.codex/skills` |
+| <img src="assets/brands/claude.svg" width="16" height="16" alt="Claude Code" valign="middle"> Claude Code | `~/.claude/skills` | `<project>/.claude/skills` |
+| <img src="assets/brands/gemini.svg" width="16" height="16" alt="Gemini" valign="middle"> Gemini | `~/.gemini/skills` | `<project>/.gemini/skills` |
+| <img src="assets/brands/opencode.svg" width="16" height="16" alt="OpenCode" valign="middle"> OpenCode | `~/.config/opencode/skills` | `<project>/.opencode/skills` |
+| <img src="assets/brands/cursor.svg" width="16" height="16" alt="Cursor" valign="middle"> Cursor | `~/.cursor/skills` | `<project>/.cursor/skills` |
+| <img src="assets/brands/copilot.svg" width="16" height="16" alt="Copilot" valign="middle"> Copilot | `~/.copilot/skills` | `<project>/.github/skills` |
+| <img src="assets/brands/windsurf.svg" width="16" height="16" alt="Windsurf" valign="middle"> Windsurf | `~/.codeium/windsurf/skills`<br>`~/.windsurf/skills` | `<project>/.windsurf/skills` |
+| <img src="assets/brands/trae.svg" width="16" height="16" alt="Trae" valign="middle"> Trae | `~/.trae/skills` | `<project>/.trae/skills` |
+| <img src="assets/brands/trae.svg" width="16" height="16" alt="Trae CN" valign="middle"> Trae CN | `~/.trae-cn/skills` | `<project>/.trae-cn/skills` |
+| <img src="assets/brands/openclaw.svg" width="16" height="16" alt="OpenClaw" valign="middle"> OpenClaw / Clawdbot | `~/.openclaw/skills`<br>`~/.clawdbot/skills` | — |
+| <img src="assets/brands/roo.svg" width="16" height="16" alt="Roo" valign="middle"> Roo | `~/.roo/skills` | `<project>/.roo/skills` |
+| <img src="assets/brands/codebuddy.svg" width="16" height="16" alt="CodeBuddy" valign="middle"> CodeBuddy | `~/.codebuddy/skills` | `<project>/.codebuddy/skills` |
+| <img src="assets/brands/workbuddy.png" width="16" height="16" alt="WorkBuddy" valign="middle"> WorkBuddy | `~/.workbuddy/skills` | `<project>/.workbuddy/skills` |
+| <img src="assets/brands/qoder.svg" width="16" height="16" alt="Qoder" valign="middle"> Qoder | `~/.qoder/skills` | `<project>/.qoder/skills` |
+| <img src="assets/brands/qoder.svg" width="16" height="16" alt="Qoder CN CLI" valign="middle"> Qoder CN CLI | `~/.qoder-cn/skills` | — |
+| <img src="assets/brands/qoder.svg" width="16" height="16" alt="Qoder CN" valign="middle"> Qoder CN | `~/.lingma/skills` | `<project>/.lingma/skills` |
 
 Ordinary project-root `<project>/skills` directories are not scanned, so repository release resources are not exposed as Agent skills. OpenClaw / Clawdbot support is limited to the user-level sources above. Qoder CN CLI project skills use `<project>/.qoder/skills` and appear as Qoder. Qoder CN IDE uses the Lingma directories. Missing external source directories are not shown.
 
