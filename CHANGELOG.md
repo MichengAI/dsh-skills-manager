@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.19 - 2026-10-14
+
+- Adjust settings navigation section order to ensure stable placement and avoid conflicts with other plugins.
+
 ## 1.1.18 - 2026-10-13
 
 - Visual and brand enhancements: integrate official brand logos for ecosystem sources (DSH, WorkBuddy, CC Switch, Codex, Qoder, Cursor, Claude Code, etc.), remove redundant collapse arrows on source cards, and preserve full paths.

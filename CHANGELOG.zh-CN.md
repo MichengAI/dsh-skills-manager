@@ -2,6 +2,10 @@
 
 [English](CHANGELOG.md)
 
+## 1.1.19 - 2026-10-14
+
+- 调整技能管理在设置中的导航排序序号，避免与其他插件同级竞争导致菜单位置跳动。
+
 ## 1.1.18 - 2026-10-13
 
 - 交互与视觉优化：为各生态来源（DSH、WorkBuddy、CC Switch、Codex、Qoder、Cursor、Claude Code 等）接入官方原版 Brand Logo，来源卡片去除冗余展开小箭头并保留完整路径。
