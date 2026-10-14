@@ -112,6 +112,55 @@ try {
     } finally { release(); await refreshing; }
     assert.equal((await stored()).repositories.find(repo => repo.id === original.id).commit, null, "旧刷新不属于新建的订阅生命周期");
   });
+  await test("超过 16 MiB 的来源状态仍可缩小清理，但不能继续增大", async () => {
+    const manager = createRepositoryManager();
+    const id = `clawhub:owner/${"a".repeat(120)}`;
+    const records = Array.from({ length: 160000 }, (_, index) => `clawhub:owner/p${String(index).padStart(6, "0")}${"b".repeat(100)}`);
+    records.push(id);
+    await mkdir(join(process.env.DSH_HOME, "skills-manager"), { recursive: true });
+    await writeFile(statePath, JSON.stringify({ version: 1, repositories: [], installs: [], catalogInstalls: records }, null, 2), "utf8");
+    assert.ok((await import("node:fs")).statSync(statePath).size > 16 << 20, "夹具必须真正超过 16 MiB");
+    await manager.forgetCatalogInstall({ legacyId: id });
+    const after = await stored();
+    assert.equal(after.catalogInstalls.includes(id), false, "超限后仍必须能删除旧身份");
+    assert.ok(after.catalogInstalls.length > 100000, "缩小清理不能截断其余身份");
+    await assert.rejects(manager.rememberCatalogInstall("clawhub:owner/new-over-limit", "actual-name", { root: "dsh" }), error => error.code === "error.repo.capacity");
+  });
+  await test("已有定位副本时，同 ID 的旧记录不再标成位置未知", async () => {
+    const name = "actual-name";
+    const skill = join(process.env.DSH_HOME, "skills", name);
+    await mkdir(skill, { recursive: true });
+    await writeFile(join(skill, "SKILL.md"), document);
+    const id = "clawhub:owner/both";
+    await mkdir(join(process.env.DSH_HOME, "skills-manager"), { recursive: true });
+    const data = await stored().catch(() => ({ version: 1, repositories: [], installs: [], catalogInstalls: [] }));
+    data.catalogInstalls = [id, { id, name, root: "dsh" }];
+    await writeFile(statePath, JSON.stringify(data), "utf8");
+    const listed = await createRepositoryManager().list();
+    assert.ok(listed.catalogInstalls.includes(id), "已定位副本仍显示已安装");
+    assert.equal(listed.catalogUnknownIds.includes(id), false, "同一 ID 不能同时显示位置未知");
+  });
+  await test("仓库安装确认写入失败要留下警告，不能静默返回", async () => {
+    const manager = createRepositoryManager({ fetchImpl: async () => new Response(zipSync({ "repo-main/pending-warning/SKILL.md": strToU8("---\nname: pending-warning\ndescription: 测试技能\n---\n正文\n") })) });
+    const repo = await manager.add({ url: "owner/pending-warning" });
+    await manager.refresh({ id: repo.id });
+    await manager.install({ id: repo.id, path: "pending-warning" });
+    const data = await stored();
+    const record = data.installs.find(item => item.name === "pending-warning");
+    record.complete = false;
+    await writeFile(statePath, JSON.stringify(data), "utf8");
+    const nodeFs = await import("node:fs");
+    const originalRename = nodeFs.promises.rename;
+    nodeFs.promises.rename = async (from, to) => {
+      if (String(to).endsWith("repositories.json")) throw new Error("模拟仓库安装确认写入失败");
+      return originalRename(from, to);
+    };
+    try {
+      const listed = await manager.list();
+      assert.ok(listed.catalogWarnings.some(item => item.code === "error.repo.installState"), "确认写回失败必须可见");
+    } finally { nodeFs.promises.rename = originalRename; }
+    assert.equal((await stored()).installs.find(item => item.id === record.id).complete, false, "写入失败不得假装已确认");
+  });
   await test("普通来源查询不补写未确认目录副本的启用策略", async () => {
     const name = "metadata-no-enable";
     const content = `---\nname: ${name}\ndescription: 测试技能\n---\n正文\n`;

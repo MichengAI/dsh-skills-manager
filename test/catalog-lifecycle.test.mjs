@@ -207,6 +207,28 @@ try {
     assert.ok(policy.disabledSkills.dsh.includes(installedName), "修复来源状态不能重新启用用户明确停用的副本");
     assert.ok(!policy.enabledSkills.dsh.includes(installedName));
   });
+  await test("永久删除的状态写入失败时保留回收站文件和身份", async () => {
+    installedName = "delete-write-failure";
+    const id = "skillsh:owner/skills/delete-write-failure";
+    assert.equal((await install("delete-write-failure")).status, 200);
+    const deleted = await post("/delete", { root: "dsh", name: installedName });
+    assert.equal(deleted.status, 200);
+    const trashDir = join(process.env.DSH_HOME, "skills-manager/trash", deleted.data.id);
+    const originalRename = fileSystem.rename;
+    fileSystem.rename = async (from, to) => {
+      if (String(to).endsWith("repositories.json")) {
+        const data = JSON.parse(await readFile(from, "utf8"));
+        if (!data.catalogInstalls.some(record => record.id === id && record.trashId === deleted.data.id)) throw new Error("模拟永久删除后的状态写入失败");
+      }
+      return originalRename(from, to);
+    };
+    let failed;
+    try { failed = await post("/trash-delete", { id: deleted.data.id }); }
+    finally { fileSystem.rename = originalRename; }
+    assert.ok(failed.status >= 400, "状态写失败必须报告失败");
+    assert.equal(await readFile(join(trashDir, "metadata.json"), "utf8").then(() => true, () => false), true, "状态未提交时不得删除回收站文件");
+    assert.equal((await stored()).catalogInstalls.find(record => record.id === id).trashId, deleted.data.id);
+  });
   await test("超过500条身份仍可安装，不淘汰已定位副本和回收记录", async () => {
     const path = join(process.env.DSH_HOME, "skills-manager/repositories.json");
     const original = await stored();

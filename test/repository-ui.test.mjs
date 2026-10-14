@@ -177,6 +177,8 @@ const pathLines = () => modalNodes().filter(n => n.type === "code").map(n => n.c
 const repoSource = await readFile(new URL("../src/repository-ui.ts", import.meta.url), "utf8");
 assert.match(repositoryLocales.zh["repo.subsource.catalogNote"], /仅.*当前显示条目.*排序/, "明确排序仅限当前显示的下载榜");
 assert.match(repositoryLocales.en["repo.subsource.catalogNote"], /sort.*displayed/i, "英文同样说明排序范围");
+assert.equal(typeof repositoryLocales.zh["error.repo.capacity"], "string", "容量错误必须有中文文案");
+assert.doesNotMatch(repositoryLocales.en["error.repo.capacity"], /[\u4e00-\u9fff]/, "英文界面不能回落成中文容量错误");
 assert.doesNotMatch(repoSource, /InstalledCatalogSkill|installedSkills\?/, "删除无效 installedSkills 参数及类型");
 const clientSource = await readFile(new URL("../src/client.ts", import.meta.url), "utf8");
 assert.doesNotMatch(clientSource, /installedSkills:\s*allRoots\.flatMap/, "客户端渲染不再为死参数遍历全部技能");

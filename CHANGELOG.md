@@ -8,6 +8,8 @@
 - Keep failed recovery from blocking listings and unrelated operations, preserve pending state with actionable warnings, and mark legacy identities with unknown locations rather than guessing directories.
 - Improve oversized-response diagnostics, stream cleanup, and cancellation on navigation or unmount; remove unused skill-array expansion.
 - Support explicit indentation indicators in YAML block scalars.
+- Source tracking above 16 MiB can still be reduced by removing Trash records or legacy identities, without deleting active installation copies. Further growth is rejected.
+- Permanent deletion removes Trash files only after source tracking is saved. A catalog skill with a known installation location no longer also shows an unknown-location badge.
 
 ## 1.1.19 - 2026-10-14
 
