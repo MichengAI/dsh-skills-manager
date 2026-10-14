@@ -257,7 +257,7 @@ export function createRepositoryManager({ fetchImpl = globalThis.fetch, log, reg
         matched.set(record, signature(files) === signature(record.files));
       } catch { /* Missing or unsafe installed copies must not be deleted. */ }
     }
-    return { installRoots: await repositoryDestinations(), repositories: data.repositories.map((repo) => ({ ...repo, skills: repo.skills.map((skill) => {
+    return { installRoots: await repositoryDestinations(), catalogInstalls: data.catalogInstalls || [], repositories: data.repositories.map((repo) => ({ ...repo, skills: repo.skills.map((skill) => {
       const found = skills.some((s) => s.name.toLowerCase() === skill.name.toLowerCase() || s.declaredName?.toLowerCase() === skill.name.toLowerCase());
 
       const { body, ...summary } = skill;
@@ -277,6 +277,15 @@ export function createRepositoryManager({ fetchImpl = globalThis.fetch, log, reg
   }
   return {
     list: () => serialize(list),
+    rememberCatalogInstall: (id: string) => serialize(async () => {
+      if (!/^(?:clawhub|skillsh):[A-Za-z0-9][A-Za-z0-9._-]{0,127}(?:\/[A-Za-z0-9][A-Za-z0-9._-]{0,127}){1,2}$/.test(id)) throw failure("目录安装记录无效");
+      const data = await read();
+      if (!data.catalogInstalls?.includes(id)) {
+        data.catalogInstalls = [...(data.catalogInstalls || []), id].slice(-500);
+        await write(data);
+      }
+      return { catalogInstalls: data.catalogInstalls || [] };
+    }),
     ...createRepositoryUpdater({ read, write, repository, download, serialize, parseRepositoryInput, registeredWorkspaces, onWorkspaceIndexBuild }),
     add: (input: RepositoryInput) => serialize(async () => {
       const source = parseRepositoryInput(input), data = await read();

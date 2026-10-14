@@ -26,13 +26,18 @@ let list = [
 ];
 let registryAvailable = true;
 let route;
+const emitted = [];
 apply({
   sessions: { get: () => ({ header: { cwd: registered } }) },
   effect(register) { return register(); },
   skills: { registerProvider() { return () => {}; } },
   webRuntime: { trustedHosts: [] },
   webServer: { register(value) { if (value.kind === "prefix") route = value; return () => {}; } },
-  get(name) { return name === "workspaceRegistry" && registryAvailable ? { list: () => list } : undefined; },
+  get(name) {
+    if (name === "sessions") return { list: () => [{ id: "test-session", header: { agentPreset: "default" } }] };
+    return name === "workspaceRegistry" && registryAvailable ? { list: () => list } : undefined;
+  },
+  emit(name, ...args) { emitted.push([name, ...args]); },
 });
 const server = createServer((req, res) => route.handler(req, res));
 await new Promise((resolveListen) => server.listen(0, "127.0.0.1", resolveListen));
@@ -258,12 +263,23 @@ try {
   response = await post("category-create", { root: "project-dsh:0123456789abcdef", name: "假项目分类", workspace: registered });
   assert.equal(response.status, 400);
   assert.equal((await response.json()).code, "error.category.root", "未登记项目键不能创建分类");
+  emitted.length = 0;
   response = await post("category-create", { root: projectKey, name: "路由分类", workspace: registered });
   assert.equal(response.status, 200, await response.clone().text());
   const categoryId = (await response.json()).data.category.id;
+  assert.deepEqual(emitted, [], "纯分类元数据创建不刷新宿主技能目录");
   response = await post("category-assign", { root: projectKey, name: "no-such-skill", category: categoryId, workspace: registered });
   assert.equal(response.status, 400);
   assert.equal((await response.json()).code, "error.skill.notFound", "路由归类也不接受不存在的技能");
+  response = await post("category-assign", { root: projectKey, name: "route-create", category: categoryId, workspace: registered });
+  assert.equal(response.status, 200, await response.clone().text());
+  assert.deepEqual(emitted, [], "切换分组只改管理器元数据，不刷新宿主技能目录");
+  response = await post("category-move", { root: projectKey, name: "route-create", category: categoryId, workspace: registered });
+  assert.equal(response.status, 200, await response.clone().text());
+  assert.deepEqual(emitted, [], "排序只改管理器元数据，不刷新宿主技能目录");
+  response = await post("category-disable", { root: projectKey, category: categoryId, workspace: registered });
+  assert.equal(response.status, 200, await response.clone().text());
+  assert.ok(emitted.some(([name]) => name === "commands/change"), "分类启停仍刷新宿主技能目录");
 
   // 保存的项目根失效后，即便登记仍在，也不能改写父 Git 项目的同名文件。
   const parentSkill = join(temporary, "work", ".dsh", "skills", "route-repo", "SKILL.md");

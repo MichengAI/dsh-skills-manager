@@ -5,7 +5,10 @@ import { createRepositoryUI, repositoryLocales } from "../src/repository-ui.ts";
 import { createDestinationKit, destinationLocales } from "../src/destination-picker.ts";
 let values = [], cursor = 0, effects = [], dependencies = [];
 const react = {
-  createElement(type, props, ...children) { return { type, props: props || {}, children: children.flat(Infinity).filter((v) => v != null && typeof v !== "boolean") }; },
+  createElement(type, props, ...children) {
+    if (props?.className === "dssm-catalog-sentinel" && props.ref) props.ref.current = {};
+    return { type, props: props || {}, children: children.flat(Infinity).filter((v) => v != null && typeof v !== "boolean") };
+  },
   useState(initial) { const i = cursor++; if (!(i in values)) values[i] = initial; return [values[i], (v) => { values[i] = typeof v === "function" ? v(values[i]) : v; }]; },
   useRef(initial) { const i = cursor++; return values[i] || (values[i] = { current: initial }); },
   useEffect(fn, deps) { const i = cursor++; if (!dependencies[i] || deps.some((v, n) => dependencies[i][n] !== v)) { effects.push(fn); dependencies[i] = deps; } },
@@ -25,6 +28,48 @@ const configuredRoots = [
 ];
 let installRoots = structuredClone(configuredRoots);
 const calls = [];
+const catalogCalls = [];
+const catalogSearchCalls = [];
+const skillshCalls = [];
+const skillshResults = [{ id: "owner/skills/react-skill", source: "owner/skills", skillId: "react-skill", name: "React Skill", installs: 123456 }];
+const catalogFetch = async (input) => {
+  const url = new URL(input);
+  if (url.pathname === "/api/v1/search") {
+    catalogSearchCalls.push(url);
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({ results: [
+        { source: "clawhub", id: "clawhub:gill-helper", slug: "gill-helper", displayName: "Gill Helper", ownerHandle: "owner-gill", summary: "A real keyword result", downloads: 21 },
+        { source: "skills-sh", id: "skills-sh:gill-guide", slug: "gill-guide", displayName: "Unrelated federated result", ownerHandle: "owner-other", summary: "Not part of ClawHub", downloads: 9000 },
+      ] }),
+    };
+  }
+  catalogCalls.push(url);
+  const offset = Number(url.searchParams.get("cursor") || 0);
+  const items = Array.from({ length: 10 }, (_value, index) => {
+    const rank = offset + index + 1;
+    return {
+      ownerHandle: "owner-" + rank,
+      slug: "skill-" + String(rank).padStart(3, "0"),
+      displayName: "Skill " + String(rank).padStart(3, "0"),
+      summary: "Live ClawHub summary " + rank,
+      stats: { downloads: 1000 - rank, installs: rank, stars: rank },
+    };
+  });
+  return {
+    ok: true,
+    status: 200,
+    json: async () => ({ items, nextCursor: offset + 10 < 100 ? String(offset + 10) : null }),
+  };
+};
+const intersections = [];
+globalThis.IntersectionObserver = class {
+  constructor(callback) { this.callback = callback; intersections.push(this); }
+  observe() {}
+  disconnect() {}
+};
+globalThis.fetch = catalogFetch;
 let workspaceRows = [];
 let finishInstall, finishUninstall;
 let failInstall = false, failUninstall = false;
@@ -34,7 +79,14 @@ let installedCalls = 0, failInstalledRefresh = false;
 const api = async (path, options) => {
   const body = options?.body ? JSON.parse(options.body) : undefined;
   calls.push({ path, body });
+  if (path.startsWith("/skills-sh/search")) {
+    const url = new URL(path, "http://localhost");
+    skillshCalls.push(url);
+    return { skills: url.searchParams.get("q") === "react" ? structuredClone(skillshResults) : [] };
+  }
   if (path === "/workspaces") return { items: structuredClone(workspaceRows) };
+  if (path === "/catalog/detail") return { name: body.name, description: "目录技能说明", body: "# " + body.name, origin: body.catalog === "skillsh" ? body.source + "/" + body.skillId : body.owner + "/" + body.slug };
+  if (path === "/catalog/install") return { name: body.name, root: body.root || body.workspace || "dsh" };
   if (path.endsWith("/install")) {
     await new Promise((resolve) => { finishInstall = resolve; });
     if (failInstall) throw new Error("下载超时，请重试");
@@ -51,7 +103,7 @@ const api = async (path, options) => {
   if (path.endsWith("/preview")) return { token: "checked", commit: "a".repeat(40), localModified: true, changes: [{ kind: "modified", path: "SKILL.md" }] };
   if (path.endsWith("/update") || path.endsWith("/rollback")) repos[0].skills[0].status = "installed";
   // 每次返回独立快照，安装/卸载必须真正 reload 才能改变 UI。
-  return structuredClone({ repositories: repos, installRoots });
+  return structuredClone({ repositories: repos, installRoots, catalogInstalls: ["clawhub:owner-2/skill-002"] });
 };
 const Input = Object.assign(() => {}, { TextArea: Symbol("官方只读说明框") });
 const Button = Symbol("官方按钮");
@@ -73,7 +125,7 @@ let languagePrefix = "";
 const rootTranslations = { "root.codex": "Codex", "root.claude": "Claude", "root.windsurf-user": "Windsurf User" };
 const t = (key) => key === "format.locale" ? "zh-CN" : languagePrefix + (rootTranslations[key] || key);
 let ui;
-function render() { cursor = 0; ui = useUI({ active: true, t, onInstalled: async () => { installedCalls++; if (failInstalledRefresh) throw new Error("本地列表刷新失败"); } }); }
+function render() { cursor = 0; ui = useUI({ active: true, t, installedSkills: [{ name: "gzh-design-skill" }, { name: "skill-002" }, { name: "Skill 001" }], onInstalled: async () => { installedCalls++; if (failInstalledRefresh) throw new Error("本地列表刷新失败"); } }); }
 // 目标选择器是函数组件：带 userDestinations 的节点展开成它渲染出的子树，其余沿用原遍历。
 function nodes(node) {
   if (!node || typeof node !== "object") return [];
@@ -87,7 +139,15 @@ const modalNodes = () => nodes(dialog());
 const modalAction = key => modalNodes().find(n => isAction(n, key));
 const rowAction = key => all().filter(n => n.props.className === "dssm-repo-row").flatMap(nodes).find(n => isAction(n, key));
 const countCalls = path => calls.filter(call => call.path === path).length;
-const settle = async () => { await new Promise(setImmediate); render(); };
+const settle = async () => {
+  for (let cycle = 0; cycle < 4; cycle++) {
+    await new Promise(setImmediate);
+    effects.splice(0).forEach(effect => effect());
+    render();
+  }
+  await new Promise(setImmediate);
+  render();
+};
 const clickNode = async node => { assert.ok(node, "必须找到可点击元素"); assert.ok(!node.props.disabled, "真实点击不能触发禁用按钮"); node.props.onClick(); await settle(); };
 const click = key => clickNode(find(n => isAction(n, key)));
 const clickModal = key => clickNode(modalAction(key));
@@ -107,6 +167,7 @@ assert.equal(/\.dssm-repo-description\{[^}]*line-height:18px/.test(repoSource), 
 assert.equal(repoSource.includes("▾") || repoSource.includes("▸"), false, "仓库折叠不再用文字三角");
 assert.match(repoSource, /h\(Collapse,/, "仓库折叠使用和全局技能相同的 Collapse，带箭头和展开动画");
 assert.deepEqual(Object.keys(repositoryLocales.en).sort(), Object.keys(repositoryLocales.zh).sort(), "中英文词条必须同步");
+assert.equal(repoSource.includes("SKILLSH_TOP10") || repoSource.includes("CLAWHUB_TOP10"), false, "线上目录榜单不再硬编码静态条目");
 const allowedDestinationKeys = ["dsh", "agents"];
 for (const locale of Object.values(repositoryLocales)) {
   for (const name of ["DSH skills", "Shared Agent"]) assert.ok(locale["repo.hint"].includes(name), "全局提示必须介绍可选安装位置：" + name);
@@ -130,7 +191,8 @@ assert.equal(find(n => isAction(n, "repo.check")), undefined, "不再提供重�
 assert.equal(find(n => n.props["aria-label"] === "repo.search").type, Input, "仓库搜索必须使用官方输入框");
 const toolbar = find(n => n.props.className === "dssm-filters");
 assert.ok(toolbar, "仓库筛选和搜索必须复用全局技能的同一个 dssm-filters 工具栏");
-assert.deepEqual(toolbar.children.map(n => n.props.className), ["dssm-source-filter", "dssm-status-filter", "dssm-search"], "左侧来源、状态紧凑筛选，右侧搜索；顺序和全局技能一致");
+assert.deepEqual(toolbar.children.map(n => n.props.className), ["dssm-source-filter", "dssm-status-filter", "dssm-search", "dssm-filter-actions"], "筛选在左、搜索居中、图标操作紧跟搜索");
+assert.ok(toolbar.children[3].children.every(button => button.children.length === 0 && button.props.icon && button.props.title === button.props["aria-label"]), "发现技能仓库操作按钮与搜索同排且仅显示带悬停提示的图标");
 assert.equal(toolbar.children[0].children[0].type, OfficialSelect);
 assert.equal(toolbar.children[0].children[0].props.label, "repo.all");
 assert.deepEqual(toolbar.children[0].children[0].props.options, [{ value: "", label: "repo.all" }, { value: "one", label: "example/skills" }]);
@@ -139,10 +201,150 @@ assert.equal(toolbar.children[1].children[0].props.label, "repo.states");
 assert.deepEqual(toolbar.children[1].children[0].props.options.map(o => o.value), ["", "available", "installed", "update", "conflict", "invalid"]);
 assert.equal(toolbar.children[2].type, Input);
 assert.equal(toolbar.children[2].props.allowClear, true, "保留搜索清空按钮");
+for (const action of toolbar.children[3].children) {
+  assert.equal(action.props.type, "text", "发现页搜索旁按钮使用中性图标样式");
+  assert.equal(action.props.style.backgroundColor, undefined, "发现页搜索旁按钮不设置强调底色");
+  assert.equal(action.props.style.width, 28, "发现页搜索旁按钮尺寸统一");
+  assert.equal(action.props.style.color, "var(--dsw-alias-label-secondary, #b9b9b9)", "发现页搜索旁按钮不使用强调色");
+}
 assert.equal(ui.content.children.some(n => n.props?.className === "dssm-search"), false, "搜索不再独占工具栏外的一行");
+const selectSubsource = async (key) => {
+  const sourceButton = find(n => n.props.className?.includes("dssm-subsource-btn") && n.children.some(child => typeof child === "string" && child.includes(key)));
+  assert.ok(sourceButton, "必须找到目录来源切换按钮");
+  sourceButton.props.onClick();
+  render();
+  await settle();
+};
+const sourceButtons = () => all().filter(n => n.props.className?.includes("dssm-subsource-btn"));
+assert.deepEqual(sourceButtons().map(n => n.children.join("")), ["repo.subsource.github (1)", "repo.subsource.clawhub", "repo.subsource.skillsh"], "ClawHub 来源紧跟 GitHub 排在第二位");
+assert.equal(catalogCalls.length, 0, "默认进入发现页不请求在线目录");
+await selectSubsource("repo.subsource.skillsh");
+assert.equal(catalogCalls.length, 0, "打开 skills.sh 来源不加载热门榜");
+assert.equal(skillshCalls.length, 0, "未输入关键词前不查询 skills.sh");
+assert.deepEqual(all().filter(n => n.props.className === "dssm-name"), [], "未查询时不显示静态或虚构技能数据");
+const skillshToolbar = find(n => n.props.className === "dssm-filters dssm-catalog-filters dssm-skillsh-filters");
+assert.deepEqual(skillshToolbar.children.map(n => n.props.className), ["dssm-search"], "skills.sh 只保留关键词查询框，不放仓库工具栏按钮");
+const skillshSearch = find(n => n.props["aria-label"] === "repo.catalog.searchSkillsh");
+assert.equal(skillshSearch.type, Input, "skills.sh 使用官方输入框查询目录结果");
+skillshSearch.props.onChange({ target: { value: "react" } }); render();
+await new Promise(resolve => setTimeout(resolve, 350)); await settle();
+assert.equal(skillshCalls.length, 1, "输入关键词后调用本地安全代理查询一次");
+assert.equal(skillshCalls[0].searchParams.get("q"), "react", "查询关键词正确传递");
+assert.deepEqual(all().filter(n => n.props.className === "dssm-name").map(n => n.children.join("")), ["React Skill"], "列表展示 skills.sh 查询接口返回的数据");
+assert.ok(all().some(n => n.props.className === "dssm-meta-origin" && n.children.join("").includes("owner/skills · 123,456 repo.catalog.installs")), "仅显示 skills.sh 响应中的来源和安装量");
+const skillshRow = all().find(n => n.props.className === "dssm-repo-row" && nodes(n).some(child => child.props.className === "dssm-name" && child.children.join("") === "React Skill"));
+const skillshActions = nodes(skillshRow).filter(n => n.props["aria-label"] === "repo.detail" || n.props["aria-label"] === "repo.install");
+assert.deepEqual(skillshActions.map(n => n.props["aria-label"]), ["repo.detail", "repo.install"], "skills.sh 每一行右侧是详情和安装");
+assert.ok(skillshActions.every(button => button.props.icon && button.children.length === 0 && button.props.type === "text" && button.props.style.width === 22), "目录行操作沿用技能行图标按钮");
+await clickNode(skillshActions[0]);
+assert.deepEqual(calls.at(-1), { path: "/catalog/detail", body: { catalog: "skillsh", source: "owner/skills", skillId: "react-skill", name: "React Skill" } }, "详情读取这一条 skills.sh 技能，不订阅仓库");
+assert.equal(modalNodes().find(n => n.type === Input.TextArea)?.props.value, "# React Skill", "详情展示该技能的真实说明");
+assert.equal(all().some(n => n.props.className === "dssm-empty" && n.props.role === "status"), false, "不显示多余授权提示");
+await selectSubsource("repo.subsource.clawhub");
+assert.equal(catalogCalls.length, 1, "选择 ClawHub 后才请求第一页");
+assert.equal(catalogCalls[0].searchParams.get("sort"), "downloads", "热门榜由 ClawHub 下载量排序");
+assert.equal(catalogCalls[0].searchParams.get("limit"), "10", "首屏只请求一页，后续由滚动触发");
+const catalogToolbar = find(n => n.props.className === "dssm-filters dssm-catalog-filters");
+assert.deepEqual(catalogToolbar.children.map(n => n.props.className), ["dssm-catalog-sort-filter", "dssm-catalog-status-filter"], "下载榜筛选控件只属于排行榜，不包含搜索框");
+const catalogSearchRow = find(n => n.props.className === "dssm-catalog-search-row");
+assert.deepEqual(catalogSearchRow.children.map(n => n.props.className), ["dssm-search"], "ClawHub 搜索框不放仓库工具栏按钮");
+assert.equal(catalogSearchRow.children[0].type, Input, "ClawHub 关键词搜索使用官方输入框");
+const catalogSelects = nodes(catalogToolbar).filter(n => n.type === OfficialSelect);
+assert.deepEqual(catalogSelects.map(n => n.props.value), ["", ""], "目录默认热门排序且不筛选状态");
+assert.deepEqual(catalogSelects[0].props.options.map(option => option.value), ["", "installs", "name"], "热门榜由下拉默认项表示，不能重复添加同名选项");
+assert.equal(new Set(catalogSelects[0].props.options.map(option => option.label)).size, catalogSelects[0].props.options.length, "排序下拉的可见标签不能重复");
+assert.deepEqual(catalogSelects[1].props.options.map(option => option.value), ["", "available", "installed"], "状态筛选区分可安装与已安装");
+catalogSelects[1].props.onChange("installed"); render();
+assert.deepEqual(all().filter(n => n.props.className === "dssm-name").map(n => n.children.join("")), ["Skill 002"], "已安装只认本次目录安装记录，不因同名本地技能点亮其他来源");
+assert.equal(all().find(n => n.props.className === "dssm-catalog-installed")?.children.join(""), "repo.installed", "已安装目录技能显示状态");
+catalogSelects[1].props.onChange("available"); render();
+assert.equal(all().some(n => n.props.className === "dssm-name" && n.children.join("") === "Skill 002"), false, "可安装筛选排除已安装技能");
+catalogSelects[1].props.onChange(""); render();
+assert.deepEqual(all().filter(n => n.props.className === "dssm-name").map(n => n.children.join("")), Array.from({ length: 10 }, (_value, index) => "Skill " + String(index + 1).padStart(3, "0")), "首屏严格显示真实 API 返回的 10 条记录");
+assert.ok(all().some(n => n.props.className === "dssm-meta-origin" && n.children.join("").includes("999 repo.catalog.downloads")), "下载量直接显示 API 的真实数值");
+const catalogRow = name => all().find(n => n.props.className === "dssm-repo-row" && nodes(n).some(child => child.props.className === "dssm-name" && child.children.join("") === name));
+const rowActions = row => nodes(row).filter(n => n.props["aria-label"] === "repo.detail" || n.props["aria-label"] === "repo.install");
+assert.deepEqual(rowActions(catalogRow("Skill 001")).map(n => n.props["aria-label"]), ["repo.detail", "repo.install"], "未安装的 ClawHub 技能行右侧是详情和安装");
+assert.deepEqual(rowActions(catalogRow("Skill 002")).map(n => n.props["aria-label"]), ["repo.detail"], "已安装技能行不重复放安装按钮");
+assert.equal(nodes(catalogRow("Skill 002")).find(n => n.props.className === "dssm-catalog-installed")?.children.join(""), "repo.installed", "已安装状态仍在该行显示");
+await clickNode(rowActions(catalogRow("Skill 001"))[0]);
+assert.deepEqual(calls.at(-1), { path: "/catalog/detail", body: { catalog: "clawhub", owner: "owner-1", slug: "skill-001", name: "Skill 001" } }, "详情按作者和 slug 读取这一条 ClawHub 技能");
+assert.equal(modalNodes().find(n => n.type === Input.TextArea)?.props.value, "# Skill 001", "详情展示 ClawHub 返回的技能说明");
+await clickNode(rowActions(catalogRow("Skill 001"))[1]);
+assert.equal(dialog()?.props.title, "repo.install", "安装沿用现有安装位置选择");
+assert.equal(radio("dsh").props.checked, true, "目录安装默认仍是 DSH，不改动后续仓库安装的选择");
+await clickModal("repo.install");
+assert.equal(calls.at(-1).path, "/catalog/install", "确认后安装这一条目录技能，不把目录订阅成仓库");
+assert.equal(calls.at(-1).body.catalog, "clawhub");
+assert.equal(calls.at(-1).body.owner, "owner-1");
+assert.equal(calls.at(-1).body.slug, "skill-001");
+assert.equal(calls.at(-1).body.root, "dsh");
+assert.equal(installedCalls, 1, "目录安装完成后刷新已安装技能");
+installedCalls = 0;
+const catalogSortSelect = () => nodes(find(n => n.props.className === "dssm-filters dssm-catalog-filters")).find(n => n.type === OfficialSelect && n.props.label === "repo.subsource.popular");
+catalogSortSelect().props.onChange("installs"); render();
+assert.equal(all().find(n => n.props.className === "dssm-name").children.join(""), "Skill 010", "安装量排序按 API 返回的真实计数排序");
+catalogSortSelect().props.onChange("name"); render();
+const names = all().filter(n => n.props.className === "dssm-name").map(n => n.children.join(""));
+assert.deepEqual(names, [...names].sort((left, right) => left.localeCompare(right)), "名称排序按技能名称升序");
+const catalogSearch = find(n => n.props["aria-label"] === "repo.catalog.searchClawhub");
+assert.equal(catalogSearch.props.maxLength, 100, "ClawHub 关键词受长度限制");
+catalogSearch.props.onChange({ target: { value: "gill" } }); render();
+await new Promise(resolve => setTimeout(resolve, 350)); await settle();
+assert.equal(catalogSearchCalls.length, 1, "输入关键词后调用 ClawHub 搜索接口，而非筛选已加载榜单");
+assert.equal(catalogSearchCalls[0].searchParams.get("q"), "gill", "真实搜索接口收到完整关键词");
+assert.equal(catalogSearchCalls[0].searchParams.get("limit"), "100", "ClawHub 搜索结果请求上限为 100 条");
+assert.equal(catalogCalls.length, 1, "搜索不会继续分页下载榜数据");
+assert.deepEqual(all().filter(n => n.props.className === "dssm-name").map(n => n.children.join("")), ["Gill Helper"], "只显示 ClawHub 关键词检索返回的真实结果，不混入联邦搜索的其他来源");
+assert.ok(all().some(n => n.props.className === "dssm-meta-origin" && n.children.join("").includes("owner-gill/gill-helper · 21 repo.catalog.downloads")), "搜索结果使用 ClawHub 返回的作者和下载量");
+assert.equal(find(n => n.props.className === "dssm-filters dssm-catalog-filters"), undefined, "搜索结果模式不显示排行榜排序和状态控件");
+assert.equal(all().some(n => n.type === "p" && n.children.includes("repo.subsource.catalogNote")), false, "关键词搜索时不显示下载榜标题说明");
+assert.equal(catalogSearchCalls.length, 1, "输入一次只发出一次防抖搜索");
+catalogSearch.props.onChange({ target: { value: "" } }); render(); await settle();
+assert.deepEqual(all().filter(n => n.props.className === "dssm-name").map(n => n.children.join("")), Array.from({ length: 10 }, (_value, index) => "Skill " + String(index + 1).padStart(3, "0")), "清空关键词返回排行榜，而不是保留查询结果");
+const sentinel = () => find(n => n.props.className === "dssm-catalog-sentinel");
+assert.equal(catalogCalls.length, 1, "进入榜单后只自动加载第一页");
+if (intersections.length) intersections.at(-1).callback([{ isIntersecting: true }]);
+await settle();
+assert.equal(catalogCalls.length, 1, "哨兵出现在视口内不能自动连翻，必须等用户向下滚动");
+sentinel().props.onWheel({ deltaY: -20 });
+await settle();
+assert.equal(catalogCalls.length, 1, "向上滚动不加载下一页");
+sentinel().props.onWheel({ deltaY: 24 });
+render();
+const loadingRow = nodes(find(n => n.props.className === "dssm-catalog-list")).find(n => n.props.className === "dssm-catalog-loading");
+assert.ok(loadingRow, "继续加载显示在目录列表内部");
+assert.ok(nodes(loadingRow).some(n => n.props.className === "dssm-repo-spinner"), "加载使用现有转圈，而不是列表外的纯文字");
+assert.equal(loadingRow.children.some(child => child === "repo.catalog.loadingMore"), true, "继续加载保留原有文案");
+await settle();
+assert.equal(catalogCalls.length, 2, "一次向下滚动只再加载 10 条");
+assert.equal(catalogCalls.at(-1).searchParams.get("limit"), "10");
+assert.equal(catalogCalls.at(-1).searchParams.get("cursor"), "10");
+sentinel().props.onWheel({ deltaY: 24 });
+await settle();
+assert.equal(catalogCalls.length, 3, "下一次向下滚动才加载再下一页");
+for (let page = catalogCalls.length; page < 10; page++) {
+  sentinel().props.onWheel({ deltaY: 24 });
+  await settle();
+}
+assert.equal(catalogCalls.length, 10, "每次向下滚动一页，最多 10 页");
+assert.equal(catalogCalls.at(-1).searchParams.get("cursor"), "90", "分页请求携带服务端 cursor");
+assert.equal(all().filter(n => n.props.className === "dssm-name").length, 100, "列表最多加载真实榜单前 100 条");
+assert.equal(sentinel(), undefined, "满 100 条后不再保留继续加载的滚动哨兵");
+assert.equal(catalogCalls.length, 10, "达到 100 条后不再请求");
+await selectSubsource("repo.subsource.github");
+
 const toolbarCss = all().filter(n => n.type === "style").map(n => n.children.join("")).join("");
+assert.match(toolbarCss, /\.dssm-catalog-list\{[^}]*border:1px solid var\(--dsw-alias-border-l2[^}]*border-radius:10px[^}]*background:transparent/, "目录结果列表沿用来源面板的边框、圆角与透明底色");
 assert.doesNotMatch(toolbarCss, /\.dssm-repo-filters/, "删除旧仓库等宽筛选 CSS，而不是叠加覆盖");
-assert.doesNotMatch(toolbarCss, /\.dssm-(?:filters|source-filter|status-filter|search)(?=[\s.{:>])/, "工具栏布局直接继承全局 CSS，不复制仓库专用规则");
+assert.match(toolbarCss, /\.dssm-catalog-filters \.dssm-search\{flex:1 1 240px/, "目录搜索填满两个筛选下拉后的剩余宽度");
+assert.match(toolbarCss, /\.dssm-catalog-search-row \.dssm-search\{width:100%\}/, "没有工具栏按钮时搜索框铺满所在行");
+assert.match(toolbarCss, /\.dssm-catalog-loading\{[^}]*display:flex[^}]*justify-content:center[^}]*var\(--dsw-alias-label-tertiary/, "目录加载行在列表内居中，使用次级文字色");
+assert.match(toolbarCss, /\.dssm-subsources\{[^}]*margin:0[^}]*padding-bottom:6px/, "来源选项上方不再保留多余外边距");
+assert.match(toolbarCss, /\.dssm-subsource-btn\.on\{[^}]*var\(--dsw-alias-bg-layer-2[^}]*var\(--dsw-alias-label-primary[^}]*var\(--dsw-alias-border-l3/, "来源选中态改用中性色");
+assert.doesNotMatch(toolbarCss, /\.dssm-subsource-btn\.on\{[^}]*rgba\(59,130,246|\.dssm-subsource-btn\.on\{[^}]*#93c5fd/, "来源选中态不再显示蓝色");
+assert.match(toolbarCss, /\.dssm-subsource-btn:focus-visible\{outline:2px solid var\(--dsw-alias-border-l3/, "键盘焦点保留中性色轮廓");
+assert.doesNotMatch(toolbarCss, /(?:^|\n)\.dssm-(?:filters|source-filter|status-filter)(?=[\s.{:>])|(?:^|\n)\.dssm-search(?=[\s,{])/, "工具栏通用布局直接继承全局 CSS，只为目录搜索保留单独伸展规则");
 // 原筛选与搜索事件保留：来源、状态和搜索可组合，且不会增加后端请求。
 const beforeFilterCalls = calls.length;
 find(n => n.props.label === "repo.all").props.onChange("missing"); render();
@@ -164,7 +366,7 @@ assert.notEqual(rowAction("repo.install").props.type, "primary", "安装按钮�
 assert.ok(rowAction("repo.detail").props.icon && rowAction("repo.install").props.icon, "仓库行的详情和安装是图标");
 assert.equal(rowAction("repo.detail").children.includes("repo.detail"), false, "详情不显示文字");
 assert.equal(rowAction("repo.install").children.includes("repo.install"), false, "安装不显示文字");
-assert.equal(find(n => isAction(n, "repo.add")).props.type, "primary", "添加仓库恢复蓝色主按钮");
+assert.equal(toolbar.children[3].children.find(n => isAction(n, "repo.add")).props.type, "text", "搜索旁添加仓库按钮使用中性图标样式");
 assert.doesNotMatch(all().filter(n => n.type === "style").map(n => n.children.join("")).join(""), /\.dssm-repo-emphasis/, "主按钮不再套灰描边");
 assert.ok(rowAction("repo.conflict").props.disabled, "未跟踪的同名冲突不能卸载");
 assert.equal(rowAction("repo.uninstall"), undefined);

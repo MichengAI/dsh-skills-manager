@@ -5,6 +5,9 @@ import { readFile } from "node:fs/promises";
 const projectCss = await readFile(new URL("../src/client.ts", import.meta.url), "utf8");
 function assertSourceCleanup() {
   assert.doesNotMatch(projectCss, /dssm-workspace|renderWorkspace|project\.searchHint/, "删除旧工作区折叠渲染、CSS和展开搜索提示");
+  assert.doesNotMatch(projectCss, /\.dssm-filters \.dssm-search\{[^}]*margin-left:auto/, "搜索框紧跟筛选，不被推到工具栏最右侧");
+  assert.match(projectCss, /\.dssm-filter-actions\{[^}]*margin-left:auto/, "搜索旁按钮组对齐到工具栏最右侧");
+  assert.match(projectCss, /\.dssm-filter-actions\{[^}]*display:flex[^}]*gap:8px;flex:none/, "搜索右侧图标按钮组间距稳定");
   assert.match(projectCss, /\.dssm-source\.ant-collapse\{[^}]*background:transparent/, "复用全局来源卡片背景");
 }
 
@@ -115,6 +118,19 @@ try {
   const textOf = (node) => JSON.stringify(nodes(node).flatMap((n) => n.children.filter((c) => typeof c === "string")));
 
   await settle();
+  const globalFilters = find(node => node.props.className === "dssm-filters");
+  const globalActions = nodes(globalFilters).find(node => node.props.className === "dssm-filter-actions");
+  assert.ok(globalActions, "全局技能的操作按钮与搜索同排");
+  for (const action of nodes(globalActions).filter(node => node.props["aria-label"])) {
+    assert.ok(action.props.icon, "全局技能操作按钮使用图标");
+    assert.equal(action.children.length, 0, "全局技能操作按钮不显示可见文字");
+    assert.ok(action.props.title, "全局技能图标按钮保留悬停提示");
+    assert.equal(action.props.style.width, 28, "工具栏图标按钮尺寸一致");
+  }
+  const createAction = nodes(globalActions).find(node => node.props["aria-label"] === t("btn.create"));
+  assert.equal(createAction.props.type, "text", "搜索旁的创建按钮使用中性图标样式");
+  assert.equal(createAction.props.style.backgroundColor, undefined, "搜索旁的创建按钮不覆盖主题背景色");
+  assert.equal(createAction.props.style.color, "var(--dsw-alias-label-secondary, #b9b9b9)", "搜索旁的按钮不使用强调色");
   await tab("项目技能");
 
   // 默认只读选择首个可用登记项，不依赖当前会话，不扫其他项目。
@@ -130,8 +146,19 @@ try {
   assert.deepEqual(scans[0].body, { workspace: "D:/work/alpha/packages/web" }, "只请求登记路径，不推导项目根");
   assert.equal(find(node => node.props.className === "dssm-summary"), undefined);
   assert.equal(find(node => node.props.className === "dssm-source-filter"), undefined);
-  const controls = nodes(find(node => node.props.className === "dssm-filters"));
+  const filters = find(node => node.props.className === "dssm-filters");
+  const controls = nodes(filters);
   assert.deepEqual(controls.filter(node => [t("filter.status"), t("filter.workspace"), t("search")].includes(node.props["aria-label"])).map(node => node.props["aria-label"]), [t("filter.status"), t("filter.workspace"), t("search")]);
+  const filterActions = nodes(filters).find(node => node.props.className === "dssm-filter-actions");
+  assert.ok(filterActions, "项目技能的操作按钮与搜索同排");
+  for (const action of nodes(filterActions).filter(node => node.props["aria-label"])) {
+    assert.ok(action.props.icon, "操作按钮使用图标");
+    assert.equal(action.children.length, 0, "操作按钮不再显示可见文字");
+    assert.ok(action.props.title, "图标按钮保留悬停提示");
+    assert.equal(action.props.style.width, 28, "项目页工具栏图标按钮尺寸一致");
+    assert.equal(action.props.type, "text", "项目页搜索旁按钮使用中性样式");
+    assert.equal(action.props.style.backgroundColor, undefined, "项目页搜索旁按钮不设置强调底色");
+  }
   await choose("D:/work/ghost");
   await choose("D:/unregistered");
   assert.deepEqual(rows(), ["alpha-one", "alpha-two"], "合成事件也不能选择不可用或未登记项");
@@ -146,7 +173,7 @@ try {
   // 刷新只重读所选项目，不清缓存后永远停在 loading。
   const beforeRefresh = calls.filter(c => c.url.endsWith("/workspace-skills")).length;
   details["D:/work/alpha"].roots[0].skills.push(skill("alpha-new"));
-  find(node => node.children.includes(t("btn.refresh")) && node.props.onClick).props.onClick();
+  find(node => node.props["aria-label"] === t("btn.refresh") && node.props.onClick).props.onClick();
   await settle();
   assert.equal(calls.filter(c => c.url.endsWith("/workspace-skills")).length, beforeRefresh + 1, "刷新重新读取所选工作区");
   assert.ok(rows().includes("alpha-new"), "刷新后所选项显示新详情");
@@ -155,7 +182,7 @@ try {
 
   // 5. 连续刷新：只读所选工作区，最新响应获胜；旧失败不能覆盖新成功。
   holdDetails = true;
-  const refreshProjects = async () => { find(node => node.children.includes(t("btn.refresh")) && node.props.onClick).props.onClick(); await settle(); };
+  const refreshProjects = async () => { find(node => node.props["aria-label"] === t("btn.refresh") && node.props.onClick).props.onClick(); await settle(); };
   await refreshProjects();
   assert.ok(find(node => node.children.includes(t("workspace.loading"))), "刷新时所选项目有 loading 提示");
   assert.equal(detailResponses.length, 1, "只重读所选工作区");
@@ -211,7 +238,7 @@ try {
   const feedback = () => find((node) => node.props.className === "dssm-feedback" && node.children.includes(t("result.updated")));
   find((node) => node.props["aria-label"] === t("skill.toggle") + " alpha-one").props.onChange(); await tick(); await tick(); render();
   assert.ok(feedback(), "操作结果显示在发起操作的页面");
-  await tab("技能仓库");
+  await tab("发现技能");
   assert.equal(feedback(), undefined, "仓库页不显示项目页的操作结果");
   await tab("回收站");
   assert.equal(feedback(), undefined, "回收站不显示项目页的操作结果");
@@ -309,7 +336,7 @@ try {
   holdLists = true;
   const pendingStart = listResponses.length;
   await refreshProjects();
-  find(node => node.children.includes(t("btn.create")) && node.props.onClick).props.onClick();
+  find(node => node.props["aria-label"] === t("btn.create") && node.props.onClick).props.onClick();
   await settle();
   assert.equal(listResponses.length, pendingStart + 2);
   listResponses[pendingStart + 1].resolve({ ok: true, json: async () => ({ ok: true, data: { items: workspaces.slice() } }) });

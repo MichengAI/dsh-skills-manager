@@ -25,8 +25,8 @@ const globalData = {
   writeDestinations: [{ key: "dsh", path: "C:/u/.dsh/skills", label: "DSH", available: true }],
   projects: [], trash: [], warnings: [],
   roots: [
-    { key: "dsh", mutable: true, path: "C:/u/.dsh/skills", categories: [{ id: "work", name: "工作" }], skills: [skill("kept", { categoryId: "work" }), skill("other", { categoryId: "work", enabled: false }), skill("loose")] },
-    { key: "codex", exists: true, toggleable: true, enabled: true, path: "C:/u/.codex/skills", categories: [], skills: [skill("codex-one")] },
+    { key: "dsh", mutable: true, path: "C:/u/.dsh/skills", categories: [{ id: "work", name: "工作" }], categoryOrder: { work: ["kept", "other"], "": ["loose"] }, skills: [skill("kept", { categoryId: "work" }), skill("other", { categoryId: "work", enabled: false }), skill("loose")] },
+    { key: "codex", exists: true, mutable: true, toggleable: true, enabled: true, path: "C:/u/.codex/skills", categories: [], categoryOrder: { "": ["codex-two", "codex-one"] }, skills: [skill("codex-one"), skill("codex-two")] },
   ],
 };
 const workspaces = [
@@ -103,6 +103,14 @@ try {
 
   const dsh = sources().find((node) => textOf(node).includes("kept"));
   const codex = sources().find((node) => textOf(node).includes("codex-one"));
+  assert.deepEqual(nodes(codex).filter((node) => node.props.className === "dssm-name").map((node) => node.children[0]), ["codex-two", "codex-one"], "没有分类时也按已保存顺序显示未分类技能");
+  const codexRows = nodes(codex).filter((node) => node.props.className === "dssm-skill-row");
+  const codexTwo = codexRows.find((node) => nodes(node).some((child) => child.props.className === "dssm-name" && child.children[0] === "codex-two"));
+  const codexOne = codexRows.find((node) => nodes(node).some((child) => child.props.className === "dssm-name" && child.children[0] === "codex-one"));
+  codexTwo.props.onDragStart({ dataTransfer: { setData() {}, effectAllowed: "" }, currentTarget: { classList: { add() {} } } });
+  codexOne.props.onDrop({ preventDefault() {}, stopPropagation() {}, clientY: 1, currentTarget: { classList: { remove() {}, add() {}, toggle() {} }, closest: () => ({ querySelectorAll: () => [] }), getBoundingClientRect: () => ({ top: 0, height: 20 }) } });
+  await tick(); await tick(); render();
+  assert.equal(calls.filter((call) => call.url.endsWith("/category-move")).at(-1).body.category, "", "没有分类时也可排序未分类技能");
   assert.equal(nodes(codex).some((node) => node.props.className === "dssm-cat"), false, "没建分类时不套分类层");
   assert.ok(rows().includes("codex-one"), "没建分类时技能仍平铺");
   assert.ok(nodes(codex).some((node) => String(node.props["aria-label"] || "").includes(t("source.toggle"))), "已有来源开关的来源仍用那颗开关");
@@ -157,11 +165,31 @@ try {
   assert.equal(nodes(addModalReopened).some(node => node.props.className === "dssm-batch-item selected"), false, "重新打开弹窗勾选已被重置");
   nodes(addModalReopened).find(node => node.children?.includes(t("btn.cancel")) && node.props?.onClick).props.onClick();
   render();
+  const categoryRows = nodes(work).filter((node) => node.props.className === "dssm-skill-row");
+  const keptRow = categoryRows.find((node) => nodes(node).some((child) => child.props.className === "dssm-name" && child.children[0] === "kept"));
+  const otherRow = categoryRows.find((node) => nodes(node).some((child) => child.props.className === "dssm-name" && child.children[0] === "other"));
+  const categoryGroup = nodes(dsh).find((node) => node.props.className === "dssm-cat" && node.props["aria-label"] === "工作");
+  const categoryClasses = new Set();
+  const categoryElement = { classList: { add: (name) => categoryClasses.add(name), remove: (name) => categoryClasses.delete(name) } };
+  keptRow.props.onDragStart({ dataTransfer: { setData() {}, effectAllowed: "" }, currentTarget: { classList: { add() {} } } });
+  categoryGroup.props.onDragOver({ preventDefault() {}, currentTarget: categoryElement });
+  assert.equal(categoryClasses.has("drag-over"), false, "同分类内部拖动不高亮分类外框");
+  const sectionElement = { querySelectorAll: () => [{ classList: { remove: (name) => categoryClasses.delete(name) } }] };
+  categoryClasses.add("drag-over");
+  otherRow.props.onDrop({ preventDefault() {}, stopPropagation() {}, clientY: 1, currentTarget: { classList: { remove() {}, add() {}, toggle() {} }, closest: () => sectionElement, getBoundingClientRect: () => ({ top: 0, height: 20 }) } });
+  assert.equal(categoryClasses.has("drag-over"), false, "技能行内部 drop 后清理分类外框高亮");
+  await tick(); await tick(); render();
+  const orderCalls = calls.filter((call) => call.url.endsWith("/category-move"));
+  assert.ok(orderCalls.length > 0, "技能行之间拖放触发排序请求");
+  assert.equal(orderCalls.at(-1).body.name, "kept", "排序请求移动拖拽技能");
+  assert.equal(orderCalls.at(-1).body.targetName, "other", "排序请求以目标技能定位");
+  assert.equal(orderCalls.at(-1).body.category, "work", "同分类排序不改变分类");
+  assert.equal(orderCalls.at(-1).body.position, "before", "根据拖放位置计算插入前后");
   // 验证拖拽落点：模拟在分类上 drop 触发归类请求
   const looseCat = nodes(dsh).find((node) => node.props.className === "dssm-cat" && node.props["aria-label"] === t("category.uncategorized"));
   looseCat.props.onDrop({
     preventDefault() {},
-    currentTarget: { classList: { remove() {} } },
+    currentTarget: { classList: { remove() {} }, closest: () => sectionElement },
     dataTransfer: {
       getData(type) {
         if (type === "text/plain") return JSON.stringify({ root: "dsh", name: "kept", currentCategoryId: "work" });
@@ -228,7 +256,7 @@ try {
   assert.deepEqual(modalFailures, [], "分类创建/重命名/删除均携带原工作区登记路径");
 
   await tab("全局技能");
-  find((node) => node.children.includes(t("btn.create"))).props.onClick();
+  find((node) => node.props["aria-label"] === t("btn.create")).props.onClick();
   await settle();
   find((node) => node.props["aria-label"] === t("dest.scope")).props.onChange("workspace");
   render();

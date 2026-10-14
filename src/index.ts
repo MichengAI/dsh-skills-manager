@@ -19,6 +19,7 @@ import {
   renameCategory,
   deleteCategory,
   assignSkillCategory,
+  moveSkillInCategory,
   setCategoryEnabled,
   deleteSkill,
   permanentlyDeleteTrash,
@@ -39,6 +40,8 @@ import {
 import { registerPluginUpdater } from "./plugin-updater.js";
 import { createRepositoryManager } from "./repositories.js";
 import { installationSourceKey } from "./repository-updates.js";
+import { searchSkillsSh } from "./skills-sh-catalog.js";
+import { loadCatalogPackage, readCatalogSkill } from "./catalog-skill.js";
 
 const name = "skills-manager";
 const inject = ["webServer", "skills", "tools", "sessions"];
@@ -480,6 +483,14 @@ function apply(ctx: HostContext) {
         if ((req.method === "GET" || req.method === "HEAD") && path === "/api/dsh-skills-manager/repositories") {
           return run(res, () => repositories.list(), undefined, req.method === "HEAD");
         }
+        if (req.method === "GET" && path === "/api/dsh-skills-manager/skills-sh/search") {
+          const queries = u.searchParams.getAll("q");
+          if (queries.length !== 1) {
+            json(res, 400, { ok: false, code: "error.catalog.query", error: "搜索词不能为空且不能超过 100 个字符" });
+            return;
+          }
+          return run(res, () => searchSkillsSh(queries[0]));
+        }
         if (req.method === "HEAD") {
           // HEAD 复用 GET/405 的载荷计算 content-length，保持与实体一致的响应头语义。
           if (path === "/api/dsh-skills-manager/state") return run(res, stateWithSources, undefined, true);
@@ -537,13 +548,15 @@ function apply(ctx: HostContext) {
             case "/api/dsh-skills-manager/source-disable":
               return run(res, () => withScope(body, (scope) => setSourceEnabled(String(body.root || ""), false, log, scopedOptions(scope))), afterWrite);
             case "/api/dsh-skills-manager/category-create":
-              return run(res, () => withScope(body, (scope) => createCategory(String(body.root || ""), String(body.name || ""), log, scopedOptions(scope))), afterWrite);
+              return run(res, () => withScope(body, (scope) => createCategory(String(body.root || ""), String(body.name || ""), log, scopedOptions(scope))));
             case "/api/dsh-skills-manager/category-rename":
-              return run(res, () => withScope(body, (scope) => renameCategory(String(body.root || ""), String(body.id || ""), String(body.name || ""), log, scopedOptions(scope))), afterWrite);
+              return run(res, () => withScope(body, (scope) => renameCategory(String(body.root || ""), String(body.id || ""), String(body.name || ""), log, scopedOptions(scope))));
             case "/api/dsh-skills-manager/category-delete":
-              return run(res, () => withScope(body, (scope) => deleteCategory(String(body.root || ""), String(body.id || ""), log, scopedOptions(scope))), afterWrite);
+              return run(res, () => withScope(body, (scope) => deleteCategory(String(body.root || ""), String(body.id || ""), log, scopedOptions(scope))));
             case "/api/dsh-skills-manager/category-assign":
-              return run(res, () => withScope(body, (scope) => assignSkillCategory(String(body.root || ""), String(body.name || ""), String(body.category || ""), log, scopedOptions(scope))), afterWrite);
+              return run(res, () => withScope(body, (scope) => assignSkillCategory(String(body.root || ""), String(body.name || ""), String(body.category || ""), log, scopedOptions(scope))));
+            case "/api/dsh-skills-manager/category-move":
+              return run(res, () => withScope(body, (scope) => moveSkillInCategory(String(body.root || ""), String(body.name || ""), String(body.category || ""), body.targetName ? String(body.targetName) : undefined, body.position === undefined ? "before" : String(body.position), log, scopedOptions(scope))));
             case "/api/dsh-skills-manager/category-enable":
               return run(res, () => withScope(body, (scope) => setCategoryEnabled(String(body.root || ""), String(body.category || ""), true, log, scopedOptions(scope))), afterWrite);
             case "/api/dsh-skills-manager/category-disable":
@@ -587,6 +600,32 @@ function apply(ctx: HostContext) {
                   ...userWriteOptions(body, target),
                 });
               }, afterWrite);
+            case "/api/dsh-skills-manager/catalog/detail":
+              return run(res, () => readCatalogSkill(body));
+            case "/api/dsh-skills-manager/catalog/install":
+              return run(res, async () => {
+                const target = await workspaceTarget(body);
+                if (target && "ok" in target && target.ok === false) return target;
+                const pack = await loadCatalogPackage(body);
+                const root = target ? (target as { root: SkillRoot }).root : await requestRoot(body.root === "agents" ? "agents" : "dsh");
+                if (!root) throw Object.assign(new Error("安装位置不可用"), { statusCode: 400, code: "error.repo.invalid" });
+                const imported = await importUploadedSkill({ name: pack.name, entries: pack.entries, zip: pack.zip }, log, {
+                  conflict: "skip",
+                  root,
+                  ...userWriteOptions(body, target),
+                });
+                if (imported.ok === false || !imported.imported?.length) {
+                  throw Object.assign(new Error(imported.error || "同名技能已存在，不会覆盖本地文件"), { statusCode: 409, code: imported.code || "error.repo.conflict" });
+                }
+                const installedName = imported.imported[0].name;
+                const catalogId = body.catalog === "skillsh" ? `skillsh:${body.source}/${body.skillId}` : `clawhub:${body.owner}/${body.slug}`;
+                await repositories.rememberCatalogInstall(catalogId);
+                const enabled = await setSkillEnabled(root, installedName, true, log);
+                if (enabled && typeof enabled === "object" && "ok" in enabled && enabled.ok === false) {
+                  throw Object.assign(new Error(enabled.error || "技能启用状态无法写入"), { statusCode: 500, code: typeof enabled.code === "string" ? enabled.code : "error.repo.enableState" });
+                }
+                return { name: installedName, root: root.path };
+              }, afterWrite);
             default:
               json(res, 404, { ok: false, code: "error.proto.unknownAction", error: `unknown action: ${path}` });
           }
@@ -606,4 +645,4 @@ function apply(ctx: HostContext) {
 export { activeSessionCwds, apply, inject, name, notifyChatCatalog, registerAgentSkillProviders };
 
 /** 请求体由各业务入口现有校验解析，此类型只声明路由转交的字段。 */
-type RequestBody = CreateInput & UploadInput & SkillRequest & RepositoryInput & {root?: string; source?: string; conflict?: string; dryRun?: boolean; workspace?: unknown; enabled?: boolean; category?: string};
+type RequestBody = CreateInput & UploadInput & SkillRequest & RepositoryInput & {root?: string; source?: string; conflict?: string; dryRun?: boolean; workspace?: unknown; enabled?: boolean; category?: string; targetName?: string; position?: "before" | "after"; catalog?: string; skillId?: string; owner?: string; slug?: string};

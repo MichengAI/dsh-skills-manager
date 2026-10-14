@@ -84,6 +84,8 @@ export interface ManagerState {
     /** 每个来源自己的列表分类。旧状态文件可以没有这两个字段。 */
     categories: Record<string, SkillCategory[]>;
     categoryMembers: Record<string, Record<string, string>>;
+    /** 每个来源、分类（空字符串代表未分类）里的手动排序；旧状态文件可以缺省。 */
+    categoryOrder: Record<string, Record<string, string[]>>;
 }
 export interface PolicyResult {
     state: ManagerState;
@@ -124,6 +126,7 @@ export interface RootView extends SkillRoot {
     enabled: boolean;
     skills: SkillView[];
     categories: SkillCategory[];
+    categoryOrder?: Record<string, string[]>;
 }
 export interface SkillItem {
     root: SkillRoot;
@@ -202,6 +205,7 @@ export interface RepositoryState {
     version: number;
     repositories: Repository[];
     installs: InstallRecord[];
+    catalogInstalls?: string[];
 }
 export interface RepositoryInput {
     url?: string;

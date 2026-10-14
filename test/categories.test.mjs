@@ -9,7 +9,7 @@ process.env.DSH_HOME = join(temporary, "dsh");
 process.env.DSH_AGENTS_HOME = join(temporary, "agents");
 process.env.DSH_CODEX_HOME = join(temporary, "codex");
 process.env.HOME = process.env.USERPROFILE = join(temporary, "user");
-const { createCategory, renameCategory, deleteCategory, assignSkillCategory, setCategoryEnabled, readManagerState, state, projectRoots, deleteSkill, restoreTrash, permanentlyDeleteTrash } = await import("../lib/core.js");
+const { createCategory, renameCategory, deleteCategory, assignSkillCategory, moveSkillInCategory, setCategoryEnabled, readManagerState, state, projectRoots, deleteSkill, restoreTrash, permanentlyDeleteTrash } = await import("../lib/core.js");
 
 const skillText = (name) => `---\nname: ${name}\ndescription: 测试技能\n---\n正文\n`;
 const writeSkill = async (root, name, text = skillText(name)) => {
@@ -123,6 +123,16 @@ await permanentlyDeleteTrash(trashedAgain.id);
 assert.equal((await readManagerState()).state.categoryMembers.dsh?.["purge-skill"], undefined, "永久删除清掉分类成员");
 await writeSkill(dsh, "purge-skill");
 assert.equal((await state()).roots.find((root) => root.key === "dsh").skills.find((item) => item.name === "purge-skill").categoryId, null, "同名新建不继承已删除技能的分类");
+
+for (const name of ["order-alpha", "order-beta", "order-gamma"]) await writeSkill(dsh, name);
+const orderCategory = await createCategory("dsh", "排序");
+for (const name of ["order-alpha", "order-beta", "order-gamma"]) await assignSkillCategory("dsh", name, orderCategory.category.id);
+const reordered = await moveSkillInCategory("dsh", "order-gamma", orderCategory.category.id, "order-alpha", "before");
+assert.deepEqual(reordered.order, ["order-gamma", "order-alpha", "order-beta"], "支持在同分类内移动到指定技能之前");
+assert.deepEqual((await readManagerState()).state.categoryOrder.dsh[orderCategory.category.id], reordered.order, "排序顺序写入状态文件");
+const movedToLoose = await moveSkillInCategory("dsh", "order-alpha", "", "loose-skill", "after");
+assert.deepEqual(movedToLoose.order, ["broken-skill", "kept-skill", "loose-skill", "order-alpha", "purge-skill"], "技能跨分类后接入目标分类现有顺序");
+assert.equal((await state()).roots.find((root) => root.key === "dsh").skills.find((item) => item.name === "order-alpha").categoryId, null, "排序落点同时更新分类归属");
 
 await rm(temporary, { recursive: true, force: true });
 console.log("categories ok");

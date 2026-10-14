@@ -11,14 +11,18 @@ export type Detail = Success<Awaited<ReturnType<typeof skillDetail>>>;
 export type TrashItem = Awaited<ReturnType<typeof listTrash>>[number];
 type Manager = ReturnType<typeof createRepositoryManager>;
 export type RepositoryRoutes = {
-    [K in keyof Manager as K extends 'sources' | 'list' | 'restoreTrash' ? never : `/repositories/${K}`]: Awaited<ReturnType<Manager[K]>>;
+    [K in keyof Manager as K extends 'sources' | 'list' | 'restoreTrash' | 'rememberCatalogInstall' ? never : `/repositories/${K}`]: Awaited<ReturnType<Manager[K]>>;
 };
-export type ApiRoutes = RepositoryRoutes & {
+type SkillsShSearchPath = `/skills-sh/search?q=${string}`;
+type SkillsShSearchResult = { skills: { id: string; source: string; skillId: string; name: string; installs?: number }[] };
+export type ApiRoutes = RepositoryRoutes & Record<SkillsShSearchPath, SkillsShSearchResult> & {
     '/repositories': Awaited<ReturnType<Manager['list']>>;
     '/state': ManagerSnapshot;
     '/workspaces': { items: Awaited<ReturnType<typeof listWorkspaces>> };
     '/workspace-skills': Success<Awaited<ReturnType<typeof workspaceSkills>>>;
     '/import': ImportResult;
+    '/catalog/detail': { name: string; description: string; body: string; origin: string };
+    '/catalog/install': { name: string; root: string };
     '/detail': Detail;
     '/create': Success<Awaited<ReturnType<typeof createSkill>>>;
     '/upload': ImportResult;
@@ -33,6 +37,7 @@ export type ApiRoutes = RepositoryRoutes & {
     '/category-rename': unknown;
     '/category-delete': unknown;
     '/category-assign': unknown;
+    '/category-move': unknown;
     '/category-enable': unknown;
     '/category-disable': unknown;
 };

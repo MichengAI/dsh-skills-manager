@@ -173,7 +173,7 @@ try {
   assert.equal(find((node) => node.props.className === "dssm-trash-count"), undefined, "空回收站不显示数量徽标");
   tab("全局技能");
   assert.deepEqual(rows(), ["global-two"], "经过回收站仍保留全局筛选");
-  const create = find((node) => node.children.includes(t("btn.create")));
+  const create = find((node) => node.props["aria-label"] === t("btn.create"));
   assert.equal(create.props.disabled, false, "全局页可创建技能");
   create.props.onClick(); await new Promise((resolve) => setImmediate(resolve)); render();
   assert.ok(find((node) => node.props["aria-label"] === t("dest.scope")), "创建弹窗使用共用的范围选择器");
