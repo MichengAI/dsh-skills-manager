@@ -86,8 +86,8 @@ try {
     const projectRoot = project.data.roots.find(root => root.kind === "project-dsh");
     const userDeleted = await post("/delete", { root: "dsh", name: installedName });
     assert.ok((await list()).catalogInstalls.includes(id), "用户副本回收后仍有活动项目副本");
-    const projectDeleted = await post("/delete", { root: projectRoot.key, workspace, name: installedName });
-    assert.equal(projectDeleted.status, 200);
+    const projectDeleted = await post("/delete", { root: "dsh", workspace, name: installedName });
+    assert.equal(projectDeleted.status, 200, "目录卸载传 dsh 加工作区时要解析到项目根，不能报来源只读");
     assert.ok(!(await list()).catalogInstalls.includes(id));
     assert.equal((await post("/trash-restore", { id: projectDeleted.data.id, workspace })).status, 200);
     assert.ok((await list()).catalogInstalls.includes(id));

@@ -94,6 +94,12 @@ try {
   assert.equal(installed.name, "pdf");
   assert.equal(await readFile(join(process.env.DSH_HOME, "skills/pdf/references/help.txt"), "utf8"), "参考资料");
   assert.equal((await manager.list()).repositories[0].skills.find((s) => s.name === "pdf").status, "installed");
+  await rm(join(process.env.DSH_HOME, "skills/pdf"), { recursive: true });
+  const missingCopy = (await manager.list()).repositories[0].skills.find((s) => s.name === "pdf");
+  assert.equal(missingCopy.installations.length, 0, "文件已不在时不把安装记录显示成已安装位置");
+  assert.equal(missingCopy.status, "available");
+  assert.equal(missingCopy.installedRoot, null);
+  await manager.install({ id: added.id, path: "skills/pdf" });
   await assert.rejects(manager.install({ id: added.id, path: "skills/pdf" }), /同名|安装/);
   sha = "b".repeat(40);
   archive = zipSync({ "repo-main/skills/pdf/SKILL.md": doc("pdf", "Use when: reviewing files"), "repo-main/skills/pdf/references/help.txt": strToU8("新版资料"), "repo-main/skills/docx/SKILL.md": doc("docx") });

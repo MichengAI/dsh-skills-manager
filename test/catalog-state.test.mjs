@@ -54,6 +54,8 @@ try {
     await writeFile(join(userSkill, "SKILL.md"), document);
     await manager.rememberCatalogInstall(id, "actual-name", { root: "dsh" });
     assert.equal((await stored()).catalogInstalls.filter(row => row.id === id).length, 2, "同一目录条目的两份副本都应保留");
+    const copies = (await manager.list()).catalogCopies.filter(copy => copy.id === id);
+    assert.deepEqual(copies.map(copy => copy.installedWorkspace ? "project" : copy.installedRoot).sort(), ["dsh", "project"], "列表返回每个安装位置，不只返回一个已安装标记");
     await manager.forgetCatalogInstall({ id, name: "actual-name", root: "dsh" });
     assert.ok((await manager.list()).catalogInstalls.includes(id), "移除用户身份不得影响项目副本");
     await rm(projectSkill, { recursive: true });

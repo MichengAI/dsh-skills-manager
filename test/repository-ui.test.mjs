@@ -81,6 +81,7 @@ let finishRefresh, finishDetail;
 let holdRefresh = false, failRefresh = false;
 let installedCalls = 0, failInstalledRefresh = false;
 let mockCatalogInstalls = ["clawhub:owner-2/skill-002"];
+let mockCatalogCopies = [{ id: "clawhub:owner-2/skill-002", name: "Skill 002", installedRoot: "dsh", canUninstall: true }];
 let mockCatalogUnknownIds = [], mockCatalogWarnings = [];
 let holdCatalogPath = "", pendingCatalog = [];
 const api = async (path, options) => {
@@ -97,7 +98,9 @@ const api = async (path, options) => {
   if (path === "/catalog/detail") return { name: body.name, description: "目录技能说明", body: "# " + body.name, origin: body.catalog === "skillsh" ? body.source + "/" + body.skillId : body.owner + "/" + body.slug };
   if (path === "/catalog/install") {
     const catalogId = body.catalog === "skillsh" ? `skillsh:${body.source}/${body.skillId}` : `clawhub:${body.owner}/${body.slug}`;
-    if (!mockCatalogInstalls.includes(catalogId)) mockCatalogInstalls.push(catalogId);
+        if (!mockCatalogInstalls.includes(catalogId)) mockCatalogInstalls.push(catalogId);
+        const installedRoot = body.root || "dsh";
+        if (!mockCatalogCopies.some(copy => copy.id === catalogId && copy.installedRoot === installedRoot && copy.installedWorkspace === body.workspace)) mockCatalogCopies.push({ id: catalogId, name: body.name, installedRoot, ...(body.workspace ? { installedWorkspace: body.workspace } : {}), canUninstall: true });
     return { name: body.name, root: body.root || body.workspace || "dsh" };
   }
   if (path.endsWith("/install")) {
@@ -116,7 +119,7 @@ const api = async (path, options) => {
   if (path.endsWith("/preview")) return { token: "checked", commit: "a".repeat(40), localModified: true, changes: [{ kind: "modified", path: "SKILL.md" }] };
   if (path.endsWith("/update") || path.endsWith("/rollback")) repos[0].skills[0].status = "installed";
   // 每次返回独立快照，安装/卸载必须真正 reload 才能改变 UI。
-  return structuredClone({ repositories: repos, installRoots, catalogInstalls: mockCatalogInstalls, catalogUnknownIds: mockCatalogUnknownIds, catalogWarnings: mockCatalogWarnings });
+  return structuredClone({ repositories: repos, installRoots, catalogInstalls: mockCatalogInstalls, catalogCopies: mockCatalogCopies, catalogUnknownIds: mockCatalogUnknownIds, catalogWarnings: mockCatalogWarnings });
 };
 const Input = Object.assign(() => {}, { TextArea: Symbol("官方只读说明框") });
 const Button = Symbol("官方按钮");
@@ -256,9 +259,10 @@ const skillshRow = all().find(n => n.props.className === "dssm-repo-row" && node
 const skillshActions = nodes(skillshRow).filter(n => n.props["aria-label"] === "repo.detail" || n.props["aria-label"] === "repo.install");
 assert.deepEqual(skillshActions.map(n => n.props["aria-label"]), ["repo.detail", "repo.install"], "skills.sh 每一行右侧是详情和安装");
 assert.ok(skillshActions.every(button => button.props.icon && button.children.length === 0 && button.props.type !== "text" && button.props.size === "small" && button.props.className === "dssm-row-icon" && button.props.style.width === 22 && button.props.style.height === 22), "目录行操作使用和图2相同的描边图标按钮");
-assert.match(repoSource, /\.dssm-repo-head \.dssm-repo-actions\{[^}]*gap:2px/, "技能行图标紧挨着，不再留出按钮间隔");
+assert.match(repoSource, /\.dssm-repo-head \.dssm-repo-actions\{[^}]*gap:8px/, "发现页行内按钮间距和回收站一样是 8px");
 assert.match(repoSource, /\.dssm-repo-actions>\.dssm-repo-copy-actions\{display:contents\}/, "卸载不能再套一层掉到安装位置下一行");
-assert.match(repoSource, /\.dssm-repo-head \.dssm-repo-actions\{[^}]*align-self:flex-start/, "行内图标和标题对齐，不在说明中间错位");
+assert.doesNotMatch(repoSource, /\.dssm-repo-head \.dssm-repo-actions\{[^}]*align-self:flex-start/, "行内按钮和标题说明垂直居中，不贴在标题顶上");
+assert.doesNotMatch(repoSource, /\.dssm-repo-row:has\(\.dssm-repo-head\)\{[^}]*padding-right:8px/, "发现页右侧留白和回收站一样，不收成 8px");
 assert.match(repoSource, /\.dssm-row-icon\.ant-btn:not\(:disabled\):not\(\.dssm-icon-danger\):hover\{[^}]*--dsw-alias-link/, "行内图标悬停变蓝");
 await clickNode(skillshActions[0]);
 assert.deepEqual(calls.at(-1), { path: "/catalog/detail", body: { catalog: "skillsh", source: "owner/skills", skillId: "react-skill", name: "React Skill" } }, "详情读取这一条 skills.sh 技能，不订阅仓库");
@@ -280,7 +284,6 @@ assert.equal(new Set(catalogSelects[0].props.options.map(option => option.label)
 assert.deepEqual(catalogSelects[1].props.options.map(option => option.value), ["", "available", "installed"], "状态筛选区分可安装与已安装");
 catalogSelects[1].props.onChange("installed"); render();
 assert.deepEqual(all().filter(n => n.props.className === "dssm-name").map(n => n.children.join("")), ["Skill 002"], "已安装只认本次目录安装记录，不因同名本地技能点亮其他来源");
-assert.equal(all().find(n => n.props.className === "dssm-catalog-installed")?.children.join(""), "repo.installed", "已安装目录技能显示状态");
 catalogSelects[1].props.onChange("available"); render();
 assert.equal(all().some(n => n.props.className === "dssm-name" && n.children.join("") === "Skill 002"), false, "可安装筛选排除已安装技能");
 catalogSelects[1].props.onChange(""); render();
@@ -290,7 +293,10 @@ const catalogRow = name => all().find(n => n.props.className === "dssm-repo-row"
 const rowActions = row => nodes(row).filter(n => n.props["aria-label"] === "repo.detail" || n.props["aria-label"] === "repo.install");
 assert.deepEqual(rowActions(catalogRow("Skill 001")).map(n => n.props["aria-label"]), ["repo.detail", "repo.install"], "未安装的 ClawHub 技能行右侧是详情和安装");
 assert.deepEqual(rowActions(catalogRow("Skill 002")).map(n => n.props["aria-label"]), ["repo.detail"], "已安装技能行不重复放安装按钮");
-assert.equal(nodes(catalogRow("Skill 002")).find(n => n.props.className === "dssm-catalog-installed")?.children.join(""), "repo.installed", "已安装状态仍在该行显示");
+assert.equal(nodes(catalogRow("Skill 002")).find(n => n.props.className === "dssm-catalog-installed"), undefined, "已安装目录技能不再只用一行绿色文字代替副本");
+assert.ok(nodes(catalogRow("Skill 002")).some(n => isAction(n, "repo.installElsewhere")), "已安装目录技能仍可安装到其他位置");
+assert.ok(nodes(catalogRow("Skill 002")).some(n => n.props.className === "dssm-repo-metadata" && String(n.children.join("")).includes("repo.rootDsh")), "目录副本显示安装位置");
+assert.ok(nodes(catalogRow("Skill 002")).some(n => isAction(n, "repo.uninstall")), "每个目录安装位置都可以卸载");
 await clickNode(rowActions(catalogRow("Skill 001"))[0]);
 assert.deepEqual(calls.at(-1), { path: "/catalog/detail", body: { catalog: "clawhub", owner: "owner-1", slug: "skill-001", name: "Skill 001" } }, "详情按作者和 slug 读取这一条 ClawHub 技能");
 assert.equal(modalNodes().find(n => n.type === Input.TextArea)?.props.value, "# Skill 001", "详情展示 ClawHub 返回的技能说明");
@@ -309,8 +315,8 @@ assert.equal(catalogInstallCall.body.slug, "skill-001");
 assert.equal(catalogInstallCall.body.root, "dsh");
 assert.equal(installedCalls, 1, "目录安装完成后刷新已安装技能");
 installedCalls = 0;
-assert.deepEqual(rowActions(catalogRow("Skill 001")).map(n => n.props["aria-label"]), ["repo.detail"], "安装完成后该技能行立即变为已安装，不再显示安装按钮");
-assert.equal(nodes(catalogRow("Skill 001")).find(n => n.props.className === "dssm-catalog-installed")?.children.join(""), "repo.installed", "安装完成后该行显示已安装状态");
+assert.ok(nodes(catalogRow("Skill 001")).some(n => isAction(n, "repo.installElsewhere")), "安装完成后仍可安装到其他位置");
+assert.ok(nodes(catalogRow("Skill 001")).some(n => isAction(n, "repo.uninstall")), "安装完成后显示该位置的卸载");
 const catalogSortSelect = () => nodes(find(n => n.props.className === "dssm-filters dssm-catalog-filters")).find(n => n.type === OfficialSelect && n.props.label === "repo.subsource.popular");
 catalogSortSelect().props.onChange("installs"); render();
 assert.equal(all().find(n => n.props.className === "dssm-name").children.join(""), "Skill 010", "安装量排序按 API 返回的真实计数排序");
@@ -521,11 +527,12 @@ assert.equal(rowAction("repo.uninstall").children.includes("repo.uninstall"), fa
 assert.equal(rowAction("repo.uninstall").props.disabled, false);
 const singleCopyRow = all().find(n => n.props.className === "dssm-repo-row" && nodes(n).some(c => isAction(c, "repo.uninstall")));
 const singleCopyActions = nodes(singleCopyRow).find(n => n.props.className === "dssm-repo-actions");
-assert.ok(singleCopyActions, "单副本的详情、添加安装和卸载必须共用行内操作区");
-for (const key of ["repo.detail", "repo.installElsewhere", "repo.uninstall"]) {
-  assert.ok(nodes(singleCopyActions).some(n => isAction(n, key)), key + " 必须在同一操作区，不能掉到安装位置下一行");
-}
-assert.equal(nodes(singleCopyRow).some(n => n.props.className === "dssm-repo-copies"), false, "单副本不再渲染单独的安装位置操作行");
+const singleCopyLocation = nodes(singleCopyRow).find(n => n.props.className === "dssm-repo-copy");
+assert.ok(singleCopyActions, "详情和再安装留在标题行");
+assert.ok(nodes(singleCopyActions).some(n => isAction(n, "repo.detail")) && nodes(singleCopyActions).some(n => isAction(n, "repo.installElsewhere")), "标题行只放详情和安装到其他位置");
+assert.equal(nodes(singleCopyActions).some(n => isAction(n, "repo.uninstall")), false, "卸载不留在标题行，避免和位置脱节");
+assert.ok(singleCopyLocation && nodes(singleCopyLocation).some(n => isAction(n, "repo.uninstall")) && nodes(singleCopyLocation).some(n => n.props.className === "dssm-repo-metadata"), "每个安装位置和自己的卸载在同一行");
+assert.match(repoSource, /\.dssm-repo-copy\{[^}]*width:100%/, "安装位置行铺满，按钮跟在该行右侧");
 assert.ok(find(n => n.props.className === "dssm-repo-main").children.some(n => n.props?.role === "status" && n.children.join("").includes("repo.installSuccess")), "成功结果留在当前行");
 languagePrefix = "en:"; render();
 assert.ok(find(n => n.props.role === "status" && n.children.includes("en:repo.installSuccess")), "切换语言后已完成提示重新翻译");
@@ -727,10 +734,10 @@ workspaceRows = [
   { name: "beta", path: "D:/work/beta", projectRoot: "D:/work/beta", registeredPaths: ["D:/work/beta/sub"], available: true, skillCount: 1 },
 ];
 const copy = (installedRoot, installedWorkspace) => ({ installedRoot, ...(installedWorkspace ? { installedWorkspace } : {}), tracked: true, status: "update", updateAvailable: true, canRollback: true, canUninstall: true });
-Object.assign(repos[0].skills[0], { name: "pdf", status: "update", installedRoot: "dsh", tracked: true, canUninstall: true, installations: [copy("dsh"), copy("agents"), copy("dsh", "d:/WORK/alpha/"), copy("dsh", "D:/work/beta"), copy("dsh", "D:/gone")] });
+Object.assign(repos[0].skills[0], { name: "pdf", status: "update", installedRoot: "dsh", tracked: true, canUninstall: true, installations: [copy("dsh"), copy("agents"), copy("dsh", "d:/WORK/alpha/"), copy("dsh", "D:/work/beta"), copy("dsh", "D:/gone"), { installedRoot: "dsh", installedWorkspace: "D:/missing", tracked: false, status: "available", canUninstall: false }] });
 await click("repo.refresh");
 const copies = () => all().filter(n => n.props.className === "dssm-repo-copy");
-assert.equal(copies().length, 5, "必须展示每个安装副本，不只取第一条");
+assert.equal(copies().length, 5, "文件已不在的安装记录不能再显示成已安装位置");
 const installedRow = all().find(n => n.props.className === "dssm-repo-row" && nodes(n).some(c => c.props.className === "dssm-repo-copy"));
 assert.equal(nodes(installedRow).find(n => n.props.className === "dssm-repo-main").children.some(n => n?.props?.className === "dssm-repo-copies"), false, "已安装位置不塞进文字列，才能和右侧图标对齐");
 const copyCss = all().filter(n => n.type === "style").map(n => n.children.join("")).join("");

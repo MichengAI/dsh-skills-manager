@@ -320,26 +320,31 @@ export function createRepositoryManager({ fetchImpl = globalThis.fetch, log, reg
       } catch { /* Missing or unsafe installed copies must not be deleted. */ }
     }
     const activeCatalogIds: string[] = [];
-    for (const record of catalogRecords(data).filter(record => record.root && record.complete !== false && !record.trashId)) {
-      try {
-        const root = await recordInstallRoot(record, registered, await indexedFor(record));
-        const files = await readSkillTree(join(root.path, record.name));
-        if (files["SKILL.md"] && !activeCatalogIds.includes(record.id)) activeCatalogIds.push(record.id);
-      } catch { /* 缺失、未登记或不安全的位置不显示徽章，也不认领其他根的同名文件。 */ }
-    }
-    return { installRoots: await repositoryDestinations(), catalogInstalls: activeCatalogIds,
+        const catalogCopies: { id: string; name: string; installedRoot: "dsh" | "agents"; installedWorkspace?: string; canUninstall: boolean }[] = [];
+        for (const record of catalogRecords(data).filter(record => record.root && record.complete !== false && !record.trashId)) {
+          try {
+            const root = await recordInstallRoot(record, registered, await indexedFor(record));
+            const files = await readSkillTree(join(root.path, record.name));
+            if (files["SKILL.md"]) {
+              if (!activeCatalogIds.includes(record.id)) activeCatalogIds.push(record.id);
+              catalogCopies.push({ id: record.id, name: record.name, installedRoot: record.root || "dsh", ...(record.workspace !== undefined ? { installedWorkspace: record.workspace } : {}), canUninstall: true });
+            }
+          } catch { /* 缺失、未登记或不安全的位置不显示徽章，也不认领其他根的同名文件。 */ }
+        }
+        return { installRoots: await repositoryDestinations(), catalogInstalls: activeCatalogIds, catalogCopies,
       catalogUnknownIds: [...new Set((data.catalogInstalls || []).flatMap(record => typeof record === "string" ? [record] : !record.root && !record.trashId ? [record.id] : []))].filter(id => !activeCatalogIds.includes(id)),
       catalogWarnings: [...catalogWarnings], repositories: data.repositories.map((repo) => ({ ...repo, skills: repo.skills.map((skill) => {
       const found = skills.some((s) => s.name.toLowerCase() === skill.name.toLowerCase() || s.declaredName?.toLowerCase() === skill.name.toLowerCase());
 
       const { body, ...summary } = skill;
-      const installations = data.installs.filter(i => i.id === repo.id && i.path === skill.path && i.name === skill.name && i.complete && !i.trashId).map(record => {
-        const tracked = present.has(record);
-        const updateAvailable = tracked && !!skill.files && signature(record.files) !== signature(skill.files);
-        return { installedRoot: record.root || "dsh", ...(record.workspace !== undefined ? { installedWorkspace: record.workspace } : {}), tracked, updateAvailable,
-          canRollback: tracked && !!record.backup, canUninstall: tracked,
-          status: !skill.valid ? "invalid" : tracked ? matched.get(record) ? updateAvailable ? "update" : "installed" : "conflict" : "available" };
-      });
+      const installations = data.installs.filter(i => i.id === repo.id && i.path === skill.path && i.name === skill.name && i.complete && !i.trashId).flatMap(record => {
+              const tracked = present.has(record);
+              if (!tracked) return [];
+              const updateAvailable = !!skill.files && signature(record.files) !== signature(skill.files);
+              return [{ installedRoot: record.root || "dsh", ...(record.workspace !== undefined ? { installedWorkspace: record.workspace } : {}), tracked, updateAvailable,
+                canRollback: !!record.backup, canUninstall: true,
+                status: !skill.valid ? "invalid" : matched.get(record) ? updateAvailable ? "update" : "installed" : "conflict" }];
+            });
       // 技能级旧字段仅兼容展示；管理调用必须指定副本目标。
       const legacy = installations.find(item => item.tracked);
       return { ...summary, installations, updateAvailable: legacy?.updateAvailable ?? false, canRollback: legacy?.canRollback ?? false, tracked: !!legacy,

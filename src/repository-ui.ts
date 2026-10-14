@@ -11,7 +11,8 @@ type CopyTarget = { root?: RepositoryRoot; workspace?: string };
 type Feedback = {error?: boolean; payload?: unknown; key?: string; name?: string; text?: string};
 type InstallRoot = RepositoryRoot;
 type Installation = Feedback & CopyTarget & {id: string; path: string; pending?: boolean; action?: 'install' | 'uninstall'};
-type RepoModal = {type: 'add' | 'manage'} | {type: 'remove'; repo: RepoView} | {type: 'install' | 'uninstall'; repo: RepoView; skill: RepoSkill; copy?: RepoCopy} | {type: 'detail'; repo: RepoView; detail?: ApiRoutes['/repositories/detail']; loading?: boolean; failed?: boolean} | {type: 'catalog-detail'; detail?: ApiRoutes['/catalog/detail']; loading?: boolean; failed?: boolean} | {type: 'catalog-install'; target: CatalogTarget} | {type: 'review' | 'rollback'; repo: RepoView; skill: RepoSkill; copy: RepoCopy; detail: ApiRoutes['/repositories/preview']};
+type CatalogCopy = { id: string; name: string; installedRoot: RepositoryRoot; installedWorkspace?: string; canUninstall?: boolean };
+type RepoModal = {type: 'add' | 'manage'} | {type: 'remove'; repo: RepoView} | {type: 'install' | 'uninstall'; repo: RepoView; skill: RepoSkill; copy?: RepoCopy} | {type: 'detail'; repo: RepoView; detail?: ApiRoutes['/repositories/detail']; loading?: boolean; failed?: boolean} | {type: 'catalog-detail'; detail?: ApiRoutes['/catalog/detail']; loading?: boolean; failed?: boolean} | {type: 'catalog-install'; target: CatalogTarget} | {type: 'catalog-uninstall'; copy: CatalogCopy} | {type: 'review' | 'rollback'; repo: RepoView; skill: RepoSkill; copy: RepoCopy; detail: ApiRoutes['/repositories/preview']};
 interface Dependencies {react: typeof React; Modal: React.ComponentType<ModalProps>; Input: React.ComponentType<any> & { TextArea: React.ComponentType<any> }; Button: React.ComponentType<any>; Collapse: React.ComponentType<any>; SourceSelect: React.ComponentType<SourceSelectProps>; destination: DestinationKit; api: ApiCall; headers: Record<string, string>; translateError: (t: Translate, error: unknown) => string; getLocale?: () => string | undefined}
 import type { CodedError } from "./types.js";
 // 仓库页复用宿主技能面板组件；只在进入页签时读取本地目录缓存。
@@ -74,7 +75,7 @@ const CSS = `
 .dssm-catalog-sentinel{height:1px}.dssm-catalog-loading{display:flex;align-items:center;justify-content:center;gap:8px;padding:12px 13px;color:var(--dsw-alias-label-tertiary,#a0a0a0);font-size:12px;border-top:1px solid var(--dsw-alias-border-l1,#3a3a3a)}.dssm-catalog-loading .dssm-repo-spinner{margin-right:0}
 .dssm-meta-origin{color:var(--dsw-alias-label-secondary,#8e8e8e);font-size:11px;margin-top:2px}
 .dssm-status-badge{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:4px}
-.dssm-repo-row .dssm-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;font-weight:650;color:var(--dsw-alias-label-primary,#eeeeee)}.dssm-repo-row{display:flex;flex-direction:column;gap:6px;padding:11px 13px;border-top:1px solid var(--dsw-alias-border-l1,#3a3a3a);background:transparent}.dssm-repo-head{display:flex;align-items:center;gap:8px;min-width:0;flex-wrap:nowrap}.dssm-repo-actions{display:flex;align-items:center;gap:8px;flex:none;flex-wrap:nowrap}.dssm-repo-actions button{flex:none}.dssm-repo-actions .dssm-repo-copy-actions{gap:8px;margin-left:0}.dssm-repo-main{flex:1;min-width:0}.dssm-repo-main>.dssm-repo-metadata{margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dssm-repo-description{margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--dsw-alias-label-tertiary,#a0a0a0);font-size:12px;line-height:18px}.dssm-repo-copies{display:flex;flex-direction:column;gap:2px;min-width:0}.dssm-repo-copy{display:flex;align-items:center;gap:8px;min-width:0;padding:0;border:0;background:transparent}.dssm-repo-copy .dssm-repo-metadata{font-size:12px;line-height:18px}.dssm-repo-copy-actions{display:flex;align-items:center;gap:2px;margin-left:auto;flex:none}.dssm-repo-spinner{display:inline-block;width:12px;height:12px;margin-right:6px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:dssm-repo-spin .8s linear infinite}@keyframes dssm-repo-spin{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.dssm-repo-spinner{animation:none}}.dssm-repo-commit-badge{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,\"Liberation Mono\",\"Courier New\",monospace;font-size:11px;line-height:16px;padding:1px 6px;border-radius:4px;background:rgba(255,255,255,0.06);color:var(--dsw-alias-label-secondary,#b9b9b9);border:1px solid var(--dsw-alias-border-l1,#3a3a3a);margin-left:12px;white-space:nowrap;user-select:all}.dssm-repo-panel{display:flex;flex-direction:column;gap:12px;min-width:0}.dssm-repo-panel .dssm-desc{margin:0}.dssm-repo-metadata{font-size:11px;color:var(--dsw-alias-label-tertiary,#a0a0a0);overflow-wrap:anywhere}.dssm-repo-panel .dssm-source{flex-shrink:0;overflow:hidden;border:1px solid var(--dsw-alias-border-l2,#494949);border-radius:10px;background:transparent}.dssm-repo-panel .dssm-source .ant-collapse-header{align-items:center}.dssm-repo-panel .dssm-source-title{font-size:14px;font-weight:650;overflow-wrap:anywhere;display:inline-flex;align-items:center;gap:7px}.dssm-repo-panel .dssm-source-brand{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;flex-shrink:0;color:var(--dsw-alias-label-secondary,#b9b9b9)}.dssm-repo-panel .dssm-source-brand svg{width:16px;height:16px;display:block}.dssm-repo-panel .dssm-source-path{min-width:0;margin-left:auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--dsw-alias-label-tertiary,#a0a0a0);font-size:11px}.dssm-repo-panel .dssm-count{padding:1px 6px;border-radius:10px;background:var(--dsw-alias-bg-layer-2,rgba(255,255,255,0.08));font-size:11px;color:var(--dsw-alias-label-secondary,#b9b9b9)}.dssm-repo-manage-row{flex-direction:row;align-items:center;justify-content:space-between;gap:12px}.dssm-repo-manage-row .dssm-repo-main{flex:1}.dssm-repo-manage-row .dssm-repo-actions{margin-left:auto}.dssm-repo-manage-row .dssm-repo-actions button{width:auto;flex:none}.dssm-repo-head .dssm-repo-actions{gap:2px;align-self:flex-start}.dssm-repo-actions>.dssm-repo-copy-actions{display:contents}.dssm-repo-row:has(.dssm-repo-head){padding-right:8px}.dssm-row-icon.ant-btn{width:22px;min-width:22px;height:22px;padding:0;border-radius:6px;background:transparent;color:var(--dsw-alias-label-secondary,#b9b9b9);border-color:var(--dsw-alias-border-l2,#494949)}.dssm-row-icon.ant-btn:not(:disabled):not(.dssm-icon-danger):hover{--ant-btn-text-color:var(--dsw-alias-link,#4176e6);--ant-btn-border-color:var(--dsw-alias-link,#4176e6);color:var(--dsw-alias-link,#4176e6)!important;border-color:var(--dsw-alias-link,#4176e6)!important}.dssm-row-icon.dssm-icon-danger,.dssm-row-icon.ant-btn-dangerous{color:var(--dsw-alias-state-error-primary,#ef7272);border-color:var(--dsw-alias-state-error-primary,#ef7272)}`;
+.dssm-repo-row .dssm-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;font-weight:650;color:var(--dsw-alias-label-primary,#eeeeee)}.dssm-repo-row{display:flex;flex-direction:column;gap:6px;padding:11px 13px;border-top:1px solid var(--dsw-alias-border-l1,#3a3a3a);background:transparent}.dssm-repo-head{display:flex;align-items:center;gap:8px;min-width:0;flex-wrap:nowrap}.dssm-repo-actions{display:flex;align-items:center;gap:8px;flex:none;flex-wrap:nowrap}.dssm-repo-actions button{flex:none}.dssm-repo-actions .dssm-repo-copy-actions{gap:8px;margin-left:0}.dssm-repo-main{flex:1;min-width:0}.dssm-repo-main>.dssm-repo-metadata{margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dssm-repo-description{margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--dsw-alias-label-tertiary,#a0a0a0);font-size:12px;line-height:18px}.dssm-repo-copies{display:flex;flex-direction:column;gap:2px;min-width:0}.dssm-repo-copy{display:flex;align-items:center;gap:8px;min-width:0;padding:0;border:0;background:transparent}.dssm-repo-copy .dssm-repo-metadata{font-size:12px;line-height:18px}.dssm-repo-copy-actions{display:flex;align-items:center;gap:8px;margin-left:auto;flex:none}.dssm-repo-spinner{display:inline-block;width:12px;height:12px;margin-right:6px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:dssm-repo-spin .8s linear infinite}@keyframes dssm-repo-spin{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.dssm-repo-spinner{animation:none}}.dssm-repo-commit-badge{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,\"Liberation Mono\",\"Courier New\",monospace;font-size:11px;line-height:16px;padding:1px 6px;border-radius:4px;background:rgba(255,255,255,0.06);color:var(--dsw-alias-label-secondary,#b9b9b9);border:1px solid var(--dsw-alias-border-l1,#3a3a3a);margin-left:12px;white-space:nowrap;user-select:all}.dssm-repo-panel{display:flex;flex-direction:column;gap:12px;min-width:0}.dssm-repo-panel .dssm-desc{margin:0}.dssm-repo-metadata{font-size:11px;color:var(--dsw-alias-label-tertiary,#a0a0a0);overflow-wrap:anywhere}.dssm-repo-panel .dssm-source{flex-shrink:0;overflow:hidden;border:1px solid var(--dsw-alias-border-l2,#494949);border-radius:10px;background:transparent}.dssm-repo-panel .dssm-source .ant-collapse-header{align-items:center}.dssm-repo-panel .dssm-source-title{font-size:14px;font-weight:650;overflow-wrap:anywhere;display:inline-flex;align-items:center;gap:7px}.dssm-repo-panel .dssm-source-brand{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;flex-shrink:0;color:var(--dsw-alias-label-secondary,#b9b9b9)}.dssm-repo-panel .dssm-source-brand svg{width:16px;height:16px;display:block}.dssm-repo-panel .dssm-source-path{min-width:0;margin-left:auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--dsw-alias-label-tertiary,#a0a0a0);font-size:11px}.dssm-repo-panel .dssm-count{padding:1px 6px;border-radius:10px;background:var(--dsw-alias-bg-layer-2,rgba(255,255,255,0.08));font-size:11px;color:var(--dsw-alias-label-secondary,#b9b9b9)}.dssm-repo-manage-row{flex-direction:row;align-items:center;justify-content:space-between;gap:12px}.dssm-repo-manage-row .dssm-repo-main{flex:1}.dssm-repo-manage-row .dssm-repo-actions{margin-left:auto}.dssm-repo-manage-row .dssm-repo-actions button{width:auto;flex:none}.dssm-repo-head .dssm-repo-actions{gap:8px}.dssm-repo-actions>.dssm-repo-copy-actions{display:contents}.dssm-row-icon.ant-btn{width:22px;min-width:22px;height:22px;padding:0;border-radius:6px;background:transparent;color:var(--dsw-alias-label-secondary,#b9b9b9);border-color:var(--dsw-alias-border-l2,#494949)}.dssm-row-icon.ant-btn:not(:disabled):not(.dssm-icon-danger):hover{--ant-btn-text-color:var(--dsw-alias-link,#4176e6);--ant-btn-border-color:var(--dsw-alias-link,#4176e6);color:var(--dsw-alias-link,#4176e6)!important;border-color:var(--dsw-alias-link,#4176e6)!important}.dssm-row-icon.dssm-icon-danger,.dssm-row-icon.ant-btn-dangerous{color:var(--dsw-alias-state-error-primary,#ef7272);border-color:var(--dsw-alias-state-error-primary,#ef7272)}.dssm-repo-copies{display:flex;flex-direction:column;gap:4px;width:100%;margin-top:2px}.dssm-repo-copy{display:flex;align-items:center;gap:8px;width:100%;min-width:0;box-sizing:border-box;padding:4px 4px 4px 8px;border-radius:6px;background:var(--dsw-alias-bg-layer-1,rgba(255,255,255,0.04))}.dssm-repo-copy .dssm-repo-metadata{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dssm-repo-copy .dssm-repo-copy-actions{margin-left:0}.dssm-repo-copy .dssm-row-icon.dssm-icon-danger{border-color:var(--dsw-alias-border-l2,#494949)}.dssm-repo-copy .dssm-row-icon.dssm-icon-danger:not(:disabled):hover{--ant-btn-text-color:var(--dsw-alias-state-error-primary,#ef7272);--ant-btn-border-color:var(--dsw-alias-state-error-primary,#ef7272);color:var(--dsw-alias-state-error-primary,#ef7272)!important;border-color:var(--dsw-alias-state-error-primary,#ef7272)!important}`;
 
 /** 返回动作区与内容区，使现有标题、页签顺序保持不变。 */
 
@@ -141,6 +142,7 @@ export function createRepositoryUI({ react, Modal, Input, Button, Collapse, Sour
     const [catalogStatus, setCatalogStatus] = react.useState("");
     const [catalogItems, setCatalogItems] = react.useState<CatalogSkillItem[]>([]);
     const [catalogInstallIds, setCatalogInstallIds] = react.useState<string[]>([]);
+    const [catalogCopies, setCatalogCopies] = react.useState<CatalogCopy[]>([]);
     const [catalogUnknownIds, setCatalogUnknownIds] = react.useState<string[]>([]);
     const [catalogWarnings, setCatalogWarnings] = react.useState<Array<{id: string; code: string; error: string}>>([]);
     const [catalogHasMore, setCatalogHasMore] = react.useState(true);
@@ -170,7 +172,7 @@ export function createRepositoryUI({ react, Modal, Input, Button, Collapse, Sour
       const data = await api("/repositories");
       if (mounted.current) {
         const roots = (data.installRoots || []).filter(root => root.key === "dsh" || root.key === "agents");
-        setRepos(data.repositories || []); setInstallRoots(roots); setCatalogInstallIds(data.catalogInstalls || []);
+        setRepos(data.repositories || []); setInstallRoots(roots); setCatalogInstallIds(data.catalogInstalls || []); setCatalogCopies(data.catalogCopies || []);
         setCatalogUnknownIds(data.catalogUnknownIds || []); setCatalogWarnings(data.catalogWarnings || []);
         if (destination.scope === 'user' && !roots.some(root => root.key === destination.location && root.available))
           setDestination({ ...destination, location: roots.find(root => root.available)?.key || 'dsh' });
@@ -196,7 +198,7 @@ export function createRepositoryUI({ react, Modal, Input, Button, Collapse, Sour
       return copy.installedRoot === 'dsh' || copy.installedRoot === 'agents' ? { root: copy.installedRoot } : null;
     }
     function copyName(copy: RepoCopy) { return copy.installedWorkspace ? t('repo.projectDestination', { path: copy.installedWorkspace }) : copy.installedRoot ? installedDestination(copy.installedRoot) : ''; }
-    function copiesOf(skill: RepoSkill): RepoCopy[] { return skill.installations ?? (skill.installedRoot ? [skill] : []); }
+    function copiesOf(skill: RepoSkill): RepoCopy[] { return (skill.installations ?? (skill.installedRoot ? [skill] : [])).filter(copy => copy.tracked === true); }
     function message(error: unknown) {
       const item = error as Diagnostic & {message?: string};
       const translated = translateError(t, error) || item.message || String(error);
@@ -450,6 +452,8 @@ export function createRepositoryUI({ react, Modal, Input, Button, Collapse, Sour
         if (!mounted.current) return;
         const catalogId = target.catalog === "skillsh" ? `skillsh:${target.source}/${target.skillId}` : `clawhub:${target.owner}/${target.slug}`;
         setCatalogInstallIds(prev => prev.includes(catalogId) ? prev : [...prev, catalogId]);
+        const installedRoot = scope.root || "dsh";
+        setCatalogCopies(prev => prev.some(copy => copy.id === catalogId && copy.installedRoot === installedRoot && copy.installedWorkspace === scope.workspace) ? prev : [...prev, { id: catalogId, name: target.name, installedRoot, ...(scope.workspace ? { installedWorkspace: scope.workspace } : {}), canUninstall: true }]);
         setFeedback({ key: "repo.installSuccess", name: target.name });
         setModal(null);
         const refreshed = await Promise.allSettled([load(), Promise.resolve().then(() => onInstalled?.())]);
@@ -630,14 +634,12 @@ export function createRepositoryUI({ react, Modal, Input, Button, Collapse, Sour
         return h("div", { key: skill.path, className: "dssm-repo-row" },
           h("div", { className: "dssm-repo-head" },
             h("div", { className: "dssm-repo-main" }, h("div", { className: "dssm-name" }, skill.name), h("div", { className: "dssm-repo-description", title: skill.description }, skill.description),
-              singleCopy ? h("div", { className: "dssm-repo-metadata", title: copyName(singleCopy) }, copyName(singleCopy)) : null,
-              singleCopy && !copyTarget(singleCopy) ? h("div", { className: "dssm-note", role: "status" }, t("repo.destinationUnavailable")) : null,
-              installation?.id === repo.id && installation.path === skill.path ? h("div", { className: "dssm-note" + (installation.error ? " dssm-error" : ""), role: installation.error ? "alert" : "status", "aria-live": "polite" }, feedbackText(installation)) : null),
-            h("div", { className: "dssm-repo-actions" },
-              rowIcon("repo.detail", () => openDetail(repo, skill)),
-              rowIcon(installation?.id === repo.id && installation.path === skill.path && installation.pending && installation.action === "install" ? "repo.installing" : copies.length ? "repo.installElsewhere" : "repo." + (skill.status === "available" ? "install" : skill.status), () => openInstallation("install", repo, skill), !copies.length && skill.status !== "available"),
-              singleCopy ? renderCopyActions(repo, skill, singleCopy) : null)),
-          copies.length > 1 ? h("div", { className: "dssm-repo-copies" }, copies.map(copy => renderCopy(repo, skill, copy))) : null);
+                          singleCopy && !copyTarget(singleCopy) ? h("div", { className: "dssm-note", role: "status" }, t("repo.destinationUnavailable")) : null,
+                          installation?.id === repo.id && installation.path === skill.path ? h("div", { className: "dssm-note" + (installation.error ? " dssm-error" : ""), role: installation.error ? "alert" : "status", "aria-live": "polite" }, feedbackText(installation)) : null),
+                        h("div", { className: "dssm-repo-actions" },
+                          rowIcon("repo.detail", () => openDetail(repo, skill)),
+                          rowIcon(installation?.id === repo.id && installation.path === skill.path && installation.pending && installation.action === "install" ? "repo.installing" : copies.length ? "repo.installElsewhere" : "repo." + (skill.status === "available" ? "install" : skill.status), () => openInstallation("install", repo, skill), !copies.length && skill.status !== "available"))),
+                      copies.length ? h("div", { className: "dssm-repo-copies" }, copies.map(copy => renderCopy(repo, skill, copy))) : null);
       }) : h("div", { className: "dssm-empty" }, t("repo.noSkills"))) : null;
       return h("div", { key: repo.id },
         h(Collapse, {
@@ -709,14 +711,48 @@ export function createRepositoryUI({ react, Modal, Input, Button, Collapse, Sour
         h("p", { className: "dssm-note" }, t("repo.installHint")),
         busy ? h("div", { role: "status", "aria-live": "polite" }, t("repo.installProgress")) : null, feedbackNode,
         h("div", { className: "dssm-modal-actions" }, button("repo.cancel", close), button(busy ? "repo.installing" : "repo.install", confirmCatalogInstall, false, !destinationReady(destination, workspaces, installRoots))));
+      if (modal.type === "catalog-uninstall") body = h("div", { className: "dssm-repo-panel", "aria-busy": busy },
+        h("div", { className: "dssm-name" }, modal.copy.name),
+        h("div", { className: "dssm-repo-metadata" }, catalogCopyName(modal.copy)),
+        h("p", { className: "dssm-desc" }, t("repo.uninstallHint")),
+        modal.copy.installedRoot === "agents" && !modal.copy.installedWorkspace ? h("p", { className: "dssm-feedback dssm-warning", role: "alert" }, t("repo.uninstallExternalWarning")) : null,
+        busy ? h("div", { role: "status", "aria-live": "polite" }, t("repo.uninstallProgress")) : null, feedbackNode,
+        h("div", { className: "dssm-modal-actions" }, button("repo.cancel", close), button(busy ? "repo.uninstalling" : "repo.confirmUninstall", confirmCatalogUninstall, false, false, true)));
       if (modal.type === "detail" && modal.detail) body = h("div", { className: "dssm-repo-panel" }, h("div", { className: "dssm-name" }, modal.detail.name), h("p", { className: "dssm-desc" }, modal.detail.description), h("div", { className: "dssm-detail-path" }, modal.repo.owner + "/" + modal.repo.name + " · " + modal.detail.path), h("div", { className: "dssm-repo-metadata" }, t("repo.commit") + " · " + modal.detail.commit), h("p", { className: "dssm-note" }, t("repo.installHint")), h(Input.TextArea, { readOnly: true, value: modal.detail.body || "", autoSize: { minRows: 6, maxRows: 16 } }));
       if (modal.type === "detail" && !modal.detail) body = h("div", { role: "status", className: "dssm-repo-panel" }, modal.loading ? t("repo.detailLoading") : null, modal.failed ? feedbackNode : null);
-      dialog = h(Modal, { title: t("repo." + (modal.type === "catalog-detail" ? "detail" : modal.type === "catalog-install" ? "install" : modal.type === "remove" ? "remove" : modal.type)), closeLabel: t("repo.close"), onClose: close }, body);
+      dialog = h(Modal, { title: t("repo." + (modal.type === "catalog-detail" ? "detail" : modal.type === "catalog-install" ? "install" : modal.type === "catalog-uninstall" ? "uninstall" : modal.type === "remove" ? "remove" : modal.type)), closeLabel: t("repo.close"), onClose: close }, body);
     }
 
-    function catalogInstalled(id: string) {
-      return catalogInstallIds.includes(id);
-    }
+    function catalogInstalled(id: string) { return catalogInstallIds.includes(id) || catalogCopiesOf(id).length > 0; }
+    function catalogCopiesOf(id: string) { return catalogCopies.filter(copy => copy.id === id); }
+        function catalogCopyName(copy: CatalogCopy) { return copy.installedWorkspace ? t("repo.projectDestination", { path: copy.installedWorkspace }) : t(copy.installedRoot === "agents" ? "repo.rootAgents" : "repo.rootDsh"); }
+        function openCatalogUninstall(copy: CatalogCopy) { if (!locked.current && copy.canUninstall) { setFeedback(null); setModal({ type: "catalog-uninstall", copy }); } }
+        function confirmCatalogUninstall() {
+          if (!modal || modal.type !== "catalog-uninstall") return;
+          const copy = modal.copy;
+          return perform(async () => {
+            await api("/delete", { method: "POST", headers, body: JSON.stringify({ name: copy.name, root: copy.installedRoot, ...(copy.installedWorkspace ? { workspace: copy.installedWorkspace } : {}) }) });
+            if (!mounted.current) return;
+            setCatalogCopies(prev => prev.filter(item => item !== copy && !(item.id === copy.id && item.installedRoot === copy.installedRoot && item.installedWorkspace === copy.installedWorkspace)));
+            setFeedback({ key: "repo.uninstallSuccess", name: copy.name });
+            setModal(null);
+            await load();
+          }, false);
+        }
+        function renderCatalogActions(id: string, unknown: boolean, openDetail: () => void, openInstall: () => void) {
+          const copies = catalogCopiesOf(id);
+          return h("div", { className: "dssm-repo-actions" },
+            rowIcon("repo.detail", openDetail),
+            unknown && !copies.length ? h("span", { className: "dssm-note", role: "status" }, t("repo.catalog.unknownLocation")) : null,
+            copies.length ? rowIcon("repo.installElsewhere", openInstall) : catalogInstalled(id) ? h("span", { className: "dssm-catalog-installed", role: "status" }, t("repo.installed")) : rowIcon(unknown ? "repo.catalog.reassociate" : "repo.install", openInstall));
+        }
+        function renderCatalogLocations(id: string) {
+          const copies = catalogCopiesOf(id);
+          if (!copies.length) return null;
+          return h("div", { className: "dssm-repo-copies" }, copies.map(copy => h("div", { className: "dssm-repo-copy", key: JSON.stringify([copy.id, copy.installedRoot, copy.installedWorkspace || ""]) },
+            h("div", { className: "dssm-repo-metadata" }, catalogCopyName(copy)),
+            copy.canUninstall ? rowIcon("repo.uninstall", () => openCatalogUninstall(copy)) : null)));
+        }
     const filteredCatalogItems = catalogItems.filter(item => {
       const installed = catalogInstalled(`clawhub:${item.owner}/${item.slug}`);
       const matchesStatus = !catalogStatus || (catalogStatus === "installed" ? installed : !installed);
@@ -725,7 +761,6 @@ export function createRepositoryUI({ react, Modal, Input, Button, Collapse, Sour
     const catalogList = catalogSort === "installs" ? filteredCatalogItems.slice().sort((left, right) => (right.installs || 0) - (left.installs || 0)) :
       catalogSort === "name" ? filteredCatalogItems.slice().sort((left, right) => left.name.localeCompare(right.name)) : filteredCatalogItems;
     const renderCatalogItem = (item: CatalogSkillItem) => {
-      const installed = catalogInstalled(`clawhub:${item.owner}/${item.slug}`);
       const unknown = catalogUnknownIds.includes(`clawhub:${item.owner}/${item.slug}`);
       const metadata = [
         item.source,
@@ -734,19 +769,16 @@ export function createRepositoryUI({ react, Modal, Input, Button, Collapse, Sour
         item.stars === undefined ? null : item.stars.toLocaleString() + " " + t("repo.catalog.stars"),
       ].filter(Boolean).join(" · ");
       return h("div", { key: item.id, className: "dssm-repo-row" },
-        h("div", { className: "dssm-repo-head" },
-          h("div", { className: "dssm-repo-main" },
-            h("div", { className: "dssm-name" }, item.name),
-            item.description ? h("div", { className: "dssm-repo-description", title: item.description }, item.description) : null,
-            h("div", { className: "dssm-meta-origin" }, metadata)
-          ),
-          h("div", { className: "dssm-repo-actions" },
-            rowIcon("repo.detail", () => openCatalogDetail({ catalog: "clawhub", owner: item.owner, slug: item.slug, name: item.name })),
-            unknown ? h("span", { className: "dssm-note", role: "status" }, t("repo.catalog.unknownLocation")) : null,
-            installed ? h("span", { className: "dssm-catalog-installed", role: "status" }, t("repo.installed")) : rowIcon(unknown ? "repo.catalog.reassociate" : "repo.install", () => openCatalogInstall({ catalog: "clawhub", owner: item.owner, slug: item.slug, name: item.name }))
-          )
-        )
-      );
+              h("div", { className: "dssm-repo-head" },
+                h("div", { className: "dssm-repo-main" },
+                  h("div", { className: "dssm-name" }, item.name),
+                  item.description ? h("div", { className: "dssm-repo-description", title: item.description }, item.description) : null,
+                  h("div", { className: "dssm-meta-origin" }, metadata)
+                ),
+                renderCatalogActions(`clawhub:${item.owner}/${item.slug}`, unknown, () => openCatalogDetail({ catalog: "clawhub", owner: item.owner, slug: item.slug, name: item.name }), () => openCatalogInstall({ catalog: "clawhub", owner: item.owner, slug: item.slug, name: item.name }))
+              ),
+              renderCatalogLocations(`clawhub:${item.owner}/${item.slug}`)
+            );
     };
     const catalogView = h("div", { className: "dssm-catalog-list", onWheel: onCatalogWheel },
       catalogList.map(renderCatalogItem),
@@ -765,22 +797,19 @@ export function createRepositoryUI({ react, Modal, Input, Button, Collapse, Sour
 
     const skillshView = h("div", { className: "dssm-catalog-list" },
       skillshItems.map(item => {
-        const installed = catalogInstalled(`skillsh:${item.source}/${item.skillId}`);
-        const unknown = catalogUnknownIds.includes(`skillsh:${item.source}/${item.skillId}`);
-        const metadata = [item.source, item.installs === undefined ? null : item.installs.toLocaleString() + " " + t("repo.catalog.installs")].filter(Boolean).join(" · ");
-        return h("div", { key: item.id, className: "dssm-repo-row" },
-          h("div", { className: "dssm-repo-head" },
-            h("div", { className: "dssm-repo-main" },
-              h("div", { className: "dssm-name" }, item.name),
-              h("div", { className: "dssm-meta-origin" }, metadata)
-            ),
-            h("div", { className: "dssm-repo-actions" },
-              rowIcon("repo.detail", () => openCatalogDetail({ catalog: "skillsh", source: item.source, skillId: item.skillId, name: item.name })),
-              unknown ? h("span", { className: "dssm-note", role: "status" }, t("repo.catalog.unknownLocation")) : null,
-              installed ? h("span", { className: "dssm-catalog-installed", role: "status" }, t("repo.installed")) : rowIcon(unknown ? "repo.catalog.reassociate" : "repo.install", () => openCatalogInstall({ catalog: "skillsh", source: item.source, skillId: item.skillId, name: item.name }))
-            )
-          )
-        );
+        const skillshId = `skillsh:${item.source}/${item.skillId}`;
+                const unknown = catalogUnknownIds.includes(skillshId);
+                const metadata = [item.source, item.installs === undefined ? null : item.installs.toLocaleString() + " " + t("repo.catalog.installs")].filter(Boolean).join(" · ");
+                return h("div", { key: item.id, className: "dssm-repo-row" },
+                  h("div", { className: "dssm-repo-head" },
+                    h("div", { className: "dssm-repo-main" },
+                      h("div", { className: "dssm-name" }, item.name),
+                      h("div", { className: "dssm-meta-origin" }, metadata)
+                    ),
+                    renderCatalogActions(skillshId, unknown, () => openCatalogDetail({ catalog: "skillsh", source: item.source, skillId: item.skillId, name: item.name }), () => openCatalogInstall({ catalog: "skillsh", source: item.source, skillId: item.skillId, name: item.name }))
+                  ),
+                  renderCatalogLocations(skillshId)
+                );
       }),
       skillshQuery.trim() && !skillshItems.length && !skillshLoading && !skillshError ? h("div", { className: "dssm-empty" }, t("repo.catalog.skillshEmpty")) : null,
       skillshLoading ? h("div", { className: "dssm-note", role: "status", "aria-live": "polite" }, t("repo.catalog.skillshLoading")) : null,
