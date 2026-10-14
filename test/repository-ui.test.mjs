@@ -255,7 +255,11 @@ assert.ok(all().some(n => n.props.className === "dssm-meta-origin" && n.children
 const skillshRow = all().find(n => n.props.className === "dssm-repo-row" && nodes(n).some(child => child.props.className === "dssm-name" && child.children.join("") === "React Skill"));
 const skillshActions = nodes(skillshRow).filter(n => n.props["aria-label"] === "repo.detail" || n.props["aria-label"] === "repo.install");
 assert.deepEqual(skillshActions.map(n => n.props["aria-label"]), ["repo.detail", "repo.install"], "skills.sh 每一行右侧是详情和安装");
-assert.ok(skillshActions.every(button => button.props.icon && button.children.length === 0 && button.props.type === "text" && button.props.style.width === 22), "目录行操作沿用技能行图标按钮");
+assert.ok(skillshActions.every(button => button.props.icon && button.children.length === 0 && button.props.type !== "text" && button.props.size === "small" && button.props.className === "dssm-row-icon" && button.props.style.width === 22 && button.props.style.height === 22), "目录行操作使用和图2相同的描边图标按钮");
+assert.match(repoSource, /\.dssm-repo-head \.dssm-repo-actions\{[^}]*gap:2px/, "技能行图标紧挨着，不再留出按钮间隔");
+assert.match(repoSource, /\.dssm-repo-actions>\.dssm-repo-copy-actions\{display:contents\}/, "卸载不能再套一层掉到安装位置下一行");
+assert.match(repoSource, /\.dssm-repo-head \.dssm-repo-actions\{[^}]*align-self:flex-start/, "行内图标和标题对齐，不在说明中间错位");
+assert.match(repoSource, /\.dssm-row-icon\.ant-btn:not\(:disabled\):not\(\.dssm-icon-danger\):hover\{[^}]*--dsw-alias-link/, "行内图标悬停变蓝");
 await clickNode(skillshActions[0]);
 assert.deepEqual(calls.at(-1), { path: "/catalog/detail", body: { catalog: "skillsh", source: "owner/skills", skillId: "react-skill", name: "React Skill" } }, "详情读取这一条 skills.sh 技能，不订阅仓库");
 assert.equal(modalNodes().find(n => n.type === Input.TextArea)?.props.value, "# React Skill", "详情展示该技能的真实说明");
@@ -453,6 +457,12 @@ assert.ok(find(n => n.props.role === "status" && n.children.some(c => typeof c =
 finishRefresh(); await settle(); holdRefresh = false;
 assert.equal(find(n => n.props.className === "dssm-repo-spinner"), undefined, "完成后停止动画");
 await click("repo.manage");
+const manageRow = modalNodes().find(n => n.props.className === "dssm-repo-row dssm-repo-manage-row");
+const manageActions = nodes(manageRow).find(n => n.props.className === "dssm-repo-actions");
+assert.ok(manageActions, "管理仓库的刷新和移除必须在标题右侧操作区");
+assert.equal(manageRow.children.at(-1), manageActions, "按钮不能单独堆在说明下面");
+for (const key of ["repo.refresh", "repo.remove"]) assert.ok(manageActions.children.some(n => isAction(n, key)), key + " 必须和仓库信息同一行");
+assert.match(repoSource, /\.dssm-repo-manage-row\{[^}]*flex-direction:row/, "管理仓库行横向排列，按钮不能被拉成整行");
 holdRefresh = true; failRefresh = true;
 await clickModal("repo.refresh");
 assert.ok(modalNodes().some(n => n.props.className === "dssm-repo-spinner"), "管理弹窗中的当前仓库也显示动画");
