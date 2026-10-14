@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.1.20 - Unreleased
+
+- Add real ClawHub / skills.sh search and individual skill installation, with ten-item download-ranking pages and an explicit load-more button.
+- Fix concurrent repository operations overwriting catalog state, lost workspace installation badges, and interference between same-name copies; preserve source identity through trash and restore.
+- Allow installation beyond 500 source records without discarding active copies or recoverable trash identities; retain the state file's byte-size limit.
+- Keep failed recovery from blocking listings and unrelated operations, preserve pending state with actionable warnings, and mark legacy identities with unknown locations rather than guessing directories.
+- Improve oversized-response diagnostics, stream cleanup, and cancellation on navigation or unmount; remove unused skill-array expansion.
+- Support explicit indentation indicators in YAML block scalars.
+
 ## 1.1.19 - 2026-10-14
 
 - Adjust settings navigation section order to ensure stable placement and avoid conflicts with other plugins.

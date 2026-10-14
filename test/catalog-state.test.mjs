@@ -60,6 +60,25 @@ try {
     assert.ok(!(await manager.list()).catalogInstalls.includes(id), "项目不存在时不能借用户根同名文件点亮");
     await rm(userSkill, { recursive: true });
   });
+  await test("显式旧身份清理只移除该 ID 的无位置记录，保留副本与回收记录", async () => {
+    const manager = createRepositoryManager();
+    const id = "clawhub:owner/legacy";
+    const data = await stored();
+    const preserved = [
+      { id, name: "actual-name", root: "dsh" },
+      { id, name: "actual-name", root: "agents" },
+      { id, name: "actual-name", trashId: "1-00000000-0000-4000-8000-000000000000" },
+      "clawhub:owner/other",
+    ];
+    data.catalogInstalls = [id, { id, name: "actual-name" }, ...preserved];
+    await writeFile(statePath, JSON.stringify(data), "utf8");
+    await manager.forgetCatalogInstall({ name: "actual-name", root: "dsh" });
+    assert.ok((await stored()).catalogInstalls.includes(id), "普通副本清理不猜测旧记录的位置");
+    await manager.forgetCatalogInstall({ legacyId: id });
+    assert.deepEqual((await stored()).catalogInstalls, preserved.slice(1), "仅清理明确 ID 的无位置旧记录");
+    await assert.rejects(manager.forgetCatalogInstall({ legacyId: "" }), /清理/);
+    assert.deepEqual((await stored()).catalogInstalls, preserved.slice(1), "无效 ID 不改写状态");
+  });
   await test("仓库卸载保留目录回收身份，但不认领后来创建的同名替代品", async () => {
     const manager = createRepositoryManager({ fetchImpl: async () => new Response(zipSync({ "repo-main/actual-name/SKILL.md": document })) });
     const repo = await manager.add({ url: "owner/sibling" });

@@ -48,7 +48,7 @@ function validateStoredState(input: unknown): asserts input is RepositoryState {
     }
   }
   if (value.catalogInstalls !== undefined) {
-    if (!Array.isArray(value.catalogInstalls) || value.catalogInstalls.length > 500) throw failure("目录安装状态格式无效");
+    if (!Array.isArray(value.catalogInstalls)) throw failure("目录安装状态格式无效");
     for (const item of value.catalogInstalls) {
       if (typeof item === "string") {
         if (!/^(?:clawhub|skillsh):[A-Za-z0-9][A-Za-z0-9._-]{0,127}(?:\/[A-Za-z0-9][A-Za-z0-9._-]{0,127}){1,2}$/.test(item)) throw failure("目录安装记录格式无效");
@@ -144,6 +144,7 @@ async function readResponse(response: Response, limit: number) {
 export function createRepositoryManager({ fetchImpl = globalThis.fetch, log, registeredWorkspaces, onWorkspaceIndexBuild }: {fetchImpl?: typeof fetch; log?: Log; registeredWorkspaces?: () => string[] | undefined; onWorkspaceIndexBuild?: () => void} = {}) {
   const file = join(managerHomePath(), "repositories.json");
   let queue: Promise<unknown> = Promise.resolve();
+  let catalogWarnings: Array<{ id: string; code: string; error: string }> = [];
   let activeIndex: ReturnType<typeof createWorkspaceIndex> | undefined;
   const serialize: Serialize = (task, recover = true) => { const run = async () => { const index = createWorkspaceIndex(registeredWorkspaces?.(), { onBuild: onWorkspaceIndexBuild }); const previous = activeIndex; activeIndex = index; try { if (recover) await recoverPending(); return await task(); } finally { activeIndex = previous; } }; const next = queue.then(run, run); queue = next.catch(() => {}); return next; };
   function requestIndex() { return activeIndex ?? createWorkspaceIndex(registeredWorkspaces?.(), { onBuild: onWorkspaceIndexBuild }); }
@@ -165,7 +166,8 @@ export function createRepositoryManager({ fetchImpl = globalThis.fetch, log, reg
   async function write(value: RepositoryState) {
     validateStoredState(value);
     const text = JSON.stringify(value, null, 2);
-    if (Buffer.byteLength(text, "utf8") > 16 << 20) throw failure("仓库状态超过容量限制，请减少来源");
+    // 容量按实际序列化字节限制，不按副本数量截断有效身份与回收凭据。
+    if (Buffer.byteLength(text, "utf8") > 16 << 20) throw failure("安装来源状态超过 16 MiB 容量，请永久清理不需要的回收记录或无效旧身份", "error.repo.capacity");
     await fs.mkdir(managerHomePath(), { recursive: true });
     if ((await fs.lstat(managerHomePath())).isSymbolicLink()) throw failure("仓库状态目录不能是链接");
     const temporary = `${file}.${randomUUID()}.tmp`;
@@ -249,7 +251,9 @@ export function createRepositoryManager({ fetchImpl = globalThis.fetch, log, reg
     } catch { return false; }
   }
   async function recoverPending() {
+    catalogWarnings = [];
     const data = await read(); let recovered = false;
+    const recoveredCatalogIds: string[] = [];
     const restoredIds: string[] = [];
     const registered = requestIndex().registered;
     for (const record of data.installs.filter(record => !record.complete && !record.trashId)) {
@@ -266,9 +270,14 @@ export function createRepositoryManager({ fetchImpl = globalThis.fetch, log, reg
     for (const record of catalogRecords(data)) {
       if (record.complete === false && !record.trashId && record.files?.length && record.root) {
         if (await catalogMatches(record, signature(record.files))) {
-          const root = await recordInstallRoot(record, registered, await indexedFor(record));
-          await enableCatalog(root, record.name, true);
-          record.complete = true; recovered = true;
+          try {
+            const root = await recordInstallRoot(record, registered, await indexedFor(record));
+            await enableCatalog(root, record.name, true);
+            record.complete = true; recovered = true; recoveredCatalogIds.push(record.id);
+          } catch {
+            // 单个副本恢复失败不能拦截列表或无关事务；持久意图仍保留未确认状态。
+            catalogWarnings.push({ id: record.id, code: "error.repo.installState", error: "技能文件和安装意图已保留，启用策略暂时不可写；修复策略后重试" });
+          }
         }
       }
     }
@@ -281,7 +290,10 @@ export function createRepositoryManager({ fetchImpl = globalThis.fetch, log, reg
     // 仅恢复与安装/恢复意图完全相同的目录；保留任何本地修改，不删除或覆盖文件。
     if (recovered) {
       try { await write(data); }
-      catch { throw failure("技能文件已保留，但安装来源状态仍无法写入，请恢复磁盘写入后重试", "error.repo.installState"); }
+      catch {
+        for (const id of recoveredCatalogIds.length ? recoveredCatalogIds : restoredIds) catalogWarnings.push({ id, code: "error.repo.installState", error: "技能文件已保留，恢复确认暂时无法写入；恢复磁盘写入后重试" });
+        return; // 不删除恢复凭据，让下一次读取仍可重试。
+      }
       for (const id of restoredIds) await fs.rm(join(trashRootPath(), `.restored-${id}`), { recursive: true, force: true }).catch(() => undefined);
     }
   }
@@ -308,7 +320,9 @@ export function createRepositoryManager({ fetchImpl = globalThis.fetch, log, reg
         if (files["SKILL.md"] && !activeCatalogIds.includes(record.id)) activeCatalogIds.push(record.id);
       } catch { /* 缺失、未登记或不安全的位置不显示徽章，也不认领其他根的同名文件。 */ }
     }
-    return { installRoots: await repositoryDestinations(), catalogInstalls: activeCatalogIds, repositories: data.repositories.map((repo) => ({ ...repo, skills: repo.skills.map((skill) => {
+    return { installRoots: await repositoryDestinations(), catalogInstalls: activeCatalogIds,
+      catalogUnknownIds: [...new Set((data.catalogInstalls || []).flatMap(record => typeof record === "string" ? [record] : !record.root && !record.trashId ? [record.id] : []))],
+      catalogWarnings: [...catalogWarnings], repositories: data.repositories.map((repo) => ({ ...repo, skills: repo.skills.map((skill) => {
       const found = skills.some((s) => s.name.toLowerCase() === skill.name.toLowerCase() || s.declaredName?.toLowerCase() === skill.name.toLowerCase());
 
       const { body, ...summary } = skill;
@@ -416,7 +430,10 @@ export function createRepositoryManager({ fetchImpl = globalThis.fetch, log, reg
             record.trashId || (record.root ? locationKey(record) !== locationKey(intent!) : record.id !== id));
           data.catalogInstalls.push(intent);
           try { await write(data); }
-          catch { throw failure("安装意图无法写入，未复制技能文件", "error.repo.installState"); }
+          catch (caught) {
+            if ((caught as CodedError).code === "error.repo.capacity") throw caught;
+            throw failure("安装意图无法写入，未复制技能文件", "error.repo.installState");
+          }
         },
       });
       const completedName = reusedLegacy ? imported.skipped?.length === 1 ? imported.skipped[0].name : undefined : imported.imported?.length === 1 ? imported.imported[0].name : undefined;
@@ -426,7 +443,7 @@ export function createRepositoryManager({ fetchImpl = globalThis.fetch, log, reg
           try { await write(data); }
           catch { throw failure("安装未完成且身份意图无法撤销，请恢复磁盘写入后重试", "error.repo.installState"); }
         }
-        throw Object.assign(failure(imported.error || "同名技能已存在，不会覆盖本地文件", imported.code || "error.repo.conflict", imported.params), { statusCode: imported.code === "error.repo.installState" ? 500 : 409 });
+        throw Object.assign(failure(imported.error || "同名技能已存在，不会覆盖本地文件", imported.code || "error.repo.conflict", imported.params), { statusCode: imported.code === "error.repo.installState" ? 500 : imported.code === "error.repo.capacity" ? 413 : 409 });
       }
       await enableCatalog(root, intent.name);
       intent.complete = true;
@@ -476,8 +493,17 @@ export function createRepositoryManager({ fetchImpl = globalThis.fetch, log, reg
       await write(data);
       return { catalogInstalls: catalogRecords(data).map(record => record.id) };
     }, false),
-    forgetCatalogInstall: (target: { id?: string; name: string; root?: unknown; workspace?: string }) => serialize(async () => {
-      if (!target || typeof target !== "object" || typeof target.name !== "string") throw failure("清理目录身份必须指定安装副本");
+    forgetCatalogInstall: (target: { id?: string; name: string; root?: unknown; workspace?: string } | { legacyId: string }) => serialize(async () => {
+      if (!target || typeof target !== "object") throw failure("清理目录身份必须指定安装副本或旧身份 ID");
+      if ("legacyId" in target) {
+        if (typeof target.legacyId !== "string" || !/^(?:clawhub|skillsh):[A-Za-z0-9][A-Za-z0-9._-]{0,127}(?:\/[A-Za-z0-9][A-Za-z0-9._-]{0,127}){1,2}$/.test(target.legacyId)) throw failure("清理旧目录身份必须指定有效 ID");
+        const data = await read();
+        // 无位置旧记录只能显式按 ID 清理，不能顺带删除已定位副本或回收身份。
+        data.catalogInstalls = (data.catalogInstalls || []).filter(record => typeof record === "string" ? record !== target.legacyId : record.root || record.trashId || record.id !== target.legacyId);
+        await write(data);
+        return { catalogInstalls: catalogRecords(data).map(record => record.id) };
+      }
+      if (typeof target.name !== "string") throw failure("清理目录身份必须指定安装副本");
       const location = await catalogLocation(target);
       const data = await read();
       data.catalogInstalls = (data.catalogInstalls || []).filter(record => typeof record === "string" || record.trashId || !record.root ||

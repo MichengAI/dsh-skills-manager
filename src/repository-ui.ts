@@ -17,13 +17,16 @@ import type { CodedError } from "./types.js";
 // 仓库页复用宿主技能面板组件；只在进入页签时读取本地目录缓存。
 export const repositoryLocales = {
   zh: {
+    "repo.catalog.unknownLocation": "位置未知",
+    "repo.catalog.reassociate": "选择位置并重关联安装",
+    "repo.catalog.unknownHint": "有旧目录安装记录位置未知；找到对应技能后可选择位置重关联安装。",
     "repo.catalog.loadMore": "再加载 10 条",
     "repo.catalog.installRefreshWarning": "技能已安装并启用，但列表刷新失败。请重新打开发现页；不要重复安装。",
     "repo.installElsewhere": "安装到其他位置", "repo.destinationUnavailable": "原项目未登记或目录不可用，无法管理此副本。请在侧栏重新登记原项目后刷新。", "repo.projectDestination": "项目 DSH · {path}",
     "repo.refreshing": "正在检查更新…", "repo.refreshed": "刷新与更新检查完成", "repo.detailLoading": "正在读取技能说明…",
     "repo.local": "本机", "repo.source": "安装来源", "repo.update": "可更新", "repo.review": "查看更新", "repo.rollback": "恢复上一版", "repo.confirmUpdate": "备份并更新", "repo.confirmRollback": "备份并恢复", "repo.overwrite": "备份本地修改并替换", "repo.modified": "检测到本地修改。替换会覆盖当前文件，原文件将完整备份，可恢复。", "repo.noChanges": "文件内容没有变化。", "repo.added": "新增", "repo.removed": "删除", "repo.modifiedFile": "修改", "repo.updating": "更新中…", "repo.updateProgress": "正在校验、备份并替换，请稍候…", "repo.updateSuccess": "更新完成，已保留上一版备份。", "repo.rollbackSuccess": "已恢复上一版。", "repo.manageUpdate": "管理更新", "error.repo.modified": "存在本地修改，请预览并确认备份后替换。",
     "scope.repositories": "发现技能", "repo.add": "添加仓库", "repo.manage": "管理仓库", "repo.refresh": "刷新并检查更新", "repo.save": "添加并扫描",
-    "repo.subsource.github": "GitHub 仓库", "repo.subsource.skillsh": "skills.sh", "repo.subsource.clawhub": "ClawHub", "repo.subsource.popular": "热门下载 Top 100", "repo.catalog.states": "全部状态", "repo.catalog.searchClawhub": "搜索 ClawHub 技能", "repo.catalog.searchLoading": "正在搜索 ClawHub…", "repo.catalog.searchEmpty": "没有找到匹配的 ClawHub 技能。", "repo.catalog.searchError": "ClawHub 搜索失败，请重试。", "repo.catalog.searchSkillsh": "搜索 skills.sh 技能", "repo.catalog.skillshLoading": "正在搜索 skills.sh…", "repo.catalog.skillshEmpty": "没有找到匹配的 skills.sh 技能。", "repo.catalog.skillshError": "skills.sh 搜索失败，请重试。", "repo.sort.installs": "安装量从高到低", "repo.sort.name": "名称 A-Z", "repo.subsource.catalogNote": "ClawHub 下载量榜 · 最多加载前 100 条", "repo.catalog.empty": "ClawHub 当前没有匹配的技能。", "repo.catalog.loading": "正在加载 ClawHub 榜单…", "repo.catalog.loadError": "ClawHub 榜单加载失败。请检查网络后重试。", "repo.catalog.retry": "重试", "repo.catalog.loadingMore": "正在加载更多…", "repo.catalog.downloads": "下载", "repo.catalog.installs": "安装", "repo.catalog.stars": "星标",
+    "repo.subsource.github": "GitHub 仓库", "repo.subsource.skillsh": "skills.sh", "repo.subsource.clawhub": "ClawHub", "repo.subsource.popular": "热门下载 Top 100", "repo.catalog.states": "全部状态", "repo.catalog.searchClawhub": "搜索 ClawHub 技能", "repo.catalog.searchLoading": "正在搜索 ClawHub…", "repo.catalog.searchEmpty": "没有找到匹配的 ClawHub 技能。", "repo.catalog.searchError": "ClawHub 搜索失败，请重试。", "repo.catalog.searchSkillsh": "搜索 skills.sh 技能", "repo.catalog.skillshLoading": "正在搜索 skills.sh…", "repo.catalog.skillshEmpty": "没有找到匹配的 skills.sh 技能。", "repo.catalog.skillshError": "skills.sh 搜索失败，请重试。", "repo.sort.installs": "安装量从高到低", "repo.sort.name": "名称 A-Z", "repo.subsource.catalogNote": "ClawHub 下载量榜 · 最多 100 条，仅对当前显示条目排序", "repo.catalog.empty": "ClawHub 当前没有匹配的技能。", "repo.catalog.loading": "正在加载 ClawHub 榜单…", "repo.catalog.loadError": "ClawHub 榜单加载失败。请检查网络后重试。", "repo.catalog.retry": "重试", "repo.catalog.loadingMore": "正在加载更多…", "repo.catalog.downloads": "下载", "repo.catalog.installs": "安装", "repo.catalog.stars": "星标",
     "repo.hint": "从已订阅的 GitHub 仓库或第三方目录发现技能，安装到用户目录的 DSH skills 或 Shared Agent，或已登记项目的 .dsh/skills。", "repo.footer": "刷新会检查仓库与技能更新，不会自动替换本地文件。历史备份不会自动清理，占用空间会随更新增加。",
     "repo.search": "搜索仓库技能", "repo.all": "全部仓库", "repo.states": "全部状态", "repo.available": "可安装", "repo.installed": "已安装", "repo.conflict": "同名冲突", "repo.invalid": "格式无效", "repo.install": "安装", "repo.detail": "详情",
     "repo.installing": "安装中…", "repo.installProgress": "正在读取并校验技能文件，请稍候…", "repo.installSuccess": "安装成功并已启用，可在对话中用斜杠调用。",
@@ -36,13 +39,16 @@ export const repositoryLocales = {
     "error.repo.invalid": "仓库地址、路径或内容无效，请检查输入及仓库大小。", "error.repo.network": "仓库访问失败，请检查网络或稍后重试。上次列表已保留。", "error.repo.state": "仓库状态文件损坏或无法读取，请保留文件并修复后重试。", "error.repo.conflict": "同名技能已存在或安装失败，本地文件未被覆盖。", "error.repo.enableState": "技能文件已撤销，但启用状态无法写入。请恢复磁盘写入后重试安装。",
   },
   en: {
+    "repo.catalog.unknownLocation": "Location unknown",
+    "repo.catalog.reassociate": "Choose destination and reinstall to reassociate",
+    "repo.catalog.unknownHint": "Some legacy catalog installs have unknown locations. Find the skill and choose a destination to reinstall and reassociate.",
     "repo.catalog.loadMore": "Load 10 more",
     "repo.catalog.installRefreshWarning": "Installed and enabled, but the list could not refresh. Reopen Discover Skills; do not install again.",
     "repo.installElsewhere": "Install elsewhere", "repo.destinationUnavailable": "The original project is unregistered or unavailable. Re-register it in the sidebar and refresh to manage this copy.", "repo.projectDestination": "Project DSH · {path}",
     "repo.refreshing": "Checking updates…", "repo.refreshed": "Refresh and update check completed", "repo.detailLoading": "Loading skill instructions…",
     "repo.local": "Local", "repo.source": "Installed from", "repo.update": "Update available", "repo.review": "Review update", "repo.rollback": "Restore previous version", "repo.confirmUpdate": "Back up and update", "repo.confirmRollback": "Back up and restore", "repo.overwrite": "Back up local edits and replace", "repo.modified": "Local edits detected. Replacement overwrites current files and keeps a complete backup for restoration.", "repo.noChanges": "No file changes.", "repo.added": "Added", "repo.removed": "Removed", "repo.modifiedFile": "Modified", "repo.updating": "Updating…", "repo.updateProgress": "Verifying, backing up and replacing files. Please wait…", "repo.updateSuccess": "Updated. Previous version backed up.", "repo.rollbackSuccess": "Previous version restored.", "repo.manageUpdate": "Manage updates", "error.repo.modified": "Local edits detected. Review and confirm replacement with a backup.",
     "scope.repositories": "Discover Skills", "repo.add": "Add repository", "repo.manage": "Manage repositories", "repo.refresh": "Refresh & check updates", "repo.save": "Add and scan",
-    "repo.subsource.github": "GitHub Repos", "repo.subsource.skillsh": "skills.sh", "repo.subsource.clawhub": "ClawHub", "repo.subsource.popular": "Top 100 by downloads", "repo.catalog.states": "All statuses", "repo.catalog.searchClawhub": "Search ClawHub skills", "repo.catalog.searchLoading": "Searching ClawHub…", "repo.catalog.searchEmpty": "No matching ClawHub skills were found.", "repo.catalog.searchError": "ClawHub search failed. Please retry.", "repo.catalog.searchSkillsh": "Search skills.sh", "repo.catalog.skillshLoading": "Searching skills.sh…", "repo.catalog.skillshEmpty": "No matching skills.sh skills were found.", "repo.catalog.skillshError": "skills.sh search failed. Please retry.", "repo.sort.installs": "Installs: high to low", "repo.sort.name": "Name A–Z", "repo.subsource.catalogNote": "ClawHub download ranking · Load up to the top 100", "repo.catalog.empty": "No matching skills were returned by ClawHub.", "repo.catalog.loading": "Loading ClawHub ranking…", "repo.catalog.loadError": "Failed to load the ClawHub ranking. Check your connection and retry.", "repo.catalog.retry": "Retry", "repo.catalog.loadingMore": "Loading more…", "repo.catalog.downloads": "downloads", "repo.catalog.installs": "installs", "repo.catalog.stars": "stars",
+    "repo.subsource.github": "GitHub Repos", "repo.subsource.skillsh": "skills.sh", "repo.subsource.clawhub": "ClawHub", "repo.subsource.popular": "Top 100 by downloads", "repo.catalog.states": "All statuses", "repo.catalog.searchClawhub": "Search ClawHub skills", "repo.catalog.searchLoading": "Searching ClawHub…", "repo.catalog.searchEmpty": "No matching ClawHub skills were found.", "repo.catalog.searchError": "ClawHub search failed. Please retry.", "repo.catalog.searchSkillsh": "Search skills.sh", "repo.catalog.skillshLoading": "Searching skills.sh…", "repo.catalog.skillshEmpty": "No matching skills.sh skills were found.", "repo.catalog.skillshError": "skills.sh search failed. Please retry.", "repo.sort.installs": "Installs: high to low", "repo.sort.name": "Name A–Z", "repo.subsource.catalogNote": "ClawHub download ranking · Up to 100; sort only displayed items", "repo.catalog.empty": "No matching skills were returned by ClawHub.", "repo.catalog.loading": "Loading ClawHub ranking…", "repo.catalog.loadError": "Failed to load the ClawHub ranking. Check your connection and retry.", "repo.catalog.retry": "Retry", "repo.catalog.loadingMore": "Loading more…", "repo.catalog.downloads": "downloads", "repo.catalog.installs": "installs", "repo.catalog.stars": "stars",
     "repo.hint": "Discover skills from subscribed GitHub repositories or community registries, and install them to user DSH skills or Shared Agent, or a registered project's .dsh/skills.", "repo.footer": "Refresh checks repositories and skill updates without replacing local files. Historical backups are not cleaned automatically and use additional disk space.",
     "repo.search": "Search repository skills", "repo.all": "All repositories", "repo.states": "All statuses", "repo.available": "Available", "repo.installed": "Installed", "repo.conflict": "Name conflict", "repo.invalid": "Invalid format", "repo.install": "Install", "repo.detail": "Details",
     "repo.installing": "Installing…", "repo.installProgress": "Reading and verifying skill files. Please wait…", "repo.installSuccess": "Installed and enabled. Invoke it from the slash menu.",
@@ -85,7 +91,7 @@ interface CatalogSkillItem {
 }
 type CatalogTarget = { catalog: "clawhub"; owner: string; slug: string; name: string } | { catalog: "skillsh"; source: string; skillId: string; name: string };
 
-type InstalledCatalogSkill = { name: string; declaredName?: string };
+
 type SkillsShCatalogItem = { id: string; source: string; skillId: string; name: string; installs?: number };
 
 type ClawHubApiPage = {
@@ -115,7 +121,7 @@ type ClawHubApiSearchResponse = { results?: ClawHubApiSearchResult[] };
 export function createRepositoryUI({ react, Modal, Input, Button, Collapse, SourceSelect, destination, api, headers, translateError, getLocale }: Dependencies) {
   const h = react.createElement;
   const { DestinationPicker, defaultDestination, destinationPayload, destinationReady } = destination;
-  return function useRepositoryUI({ active, t, onInstalled }: {active: boolean; t: Translate; onInstalled?: () => unknown; installedSkills?: InstalledCatalogSkill[]}) {
+  return function useRepositoryUI({ active, t, onInstalled }: {active: boolean; t: Translate; onInstalled?: () => unknown}) {
     const [repos, setRepos] = react.useState<RepoView[]>([]);
     const [installRoots, setInstallRoots] = react.useState<RepositoryDestination[]>([]);
     const [busy, setBusy] = react.useState(false);
@@ -135,6 +141,8 @@ export function createRepositoryUI({ react, Modal, Input, Button, Collapse, Sour
     const [catalogStatus, setCatalogStatus] = react.useState("");
     const [catalogItems, setCatalogItems] = react.useState<CatalogSkillItem[]>([]);
     const [catalogInstallIds, setCatalogInstallIds] = react.useState<string[]>([]);
+    const [catalogUnknownIds, setCatalogUnknownIds] = react.useState<string[]>([]);
+    const [catalogWarnings, setCatalogWarnings] = react.useState<Array<{id: string; code: string; error: string}>>([]);
     const [catalogHasMore, setCatalogHasMore] = react.useState(true);
     const [catalogLoading, setCatalogLoading] = react.useState(false);
     const [catalogError, setCatalogError] = react.useState(false);
@@ -152,7 +160,7 @@ export function createRepositoryUI({ react, Modal, Input, Button, Collapse, Sour
     const skillshAbort = react.useRef<AbortController | null>(null);
     const skillshTimer = react.useRef<ReturnType<typeof setTimeout> | null>(null);
     const catalogPager = react.useRef<{cursor: string | null; count: number; hasMore: boolean}>({ cursor: null, count: 0, hasMore: true });
-    const catalogRequest = react.useRef(false);
+    const catalogRequest = react.useRef<AbortController | null>(null);
     const catalogSentinel = react.useRef<HTMLDivElement | null>(null);
     const [form, setForm] = react.useState<Record<string, string>>({ url: "", ref: "", subdirectory: "" });
     const locked = react.useRef(false);
@@ -163,6 +171,7 @@ export function createRepositoryUI({ react, Modal, Input, Button, Collapse, Sour
       if (mounted.current) {
         const roots = (data.installRoots || []).filter(root => root.key === "dsh" || root.key === "agents");
         setRepos(data.repositories || []); setInstallRoots(roots); setCatalogInstallIds(data.catalogInstalls || []);
+        setCatalogUnknownIds(data.catalogUnknownIds || []); setCatalogWarnings(data.catalogWarnings || []);
         if (destination.scope === 'user' && !roots.some(root => root.key === destination.location && root.available))
           setDestination({ ...destination, location: roots.find(root => root.available)?.key || 'dsh' });
         // 工作区列表只读登记信息，失败不影响仓库列表本身。
@@ -205,13 +214,14 @@ export function createRepositoryUI({ react, Modal, Input, Button, Collapse, Sour
     function post<K extends RepositoryAction>(action: K, body: unknown) { return api(`/repositories/${action}` as `/repositories/${K}`, { method: "POST", headers, body: JSON.stringify(body) }); }
     const catalogScrollGate = react.useRef(false);
     async function loadClawHubPage(reset = false, fromScroll = false) {
-      if (catalogQuery.trim() || catalogRequest.current) return;
+      if (!active || catalogQuery.trim() || catalogRequest.current) return;
       if (fromScroll && catalogScrollGate.current) return;
       const current = catalogPager.current;
       if (!reset && (!current.hasMore || current.count >= 100)) return;
       if (fromScroll) catalogScrollGate.current = true;
       const offset = reset ? 0 : current.count;
-      catalogRequest.current = true;
+      const controller = new AbortController();
+      catalogRequest.current = controller;
       setCatalogLoading(true);
       setCatalogError(false);
       if (reset) {
@@ -222,7 +232,8 @@ export function createRepositoryUI({ react, Modal, Input, Button, Collapse, Sour
         const params = new URLSearchParams({ sort: "downloads", limit: String(Math.min(10, 100 - offset)) });
         const cursor = reset ? null : current.cursor;
         if (cursor) params.set("cursor", cursor);
-        const page = await api(`/clawhub/list?${params.toString()}`) as ClawHubApiPage;
+        const page = await api(`/clawhub/list?${params.toString()}`, { signal: controller.signal }) as ClawHubApiPage;
+        if (catalogRequest.current !== controller || controller.signal.aborted || !mounted.current) return;
         if (!Array.isArray(page.items)) throw new Error("ClawHub response has no items array");
         const items = page.items.flatMap((item): CatalogSkillItem[] => {
           if (typeof item.ownerHandle !== "string" || !item.ownerHandle || typeof item.slug !== "string" || !item.slug) return [];
@@ -246,11 +257,13 @@ export function createRepositoryUI({ react, Modal, Input, Button, Collapse, Sour
         setCatalogItems(previous => [...(reset ? [] : previous), ...items].slice(0, 100));
         setCatalogHasMore(catalogPager.current.hasMore);
       } catch {
-        if (mounted.current) setCatalogError(true);
+        if (catalogRequest.current === controller && !controller.signal.aborted && mounted.current) setCatalogError(true);
       } finally {
-        catalogRequest.current = false;
-        catalogScrollGate.current = false;
-        if (mounted.current) setCatalogLoading(false);
+        if (catalogRequest.current === controller) {
+          catalogRequest.current = null;
+          catalogScrollGate.current = false;
+          if (mounted.current) setCatalogLoading(false);
+        }
       }
     }
     function cancelClawHubSearch() {
@@ -259,7 +272,7 @@ export function createRepositoryUI({ react, Modal, Input, Button, Collapse, Sour
       clawhubSearchRequest.current++;
       clawhubSearchAbort.current?.abort();
       clawhubSearchAbort.current = null;
-      setClawhubSearchLoading(false);
+      if (mounted.current) setClawhubSearchLoading(false);
     }
     async function fetchClawHubSearch(query: string) {
       const request = ++clawhubSearchRequest.current;
@@ -323,7 +336,7 @@ export function createRepositoryUI({ react, Modal, Input, Button, Collapse, Sour
       skillshRequest.current++;
       skillshAbort.current?.abort();
       skillshAbort.current = null;
-      setSkillshLoading(false);
+      if (mounted.current) setSkillshLoading(false);
     }
     async function fetchSkillshResults(query: string) {
       const request = ++skillshRequest.current;
@@ -364,10 +377,9 @@ export function createRepositoryUI({ react, Modal, Input, Button, Collapse, Sour
       }, 300);
     }
     function selectSubsource(next: 'github' | 'skillsh' | 'clawhub') {
-      if (subsource === "skillsh" && next !== "skillsh") cancelSkillshSearch();
       setModal(null);
       setSubsource(next);
-      if (next === "clawhub" && !catalogItems.length && !catalogLoading) void loadClawHubPage(true);
+
     }
     function catalogNearBottom(node: HTMLElement) {
       const rect = node.getBoundingClientRect();
@@ -382,20 +394,14 @@ export function createRepositoryUI({ react, Modal, Input, Button, Collapse, Sour
       }
       return rect.top <= window.innerHeight + 80;
     }
-    function onCatalogWheel(event: { deltaY?: number }) {
-      if (!event || typeof event.deltaY !== "number" || event.deltaY <= 0) return;
+    function onCatalogWheel(event: React.WheelEvent<HTMLDivElement>) {
+      if (modal || event.defaultPrevented || event.deltaY <= 0 || subsource !== "clawhub" || catalogQuery.trim() || !catalogHasMore || catalogError) return;
+      // React portal 的事件也会沿组件树冒泡，必须排除列表外的真实 DOM 目标。
+      if (!event.target || !event.currentTarget.contains(event.target as Node)) return;
+      const node = catalogSentinel.current;
+      if (!node || typeof node.getBoundingClientRect !== "function" || !catalogNearBottom(node)) return;
       void loadClawHubPage(false, true);
     }
-    react.useEffect(() => {
-      if (subsource !== "clawhub" || catalogQuery.trim() || !catalogHasMore || catalogError || typeof window === "undefined") return;
-      const onWheel = (event: WheelEvent) => {
-        const node = catalogSentinel.current;
-        if (!node || typeof node.getBoundingClientRect !== "function" || !catalogNearBottom(node)) return;
-        onCatalogWheel(event);
-      };
-      window.addEventListener("wheel", onWheel, { passive: true });
-      return () => window.removeEventListener("wheel", onWheel);
-    }, [subsource, catalogQuery, catalogHasMore, catalogError, catalogItems.length]);
     async function refreshRepo(id: string) { const result = await post("refresh", { id }); if (result.error) setFeedback({ error: true, payload: result.error }); }
     function refresh(selected: RepoView[]) {
       return perform(async () => {
@@ -451,6 +457,22 @@ export function createRepositoryUI({ react, Modal, Input, Button, Collapse, Sour
       }, false);
     }
     react.useEffect(() => { if (active) perform(load, false); }, [active]);
+    react.useEffect(() => {
+      if (active) {
+        if (subsource === "clawhub") {
+          if (catalogQuery.trim()) void fetchClawHubSearch(catalogQuery.trim());
+          else if (!catalogItems.length) void loadClawHubPage(true);
+        } else if (subsource === "skillsh" && skillshQuery.trim()) void fetchSkillshResults(skillshQuery.trim());
+      }
+      return () => {
+        cancelClawHubSearch();
+        cancelSkillshSearch();
+        catalogRequest.current?.abort();
+        catalogRequest.current = null;
+        catalogScrollGate.current = false;
+        if (mounted.current) setCatalogLoading(false);
+      };
+    }, [active, subsource]);
     function button(key: string, action: () => unknown, secondary = true, disabled = false, danger = false) { return h(Button, { type: secondary ? "default" : "primary", danger, disabled: busy || disabled, onClick: action }, t(key)); }
     function rowGlyph(d: string) {
       return h("svg", { viewBox: "0 0 16 16", width: 16, height: 16, "aria-hidden": true, focusable: "false" }, h("path", { d: d, fill: "none", stroke: "currentColor", strokeWidth: 1.5, strokeLinecap: "round", strokeLinejoin: "round" }));
@@ -710,6 +732,7 @@ export function createRepositoryUI({ react, Modal, Input, Button, Collapse, Sour
       catalogSort === "name" ? filteredCatalogItems.slice().sort((left, right) => left.name.localeCompare(right.name)) : filteredCatalogItems;
     const renderCatalogItem = (item: CatalogSkillItem) => {
       const installed = catalogInstalled(`clawhub:${item.owner}/${item.slug}`);
+      const unknown = catalogUnknownIds.includes(`clawhub:${item.owner}/${item.slug}`);
       const metadata = [
         item.source,
         item.downloads === undefined ? null : item.downloads.toLocaleString() + " " + t("repo.catalog.downloads"),
@@ -725,17 +748,18 @@ export function createRepositoryUI({ react, Modal, Input, Button, Collapse, Sour
           ),
           h("div", { className: "dssm-repo-actions" },
             rowIcon("repo.detail", () => openCatalogDetail({ catalog: "clawhub", owner: item.owner, slug: item.slug, name: item.name })),
-            installed ? h("span", { className: "dssm-catalog-installed", role: "status" }, t("repo.installed")) : rowIcon("repo.install", () => openCatalogInstall({ catalog: "clawhub", owner: item.owner, slug: item.slug, name: item.name }))
+            unknown ? h("span", { className: "dssm-note", role: "status" }, t("repo.catalog.unknownLocation")) : null,
+            installed ? h("span", { className: "dssm-catalog-installed", role: "status" }, t("repo.installed")) : rowIcon(unknown ? "repo.catalog.reassociate" : "repo.install", () => openCatalogInstall({ catalog: "clawhub", owner: item.owner, slug: item.slug, name: item.name }))
           )
         )
       );
     };
-    const catalogView = h("div", { className: "dssm-catalog-list" },
+    const catalogView = h("div", { className: "dssm-catalog-list", onWheel: onCatalogWheel },
       catalogList.map(renderCatalogItem),
       !catalogList.length && !catalogLoading && !catalogError ? h("div", { className: "dssm-empty" }, t("repo.catalog.empty")) : null,
       catalogLoading ? h("div", { className: "dssm-catalog-loading", role: "status", "aria-live": "polite" }, h("span", { className: "dssm-repo-spinner", "aria-hidden": true }), catalogItems.length ? t("repo.catalog.loadingMore") : t("repo.catalog.loading")) : null,
       catalogError ? h("div", { className: "dssm-feedback dssm-error", role: "alert" }, t("repo.catalog.loadError"), h(Button, { type: "text", onClick: () => { void loadClawHubPage(); } }, t("repo.catalog.retry"))) : null,
-      subsource === "clawhub" && !catalogQuery.trim() && catalogHasMore && !catalogError ? h("div", { className: "dssm-catalog-sentinel", ref: catalogSentinel, "aria-hidden": true, onWheel: onCatalogWheel }) : null,
+      subsource === "clawhub" && !catalogQuery.trim() && catalogHasMore && !catalogError ? h("div", { className: "dssm-catalog-sentinel", ref: catalogSentinel, "aria-hidden": true }) : null,
       subsource === "clawhub" && !catalogQuery.trim() && catalogHasMore && !catalogError && !catalogLoading ? h("div", { className: "dssm-catalog-loading" }, h(Button, { type: "text", onClick: () => { void loadClawHubPage(false, true); } }, t("repo.catalog.loadMore"))) : null
     );
     const clawhubSearchView = h("div", { className: "dssm-catalog-list" },
@@ -748,6 +772,7 @@ export function createRepositoryUI({ react, Modal, Input, Button, Collapse, Sour
     const skillshView = h("div", { className: "dssm-catalog-list" },
       skillshItems.map(item => {
         const installed = catalogInstalled(`skillsh:${item.source}/${item.skillId}`);
+        const unknown = catalogUnknownIds.includes(`skillsh:${item.source}/${item.skillId}`);
         const metadata = [item.source, item.installs === undefined ? null : item.installs.toLocaleString() + " " + t("repo.catalog.installs")].filter(Boolean).join(" · ");
         return h("div", { key: item.id, className: "dssm-repo-row" },
           h("div", { className: "dssm-repo-head" },
@@ -757,7 +782,8 @@ export function createRepositoryUI({ react, Modal, Input, Button, Collapse, Sour
             ),
             h("div", { className: "dssm-repo-actions" },
               rowIcon("repo.detail", () => openCatalogDetail({ catalog: "skillsh", source: item.source, skillId: item.skillId, name: item.name })),
-              installed ? h("span", { className: "dssm-catalog-installed", role: "status" }, t("repo.installed")) : rowIcon("repo.install", () => openCatalogInstall({ catalog: "skillsh", source: item.source, skillId: item.skillId, name: item.name }))
+              unknown ? h("span", { className: "dssm-note", role: "status" }, t("repo.catalog.unknownLocation")) : null,
+              installed ? h("span", { className: "dssm-catalog-installed", role: "status" }, t("repo.installed")) : rowIcon(unknown ? "repo.catalog.reassociate" : "repo.install", () => openCatalogInstall({ catalog: "skillsh", source: item.source, skillId: item.skillId, name: item.name }))
             )
           )
         );
@@ -794,6 +820,8 @@ export function createRepositoryUI({ react, Modal, Input, Button, Collapse, Sour
       subsourceToolbar,
       subsource === "github" ? h("p", { className: "dssm-desc" }, t("repo.hint")) : subsource === "clawhub" && !catalogQuery.trim() ? h("p", { className: "dssm-desc" }, t("repo.subsource.catalogNote")) : null,
       filtersRow,
+      catalogUnknownIds.length ? h("div", { className: "dssm-note", role: "status" }, t("repo.catalog.unknownHint")) : null,
+      catalogWarnings.map(warning => h("div", { key: warning.id, className: "dssm-feedback dssm-error", role: "alert" }, warning.id + " · " + message(warning))),
       feedbackNode, !modal ? refreshProgress : null, busy && !refreshing ? h("div", { className: "dssm-note", role: "status" }, t("repo.loading")) : null,
       subsource === "github" ? (repos.length ? groups : h("div", { className: "dssm-empty" }, t("repo.empty"))) :
         subsource === "skillsh" ? skillshView : catalogQuery.trim() ? clawhubSearchView : catalogView,

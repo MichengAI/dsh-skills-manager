@@ -61,7 +61,8 @@ for (const [operation, input, chunkSize] of [
 ]) {
   let pulls = 0, cancelled = false;
   const stream = new ReadableStream({ pull(controller) { pulls++; if (pulls <= 2) controller.enqueue(new Uint8Array(chunkSize)); else controller.close(); }, cancel() { cancelled = true; } }, { highWaterMark: 0 });
-  await assert.rejects(operation(input, async () => new Response(stream)), error => error.code === "error.catalog.response");
+  await assert.rejects(operation(input, async () => new Response(stream)), error => error.code === "error.catalog.response" && error.statusCode === 502 && error.message === "目录技能内容过大");
+  assert.equal(stream.locked, false, "超限后必须释放读取锁");
   assert.equal(pulls, 2, "无 content-length 的超限流必须立即停止读取");
   assert.equal(cancelled, true, "超限流必须取消");
 }
@@ -77,6 +78,17 @@ for (const operation of [readCatalogSkill, loadCatalogPackage]) {
   await assert.rejects(operation(skillshIdentity, async () => { throw new TypeError("网络不可达"); }), error => error.code === "error.catalog.upstream" && error.statusCode === 502, "网络异常也必须返回目录错误码");
 }
 for (const operation of [readCatalogSkill, loadCatalogPackage]) {
-  await assert.rejects(operation(skillshIdentity, async () => new Response(new ReadableStream({ start(controller) { controller.error(new Error("响应流中断")); } }))), error => error.code === "error.catalog.response" && error.statusCode === 502, "响应读取中断也必须返回稳定目录诊断");
+  let cancelAttempts = 0;
+  const stream = new ReadableStream({ start(controller) { controller.error(new Error("private reader failure")); } });
+  const getReader = stream.getReader.bind(stream);
+  stream.getReader = () => {
+    const reader = getReader();
+    const cancel = reader.cancel.bind(reader);
+    reader.cancel = (...args) => { cancelAttempts++; return cancel(...args); };
+    return reader;
+  };
+  await assert.rejects(operation(skillshIdentity, async () => new Response(stream)), error => error.code === "error.catalog.response" && error.statusCode === 502 && error.message === "目录技能响应无效或读取中断", "真实 reader 异常不得泄漏内部信息");
+  assert.equal(cancelAttempts, 1, "读取中断必须尝试 cancel，即使 cancel 自身拒绝");
+  assert.equal(stream.locked, false, "读取中断必须释放读取锁");
 }
 console.log("目录技能详情与安装包地址测试通过");

@@ -207,6 +207,49 @@ try {
     assert.ok(policy.disabledSkills.dsh.includes(installedName), "修复来源状态不能重新启用用户明确停用的副本");
     assert.ok(!policy.enabledSkills.dsh.includes(installedName));
   });
+  await test("超过500条身份仍可安装，不淘汰已定位副本和回收记录", async () => {
+    const path = join(process.env.DSH_HOME, "skills-manager/repositories.json");
+    const original = await stored();
+    const records = Array.from({ length: 500 }, (_, index) => ({ id: `clawhub:owner/capacity-${index}`, name: `capacity-${index}`, root: index % 2 ? "agents" : "dsh", ...(index === 0 ? { trashId: "1-00000000-0000-4000-8000-000000000000" } : {}) }));
+    try {
+      await writeFile(path, JSON.stringify({ ...original, catalogInstalls: records }), "utf8");
+      installedName = "capacity-new";
+      assert.equal((await install("capacity-new")).status, 200, "第501次安装不能被记录数量阻断");
+      const actual = (await stored()).catalogInstalls;
+      assert.equal(actual.length, 501);
+      assert.deepEqual(actual.slice(0, 500), records, "已有副本和回收记录不得被截断");
+    } finally { await writeFile(path, JSON.stringify(original), "utf8"); }
+  });
+  await test("恢复启用失败不阻断查询和其他仓库操作，意图与诊断保留", async () => {
+    const path = join(process.env.DSH_HOME, "skills-manager/repositories.json");
+    const policyPath = join(process.env.DSH_HOME, "skills-manager/state.json");
+    const original = await stored();
+    const originalPolicy = await readFile(policyPath, "utf8");
+    installedName = "pending-broken-policy";
+    const id = "skillsh:owner/skills/pending-broken-policy";
+    const originalRename = fileSystem.rename;
+    fileSystem.rename = async (from, to) => {
+      if (to.endsWith("state.json")) throw new Error("模拟启用失败");
+      return originalRename(from, to);
+    };
+    try { assert.equal((await install("pending-broken-policy")).status, 500); }
+    finally { fileSystem.rename = originalRename; }
+    try {
+      await writeFile(policyPath, "{broken-json", "utf8");
+      const response = await nativeFetch(base + "/repositories");
+      assert.equal(response.status, 200, "恢复意图失败不能阻断列表");
+      const data = (await response.json()).data;
+      assert.ok(data.catalogWarnings.some(item => item.id === id && item.code === "error.repo.installState"), "读取成功也必须提示恢复失败");
+      assert.equal((await stored()).catalogInstalls.find(item => item.id === id).complete, false);
+      const added = await post("/repositories/add", { url: "owner/unrelated-policy" });
+      assert.equal(added.status, 200, "无关仓库操作不能被启用意图阻断");
+      await writeFile(policyPath, originalPolicy, "utf8");
+      assert.ok((await list()).catalogInstalls.includes(id), "策略恢复后再完成原意图");
+    } finally {
+      await writeFile(path, JSON.stringify(original), "utf8");
+      await writeFile(policyPath, originalPolicy, "utf8");
+    }
+  });
 } finally {
   globalThis.fetch = nativeFetch;
   server.closeAllConnections();

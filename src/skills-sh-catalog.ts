@@ -67,13 +67,13 @@ export async function searchSkillsSh(query: string): Promise<{ skills: SkillsShS
         if (done) break;
         size += value.byteLength;
         if (size > MAX_RESPONSE_BYTES) {
-          await reader.cancel().catch(() => undefined);
           throw catalogError("skills.sh 搜索响应过大", 502, "error.catalog.response");
         }
         chunks.push(value);
       }
-    } catch {
+    } catch (error) {
       await reader.cancel().catch(() => undefined);
+      if (error instanceof Error && "code" in error && error.code === "error.catalog.response" && "statusCode" in error && error.statusCode === 502) throw error;
       throw catalogError("skills.sh 搜索响应无效或读取中断", 502, "error.catalog.response");
     } finally { reader.releaseLock(); }
   }

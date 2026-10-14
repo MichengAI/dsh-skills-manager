@@ -23,8 +23,10 @@ try {
   assert.ok(call.options.signal instanceof AbortSignal);
   for (const query of ["", " ", "q".repeat(101), null]) await assert.rejects(searchSkillsSh(query), error => error.code === "error.catalog.query");
   let pulls = 0, cancelled = false;
-  globalThis.fetch = async () => new Response(new ReadableStream({ pull(controller) { pulls++; if (pulls <= 2) controller.enqueue(new Uint8Array(700_000)); else controller.close(); }, cancel() { cancelled = true; } }, { highWaterMark: 0 }));
-  await assert.rejects(searchSkillsSh("browser"), error => error.code === "error.catalog.response");
+  const oversizedStream = new ReadableStream({ pull(controller) { pulls++; if (pulls <= 2) controller.enqueue(new Uint8Array(700_000)); else controller.close(); }, cancel() { cancelled = true; } }, { highWaterMark: 0 });
+  globalThis.fetch = async () => new Response(oversizedStream);
+  await assert.rejects(searchSkillsSh("browser"), error => error.code === "error.catalog.response" && error.statusCode === 502 && error.message === "skills.sh 搜索响应过大");
+  assert.equal(oversizedStream.locked, false, "超限后必须释放读取锁");
   assert.equal(pulls, 2, "搜索必须流式限制字节，而非完整读取后检查");
   assert.equal(cancelled, true);
   for (const body of ["not json", "null", "[]", "{}", '{"skills":null}', '{"skills":{}}']) {
@@ -41,7 +43,18 @@ try {
   assert.equal(bounded.skills[99].installs, 99);
   globalThis.fetch = async () => { throw new TypeError("网络不可达"); };
   await assert.rejects(searchSkillsSh("browser"), error => error.code === "error.catalog.upstream" && error.statusCode === 502);
-  globalThis.fetch = async () => new Response(new ReadableStream({ start(controller) { controller.error(new Error("响应流中断")); } }));
-  await assert.rejects(searchSkillsSh("browser"), error => error.code === "error.catalog.response" && error.statusCode === 502);
+  let cancelAttempts = 0;
+  const interruptedStream = new ReadableStream({ start(controller) { controller.error(new Error("private reader failure")); } });
+  const getReader = interruptedStream.getReader.bind(interruptedStream);
+  interruptedStream.getReader = () => {
+    const reader = getReader();
+    const cancel = reader.cancel.bind(reader);
+    reader.cancel = (...args) => { cancelAttempts++; return cancel(...args); };
+    return reader;
+  };
+  globalThis.fetch = async () => new Response(interruptedStream);
+  await assert.rejects(searchSkillsSh("browser"), error => error.code === "error.catalog.response" && error.statusCode === 502 && error.message === "skills.sh 搜索响应无效或读取中断");
+  assert.equal(cancelAttempts, 1, "读取中断必须尝试 cancel，即使 cancel 自身拒绝");
+  assert.equal(interruptedStream.locked, false, "读取中断必须释放读取锁");
 } finally { globalThis.fetch = originalFetch; }
 console.log("skills.sh 搜索校验测试通过");

@@ -914,7 +914,7 @@ export function parseSkillDoc(text: string): ParsedSkill {
         const m = /^([A-Za-z0-9_-]+)\s*:\s*(.*)$/.exec(lines[i]);
         if (m) {
           fields.push({ key: m[1], raw: m[2] });
-          const block = /^([>|])[-+]?\s*$/.exec(m[2]);
+          const block = /^([>|])(?:([1-9])[-+]?|[-+]([1-9])?)?\s*$/.exec(m[2]);
           if (block) {
             const content = [];
             while (
@@ -924,13 +924,16 @@ export function parseSkillDoc(text: string): ParsedSkill {
               i++;
               content.push(lines[i]);
             }
-            const indentation = content
-              .filter((line) => line.trim() !== "")
-              .reduce(
-                (min, line) =>
-                  Math.min(min, (/^\s*/.exec(line) || [""])[0].length),
-                Infinity,
-              );
+            const explicitIndentation = block[2] || block[3];
+            const indentation = explicitIndentation
+              ? Number(explicitIndentation)
+              : content
+                  .filter((line) => line.trim() !== "")
+                  .reduce(
+                    (min, line) =>
+                      Math.min(min, (/^\s*/.exec(line) || [""])[0].length),
+                    Infinity,
+                  );
             const normalized = content.map((line) =>
               Number.isFinite(indentation)
                 ? line.slice(Math.min(indentation, line.length))
@@ -939,7 +942,9 @@ export function parseSkillDoc(text: string): ParsedSkill {
             map[m[1]] =
               block[1] === ">"
                 ? normalized.join(" ").replace(/\s+/g, " ").trim()
-                : normalized.join("\n").trim();
+                : explicitIndentation
+                  ? normalized.join("\n").replace(/^\n+|\n+$/g, "")
+                  : normalized.join("\n").trim();
           } else {
             map[m[1]] = decodeYamlScalar(m[2]);
           }

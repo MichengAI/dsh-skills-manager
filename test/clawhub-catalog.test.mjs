@@ -47,8 +47,22 @@ for (const [invoke, key] of [
   await assert.rejects(invoke(async () => new Response("{}", { status: 503 })), error => error.code === "error.catalog.upstream");
   await assert.rejects(invoke(async () => { throw new TypeError("redirect blocked"); }), error => error.code === "error.catalog.upstream");
   let pulls = 0, cancelled = false;
-  await assert.rejects(invoke(async () => new Response(new ReadableStream({ pull(controller) { pulls++; if (pulls <= 2) controller.enqueue(new Uint8Array(700_000)); else controller.close(); }, cancel() { cancelled = true; } }, { highWaterMark: 0 }))), error => error.code === "error.catalog.response");
+  const oversizedStream = new ReadableStream({ pull(controller) { pulls++; if (pulls <= 2) controller.enqueue(new Uint8Array(700_000)); else controller.close(); }, cancel() { cancelled = true; } }, { highWaterMark: 0 });
+  await assert.rejects(invoke(async () => new Response(oversizedStream)), error => error.code === "error.catalog.response" && error.statusCode === 502 && error.message === "ClawHub 响应过大");
+  assert.equal(oversizedStream.locked, false, "超限后必须释放读取锁");
   assert.equal(pulls, 2); assert.equal(cancelled, true);
+  let cancelAttempts = 0;
+  const interruptedStream = new ReadableStream({ start(controller) { controller.error(new Error("private reader failure")); } });
+  const getReader = interruptedStream.getReader.bind(interruptedStream);
+  interruptedStream.getReader = () => {
+    const reader = getReader();
+    const cancel = reader.cancel.bind(reader);
+    reader.cancel = (...args) => { cancelAttempts++; return cancel(...args); };
+    return reader;
+  };
+  await assert.rejects(invoke(async () => new Response(interruptedStream)), error => error.code === "error.catalog.response" && error.statusCode === 502 && error.message === "ClawHub 响应无效或过大");
+  assert.equal(cancelAttempts, 1, "读取中断必须尝试 cancel，即使 cancel 自身拒绝");
+  assert.equal(interruptedStream.locked, false, "读取中断必须释放读取锁");
   await assert.rejects(invoke(async () => new Response("{}", { headers: { "content-length": "1048577" } })), error => error.code === "error.catalog.response");
 }
 for (const nextCursor of [1, {}, "x".repeat(4097)]) await assert.rejects(listClawHub({}, async () => new Response(JSON.stringify({ items: [], nextCursor }))), error => error.code === "error.catalog.response");

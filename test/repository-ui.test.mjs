@@ -3,7 +3,11 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { createRepositoryUI, repositoryLocales } from "../src/repository-ui.ts";
 import { createDestinationKit, destinationLocales } from "../src/destination-picker.ts";
-let values = [], cursor = 0, effects = [], dependencies = [];
+let values = [], cursor = 0, effects = [], dependencies = [], cleanups = [];
+let active = true;
+function flushEffects() { effects.splice(0).forEach(({ i, fn }) => { cleanups[i]?.(); cleanups[i] = fn(); }); }
+function unmount() { effects = []; cleanups.forEach(cleanup => cleanup?.()); cleanups = []; }
+function resetMount() { unmount(); values = []; cursor = 0; dependencies = []; active = true; }
 const react = {
   createElement(type, props, ...children) {
     if (props?.className === "dssm-catalog-sentinel" && props.ref) props.ref.current = {};
@@ -11,7 +15,7 @@ const react = {
   },
   useState(initial) { const i = cursor++; if (!(i in values)) values[i] = initial; return [values[i], (v) => { values[i] = typeof v === "function" ? v(values[i]) : v; }]; },
   useRef(initial) { const i = cursor++; return values[i] || (values[i] = { current: initial }); },
-  useEffect(fn, deps) { const i = cursor++; if (!dependencies[i] || deps.some((v, n) => dependencies[i][n] !== v)) { effects.push(fn); dependencies[i] = deps; } },
+  useEffect(fn, deps) { const i = cursor++; if (!dependencies[i] || deps.some((v, n) => dependencies[i][n] !== v)) { effects.push({ i, fn }); dependencies[i] = deps; } },
 };
 const repos = [{ id: "one", owner: "example", name: "skills", skills: [
   { path: "skills/pdf", name: "pdf", description: "PDF 文档", status: "available", installedRoot: null, canUninstall: false },
@@ -77,7 +81,10 @@ let finishRefresh, finishDetail;
 let holdRefresh = false, failRefresh = false;
 let installedCalls = 0, failInstalledRefresh = false;
 let mockCatalogInstalls = ["clawhub:owner-2/skill-002"];
+let mockCatalogUnknownIds = [], mockCatalogWarnings = [];
+let holdCatalogPath = "", pendingCatalog = [];
 const api = async (path, options) => {
+  if (holdCatalogPath && path.startsWith(holdCatalogPath)) return new Promise(resolve => pendingCatalog.push({ path, signal: options?.signal, resolve }));
   const body = options?.body ? JSON.parse(options.body) : undefined;
   calls.push({ path, body });
   if (path.startsWith("/clawhub/")) return (await catalogFetch("http://localhost" + path)).json();
@@ -109,7 +116,7 @@ const api = async (path, options) => {
   if (path.endsWith("/preview")) return { token: "checked", commit: "a".repeat(40), localModified: true, changes: [{ kind: "modified", path: "SKILL.md" }] };
   if (path.endsWith("/update") || path.endsWith("/rollback")) repos[0].skills[0].status = "installed";
   // 每次返回独立快照，安装/卸载必须真正 reload 才能改变 UI。
-  return structuredClone({ repositories: repos, installRoots, catalogInstalls: mockCatalogInstalls });
+  return structuredClone({ repositories: repos, installRoots, catalogInstalls: mockCatalogInstalls, catalogUnknownIds: mockCatalogUnknownIds, catalogWarnings: mockCatalogWarnings });
 };
 const Input = Object.assign(() => {}, { TextArea: Symbol("官方只读说明框") });
 const Button = Symbol("官方按钮");
@@ -131,7 +138,7 @@ let languagePrefix = "";
 const rootTranslations = { "root.codex": "Codex", "root.claude": "Claude", "root.windsurf-user": "Windsurf User" };
 const t = (key) => key === "format.locale" ? "zh-CN" : languagePrefix + (rootTranslations[key] || key);
 let ui;
-function render() { cursor = 0; ui = useUI({ active: true, t, installedSkills: [{ name: "gzh-design-skill" }, { name: "skill-002" }, { name: "Skill 001" }], onInstalled: async () => { installedCalls++; if (failInstalledRefresh) throw new Error("本地列表刷新失败"); } }); }
+function render() { cursor = 0; ui = useUI({ active, t, onInstalled: async () => { installedCalls++; if (failInstalledRefresh) throw new Error("本地列表刷新失败"); } }); }
 // 目标选择器是函数组件：带 userDestinations 的节点展开成它渲染出的子树，其余沿用原遍历。
 function nodes(node) {
   if (!node || typeof node !== "object") return [];
@@ -148,7 +155,7 @@ const countCalls = path => calls.filter(call => call.path === path).length;
 const settle = async () => {
   for (let cycle = 0; cycle < 4; cycle++) {
     await new Promise(setImmediate);
-    effects.splice(0).forEach(effect => effect());
+    flushEffects();
     render();
   }
   await new Promise(setImmediate);
@@ -168,6 +175,11 @@ const destinationLabels = () => locationSelect()?.props.options ?? [];
 const pathLines = () => modalNodes().filter(n => n.type === "code").map(n => n.children.join(""));
 
 const repoSource = await readFile(new URL("../src/repository-ui.ts", import.meta.url), "utf8");
+assert.match(repositoryLocales.zh["repo.subsource.catalogNote"], /仅.*当前显示条目.*排序/, "明确排序仅限当前显示的下载榜");
+assert.match(repositoryLocales.en["repo.subsource.catalogNote"], /sort.*displayed/i, "英文同样说明排序范围");
+assert.doesNotMatch(repoSource, /InstalledCatalogSkill|installedSkills\?/, "删除无效 installedSkills 参数及类型");
+const clientSource = await readFile(new URL("../src/client.ts", import.meta.url), "utf8");
+assert.doesNotMatch(clientSource, /installedSkills:\s*allRoots\.flatMap/, "客户端渲染不再为死参数遍历全部技能");
 assert.equal(repoSource.includes('.dssm-repo-row:first-child{border-top:0}'), false, "仓库第一条技能必须保留标题下方分隔线");
 assert.equal(/\.dssm-repo-description\{[^}]*line-height:18px/.test(repoSource), true, "仓库描述行高与全局技能的 18px 一致");
 assert.equal(repoSource.includes("▾") || repoSource.includes("▸"), false, "仓库折叠不再用文字三角");
@@ -191,7 +203,7 @@ assert.match(repositoryLocales.en["repo.installLocationsHint"], /Missing directo
 assert.match(repositoryLocales.zh["repo.installLocationsHint"], /用户目录.*DSH skills 或 Shared Agent/);
 assert.match(repositoryLocales.zh["repo.installLocationsHint"], /项目.*仅.*\.dsh\/skills/);
 assert.match(repositoryLocales.zh["repo.installLocationsHint"], /缺少的目录会在确认安装后创建/);
-render(); effects.splice(0).forEach((f) => f()); await settle();
+render(); flushEffects(); await settle();
 assert.equal(countCalls("/repositories"), 1, "进入仓库只读取一次列表");
 assert.equal(find(n => isAction(n, "repo.check")), undefined, "不再提供重复的检查更新按钮");
 assert.equal(find(n => n.props["aria-label"] === "repo.search").type, Input, "仓库搜索必须使用官方输入框");
@@ -319,10 +331,39 @@ assert.equal(catalogCalls.length, 1, "进入榜单后只自动加载第一页");
 if (intersections.length) intersections.at(-1).callback([{ isIntersecting: true }]);
 await settle();
 assert.equal(catalogCalls.length, 1, "哨兵出现在视口内不能自动连翻，必须等用户向下滚动");
-sentinel().props.onWheel({ deltaY: -20 });
+const catalogWheel = (deltaY, overrides = {}) => {
+  const target = {};
+  const node = find(n => n.props.className === "dssm-catalog-list");
+  assert.equal(typeof node.props.onWheel, "function", "滚轮监听应绑定目录列表，而不是 window");
+  return node.props.onWheel({ deltaY, target, currentTarget: { contains: candidate => candidate === target }, ...overrides });
+};
+const savedWindow = globalThis.window;
+const prepareSentinel = () => {
+  sentinel().props.ref.current = { parentElement: null, getBoundingClientRect: () => ({ top: 700, bottom: 701 }) };
+};
+globalThis.window = { innerHeight: 800 };
+prepareSentinel();
+catalogWheel(24, { target: {} });
+catalogWheel(24, { defaultPrevented: true });
+await settle();
+assert.equal(catalogCalls.length, 1, "目录外和已处理的滚轮不触发翻页");
+assert.doesNotMatch(repoSource, /window\.addEventListener\(["']wheel/, "不再注册 window 级滚轮监听");
+prepareSentinel();
+sentinel().props.ref.current.getBoundingClientRect = () => ({ top: 1000, bottom: 1001 });
+catalogWheel(24);
+await settle();
+assert.equal(catalogCalls.length, 1, "目录底部未接近视口时不翻页");
+await click("repo.detail");
+prepareSentinel();
+catalogWheel(24);
+await settle();
+assert.equal(catalogCalls.length, 1, "详情弹窗打开时不在后台翻页");
+dialog().props.onClose(); render();
+prepareSentinel();
+catalogWheel(-20);
 await settle();
 assert.equal(catalogCalls.length, 1, "向上滚动不加载下一页");
-sentinel().props.onWheel({ deltaY: 24 });
+prepareSentinel(); catalogWheel(24);
 render();
 const loadingRow = nodes(find(n => n.props.className === "dssm-catalog-list")).find(n => n.props.className === "dssm-catalog-loading");
 assert.ok(loadingRow, "继续加载显示在目录列表内部");
@@ -337,7 +378,7 @@ assert.ok(manualMore, "榜单提供可触控和键盘激活的显式下一页入
 await clickNode(manualMore);
 assert.equal(catalogCalls.length, 3, "显式加载也只加载一页，不靠自动哨兵");
 for (let page = catalogCalls.length; page < 10; page++) {
-  sentinel().props.onWheel({ deltaY: 24 });
+  prepareSentinel(); catalogWheel(24);
   await settle();
 }
 assert.equal(catalogCalls.length, 10, "每次向下滚动一页，最多 10 页");
@@ -345,6 +386,7 @@ assert.equal(catalogCalls.at(-1).searchParams.get("cursor"), "90", "分页请求
 assert.equal(all().filter(n => n.props.className === "dssm-name").length, 100, "列表最多加载真实榜单前 100 条");
 assert.equal(sentinel(), undefined, "满 100 条后不再保留继续加载的滚动哨兵");
 assert.equal(catalogCalls.length, 10, "达到 100 条后不再请求");
+globalThis.window = savedWindow;
 await selectSubsource("repo.subsource.github");
 
 const toolbarCss = all().filter(n => n.type === "style").map(n => n.children.join("")).join("");
@@ -634,8 +676,8 @@ await clickModal("repo.cancel");
 // 全新 mount：缺少目的地字段、空列表或全部不可用时不能确认安装。
 for (const roots of [undefined, [], configuredRoots.map(root => ({ ...root, available: false, error: { error: "Root unavailable" } }))]) {
   installRoots = roots;
-  values = []; cursor = 0; effects = []; dependencies = [];
-  render(); effects.splice(0).forEach(f => f()); await settle();
+  resetMount();
+  render(); flushEffects(); await settle();
   find(n => n.props["aria-expanded"] === false).props.onClick(); render();
   const beforeInstall = countCalls("/repositories/install");
   await click("repo.install");
@@ -719,4 +761,75 @@ workspaceSelect.props.onChange("D:/work/beta/sub"); render();
 await clickModal("repo.install");
 assert.deepEqual(calls.filter(c => c.path === "/repositories/install").at(-1).body, { id: "one", path: "skills/pdf", workspace: "D:/work/beta/sub" }, "已安装技能还能指定另一项目，冲突由服务端处理");
 finishInstall(); await settle();
-console.log("仓库界面折叠、搜索、DSH/公共 Agent 安装位置、回收站卸载、错误重试、更新与恢复测试通过");
+// 未知旧身份不猜安装位置：两种目录行均保留显式重关联安装入口。
+mockCatalogUnknownIds = ["clawhub:owner-3/skill-003", "skillsh:owner/skills/react-skill", "clawhub:not-loaded/old"];
+mockCatalogWarnings = [{ id: "clawhub:broken/recovery", code: "error.repo.installState", error: "恢复记录失败" }];
+resetMount(); render(); flushEffects(); await settle();
+assert.ok(find(n => n.props.role === "alert" && n.children.join("").includes("clawhub:broken/recovery") && n.children.join("").includes("恢复记录失败")), "恢复诊断必须可见且保留身份和错误");
+assert.ok(find(n => n.props.role === "status" && n.children.includes("repo.catalog.unknownHint")), "未知身份即使未加载到目录行也有简短提示");
+await selectSubsource("repo.subsource.clawhub");
+assert.ok(nodes(catalogRow("Skill 003")).some(n => n.children.includes("repo.catalog.unknownLocation")), "ClawHub 旧身份标注位置未知");
+assert.ok(nodes(catalogRow("Skill 003")).some(n => isAction(n, "repo.catalog.reassociate") && !n.props.disabled), "未知身份保留显式重关联安装入口");
+assert.equal(nodes(catalogRow("Skill 003")).some(n => n.children.includes("repo.installed")), false, "未知身份不能冒充已定位安装");
+await clickNode(nodes(catalogRow("Skill 003")).find(n => isAction(n, "repo.catalog.reassociate")));
+assert.ok(dialog() && locationSelect(), "重关联必须先选择明确安装位置");
+await clickModal("repo.cancel");
+await selectSubsource("repo.subsource.skillsh");
+find(n => n.props["aria-label"] === "repo.catalog.searchSkillsh").props.onChange({ target: { value: "react" } }); render();
+await new Promise(resolve => setTimeout(resolve, 350)); await settle();
+assert.ok(nodes(catalogRow("React Skill")).some(n => n.children.includes("repo.catalog.unknownLocation")), "skills.sh 旧身份标注位置未知");
+assert.ok(nodes(catalogRow("React Skill")).some(n => isAction(n, "repo.catalog.reassociate") && !n.props.disabled), "skills.sh 未知身份也保留重关联");
+mockCatalogUnknownIds = []; mockCatalogWarnings = [];
+// 通过真实 effect 依赖切换及卸载执行 cleanup，不手调生产取消函数。
+for (const kind of ["list", "clawhub", "skillsh"]) {
+  for (const exit of ["source", "inactive", "unmount"]) {
+    resetMount(); render(); flushEffects(); await settle();
+    holdCatalogPath = kind === "list" ? "/clawhub/list" : kind === "clawhub" ? "/clawhub/search" : "/skills-sh/search";
+    pendingCatalog = [];
+    await selectSubsource(kind === "skillsh" ? "repo.subsource.skillsh" : "repo.subsource.clawhub");
+    if (kind !== "list") {
+      find(n => n.props["aria-label"] === (kind === "skillsh" ? "repo.catalog.searchSkillsh" : "repo.catalog.searchClawhub")).props.onChange({ target: { value: "held" } });
+      render(); await new Promise(resolve => setTimeout(resolve, 350)); await settle();
+    }
+    const old = pendingCatalog.at(-1);
+    assert.ok(old, "必须启动真实请求");
+    if (exit === "source") await selectSubsource("repo.subsource.github");
+    else if (exit === "inactive") { active = false; render(); flushEffects(); await settle(); }
+    else unmount();
+    assert.equal(old.signal?.aborted, true, `${kind}/${exit} 必须 abort`);
+    if (exit === "unmount") { values = []; dependencies = []; active = true; render(); flushEffects(); await settle(); }
+    else { active = true; render(); flushEffects(); await settle(); }
+    await selectSubsource("repo.subsource.github");
+    await selectSubsource(kind === "skillsh" ? "repo.subsource.skillsh" : "repo.subsource.clawhub");
+    await new Promise(resolve => setTimeout(resolve, 350)); await settle();
+    if (exit === "unmount" && kind !== "list") {
+      find(n => n.props["aria-label"] === (kind === "skillsh" ? "repo.catalog.searchSkillsh" : "repo.catalog.searchClawhub")).props.onChange({ target: { value: "held" } }); render();
+      await new Promise(resolve => setTimeout(resolve, 350)); await settle();
+    }
+    const fresh = pendingCatalog.at(-1);
+    assert.notEqual(fresh, old, "旧请求不能阻挡重新进入");
+    old.resolve(kind === "list" ? { items: [{ ownerHandle: "stale", slug: "stale", displayName: "STALE" }], nextCursor: "bad" } : kind === "skillsh" ? { skills: [{ id: "stale", name: "STALE", source: "stale", skillId: "stale" }] } : { results: [{ ownerHandle: "stale", slug: "stale", displayName: "STALE" }] });
+    await settle();
+    assert.equal(all().some(n => n.children.includes("STALE")), false, "陈旧响应不可更新列表");
+    assert.equal(fresh.signal.aborted, false, "陈旧 finally 不可取消新请求");
+    assert.ok(find(n => n.props.role === "status" && n.children.includes(kind === "list" ? "repo.catalog.loading" : kind === "skillsh" ? "repo.catalog.skillshLoading" : "repo.catalog.searchLoading")), "陈旧 finally 不可清除新请求的加载状态");
+    holdCatalogPath = "";
+    fresh.resolve(kind === "list" ? { items: [], nextCursor: null } : kind === "skillsh" ? { skills: [] } : { results: [] });
+    await settle();
+  }
+}
+for (const kind of ["clawhub", "skillsh"]) {
+  for (const exit of ["source", "inactive", "unmount"]) {
+    resetMount(); render(); flushEffects(); await settle();
+    await selectSubsource(kind === "skillsh" ? "repo.subsource.skillsh" : "repo.subsource.clawhub");
+    const before = kind === "skillsh" ? skillshCalls.length : catalogSearchCalls.length;
+    find(n => n.props["aria-label"] === (kind === "skillsh" ? "repo.catalog.searchSkillsh" : "repo.catalog.searchClawhub")).props.onChange({ target: { value: "cancel-timer" } }); render();
+    if (exit === "source") await selectSubsource("repo.subsource.github");
+    else if (exit === "inactive") { active = false; render(); flushEffects(); }
+    else unmount();
+    await new Promise(resolve => setTimeout(resolve, 350));
+    assert.equal(kind === "skillsh" ? skillshCalls.length : catalogSearchCalls.length, before, `${kind}/${exit} 必须清理防抖 timer`);
+  }
+}
+unmount();
+console.log("仓库界面及目录生命周期专项测试通过");

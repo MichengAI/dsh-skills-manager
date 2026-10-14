@@ -631,6 +631,49 @@ eq(
   "parseSkillDoc removes common block indentation",
 );
 
+// 显式缩进只剥离指定数量的空格，而不是内容的最小缩进。
+for (const header of ["|2", "|2-", "|-2", "|2+", "|+2"]) {
+  const explicitLiteral = parseSkillDoc(
+    `---\ndescription: ${header}\n    First line.\n      Second line.\nname: explicit\n---\nbody`,
+  );
+  eq(
+    explicitLiteral.map.description,
+    "  First line.\n    Second line.",
+    `parseSkillDoc honors explicit literal indentation: ${header}`,
+  );
+  eq(explicitLiteral.map.name, "explicit", `${header} stops at the next field`);
+  eq(explicitLiteral.body, "body", `${header} preserves the body`);
+  eq(explicitLiteral.fields[0].raw, header, `${header} preserves the raw header`);
+}
+for (const header of [">2", ">2-", ">-2", ">2+", ">+2"]) {
+  const explicitFolded = parseSkillDoc(
+    `---\ndescription: ${header}\n  First line.\n  Second line.\n---\nbody`,
+  );
+  eq(
+    explicitFolded.map.description,
+    "First line. Second line.",
+    `parseSkillDoc retains folded display semantics: ${header}`,
+  );
+}
+for (const indentation of [1, 9]) {
+  const explicitBoundary = parseSkillDoc(
+    `---\ndescription: |${indentation}\n${" ".repeat(indentation + 2)}First line.\n${" ".repeat(indentation + 4)}Second line.\n---\nbody`,
+  );
+  eq(
+    explicitBoundary.map.description,
+    "  First line.\n    Second line.",
+    `parseSkillDoc supports indentation indicator ${indentation}`,
+  );
+}
+const explicitSecondLine = parseSkillDoc(
+  "---\ndescription: |2\n  First line.\n    Second line.\n---\nbody",
+);
+eq(
+  explicitSecondLine.map.description,
+  "First line.\n  Second line.",
+  "parseSkillDoc preserves extra indentation on the second literal line",
+);
+
 // ── 启用 / 停用 ──
 const goodSkillSource =
   "---\nname: good-skill\ndescription: A good skill.\n---\nbody";

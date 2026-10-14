@@ -809,7 +809,7 @@ import { antdLocaleFromDocument } from "./antd-locale.js";
                 iconButton(t("btn.delete.forever"), strokeIcon("M3.5 4.5h9M6.5 4.5V3h3v1.5M5 4.5l.7 8.5h4.6L11 4.5"), function () { setModal({ type: "delete-confirm", id: item.id, name: item.name }); }, true, busy)));
           }) : h("div", { className: "dssm-empty" }, t("trash.empty")));
       }
-      var repositoryUI = useRepositoryUI({ active: scope === "repositories", t: t, installedSkills: allRoots.flatMap(function (root) { return root.skills || []; }), onInstalled: function () { return Promise.all([refresh(false), refreshWorkspaceDetails()]); } });
+      var repositoryUI = useRepositoryUI({ active: scope === "repositories", t: t, onInstalled: function () { return Promise.all([refresh(false), refreshWorkspaceDetails()]); } });
       function getTabIcon(tabVal: string) {
         var d = tabVal === "user" ? "M8 0a8 8 0 100 16A8 8 0 008 0zm6.5 8a6.5 6.5 0 01-.65 2.82L10.3 8.35a.75.75 0 00-1.06 0L8.2 9.4V6.5a.75.75 0 00-.75-.75h-1V4.25a.75.75 0 00-.75-.75h-1a6.47 6.47 0 013.3-1.95v1.2a.75.75 0 00.75.75h1.5a.75.75 0 00.75-.75V2.3A6.52 6.52 0 0114.5 8z" :
                 tabVal === "project" ? "M1.75 2.5h3.44l1.5 1.5h7.56c.966 0 1.75.784 1.75 1.75v7.5a1.75 1.75 0 01-1.75 1.75H1.75A1.75 1.75 0 010 13.25V4.25C0 3.284.784 2.5 1.75 2.5z" :
