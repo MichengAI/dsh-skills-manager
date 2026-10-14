@@ -20,7 +20,7 @@ async function ok(condition, message) {
   }
 }
 
-for (const path of ["../src/core.ts", "../src/readonly-discovery.ts", "../src/index.ts", "../src/skills-sh-catalog.ts", "../src/catalog-skill.ts", "../src/client.ts"]) {
+for (const path of ["../src/core.ts", "../src/readonly-discovery.ts", "../src/index.ts", "../src/skills-sh-catalog.ts", "../src/catalog-skill.ts", "../src/clawhub-catalog.ts", "../src/client.ts"]) {
   try {
     await access(new URL(path, import.meta.url), constants.R_OK);
     await ok(true, `${path} exists as maintained source`);
@@ -29,7 +29,7 @@ for (const path of ["../src/core.ts", "../src/readonly-discovery.ts", "../src/in
   }
 }
 
-for (const path of ["../lib/core.js", "../lib/readonly-discovery.js", "../lib/index.js", "../lib/skills-sh-catalog.js", "../lib/catalog-skill.js", "../lib/client.js"]) {
+for (const path of ["../lib/core.js", "../lib/readonly-discovery.js", "../lib/index.js", "../lib/skills-sh-catalog.js", "../lib/catalog-skill.js", "../lib/clawhub-catalog.js", "../lib/client.js"]) {
   try {
     await access(new URL(path, import.meta.url), constants.R_OK);
     await ok(true, `${path} exists as generated output`);

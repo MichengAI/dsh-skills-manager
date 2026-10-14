@@ -58,10 +58,46 @@ export function catalogUrls(input: CatalogRequest) {
 
 async function readBounded(response: Response, limit: number) {
   const declared = Number(response.headers.get("content-length"));
-  if (Number.isFinite(declared) && declared > limit) throw catalogError("目录技能内容过大", 502, "error.catalog.response");
-  const bytes = new Uint8Array(await response.arrayBuffer());
-  if (bytes.byteLength > limit) throw catalogError("目录技能内容过大", 502, "error.catalog.response");
-  return bytes;
+  if (Number.isFinite(declared) && declared > limit) {
+    await response.body?.cancel().catch(() => undefined);
+    throw catalogError("目录技能内容过大", 502, "error.catalog.response");
+  }
+  const reader = response.body?.getReader();
+  if (!reader) return new Uint8Array();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > limit) {
+        await reader.cancel().catch(() => undefined);
+        throw catalogError("目录技能内容过大", 502, "error.catalog.response");
+      }
+      chunks.push(value);
+    }
+  } catch {
+    await reader.cancel().catch(() => undefined);
+    throw catalogError("目录技能响应无效或读取中断", 502, "error.catalog.response");
+  } finally { reader.releaseLock(); }
+  return Buffer.concat(chunks, size);
+}
+
+function parseFilesJson(bytes: Uint8Array) {
+  let payload: unknown;
+  try {
+    payload = JSON.parse(new TextDecoder().decode(bytes));
+  } catch {
+    throw catalogError("目录技能返回了无效 JSON", 502, "error.catalog.response");
+  }
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) throw catalogError("目录技能文件无效", 502, "error.catalog.response");
+  const files = (payload as { files?: unknown }).files;
+  if (!Array.isArray(files) || !files.length || files.length > MAX_FILES) throw catalogError("目录技能文件无效或过多", 502, "error.catalog.response");
+  for (const file of files) {
+    if (!file || typeof file !== "object" || Array.isArray(file) || typeof file.path !== "string" || typeof file.contents !== "string") throw catalogError("目录技能文件无效", 502, "error.catalog.response");
+  }
+  return { files: files as { path: string; contents: string }[] };
 }
 
 function skillDocSummary(markdown: string) {
@@ -72,7 +108,9 @@ function skillDocSummary(markdown: string) {
 }
 
 async function fetchFixed(url: string, fetchImpl: FetchLike, accept: string) {
-  const response = await fetchImpl(url, { headers: { accept }, redirect: "error", signal: AbortSignal.timeout(15_000) });
+  let response: Response;
+  try { response = await fetchImpl(url, { headers: { accept }, redirect: "error", signal: AbortSignal.timeout(15_000) }); }
+  catch { throw catalogError("目录技能暂时无法读取", 502, "error.catalog.upstream"); }
   if (!response.ok) throw catalogError("目录技能暂时无法读取", 502, "error.catalog.upstream");
   return response;
 }
@@ -87,7 +125,7 @@ export async function readCatalogSkill(input: CatalogRequest, fetchImpl: FetchLi
     return { name: parsed.name, description: parsed.description, body: parsed.body, origin: urls.origin };
   }
   const response = await fetchFixed(urls.download, fetchImpl, "application/json");
-  const payload = JSON.parse(new TextDecoder().decode(await readBounded(response, MAX_TEXT_BYTES))) as { files?: { path?: unknown; contents?: unknown }[] };
+  const payload = parseFilesJson(await readBounded(response, MAX_TEXT_BYTES));
   const document = payload.files?.find(file => file.path === "SKILL.md" && typeof file.contents === "string");
   if (!document || typeof document.contents !== "string") throw catalogError("目录技能说明无效", 502, "error.catalog.response");
   const parsed = skillDocSummary(document.contents);
@@ -104,7 +142,7 @@ export async function loadCatalogPackage(input: CatalogRequest, fetchImpl: Fetch
     return { name: detail.name, zip: Buffer.from(bytes).toString("base64") };
   }
   const response = await fetchFixed(urls.download, fetchImpl, "application/json");
-  const payload = JSON.parse(new TextDecoder().decode(await readBounded(response, MAX_ARCHIVE_BYTES))) as { files?: { path?: unknown; contents?: unknown }[] };
+  const payload = parseFilesJson(await readBounded(response, MAX_ARCHIVE_BYTES));
   if (!Array.isArray(payload.files) || !payload.files.length || payload.files.length > MAX_FILES) throw catalogError("目录技能文件无效或过多", 502, "error.catalog.response");
   const entries = payload.files.map(file => {
     if (typeof file.path !== "string" || !SAFE_PATH.test(file.path) || typeof file.contents !== "string") throw catalogError("目录技能包含非法文件路径", 502, "error.catalog.response");

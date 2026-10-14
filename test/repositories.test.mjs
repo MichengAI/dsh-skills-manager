@@ -168,7 +168,7 @@ try {
   await manager.rememberCatalogInstall("clawhub:owner/missing-skill", "missing");
   const initialCatalogList = await manager.list();
   assert.deepEqual(initialCatalogList.catalogInstalls, ["clawhub:owner/skill-a"], "list() 只返回本地实际存在的技能目录标识，过滤已不存在的技能");
-  await manager.forgetCatalogInstall("pdf");
+  await manager.forgetCatalogInstall({ name: "pdf", root: "dsh" });
   const clearedCatalogList = await manager.list();
   assert.deepEqual(clearedCatalogList.catalogInstalls, [], "forgetCatalogInstall 成功清除对应技能的目录安装记录");
   await writeFile(join(process.env.DSH_HOME, "skills-manager/repositories.json"), "坏数据", "utf8");

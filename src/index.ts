@@ -21,8 +21,6 @@ import {
   assignSkillCategory,
   moveSkillInCategory,
   setCategoryEnabled,
-  deleteSkill,
-  permanentlyDeleteTrash,
   importSkill,
   importUploadedSkill,
   browseDirectories,
@@ -40,6 +38,7 @@ import {
 import { registerPluginUpdater } from "./plugin-updater.js";
 import { createRepositoryManager } from "./repositories.js";
 import { installationSourceKey } from "./repository-updates.js";
+import { listClawHub, searchClawHub } from "./clawhub-catalog.js";
 import { searchSkillsSh } from "./skills-sh-catalog.js";
 import { loadCatalogPackage, readCatalogSkill } from "./catalog-skill.js";
 
@@ -481,7 +480,17 @@ function apply(ctx: HostContext) {
           return run(res, async () => ({ items: await listWorkspaces(registeredWorkspacePaths(ctx) ?? []) }), undefined, req.method === "HEAD");
         }
         if ((req.method === "GET" || req.method === "HEAD") && path === "/api/dsh-skills-manager/repositories") {
-          return run(res, () => repositories.list(), undefined, req.method === "HEAD");
+          return run(res, () => enqueueMutation(() => repositories.list()), undefined, req.method === "HEAD");
+        }
+        if (req.method === "GET" && (path === "/api/dsh-skills-manager/clawhub/list" || path === "/api/dsh-skills-manager/clawhub/search")) {
+          const searching = path.endsWith("/search");
+          const allowed = searching ? ["q", "limit"] : ["limit", "cursor", "sort"];
+          if ([...u.searchParams.keys()].some(key => !allowed.includes(key) || u.searchParams.getAll(key).length !== 1) || searching && !u.searchParams.has("q")) {
+            json(res, 400, { ok: false, code: "error.catalog.query", error: "目录查询参数无效" });
+            return;
+          }
+          const parameter = (key: string) => u.searchParams.get(key) ?? undefined;
+          return run(res, () => searching ? searchClawHub(parameter("q")!, { limit: parameter("limit") }) : listClawHub({ limit: parameter("limit"), sort: parameter("sort"), cursor: parameter("cursor") }));
         }
         if (req.method === "GET" && path === "/api/dsh-skills-manager/skills-sh/search") {
           const queries = u.searchParams.getAll("q");
@@ -514,8 +523,20 @@ function apply(ctx: HostContext) {
         if (path === "/api/dsh-skills-manager/browse") {
           return run(res, () => browseDirectories(body.path));
         }
-        // 下载刷新只修改仓库目录缓存，使用仓库自己的串行队列，避免阻塞本地启停和导入。
+        // 网络只读阶段不占本地写入队列；最终文件和状态提交仍串行。
         if (path === "/api/dsh-skills-manager/repositories/refresh") return run(res, () => repositories.refresh(body));
+        if (path === "/api/dsh-skills-manager/catalog/detail") return run(res, () => readCatalogSkill(body));
+        if (path === "/api/dsh-skills-manager/catalog/install") {
+          return run(res, async () => {
+            if (body.root !== undefined && body.root !== "dsh" && body.root !== "agents") throw Object.assign(new Error("技能安装位置无效"), { statusCode: 400, code: "error.repo.invalid" });
+            if (body.workspace !== undefined && body.root !== undefined && body.root !== "dsh") throw Object.assign(new Error("工作区只能安装到项目 DSH skills"), { statusCode: 400, code: "error.repo.invalid" });
+            const target = await workspaceTarget(body);
+            if (target && "ok" in target && target.ok === false) return target;
+            const pack = await loadCatalogPackage(body);
+            const catalogId = body.catalog === "skillsh" ? `skillsh:${body.source}/${body.skillId}` : `clawhub:${body.owner}/${body.slug}`;
+            return enqueueMutation(() => repositories.installCatalog(catalogId, pack, { root: body.root, ...(body.workspace === undefined ? {} : { workspace: body.workspace }) }));
+          }, afterWrite);
+        }
         return enqueueMutation(() => {
           switch (path) {
             case "/api/dsh-skills-manager/repositories/add":
@@ -527,11 +548,7 @@ function apply(ctx: HostContext) {
             case "/api/dsh-skills-manager/repositories/install":
               return run(res, () => repositories.install(body, registeredWorkspacePaths(ctx)), afterWrite);
             case "/api/dsh-skills-manager/repositories/uninstall":
-              return run(res, async () => {
-                const result = await repositories.uninstall(body);
-                await repositories.forgetCatalogInstall(String(body.name || ""));
-                return result;
-              }, afterWrite);
+              return run(res, () => repositories.uninstall(body), afterWrite);
             case "/api/dsh-skills-manager/repositories/preview":
               return run(res, () => repositories.preview(body));
             case "/api/dsh-skills-manager/repositories/update":
@@ -566,15 +583,11 @@ function apply(ctx: HostContext) {
             case "/api/dsh-skills-manager/category-disable":
               return run(res, () => withScope(body, (scope) => setCategoryEnabled(String(body.root || ""), String(body.category || ""), false, log, scopedOptions(scope))), afterWrite);
             case "/api/dsh-skills-manager/delete":
-              return run(res, () => withScope(body, async (scope) => {
-                const result = await deleteSkill(await requestRoot(String(body.root || "dsh"), scope?.projectCwds), String(body.name || ""), log);
-                await repositories.forgetCatalogInstall(String(body.name || ""));
-                return result;
-              }), afterWrite);
+              return run(res, () => withScope(body, async (scope) => repositories.trashSkill(await requestRoot(String(body.root || "dsh"), scope?.projectCwds), String(body.name || ""))), afterWrite);
             case "/api/dsh-skills-manager/trash-restore":
               return run(res, () => withScope(body, (scope) => repositories.restoreTrash(String(body.id || ""), { ...(scope ?? {}), registeredWorkspaces: registeredWorkspacePaths(ctx) })), afterWrite);
             case "/api/dsh-skills-manager/trash-delete":
-              return run(res, () => permanentlyDeleteTrash(String(body.id || ""), log));
+              return run(res, () => repositories.permanentlyDeleteTrash(String(body.id || "")));
             case "/api/dsh-skills-manager/detail":
               return run(res, () => withScope(body, (scope) => skillDetail(String(body.root || "dsh"), String(body.name || ""), scope ? { ...scope, workspaceBound: true } : projectOptions())));
             case "/api/dsh-skills-manager/create":
@@ -607,32 +620,6 @@ function apply(ctx: HostContext) {
                   ...(target ? { root: (target as { root: SkillRoot }).root } : body.root === "agents" ? { root: await requestRoot("agents") } : {}),
                   ...userWriteOptions(body, target),
                 });
-              }, afterWrite);
-            case "/api/dsh-skills-manager/catalog/detail":
-              return run(res, () => readCatalogSkill(body));
-            case "/api/dsh-skills-manager/catalog/install":
-              return run(res, async () => {
-                const target = await workspaceTarget(body);
-                if (target && "ok" in target && target.ok === false) return target;
-                const pack = await loadCatalogPackage(body);
-                const root = target ? (target as { root: SkillRoot }).root : await requestRoot(body.root === "agents" ? "agents" : "dsh");
-                if (!root) throw Object.assign(new Error("安装位置不可用"), { statusCode: 400, code: "error.repo.invalid" });
-                const imported = await importUploadedSkill({ name: pack.name, entries: pack.entries, zip: pack.zip }, log, {
-                  conflict: "skip",
-                  root,
-                  ...userWriteOptions(body, target),
-                });
-                if (imported.ok === false || !imported.imported?.length) {
-                  throw Object.assign(new Error(imported.error || "同名技能已存在，不会覆盖本地文件"), { statusCode: 409, code: imported.code || "error.repo.conflict" });
-                }
-                const installedName = imported.imported[0].name;
-                const catalogId = body.catalog === "skillsh" ? `skillsh:${body.source}/${body.skillId}` : `clawhub:${body.owner}/${body.slug}`;
-                await repositories.rememberCatalogInstall(catalogId, installedName);
-                const enabled = await setSkillEnabled(root, installedName, true, log);
-                if (enabled && typeof enabled === "object" && "ok" in enabled && enabled.ok === false) {
-                  throw Object.assign(new Error(enabled.error || "技能启用状态无法写入"), { statusCode: 500, code: typeof enabled.code === "string" ? enabled.code : "error.repo.enableState" });
-                }
-                return { name: installedName, root: root.path };
               }, afterWrite);
             default:
               json(res, 404, { ok: false, code: "error.proto.unknownAction", error: `unknown action: ${path}` });

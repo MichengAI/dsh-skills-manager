@@ -204,6 +204,15 @@ export interface InstallRecord {
 export interface CatalogInstallRecord {
     id: string;
     name: string;
+    /** 旧记录缺少位置时保留，但不猜测其安装归属。 */
+    root?: RepositoryRoot;
+    workspace?: string;
+    /** 回收站中的副本不会把后来创建的同名技能认作原安装。 */
+    trashId?: string;
+    restoreFingerprint?: string;
+    /** 文件落盘前记录精确摘要，确认失败后只恢复完全匹配的副本。 */
+    complete?: boolean;
+    files?: FileDigest[];
 }
 export interface RepositoryState {
     version: number;
@@ -255,11 +264,15 @@ export interface MutationOptions extends ScopeOptions {
     allowRepositoryRoot?: boolean;
     repositoryEntryOnly?: boolean;
     repositoryTrash?: { id: string; repository: { id: string; path: string } };
+    /** 内部目录副本回收凭据，不从 HTTP 请求体读取。 */
+    catalogTrash?: { id: string; ids: string[] };
     repositoryRestore?: boolean;
     root?: RootInput;
     renameOptions?: RenameOptions;
     conflict?: string;
     dryRun?: boolean;
+    /** 内部安装事务在文件复制前持久化意图，不接受请求体回调。 */
+    beforeImport?: (pending: ImportPending[], conflicts: ImportConflict[], failed: ImportFailure[]) => Promise<void>;
 }
 export interface UploadInput {
     name?: string;

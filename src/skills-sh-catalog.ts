@@ -2,6 +2,7 @@ const SEARCH_URL = "https://skills.sh/api/search";
 const MAX_QUERY_LENGTH = 100;
 const MAX_RESPONSE_BYTES = 1 << 20;
 const MAX_RESULTS = 100;
+const IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 
 type SkillsShEntry = {
   id?: unknown;
@@ -40,23 +41,43 @@ export async function searchSkillsSh(query: string): Promise<{ skills: SkillsShS
 
   const url = new URL(SEARCH_URL);
   url.searchParams.set("q", normalized);
-  const response = await fetch(url, {
-    headers: { accept: "application/json" },
-    redirect: "error",
-    signal: AbortSignal.timeout(10_000),
-  });
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      headers: { accept: "application/json" },
+      redirect: "error",
+      signal: AbortSignal.timeout(10_000),
+    });
+  } catch { throw catalogError("skills.sh 搜索服务暂时不可用", 502, "error.catalog.upstream"); }
   if (!response.ok) {
     throw catalogError("skills.sh 搜索服务暂时不可用", 502, "error.catalog.upstream");
   }
   const contentLength = Number(response.headers.get("content-length"));
   if (Number.isFinite(contentLength) && contentLength > MAX_RESPONSE_BYTES) {
+    await response.body?.cancel().catch(() => undefined);
     throw catalogError("skills.sh 搜索响应过大", 502, "error.catalog.response");
   }
-
-  const body = await response.text();
-  if (Buffer.byteLength(body, "utf8") > MAX_RESPONSE_BYTES) {
-    throw catalogError("skills.sh 搜索响应过大", 502, "error.catalog.response");
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  const reader = response.body?.getReader();
+  if (reader) {
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        size += value.byteLength;
+        if (size > MAX_RESPONSE_BYTES) {
+          await reader.cancel().catch(() => undefined);
+          throw catalogError("skills.sh 搜索响应过大", 502, "error.catalog.response");
+        }
+        chunks.push(value);
+      }
+    } catch {
+      await reader.cancel().catch(() => undefined);
+      throw catalogError("skills.sh 搜索响应无效或读取中断", 502, "error.catalog.response");
+    } finally { reader.releaseLock(); }
   }
+  const body = Buffer.concat(chunks, size).toString("utf8");
 
   let payload: SkillsShResponse;
   try {
@@ -72,8 +93,8 @@ export async function searchSkillsSh(query: string): Promise<{ skills: SkillsShS
   const seen = new Set<string>();
   for (const candidate of payload.skills as SkillsShEntry[]) {
     if (!candidate || typeof candidate !== "object") continue;
-    const source = boundedString(candidate.source, 256);
-    const skillId = boundedString(candidate.skillId, 256);
+    const source = typeof candidate.source === "string" && candidate.source.split("/").length === 2 && candidate.source.split("/").every(part => IDENTIFIER.test(part)) ? candidate.source : undefined;
+    const skillId = typeof candidate.skillId === "string" && IDENTIFIER.test(candidate.skillId) ? candidate.skillId : undefined;
     const name = boundedString(candidate.name, 256);
     const id = boundedString(candidate.id, 768) || (source && skillId ? `${source}/${skillId}` : undefined);
     if (!id || !source || !skillId || !name || seen.has(id)) continue;

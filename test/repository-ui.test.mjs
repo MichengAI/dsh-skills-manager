@@ -34,7 +34,7 @@ const skillshCalls = [];
 const skillshResults = [{ id: "owner/skills/react-skill", source: "owner/skills", skillId: "react-skill", name: "React Skill", installs: 123456 }];
 const catalogFetch = async (input) => {
   const url = new URL(input);
-  if (url.pathname === "/api/v1/search") {
+  if (url.pathname === "/clawhub/search") {
     catalogSearchCalls.push(url);
     return {
       ok: true,
@@ -69,7 +69,7 @@ globalThis.IntersectionObserver = class {
   observe() {}
   disconnect() {}
 };
-globalThis.fetch = catalogFetch;
+globalThis.fetch = async () => { throw new Error("目录客户端不得直连外部网络"); };
 let workspaceRows = [];
 let finishInstall, finishUninstall;
 let failInstall = false, failUninstall = false;
@@ -80,6 +80,7 @@ let mockCatalogInstalls = ["clawhub:owner-2/skill-002"];
 const api = async (path, options) => {
   const body = options?.body ? JSON.parse(options.body) : undefined;
   calls.push({ path, body });
+  if (path.startsWith("/clawhub/")) return (await catalogFetch("http://localhost" + path)).json();
   if (path.startsWith("/skills-sh/search")) {
     const url = new URL(path, "http://localhost");
     skillshCalls.push(url);
@@ -278,7 +279,10 @@ assert.equal(modalNodes().find(n => n.type === Input.TextArea)?.props.value, "# 
 await clickNode(rowActions(catalogRow("Skill 001"))[1]);
 assert.equal(dialog()?.props.title, "repo.install", "安装沿用现有安装位置选择");
 assert.equal(radio("dsh").props.checked, true, "目录安装默认仍是 DSH，不改动后续仓库安装的选择");
+failInstalledRefresh = true;
 await clickModal("repo.install");
+failInstalledRefresh = false;
+assert.ok(find(node => node.props.role === "status" && node.children.some(child => typeof child === "string" && child.includes("repo.catalog.installRefreshWarning"))), "目录安装成功但刷新失败时只提示刷新警告，不误报安装失败");
 const catalogInstallCall = calls.findLast(c => c.path === "/catalog/install");
 assert.ok(catalogInstallCall, "确认后安装这一条目录技能，不把目录订阅成仓库");
 assert.equal(catalogInstallCall.body.catalog, "clawhub");
@@ -328,9 +332,10 @@ await settle();
 assert.equal(catalogCalls.length, 2, "一次向下滚动只再加载 10 条");
 assert.equal(catalogCalls.at(-1).searchParams.get("limit"), "10");
 assert.equal(catalogCalls.at(-1).searchParams.get("cursor"), "10");
-sentinel().props.onWheel({ deltaY: 24 });
-await settle();
-assert.equal(catalogCalls.length, 3, "下一次向下滚动才加载再下一页");
+const manualMore = find(node => isAction(node, "repo.catalog.loadMore"));
+assert.ok(manualMore, "榜单提供可触控和键盘激活的显式下一页入口");
+await clickNode(manualMore);
+assert.equal(catalogCalls.length, 3, "显式加载也只加载一页，不靠自动哨兵");
 for (let page = catalogCalls.length; page < 10; page++) {
   sentinel().props.onWheel({ deltaY: 24 });
   await settle();

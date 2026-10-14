@@ -47,6 +47,22 @@ try {
   assert.equal(outerStatus, 400);
   assert.deepEqual(outerPayload.params, { path: "C:/missing", action: "restore" }, "外层响应保留完整业务参数");
   assert.equal((await fetch(api)).status, 200);
+  let proxyRequest;
+  interceptedCatalog = async (url, options) => {
+    proxyRequest = { url: String(url), options };
+    return Response.json(String(url).includes("/search?") ? { results: [{ ownerHandle: "owner", slug: "proxy-skill", displayName: "Proxy Skill", summary: "真实字段" }] } : { items: [{ ownerHandle: "owner", slug: "proxy-skill", displayName: "Proxy Skill", summary: "真实字段" }], nextCursor: "next" });
+  };
+  const clawBase = api.replace("/repositories", "/clawhub");
+  const listProxy = await fetch(clawBase + "/list?sort=downloads&limit=10&cursor=opaque");
+  assert.equal(listProxy.status, 200, "ClawHub 下载榜通过本地代理读取");
+  assert.equal((await listProxy.json()).data.items[0].slug, "proxy-skill");
+  assert.equal(proxyRequest.url, "https://clawhub.ai/api/v1/skills?sort=downloads&limit=10&cursor=opaque");
+  assert.equal(proxyRequest.options.redirect, "error");
+  const searchProxy = await fetch(clawBase + "/search?q=Browser&limit=100");
+  assert.equal(searchProxy.status, 200);
+  assert.equal((await searchProxy.json()).data.results[0].ownerHandle, "owner");
+  assert.equal(proxyRequest.url, "https://clawhub.ai/api/v1/search?q=Browser&limit=100");
+  for (const query of ["/list?limit=11", "/list?cursor=", "/list?limit=10&limit=1", "/list?url=https://evil.test", "/search?q=a&q=b", "/search?limit=100", "/search?q=a&limit=101"]) assert.equal((await fetch(clawBase + query)).status, 400, "本地代理拒绝非法或重复参数");
   let upstreamRequest;
   interceptedSkillshSearch = async (url, options) => {
     upstreamRequest = { url: String(url), headers: options?.headers, redirect: options?.redirect };

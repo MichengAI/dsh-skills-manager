@@ -40,4 +40,43 @@ assert.equal(folded.description, "Lazy senior dev mode: the smallest change.", "
 const foldedDash = await readCatalogSkill({ catalog: "skillsh", source: "owner/repo", skillId: "ponytail-dash" }, async () => new Response(JSON.stringify({ files: [{ path: "SKILL.md", contents: "---\nname: ponytail\ndescription: >-\n  Lazy senior dev mode: dash variant.\n---\n\n# Ponytail\n" }] }), { status: 200, headers: { "content-type": "application/json" } }));
 assert.equal(foldedDash.description, "Lazy senior dev mode: dash variant.", "YAML 折叠标记 >- 不能当成简介");
 
+const skillshIdentity = { catalog: "skillsh", source: "owner/repo", skillId: "skill" };
+for (const operation of [readCatalogSkill, loadCatalogPackage]) {
+  await assert.rejects(operation(skillshIdentity, async () => new Response("not json")),
+    error => error.code === "error.catalog.response" && error.statusCode === 502,
+    "下载 JSON 解析失败必须返回统一诊断，不能暴露 SyntaxError");
+}
+
+for (const payload of [null, [], 1, "text", {}, { files: null }, { files: {} }, { files: [] }, { files: [null] }, { files: ["text"] }, { files: [{ path: "SKILL.md", contents: 1 }] }]) {
+  for (const operation of [readCatalogSkill, loadCatalogPackage]) {
+    await assert.rejects(operation(skillshIdentity, async () => new Response(JSON.stringify(payload))),
+      error => error.code === "error.catalog.response" && error.statusCode === 502,
+      `无效响应结构 ${JSON.stringify(payload)} 不得泄漏 TypeError`);
+  }
+}
+
+for (const [operation, input, chunkSize] of [
+  [readCatalogSkill, { catalog: "clawhub", owner: "owner", slug: "skill" }, 700_000],
+  [loadCatalogPackage, { catalog: "clawhub", owner: "owner", slug: "skill" }, 5_000_000],
+]) {
+  let pulls = 0, cancelled = false;
+  const stream = new ReadableStream({ pull(controller) { pulls++; if (pulls <= 2) controller.enqueue(new Uint8Array(chunkSize)); else controller.close(); }, cancel() { cancelled = true; } }, { highWaterMark: 0 });
+  await assert.rejects(operation(input, async () => new Response(stream)), error => error.code === "error.catalog.response");
+  assert.equal(pulls, 2, "无 content-length 的超限流必须立即停止读取");
+  assert.equal(cancelled, true, "超限流必须取消");
+}
+const skillDoc = "---\nname: example\ndescription: Example\n---\n\nUse it.\n";
+const successfulPackage = await loadCatalogPackage(skillshIdentity, async () => new Response(JSON.stringify({ files: [{ path: "SKILL.md", contents: skillDoc }, { path: "scripts/demo.txt", contents: "示例" }] })));
+assert.equal(successfulPackage.name, "example");
+assert.equal(Buffer.from(successfulPackage.entries[1].data, "base64").toString("utf8"), "示例");
+for (const operation of [readCatalogSkill, loadCatalogPackage]) {
+  await assert.rejects(operation(skillshIdentity, async () => new Response(JSON.stringify({ files: Array.from({ length: 101 }, () => ({ path: "SKILL.md", contents: skillDoc })) }))), error => error.code === "error.catalog.response");
+  await assert.rejects(operation(skillshIdentity, async () => new Response("{}", { headers: { "content-length": "8388609" } })), error => error.code === "error.catalog.response");
+}
+for (const operation of [readCatalogSkill, loadCatalogPackage]) {
+  await assert.rejects(operation(skillshIdentity, async () => { throw new TypeError("网络不可达"); }), error => error.code === "error.catalog.upstream" && error.statusCode === 502, "网络异常也必须返回目录错误码");
+}
+for (const operation of [readCatalogSkill, loadCatalogPackage]) {
+  await assert.rejects(operation(skillshIdentity, async () => new Response(new ReadableStream({ start(controller) { controller.error(new Error("响应流中断")); } }))), error => error.code === "error.catalog.response" && error.statusCode === 502, "响应读取中断也必须返回稳定目录诊断");
+}
 console.log("目录技能详情与安装包地址测试通过");

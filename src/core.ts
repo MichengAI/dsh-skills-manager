@@ -2108,7 +2108,7 @@ export async function deleteSkill(root: RootInput, name: string, log?: Log, opti
   const targets = (await safeExistingEntryPaths(definition.path, name))
     .filter(target => !options.repositoryEntryOnly || target.fileName === name);
   if (!targets.length) return { ok: false, error: `技能不存在: ${name}`, code: "error.skill.notFound", params: { name } };
-  const id = options.repositoryTrash?.id || `${Date.now()}-${randomUUID()}`;
+  const id = options.repositoryTrash?.id || options.catalogTrash?.id || `${Date.now()}-${randomUUID()}`;
   if (!/^\d+-[a-f0-9-]{36}$/.test(id)) throw codedError("回收站条目编号非法", "error.trash.invalid", { id });
   const trashRoot = trashRootPath();
   const stage = join(trashRoot, `.stage-${randomUUID()}`);
@@ -2138,6 +2138,7 @@ export async function deleteSkill(root: RootInput, name: string, log?: Log, opti
       entries: moved.map((item) => item.fileName),
       root: trashRootMetadata(definition),
       ...(options.repositoryTrash ? { repository: options.repositoryTrash.repository } : {}),
+      ...(options.catalogTrash ? { catalog: options.catalogTrash.ids } : {}),
     };
     await fs.writeFile(
       join(stage, "metadata.json"),
@@ -2693,6 +2694,8 @@ export async function importSkill(source: string, log?: Log, options: MutationOp
     if (pending.length === 0 && conflicts.length === 0) return failureResult();
     return { kind: analysis.kind, pending, conflicts, failed };
   }
+
+  if (!dryRun && options.beforeImport) await options.beforeImport(pending, conflicts, failed);
 
   if (
     pending.length > 0 ||
@@ -3514,4 +3517,4 @@ export type ProviderCandidate = Awaited<ReturnType<typeof listProviderCandidates
 type SourceAnalysis = ({kind: "none"} & Diagnostic) | ({kind: "single"; skillFile: string} & ImportCandidate) | {kind: "batch"; rawName: string; source: string; isDir: boolean};
 type MetadataEntry = DiscoveredEntry & {name: string; providerRank?: number; policyAliases?: {rootKey: string; name: string}[]};
 interface MetadataScan {exists: boolean; entries: MetadataEntry[]; truncated?: boolean}
-interface TrashMetadata { id: string; name: string; deletedAt: string; repository?: {id: string; path: string}; root?: {key: string; scope: string; label: string; localeKey?: string; projectRoot?: string; projectName?: string; kind?: string}; entries: string[] }
+interface TrashMetadata { id: string; name: string; deletedAt: string; repository?: {id: string; path: string}; catalog?: string[]; root?: {key: string; scope: string; label: string; localeKey?: string; projectRoot?: string; projectName?: string; kind?: string}; entries: string[] }

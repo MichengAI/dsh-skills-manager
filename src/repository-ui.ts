@@ -17,6 +17,8 @@ import type { CodedError } from "./types.js";
 // 仓库页复用宿主技能面板组件；只在进入页签时读取本地目录缓存。
 export const repositoryLocales = {
   zh: {
+    "repo.catalog.loadMore": "再加载 10 条",
+    "repo.catalog.installRefreshWarning": "技能已安装并启用，但列表刷新失败。请重新打开发现页；不要重复安装。",
     "repo.installElsewhere": "安装到其他位置", "repo.destinationUnavailable": "原项目未登记或目录不可用，无法管理此副本。请在侧栏重新登记原项目后刷新。", "repo.projectDestination": "项目 DSH · {path}",
     "repo.refreshing": "正在检查更新…", "repo.refreshed": "刷新与更新检查完成", "repo.detailLoading": "正在读取技能说明…",
     "repo.local": "本机", "repo.source": "安装来源", "repo.update": "可更新", "repo.review": "查看更新", "repo.rollback": "恢复上一版", "repo.confirmUpdate": "备份并更新", "repo.confirmRollback": "备份并恢复", "repo.overwrite": "备份本地修改并替换", "repo.modified": "检测到本地修改。替换会覆盖当前文件，原文件将完整备份，可恢复。", "repo.noChanges": "文件内容没有变化。", "repo.added": "新增", "repo.removed": "删除", "repo.modifiedFile": "修改", "repo.updating": "更新中…", "repo.updateProgress": "正在校验、备份并替换，请稍候…", "repo.updateSuccess": "更新完成，已保留上一版备份。", "repo.rollbackSuccess": "已恢复上一版。", "repo.manageUpdate": "管理更新", "error.repo.modified": "存在本地修改，请预览并确认备份后替换。",
@@ -34,6 +36,8 @@ export const repositoryLocales = {
     "error.repo.invalid": "仓库地址、路径或内容无效，请检查输入及仓库大小。", "error.repo.network": "仓库访问失败，请检查网络或稍后重试。上次列表已保留。", "error.repo.state": "仓库状态文件损坏或无法读取，请保留文件并修复后重试。", "error.repo.conflict": "同名技能已存在或安装失败，本地文件未被覆盖。", "error.repo.enableState": "技能文件已撤销，但启用状态无法写入。请恢复磁盘写入后重试安装。",
   },
   en: {
+    "repo.catalog.loadMore": "Load 10 more",
+    "repo.catalog.installRefreshWarning": "Installed and enabled, but the list could not refresh. Reopen Discover Skills; do not install again.",
     "repo.installElsewhere": "Install elsewhere", "repo.destinationUnavailable": "The original project is unregistered or unavailable. Re-register it in the sidebar and refresh to manage this copy.", "repo.projectDestination": "Project DSH · {path}",
     "repo.refreshing": "Checking updates…", "repo.refreshed": "Refresh and update check completed", "repo.detailLoading": "Loading skill instructions…",
     "repo.local": "Local", "repo.source": "Installed from", "repo.update": "Update available", "repo.review": "Review update", "repo.rollback": "Restore previous version", "repo.confirmUpdate": "Back up and update", "repo.confirmRollback": "Back up and restore", "repo.overwrite": "Back up local edits and replace", "repo.modified": "Local edits detected. Replacement overwrites current files and keeps a complete backup for restoration.", "repo.noChanges": "No file changes.", "repo.added": "Added", "repo.removed": "Removed", "repo.modifiedFile": "Modified", "repo.updating": "Updating…", "repo.updateProgress": "Verifying, backing up and replacing files. Please wait…", "repo.updateSuccess": "Updated. Previous version backed up.", "repo.rollbackSuccess": "Previous version restored.", "repo.manageUpdate": "Manage updates", "error.repo.modified": "Local edits detected. Review and confirm replacement with a backup.",
@@ -111,7 +115,7 @@ type ClawHubApiSearchResponse = { results?: ClawHubApiSearchResult[] };
 export function createRepositoryUI({ react, Modal, Input, Button, Collapse, SourceSelect, destination, api, headers, translateError, getLocale }: Dependencies) {
   const h = react.createElement;
   const { DestinationPicker, defaultDestination, destinationPayload, destinationReady } = destination;
-  return function useRepositoryUI({ active, t, onInstalled, installedSkills = [] }: {active: boolean; t: Translate; onInstalled?: () => unknown; installedSkills?: InstalledCatalogSkill[]}) {
+  return function useRepositoryUI({ active, t, onInstalled }: {active: boolean; t: Translate; onInstalled?: () => unknown; installedSkills?: InstalledCatalogSkill[]}) {
     const [repos, setRepos] = react.useState<RepoView[]>([]);
     const [installRoots, setInstallRoots] = react.useState<RepositoryDestination[]>([]);
     const [busy, setBusy] = react.useState(false);
@@ -218,9 +222,7 @@ export function createRepositoryUI({ react, Modal, Input, Button, Collapse, Sour
         const params = new URLSearchParams({ sort: "downloads", limit: String(Math.min(10, 100 - offset)) });
         const cursor = reset ? null : current.cursor;
         if (cursor) params.set("cursor", cursor);
-        const response = await globalThis.fetch("https://clawhub.ai/api/v1/skills?" + params.toString(), { headers: { accept: "application/json" } });
-        if (!response.ok) throw new Error("ClawHub request failed with HTTP " + response.status);
-        const page = await response.json() as ClawHubApiPage;
+        const page = await api(`/clawhub/list?${params.toString()}`) as ClawHubApiPage;
         if (!Array.isArray(page.items)) throw new Error("ClawHub response has no items array");
         const items = page.items.flatMap((item): CatalogSkillItem[] => {
           if (typeof item.ownerHandle !== "string" || !item.ownerHandle || typeof item.slug !== "string" || !item.slug) return [];
@@ -269,13 +271,7 @@ export function createRepositoryUI({ react, Modal, Input, Button, Collapse, Sour
       setClawhubSearchError(false);
       try {
         const params = new URLSearchParams({ q: query, limit: "100" });
-        const response = await globalThis.fetch("https://clawhub.ai/api/v1/search?" + params.toString(), {
-          headers: { accept: "application/json" },
-          redirect: "error",
-          signal: controller.signal,
-        });
-        if (!response.ok) throw new Error("ClawHub search failed with HTTP " + response.status);
-        const result = await response.json() as ClawHubApiSearchResponse;
+        const result = await api(`/clawhub/search?${params.toString()}`, { signal: controller.signal }) as ClawHubApiSearchResponse;
         if (!Array.isArray(result.results)) throw new Error("ClawHub search response has no results array");
         const count = (value: unknown) => typeof value === "number" && Number.isFinite(value) ? value : undefined;
         const items = result.results.flatMap((item): CatalogSkillItem[] => {
@@ -450,7 +446,8 @@ export function createRepositoryUI({ react, Modal, Input, Button, Collapse, Sour
         setCatalogInstallIds(prev => prev.includes(catalogId) ? prev : [...prev, catalogId]);
         setFeedback({ key: "repo.installSuccess", name: target.name });
         setModal(null);
-        await Promise.all([load(), Promise.resolve().then(() => onInstalled?.())]);
+        const refreshed = await Promise.allSettled([load(), Promise.resolve().then(() => onInstalled?.())]);
+        if (mounted.current && refreshed.some(result => result.status === "rejected")) setFeedback({ key: "repo.catalog.installRefreshWarning", name: target.name });
       }, false);
     }
     react.useEffect(() => { if (active) perform(load, false); }, [active]);
@@ -700,7 +697,7 @@ export function createRepositoryUI({ react, Modal, Input, Button, Collapse, Sour
       if (modal.type === "detail" && !modal.detail) body = h("div", { role: "status", className: "dssm-repo-panel" }, modal.loading ? t("repo.detailLoading") : null, modal.failed ? feedbackNode : null);
       dialog = h(Modal, { title: t("repo." + (modal.type === "catalog-detail" ? "detail" : modal.type === "catalog-install" ? "install" : modal.type === "remove" ? "remove" : modal.type)), closeLabel: t("repo.close"), onClose: close }, body);
     }
-    const installedCatalogNames = new Set(installedSkills.flatMap(skill => [skill.name, skill.declaredName].filter((name): name is string => !!name).map(name => name.toLowerCase())));
+
     function catalogInstalled(id: string) {
       return catalogInstallIds.includes(id);
     }
@@ -738,7 +735,8 @@ export function createRepositoryUI({ react, Modal, Input, Button, Collapse, Sour
       !catalogList.length && !catalogLoading && !catalogError ? h("div", { className: "dssm-empty" }, t("repo.catalog.empty")) : null,
       catalogLoading ? h("div", { className: "dssm-catalog-loading", role: "status", "aria-live": "polite" }, h("span", { className: "dssm-repo-spinner", "aria-hidden": true }), catalogItems.length ? t("repo.catalog.loadingMore") : t("repo.catalog.loading")) : null,
       catalogError ? h("div", { className: "dssm-feedback dssm-error", role: "alert" }, t("repo.catalog.loadError"), h(Button, { type: "text", onClick: () => { void loadClawHubPage(); } }, t("repo.catalog.retry"))) : null,
-      subsource === "clawhub" && !catalogQuery.trim() && catalogHasMore && !catalogError ? h("div", { className: "dssm-catalog-sentinel", ref: catalogSentinel, "aria-hidden": true, onWheel: onCatalogWheel }) : null
+      subsource === "clawhub" && !catalogQuery.trim() && catalogHasMore && !catalogError ? h("div", { className: "dssm-catalog-sentinel", ref: catalogSentinel, "aria-hidden": true, onWheel: onCatalogWheel }) : null,
+      subsource === "clawhub" && !catalogQuery.trim() && catalogHasMore && !catalogError && !catalogLoading ? h("div", { className: "dssm-catalog-loading" }, h(Button, { type: "text", onClick: () => { void loadClawHubPage(false, true); } }, t("repo.catalog.loadMore"))) : null
     );
     const clawhubSearchView = h("div", { className: "dssm-catalog-list" },
       clawhubSearchItems.map(renderCatalogItem),

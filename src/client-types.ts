@@ -1,3 +1,4 @@
+import type { ClawHubPage, ClawHubSearchResponse } from './clawhub-catalog.js';
 import type * as React from 'react';
 import type { createRepositoryManager } from './repositories.js';
 import type { state, skillDetail, createSkill, listTrash, listWorkspaces, workspaceSkills } from './core.js';
@@ -11,11 +12,11 @@ export type Detail = Success<Awaited<ReturnType<typeof skillDetail>>>;
 export type TrashItem = Awaited<ReturnType<typeof listTrash>>[number];
 type Manager = ReturnType<typeof createRepositoryManager>;
 export type RepositoryRoutes = {
-    [K in keyof Manager as K extends 'sources' | 'list' | 'restoreTrash' | 'rememberCatalogInstall' | 'forgetCatalogInstall' ? never : `/repositories/${K}`]: Awaited<ReturnType<Manager[K]>>;
+    [K in keyof Manager as K extends 'sources' | 'list' | 'restoreTrash' | 'rememberCatalogInstall' | 'forgetCatalogInstall' | 'installCatalog' | 'trashSkill' | 'permanentlyDeleteTrash' ? never : `/repositories/${K}`]: Awaited<ReturnType<Manager[K]>>;
 };
 type SkillsShSearchPath = `/skills-sh/search?q=${string}`;
 type SkillsShSearchResult = { skills: { id: string; source: string; skillId: string; name: string; installs?: number }[] };
-export type ApiRoutes = RepositoryRoutes & Record<SkillsShSearchPath, SkillsShSearchResult> & {
+export type ApiRoutes = RepositoryRoutes & Record<SkillsShSearchPath, SkillsShSearchResult> & Record<`/clawhub/list?${string}`, ClawHubPage> & Record<`/clawhub/search?${string}`, ClawHubSearchResponse> & {
     '/repositories': Awaited<ReturnType<Manager['list']>>;
     '/state': ManagerSnapshot;
     '/workspaces': { items: Awaited<ReturnType<typeof listWorkspaces>> };
