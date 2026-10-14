@@ -1173,7 +1173,7 @@ function entryOf(name: string, kind: string, docPath: string, doc: Pick<ParsedSk
     });
   if (doc.hasFrontmatter && !declaredName)
     diagnostics.push({ level: "error", code: "diagnostic.name.missing" });
-  else if (declaredName && !KEBAB_RE.test(declaredName))
+  else if (declaredName && !KEBAB_RE.test(toKebab(declaredName)))
     diagnostics.push({
       level: "error",
       code: "diagnostic.name.invalid",
@@ -1198,7 +1198,7 @@ function entryOf(name: string, kind: string, docPath: string, doc: Pick<ParsedSk
     hasFrontmatter: doc.hasFrontmatter,
     // 调用策略值异常可以由 manager 本地策略覆盖；结构本身合法即可加载。
     loadable:
-      doc.hasFrontmatter && KEBAB_RE.test(declaredName) && description !== "",
+      doc.hasFrontmatter && description !== "" && KEBAB_RE.test(KEBAB_RE.test(declaredName) ? declaredName : toKebab(declaredName)),
     diagnostics,
   };
 }
@@ -3146,7 +3146,7 @@ export async function listProviderCandidates(options: ScopeOptions = {}) {
       policyResult.writable === false;
     if (!needsOverlay) continue;
     candidates.push({
-      name: entry.declaredName,
+      name: canonicalSkillName({ root, entry, policy }),
       description: entry.description,
       invocation: {
         modelInvocable: policy.modelInvocable,
@@ -3223,8 +3223,9 @@ export async function getProviderSkill(candidate: ProviderCandidate, options: Sc
       await fs.readFile(entry.realDocPath || entry.docPath, "utf8"),
     );
     const summary = entryOf(locator.entryName, entry.kind, entry.docPath, doc);
-    if (!summary.loadable || summary.declaredName !== candidate.name)
-      return undefined;
+    if (!summary.loadable) return undefined;
+    const invocationName = KEBAB_RE.test(summary.declaredName) ? summary.declaredName : toKebab(summary.declaredName);
+    if (invocationName !== candidate.name && summary.declaredName !== candidate.name) return undefined;
     return {
       name: candidate.name,
       description: candidate.description,
@@ -3244,7 +3245,10 @@ export async function getProviderSkill(candidate: ProviderCandidate, options: Sc
 // ── 状态快照 ────────────────────────────────────────────────────────────────
 
 function canonicalSkillName(item: SkillItem) {
-  return item.entry.declaredName || item.entry.name;
+  const declared = item.entry.declaredName || "";
+  if (KEBAB_RE.test(declared)) return declared;
+  const kebab = toKebab(declared);
+  return kebab && kebab === item.entry.name ? item.entry.name : declared || item.entry.name;
 }
 
 /** 真实路径去重后按声明名分组；管理页与当前工作区 provider 共用来源优先级。 */

@@ -818,6 +818,19 @@ eq(
   "structurally incomplete toggle carries the notLoadable code",
 );
 await makeSkill(
+  dshRoot,
+  "skill-scan",
+  "---\nname: SkillScan\ndescription: Security gate for skills.\n---\nbody\n",
+);
+const titledToggle = await setSkillEnabled(dshRoot, "skill-scan", true);
+ok(
+  titledToggle.ok !== false && titledToggle.enabled === true,
+  "frontmatter title SkillScan can be enabled under its kebab folder name",
+);
+const titledState = await state();
+const titledSkill = titledState.roots.flatMap((root) => root.skills || []).find((skill) => skill.name === "skill-scan");
+ok(titledSkill && titledSkill.loadable !== false, "a title-case frontmatter name does not make the installed skill invalid");
+await makeSkill(
   agentsRoot,
   "public-skill",
   "---\nname: public-skill\ndescription: Public skill.\n---\nbody",
