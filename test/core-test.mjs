@@ -830,6 +830,18 @@ ok(
 const titledState = await state();
 const titledSkill = titledState.roots.flatMap((root) => root.skills || []).find((skill) => skill.name === "skill-scan");
 ok(titledSkill && titledSkill.loadable !== false, "a title-case frontmatter name does not make the installed skill invalid");
+// 同一声明名不因嵌套路径变化；候选名称必须满足宿主 kebab-case 契约。
+for (const name of ["nested-title-scan", "team/nested-title-scan"]) {
+  await makeSkill(codexRoot, name, "---\nname: NestedTitleScan\ndescription: 嵌套标题名回归。\n---\n正文\n");
+}
+const nestedTitleSkills = (await state()).roots.flatMap(root => root.skills || []).filter(skill => skill.declaredName === "NestedTitleScan");
+eq(nestedTitleSkills.filter(skill => skill.winner).length, 1, "嵌套与顶层的同声明名只产生一个 winner");
+eq(nestedTitleSkills.find(skill => skill.winner)?.canonicalName, "nested-title-scan", "嵌套路径不改变 winner 的规整调用名");
+ok(nestedTitleSkills.some(skill => skill.shadowedBy?.name === "nested-title-scan"), "嵌套副本遵循同名遮蔽规则");
+const nestedTitleCandidates = (await listProviderCandidates()).filter(candidate => candidate.locator?.entryName?.includes("nested-title-scan"));
+eq(nestedTitleCandidates.length, 1, "provider 将嵌套同名技能合并为单个候选");
+ok(nestedTitleCandidates.every(candidate => candidate.name === "nested-title-scan"), "provider 不返回宿主拒绝的大写名称");
+for (const name of ["nested-title-scan", "team/nested-title-scan"]) await rm(join(codexRoot, name), { recursive: true });
 await makeSkill(
   agentsRoot,
   "public-skill",

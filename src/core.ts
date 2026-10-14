@@ -3248,7 +3248,7 @@ function canonicalSkillName(item: SkillItem) {
   const declared = item.entry.declaredName || "";
   if (KEBAB_RE.test(declared)) return declared;
   const kebab = toKebab(declared);
-  return kebab && kebab === item.entry.name ? item.entry.name : declared || item.entry.name;
+  return kebab || declared || item.entry.name;
 }
 
 /** 真实路径去重后按声明名分组；管理页与当前工作区 provider 共用来源优先级。 */

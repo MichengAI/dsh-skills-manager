@@ -96,6 +96,17 @@ try {
     assert.equal(remaining.length, 1, "永久删除只清对应回收副本");
     assert.equal(remaining[0].workspace, projectRoot.projectRoot);
   });
+  await test("Shared Agent 目录副本可以回收、恢复并保留安装身份", async () => {
+    installedName = "shared-catalog-name";
+    const id = "skillsh:owner/skills/shared-catalog-slug";
+    assert.equal((await install("shared-catalog-slug", { root: "agents" })).status, 200);
+    const deleted = await post("/delete", { root: "agents", name: installedName });
+    assert.equal(deleted.status, 200, "已安装的 Shared Agent 副本不能被误判为只读");
+    assert.ok(!(await list()).catalogInstalls.includes(id));
+    assert.ok((await stored()).catalogInstalls.some(record => record.id === id && record.trashId === deleted.data.id));
+    assert.equal((await post("/trash-restore", { id: deleted.data.id })).status, 200);
+    assert.ok((await list()).catalogInstalls.includes(id));
+  });
   await test("旧字符串身份不猜名称，用户重装时仅对完整相同内容重新关联", async () => {
     installedName = "legacy-real-name";
     const skill = join(process.env.DSH_HOME, "skills", installedName);

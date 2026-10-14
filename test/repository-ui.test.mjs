@@ -34,6 +34,7 @@ let installRoots = structuredClone(configuredRoots);
 const calls = [];
 const catalogCalls = [];
 const catalogSearchCalls = [];
+let failCatalogRanking = false;
 const skillshCalls = [];
 const skillshResults = [{ id: "owner/skills/react-skill", source: "owner/skills", skillId: "react-skill", name: "React Skill", installs: 123456 }];
 const catalogFetch = async (input) => {
@@ -50,6 +51,7 @@ const catalogFetch = async (input) => {
     };
   }
   catalogCalls.push(url);
+  if (failCatalogRanking) throw new Error("模拟榜单首次请求失败");
   const offset = Number(url.searchParams.get("cursor") || 0);
   const items = Array.from({ length: 10 }, (_value, index) => {
     const rank = offset + index + 1;
@@ -79,7 +81,7 @@ let finishInstall, finishUninstall;
 let failInstall = false, failUninstall = false;
 let finishRefresh, finishDetail;
 let holdRefresh = false, failRefresh = false;
-let installedCalls = 0, failInstalledRefresh = false;
+let installedCalls = 0, failInstalledRefresh = false, failRepositoryList = false;
 let mockCatalogInstalls = ["clawhub:owner-2/skill-002"];
 let mockCatalogCopies = [{ id: "clawhub:owner-2/skill-002", name: "Skill 002", installedRoot: "dsh", canUninstall: true }];
 let mockCatalogUnknownIds = [], mockCatalogWarnings = [];
@@ -88,6 +90,7 @@ const api = async (path, options) => {
   if (holdCatalogPath && path.startsWith(holdCatalogPath)) return new Promise(resolve => pendingCatalog.push({ path, signal: options?.signal, resolve }));
   const body = options?.body ? JSON.parse(options.body) : undefined;
   calls.push({ path, body });
+  if (path === "/repositories" && failRepositoryList) throw new Error("目录列表刷新失败");
   if (path.startsWith("/clawhub/")) return (await catalogFetch("http://localhost" + path)).json();
   if (path.startsWith("/skills-sh/search")) {
     const url = new URL(path, "http://localhost");
@@ -99,9 +102,10 @@ const api = async (path, options) => {
   if (path === "/catalog/install") {
     const catalogId = body.catalog === "skillsh" ? `skillsh:${body.source}/${body.skillId}` : `clawhub:${body.owner}/${body.slug}`;
         if (!mockCatalogInstalls.includes(catalogId)) mockCatalogInstalls.push(catalogId);
-        const installedRoot = body.root || "dsh";
-        if (!mockCatalogCopies.some(copy => copy.id === catalogId && copy.installedRoot === installedRoot && copy.installedWorkspace === body.workspace)) mockCatalogCopies.push({ id: catalogId, name: body.name, installedRoot, ...(body.workspace ? { installedWorkspace: body.workspace } : {}), canUninstall: true });
-    return { name: body.name, root: body.root || body.workspace || "dsh" };
+    const installedRoot = body.root || "dsh";
+    const installedName = body.catalog === "clawhub" ? body.slug : body.skillId;
+    if (!mockCatalogCopies.some(copy => copy.id === catalogId && copy.installedRoot === installedRoot && copy.installedWorkspace === body.workspace)) mockCatalogCopies.push({ id: catalogId, name: installedName, installedRoot, ...(body.workspace ? { installedWorkspace: body.workspace } : {}), canUninstall: true });
+    return { name: installedName, root: installedRoot };
   }
   if (path.endsWith("/install")) {
     await new Promise((resolve) => { finishInstall = resolve; });
@@ -246,7 +250,10 @@ assert.equal(catalogCalls.length, 0, "打开 skills.sh 来源不加载热门榜"
 assert.equal(skillshCalls.length, 0, "未输入关键词前不查询 skills.sh");
 assert.deepEqual(all().filter(n => n.props.className === "dssm-name"), [], "未查询时不显示静态或虚构技能数据");
 const skillshToolbar = find(n => n.props.className === "dssm-filters dssm-catalog-filters dssm-skillsh-filters");
-assert.deepEqual(skillshToolbar.children.map(n => n.props.className), ["dssm-search"], "skills.sh 只保留关键词查询框，不放仓库工具栏按钮");
+assert.deepEqual(skillshToolbar.children.map(n => n.props.className), ["dssm-catalog-status-filter", "dssm-search"], "skills.sh 是状态下拉加搜索，不放仓库工具栏按钮");
+const skillshStatus = nodes(skillshToolbar).find(n => n.type === OfficialSelect);
+assert.deepEqual(skillshStatus.props.options.map(option => option.value), ["", "available", "installed"], "skills.sh 状态筛选是未安装和已安装");
+assert.equal(skillshStatus.props.options[1].label, "repo.catalog.uninstalled", "未安装使用目录文案，不复用仓库的可安装");
 const skillshSearch = find(n => n.props["aria-label"] === "repo.catalog.searchSkillsh");
 assert.equal(skillshSearch.type, Input, "skills.sh 使用官方输入框查询目录结果");
 skillshSearch.props.onChange({ target: { value: "react" } }); render();
@@ -254,6 +261,11 @@ await new Promise(resolve => setTimeout(resolve, 350)); await settle();
 assert.equal(skillshCalls.length, 1, "输入关键词后调用本地安全代理查询一次");
 assert.equal(skillshCalls[0].searchParams.get("q"), "react", "查询关键词正确传递");
 assert.deepEqual(all().filter(n => n.props.className === "dssm-name").map(n => n.children.join("")), ["React Skill"], "列表展示 skills.sh 查询接口返回的数据");
+skillshStatus.props.onChange("installed"); render();
+assert.deepEqual(all().filter(n => n.props.className === "dssm-name").map(n => n.children.join("")), [], "已安装筛选排除尚未安装的 skills.sh 结果");
+skillshStatus.props.onChange("available"); render();
+assert.deepEqual(all().filter(n => n.props.className === "dssm-name").map(n => n.children.join("")), ["React Skill"], "未安装筛选保留尚未安装的 skills.sh 结果");
+skillshStatus.props.onChange(""); render();
 assert.ok(all().some(n => n.props.className === "dssm-meta-origin" && n.children.join("").includes("owner/skills · 123,456 repo.catalog.installs")), "仅显示 skills.sh 响应中的来源和安装量");
 const skillshRow = all().find(n => n.props.className === "dssm-repo-row" && nodes(n).some(child => child.props.className === "dssm-name" && child.children.join("") === "React Skill"));
 const skillshActions = nodes(skillshRow).filter(n => n.props["aria-label"] === "repo.detail" || n.props["aria-label"] === "repo.install");
@@ -273,10 +285,8 @@ assert.equal(catalogCalls.length, 1, "选择 ClawHub 后才请求第一页");
 assert.equal(catalogCalls[0].searchParams.get("sort"), "downloads", "热门榜由 ClawHub 下载量排序");
 assert.equal(catalogCalls[0].searchParams.get("limit"), "10", "首屏只请求一页，后续由滚动触发");
 const catalogToolbar = find(n => n.props.className === "dssm-filters dssm-catalog-filters");
-assert.deepEqual(catalogToolbar.children.map(n => n.props.className), ["dssm-catalog-sort-filter", "dssm-catalog-status-filter"], "下载榜筛选控件只属于排行榜，不包含搜索框");
-const catalogSearchRow = find(n => n.props.className === "dssm-catalog-search-row");
-assert.deepEqual(catalogSearchRow.children.map(n => n.props.className), ["dssm-search"], "ClawHub 搜索框不放仓库工具栏按钮");
-assert.equal(catalogSearchRow.children[0].type, Input, "ClawHub 关键词搜索使用官方输入框");
+assert.deepEqual(catalogToolbar.children.map(n => n.props.className), ["dssm-catalog-sort-filter", "dssm-catalog-status-filter", "dssm-search"], "ClawHub 搜索和下拉在同一行");
+assert.equal(find(n => n.props.className === "dssm-catalog-search-row"), undefined, "搜索不再单独占一行");
 const catalogSelects = nodes(catalogToolbar).filter(n => n.type === OfficialSelect);
 assert.deepEqual(catalogSelects.map(n => n.props.value), ["", ""], "目录默认热门排序且不筛选状态");
 assert.deepEqual(catalogSelects[0].props.options.map(option => option.value), ["", "installs", "name"], "热门榜由下拉默认项表示，不能重复添加同名选项");
@@ -304,8 +314,10 @@ await clickNode(rowActions(catalogRow("Skill 001"))[1]);
 assert.equal(dialog()?.props.title, "repo.install", "安装沿用现有安装位置选择");
 assert.equal(radio("dsh").props.checked, true, "目录安装默认仍是 DSH，不改动后续仓库安装的选择");
 failInstalledRefresh = true;
+failRepositoryList = true;
 await clickModal("repo.install");
 failInstalledRefresh = false;
+failRepositoryList = false;
 assert.ok(find(node => node.props.role === "status" && node.children.some(child => typeof child === "string" && child.includes("repo.catalog.installRefreshWarning"))), "目录安装成功但刷新失败时只提示刷新警告，不误报安装失败");
 const catalogInstallCall = calls.findLast(c => c.path === "/catalog/install");
 assert.ok(catalogInstallCall, "确认后安装这一条目录技能，不把目录订阅成仓库");
@@ -319,8 +331,11 @@ assert.ok(nodes(catalogRow("Skill 001")).some(n => isAction(n, "repo.installElse
 assert.ok(nodes(catalogRow("Skill 001")).some(n => isAction(n, "repo.uninstall")), "安装完成后显示该位置的卸载");
 installedCalls = 0;
 await clickNode(nodes(catalogRow("Skill 001")).find(n => isAction(n, "repo.uninstall")));
+failInstalledRefresh = true;
 await clickModal("repo.confirmUninstall");
-assert.equal(calls.findLast(c => c.path === "/delete").body.name, "Skill 001", "目录卸载按这一条副本删除");
+failInstalledRefresh = false;
+assert.ok(find(node => node.props.role === "status" && node.children.some(child => typeof child === "string" && child.includes("repo.catalog.uninstallRefreshWarning"))), "卸载成功但刷新失败只能提示卸载刷新警告");
+assert.equal(calls.findLast(c => c.path === "/delete").body.name, "skill-001", "刷新失败时仍按安装响应的实际落盘名卸载，而不是展示名");
 assert.equal(installedCalls, 1, "目录卸载完成后刷新宿主列表和回收站");
 installedCalls = 0;
 const catalogSortSelect = () => nodes(find(n => n.props.className === "dssm-filters dssm-catalog-filters")).find(n => n.type === OfficialSelect && n.props.label === "repo.subsource.popular");
@@ -339,7 +354,8 @@ assert.equal(catalogSearchCalls[0].searchParams.get("limit"), "100", "ClawHub �
 assert.equal(catalogCalls.length, 1, "搜索不会继续分页下载榜数据");
 assert.deepEqual(all().filter(n => n.props.className === "dssm-name").map(n => n.children.join("")), ["Gill Helper"], "只显示 ClawHub 关键词检索返回的真实结果，不混入联邦搜索的其他来源");
 assert.ok(all().some(n => n.props.className === "dssm-meta-origin" && n.children.join("").includes("owner-gill/gill-helper · 21 repo.catalog.downloads")), "搜索结果使用 ClawHub 返回的作者和下载量");
-assert.equal(find(n => n.props.className === "dssm-filters dssm-catalog-filters"), undefined, "搜索结果模式不显示排行榜排序和状态控件");
+const searchFilters = find(n => n.props.className === "dssm-filters dssm-catalog-filters");
+assert.deepEqual(searchFilters.children.map(n => n.props.className), ["dssm-search"], "搜索结果模式不显示排行榜排序和状态控件");
 assert.equal(all().some(n => n.type === "p" && n.children.includes("repo.subsource.catalogNote")), false, "关键词搜索时不显示下载榜标题说明");
 assert.equal(catalogSearchCalls.length, 1, "输入一次只发出一次防抖搜索");
 catalogSearch.props.onChange({ target: { value: "" } }); render(); await settle();
@@ -410,8 +426,8 @@ await selectSubsource("repo.subsource.github");
 const toolbarCss = all().filter(n => n.type === "style").map(n => n.children.join("")).join("");
 assert.match(toolbarCss, /\.dssm-catalog-list\{[^}]*border:1px solid var\(--dsw-alias-border-l2[^}]*border-radius:10px[^}]*background:transparent/, "目录结果列表沿用来源面板的边框、圆角与透明底色");
 assert.doesNotMatch(toolbarCss, /\.dssm-repo-filters/, "删除旧仓库等宽筛选 CSS，而不是叠加覆盖");
-assert.match(toolbarCss, /\.dssm-catalog-filters \.dssm-search\{flex:1 1 240px/, "目录搜索填满两个筛选下拉后的剩余宽度");
-assert.match(toolbarCss, /\.dssm-catalog-search-row \.dssm-search\{width:100%\}/, "没有工具栏按钮时搜索框铺满所在行");
+assert.match(toolbarCss, /\.dssm-filters\.dssm-catalog-filters \.dssm-search\{flex:1 1 160px;min-width:0;max-width:none\}/, "目录搜索填满筛选下拉后的剩余宽度，不受工具栏 180px 上限");
+assert.doesNotMatch(toolbarCss, /\.dssm-catalog-search-row/, "目录搜索不再单独成行");
 assert.match(toolbarCss, /\.dssm-catalog-loading\{[^}]*display:flex[^}]*justify-content:center[^}]*var\(--dsw-alias-label-tertiary/, "目录加载行在列表内居中，使用次级文字色");
 assert.match(toolbarCss, /\.dssm-subsources\{[^}]*margin:0[^}]*padding-bottom:6px/, "来源选项上方不再保留多余外边距");
 assert.match(toolbarCss, /\.dssm-subsource-btn\.on\{[^}]*var\(--dsw-alias-bg-layer-2[^}]*var\(--dsw-alias-label-primary[^}]*var\(--dsw-alias-border-l3/, "来源选中态改用中性色");
@@ -805,6 +821,17 @@ await new Promise(resolve => setTimeout(resolve, 350)); await settle();
 assert.ok(nodes(catalogRow("React Skill")).some(n => n.children.includes("repo.catalog.unknownLocation")), "skills.sh 旧身份标注位置未知");
 assert.ok(nodes(catalogRow("React Skill")).some(n => isAction(n, "repo.catalog.reassociate") && !n.props.disabled), "skills.sh 未知身份也保留重关联");
 mockCatalogUnknownIds = []; mockCatalogWarnings = [];
+// 榜单失败后，经关键词搜索再清空，必须重试榜单而不是保留旧错误态。
+resetMount(); render(); flushEffects(); await settle();
+failCatalogRanking = true;
+await selectSubsource("repo.subsource.clawhub");
+const failedRankingCalls = catalogCalls.length;
+failCatalogRanking = false;
+find(n => n.props["aria-label"] === "repo.catalog.searchClawhub").props.onChange({ target: { value: "gill" } }); render();
+await new Promise(resolve => setTimeout(resolve, 350)); await settle();
+find(n => n.props["aria-label"] === "repo.catalog.searchClawhub").props.onChange({ target: { value: "" } }); render(); await settle();
+assert.equal(catalogCalls.length, failedRankingCalls + 1, "清空搜索使用新关键词状态重试失败的榜单");
+assert.equal(all().filter(n => n.props.className === "dssm-repo-row").length, 10, "清空后恢复真实榜单第一页");
 // 通过真实 effect 依赖切换及卸载执行 cleanup，不手调生产取消函数。
 for (const kind of ["list", "clawhub", "skillsh"]) {
   for (const exit of ["source", "inactive", "unmount"]) {

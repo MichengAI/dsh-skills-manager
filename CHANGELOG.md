@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.21 - Unreleased
+
+- Support DSH `0.2.1-alpha.3` while retaining all existing supported versions.
+
 ## 1.1.20 - Unreleased
 
 - Add real ClawHub / skills.sh search and individual skill installation, with ten-item download-ranking pages and an explicit load-more button.

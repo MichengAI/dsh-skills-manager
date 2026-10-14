@@ -26,7 +26,7 @@ const globalData = {
   projects: [], trash: [], warnings: [],
   roots: [
     { key: "dsh", mutable: true, path: "C:/u/.dsh/skills", categories: [{ id: "work", name: "工作" }], categoryOrder: { work: ["kept", "other"], "": ["loose"] }, skills: [skill("kept", { categoryId: "work" }), skill("other", { categoryId: "work", enabled: false }), skill("loose")] },
-    { key: "codex", exists: true, mutable: true, toggleable: true, enabled: true, path: "C:/u/.codex/skills", categories: [], categoryOrder: { "": ["codex-two", "codex-one"] }, skills: [skill("codex-one"), skill("codex-two")] },
+    { key: "codex", exists: true, mutable: true, toggleable: true, enabled: true, path: "C:/u/.codex/skills", categories: [], categoryOrder: { "": ["codex-two", "codex-one"] }, skills: [skill("codex-one"), skill("codex-two"), skill("ordinary"), skill("constructor")] },
   ],
 };
 const workspaces = [
@@ -103,7 +103,7 @@ try {
 
   const dsh = sources().find((node) => textOf(node).includes("kept"));
   const codex = sources().find((node) => textOf(node).includes("codex-one"));
-  assert.deepEqual(nodes(codex).filter((node) => node.props.className === "dssm-name").map((node) => node.children[0]), ["codex-two", "codex-one"], "没有分类时也按已保存顺序显示未分类技能");
+  assert.deepEqual(nodes(codex).filter((node) => node.props.className === "dssm-name").map((node) => node.children[0]), ["codex-two", "codex-one", "ordinary", "constructor"], "已保存顺序优先；未排序的 constructor 不得命中继承属性而插队");
   const codexRows = nodes(codex).filter((node) => node.props.className === "dssm-skill-row");
   const codexTwo = codexRows.find((node) => nodes(node).some((child) => child.props.className === "dssm-name" && child.children[0] === "codex-two"));
   const codexOne = codexRows.find((node) => nodes(node).some((child) => child.props.className === "dssm-name" && child.children[0] === "codex-one"));
@@ -212,7 +212,8 @@ try {
   const css = nodes().filter((node) => node.type === "style").map((node) => node.children.join("")).join("");
   assert.match(css, /\.dssm-skill-row\{[^}]*padding:11px 13px/, "技能行留白对齐仓库行");
   assert.match(css, /\.dssm-skill-desc\{[^}]*--dsw-alias-label-tertiary/, "描述用次级文字色");
-  assert.doesNotMatch(css, /#1677ff|#4176e6/);
+  assert.match(css, /\.dssm-row-icon\.ant-btn\{[^}]*background:transparent[^}]*border-color:var\(--dsw-alias-border-l2/, "行内描边使用宿主主题令牌和透明底色");
+  assert.match(css, /\.dssm-row-icon\.ant-btn:not\(:disabled\):not\(\.dssm-icon-danger\):hover\{[^}]*--ant-btn-text-color:var\(--dsw-alias-link,[^)]+\)/, "普通图标悬停优先使用宿主链接色，危险按钮排除");
   assert.match(css, /\.dssm-stat\{[^}]*padding:4px 10px/, "顶部统计格子更矮");
   assert.match(css, /\.dssm-icon-btn\{[^}]*width:22px/, "图标按钮同一尺寸");
 

@@ -23,11 +23,12 @@ export const repositoryLocales = {
     "repo.catalog.unknownHint": "有旧目录安装记录位置未知；找到对应技能后可选择位置重关联安装。",
     "repo.catalog.loadMore": "再加载 10 条",
     "repo.catalog.installRefreshWarning": "技能已安装并启用，但列表刷新失败。请重新打开发现页；不要重复安装。",
+    "repo.catalog.uninstallRefreshWarning": "技能已移入回收站，但列表刷新失败。请刷新技能列表或重新打开设置页；不要重复卸载。",
     "repo.installElsewhere": "安装到其他位置", "repo.destinationUnavailable": "原项目未登记或目录不可用，无法管理此副本。请在侧栏重新登记原项目后刷新。", "repo.projectDestination": "项目 DSH · {path}",
     "repo.refreshing": "正在检查更新…", "repo.refreshed": "刷新与更新检查完成", "repo.detailLoading": "正在读取技能说明…",
     "repo.local": "本机", "repo.source": "安装来源", "repo.update": "可更新", "repo.review": "查看更新", "repo.rollback": "恢复上一版", "repo.confirmUpdate": "备份并更新", "repo.confirmRollback": "备份并恢复", "repo.overwrite": "备份本地修改并替换", "repo.modified": "检测到本地修改。替换会覆盖当前文件，原文件将完整备份，可恢复。", "repo.noChanges": "文件内容没有变化。", "repo.added": "新增", "repo.removed": "删除", "repo.modifiedFile": "修改", "repo.updating": "更新中…", "repo.updateProgress": "正在校验、备份并替换，请稍候…", "repo.updateSuccess": "更新完成，已保留上一版备份。", "repo.rollbackSuccess": "已恢复上一版。", "repo.manageUpdate": "管理更新", "error.repo.modified": "存在本地修改，请预览并确认备份后替换。",
     "scope.repositories": "发现技能", "repo.add": "添加仓库", "repo.manage": "管理仓库", "repo.refresh": "刷新并检查更新", "repo.save": "添加并扫描",
-    "repo.subsource.github": "GitHub 仓库", "repo.subsource.skillsh": "skills.sh", "repo.subsource.clawhub": "ClawHub", "repo.subsource.popular": "热门下载 Top 100", "repo.catalog.states": "全部状态", "repo.catalog.searchClawhub": "搜索 ClawHub 技能", "repo.catalog.searchLoading": "正在搜索 ClawHub…", "repo.catalog.searchEmpty": "没有找到匹配的 ClawHub 技能。", "repo.catalog.searchError": "ClawHub 搜索失败，请重试。", "repo.catalog.searchSkillsh": "搜索 skills.sh 技能", "repo.catalog.skillshLoading": "正在搜索 skills.sh…", "repo.catalog.skillshEmpty": "没有找到匹配的 skills.sh 技能。", "repo.catalog.skillshError": "skills.sh 搜索失败，请重试。", "repo.sort.installs": "安装量从高到低", "repo.sort.name": "名称 A-Z", "repo.subsource.catalogNote": "ClawHub 下载量榜 · 最多 100 条，仅对当前显示条目排序", "repo.catalog.empty": "ClawHub 当前没有匹配的技能。", "repo.catalog.loading": "正在加载 ClawHub 榜单…", "repo.catalog.loadError": "ClawHub 榜单加载失败。请检查网络后重试。", "repo.catalog.retry": "重试", "repo.catalog.loadingMore": "正在加载更多…", "repo.catalog.downloads": "下载", "repo.catalog.installs": "安装", "repo.catalog.stars": "星标",
+    "repo.subsource.github": "GitHub 仓库", "repo.subsource.skillsh": "skills.sh", "repo.subsource.clawhub": "ClawHub", "repo.subsource.popular": "热门下载 Top 100", "repo.catalog.states": "全部状态", "repo.catalog.uninstalled": "未安装", "repo.catalog.searchClawhub": "搜索 ClawHub 技能", "repo.catalog.searchLoading": "正在搜索 ClawHub…", "repo.catalog.searchEmpty": "没有找到匹配的 ClawHub 技能。", "repo.catalog.searchError": "ClawHub 搜索失败，请重试。", "repo.catalog.searchSkillsh": "搜索 skills.sh 技能", "repo.catalog.skillshLoading": "正在搜索 skills.sh…", "repo.catalog.skillshEmpty": "没有找到匹配的 skills.sh 技能。", "repo.catalog.skillshError": "skills.sh 搜索失败，请重试。", "repo.sort.installs": "安装量从高到低", "repo.sort.name": "名称 A-Z", "repo.subsource.catalogNote": "ClawHub 下载量榜 · 最多 100 条，仅对当前显示条目排序", "repo.catalog.empty": "ClawHub 当前没有匹配的技能。", "repo.catalog.loading": "正在加载 ClawHub 榜单…", "repo.catalog.loadError": "ClawHub 榜单加载失败。请检查网络后重试。", "repo.catalog.retry": "重试", "repo.catalog.loadingMore": "正在加载更多…", "repo.catalog.downloads": "下载", "repo.catalog.installs": "安装", "repo.catalog.stars": "星标",
     "repo.hint": "从已订阅的 GitHub 仓库或第三方目录发现技能，安装到用户目录的 DSH skills 或 Shared Agent，或已登记项目的 .dsh/skills。", "repo.footer": "刷新会检查仓库与技能更新，不会自动替换本地文件。历史备份不会自动清理，占用空间会随更新增加。",
     "repo.search": "搜索仓库技能", "repo.all": "全部仓库", "repo.states": "全部状态", "repo.available": "可安装", "repo.installed": "已安装", "repo.conflict": "同名冲突", "repo.invalid": "格式无效", "repo.install": "安装", "repo.detail": "详情",
     "repo.installing": "安装中…", "repo.installProgress": "正在读取并校验技能文件，请稍候…", "repo.installSuccess": "安装成功并已启用，可在对话中用斜杠调用。",
@@ -45,11 +46,12 @@ export const repositoryLocales = {
     "repo.catalog.unknownHint": "Some legacy catalog installs have unknown locations. Find the skill and choose a destination to reinstall and reassociate.",
     "repo.catalog.loadMore": "Load 10 more",
     "repo.catalog.installRefreshWarning": "Installed and enabled, but the list could not refresh. Reopen Discover Skills; do not install again.",
+    "repo.catalog.uninstallRefreshWarning": "Moved to trash, but the list could not refresh. Refresh the skill list or reopen Settings; do not uninstall again.",
     "repo.installElsewhere": "Install elsewhere", "repo.destinationUnavailable": "The original project is unregistered or unavailable. Re-register it in the sidebar and refresh to manage this copy.", "repo.projectDestination": "Project DSH · {path}",
     "repo.refreshing": "Checking updates…", "repo.refreshed": "Refresh and update check completed", "repo.detailLoading": "Loading skill instructions…",
     "repo.local": "Local", "repo.source": "Installed from", "repo.update": "Update available", "repo.review": "Review update", "repo.rollback": "Restore previous version", "repo.confirmUpdate": "Back up and update", "repo.confirmRollback": "Back up and restore", "repo.overwrite": "Back up local edits and replace", "repo.modified": "Local edits detected. Replacement overwrites current files and keeps a complete backup for restoration.", "repo.noChanges": "No file changes.", "repo.added": "Added", "repo.removed": "Removed", "repo.modifiedFile": "Modified", "repo.updating": "Updating…", "repo.updateProgress": "Verifying, backing up and replacing files. Please wait…", "repo.updateSuccess": "Updated. Previous version backed up.", "repo.rollbackSuccess": "Previous version restored.", "repo.manageUpdate": "Manage updates", "error.repo.modified": "Local edits detected. Review and confirm replacement with a backup.",
     "scope.repositories": "Discover Skills", "repo.add": "Add repository", "repo.manage": "Manage repositories", "repo.refresh": "Refresh & check updates", "repo.save": "Add and scan",
-    "repo.subsource.github": "GitHub Repos", "repo.subsource.skillsh": "skills.sh", "repo.subsource.clawhub": "ClawHub", "repo.subsource.popular": "Top 100 by downloads", "repo.catalog.states": "All statuses", "repo.catalog.searchClawhub": "Search ClawHub skills", "repo.catalog.searchLoading": "Searching ClawHub…", "repo.catalog.searchEmpty": "No matching ClawHub skills were found.", "repo.catalog.searchError": "ClawHub search failed. Please retry.", "repo.catalog.searchSkillsh": "Search skills.sh", "repo.catalog.skillshLoading": "Searching skills.sh…", "repo.catalog.skillshEmpty": "No matching skills.sh skills were found.", "repo.catalog.skillshError": "skills.sh search failed. Please retry.", "repo.sort.installs": "Installs: high to low", "repo.sort.name": "Name A–Z", "repo.subsource.catalogNote": "ClawHub download ranking · Up to 100; sort only displayed items", "repo.catalog.empty": "No matching skills were returned by ClawHub.", "repo.catalog.loading": "Loading ClawHub ranking…", "repo.catalog.loadError": "Failed to load the ClawHub ranking. Check your connection and retry.", "repo.catalog.retry": "Retry", "repo.catalog.loadingMore": "Loading more…", "repo.catalog.downloads": "downloads", "repo.catalog.installs": "installs", "repo.catalog.stars": "stars",
+    "repo.subsource.github": "GitHub Repos", "repo.subsource.skillsh": "skills.sh", "repo.subsource.clawhub": "ClawHub", "repo.subsource.popular": "Top 100 by downloads", "repo.catalog.states": "All statuses", "repo.catalog.uninstalled": "Not installed", "repo.catalog.searchClawhub": "Search ClawHub skills", "repo.catalog.searchLoading": "Searching ClawHub…", "repo.catalog.searchEmpty": "No matching ClawHub skills were found.", "repo.catalog.searchError": "ClawHub search failed. Please retry.", "repo.catalog.searchSkillsh": "Search skills.sh", "repo.catalog.skillshLoading": "Searching skills.sh…", "repo.catalog.skillshEmpty": "No matching skills.sh skills were found.", "repo.catalog.skillshError": "skills.sh search failed. Please retry.", "repo.sort.installs": "Installs: high to low", "repo.sort.name": "Name A–Z", "repo.subsource.catalogNote": "ClawHub download ranking · Up to 100; sort only displayed items", "repo.catalog.empty": "No matching skills were returned by ClawHub.", "repo.catalog.loading": "Loading ClawHub ranking…", "repo.catalog.loadError": "Failed to load the ClawHub ranking. Check your connection and retry.", "repo.catalog.retry": "Retry", "repo.catalog.loadingMore": "Loading more…", "repo.catalog.downloads": "downloads", "repo.catalog.installs": "installs", "repo.catalog.stars": "stars",
     "repo.hint": "Discover skills from subscribed GitHub repositories or community registries, and install them to user DSH skills or Shared Agent, or a registered project's .dsh/skills.", "repo.footer": "Refresh checks repositories and skill updates without replacing local files. Historical backups are not cleaned automatically and use additional disk space.",
     "repo.search": "Search repository skills", "repo.all": "All repositories", "repo.states": "All statuses", "repo.available": "Available", "repo.installed": "Installed", "repo.conflict": "Name conflict", "repo.invalid": "Invalid format", "repo.install": "Install", "repo.detail": "Details",
     "repo.installing": "Installing…", "repo.installProgress": "Reading and verifying skill files. Please wait…", "repo.installSuccess": "Installed and enabled. Invoke it from the slash menu.",
@@ -69,7 +71,7 @@ const CSS = `
 .dssm-subsource-btn:hover{background:var(--dsw-alias-bg-layer-2,#2c2c2c);color:var(--dsw-alias-label-primary,#eee)}
 .dssm-subsource-btn.on{background:var(--dsw-alias-bg-layer-2,#2c2c2c);color:var(--dsw-alias-label-primary,#eee);border-color:var(--dsw-alias-border-l3,#555);font-weight:600}
 .dssm-subsource-btn:focus-visible{outline:2px solid var(--dsw-alias-border-l3,#555);outline-offset:2px}
-.dssm-catalog-list{border:1px solid var(--dsw-alias-border-l2,#494949);border-radius:10px;overflow:hidden;background:transparent;margin-bottom:12px}.dssm-catalog-filters .dssm-search{flex:1 1 240px;min-width:140px}.dssm-catalog-search-row{margin-bottom:8px}.dssm-catalog-search-row .dssm-search{width:100%}.dssm-catalog-installed{color:var(--dsw-alias-state-success-primary,#51b976);font-size:12px;white-space:nowrap}
+.dssm-catalog-list{border:1px solid var(--dsw-alias-border-l2,#494949);border-radius:10px;overflow:hidden;background:transparent;margin-bottom:12px}.dssm-filters.dssm-catalog-filters .dssm-search{flex:1 1 160px;min-width:0;max-width:none}.dssm-catalog-installed{color:var(--dsw-alias-state-success-primary,#51b976);font-size:12px;white-space:nowrap}
 .dssm-catalog-list .dssm-repo-row{border-top:1px solid var(--dsw-alias-border-l1,#3a3a3a)}
 .dssm-catalog-list > div:first-child{border-top:0}
 .dssm-catalog-sentinel{height:1px}.dssm-catalog-loading{display:flex;align-items:center;justify-content:center;gap:8px;padding:12px 13px;color:var(--dsw-alias-label-tertiary,#a0a0a0);font-size:12px;border-top:1px solid var(--dsw-alias-border-l1,#3a3a3a)}.dssm-catalog-loading .dssm-repo-spinner{margin-right:0}
@@ -155,6 +157,7 @@ export function createRepositoryUI({ react, Modal, Input, Button, Collapse, Sour
     const clawhubSearchAbort = react.useRef<AbortController | null>(null);
     const clawhubSearchTimer = react.useRef<ReturnType<typeof setTimeout> | null>(null);
     const [skillshQuery, setSkillshQuery] = react.useState("");
+    const [skillshStatus, setSkillshStatus] = react.useState("");
     const [skillshItems, setSkillshItems] = react.useState<SkillsShCatalogItem[]>([]);
     const [skillshLoading, setSkillshLoading] = react.useState(false);
     const [skillshError, setSkillshError] = react.useState(false);
@@ -215,8 +218,8 @@ export function createRepositoryUI({ react, Modal, Input, Button, Collapse, Sour
     }
     function post<K extends RepositoryAction>(action: K, body: unknown) { return api(`/repositories/${action}` as `/repositories/${K}`, { method: "POST", headers, body: JSON.stringify(body) }); }
     const catalogScrollGate = react.useRef(false);
-    async function loadClawHubPage(reset = false, fromScroll = false) {
-      if (!active || catalogQuery.trim() || catalogRequest.current) return;
+    async function loadClawHubPage(reset = false, fromScroll = false, query = catalogQuery) {
+      if (!active || query.trim() || catalogRequest.current) return;
       if (fromScroll && catalogScrollGate.current) return;
       const current = catalogPager.current;
       if (!reset && (!current.hasMore || current.count >= 100)) return;
@@ -323,7 +326,8 @@ export function createRepositoryUI({ react, Modal, Input, Button, Collapse, Sour
       setClawhubSearchError(false);
       const normalized = value.trim().slice(0, 100);
       if (!normalized) {
-        if (subsource === "clawhub" && !catalogItems.length && !catalogLoading) void loadClawHubPage(true);
+        // setState 尚未提交时仍在旧闭包内，显式传入已清空的查询值。
+        if (subsource === "clawhub" && !catalogItems.length && !catalogLoading) void loadClawHubPage(true, false, normalized);
         return;
       }
       setClawhubSearchLoading(true);
@@ -448,12 +452,12 @@ export function createRepositoryUI({ react, Modal, Input, Button, Collapse, Sour
       const target = modal.target;
       const scope = destinationPayload(destination);
       return perform(async () => {
-        await api("/catalog/install", { method: "POST", headers, body: JSON.stringify({ ...target, ...scope }) });
+        const installed = await api("/catalog/install", { method: "POST", headers, body: JSON.stringify({ ...target, ...scope }) });
         if (!mounted.current) return;
         const catalogId = target.catalog === "skillsh" ? `skillsh:${target.source}/${target.skillId}` : `clawhub:${target.owner}/${target.slug}`;
         setCatalogInstallIds(prev => prev.includes(catalogId) ? prev : [...prev, catalogId]);
         const installedRoot = scope.root || "dsh";
-        setCatalogCopies(prev => prev.some(copy => copy.id === catalogId && copy.installedRoot === installedRoot && copy.installedWorkspace === scope.workspace) ? prev : [...prev, { id: catalogId, name: target.name, installedRoot, ...(scope.workspace ? { installedWorkspace: scope.workspace } : {}), canUninstall: true }]);
+        setCatalogCopies(prev => prev.some(copy => copy.id === catalogId && copy.installedRoot === installedRoot && copy.installedWorkspace === scope.workspace) ? prev : [...prev, { id: catalogId, name: installed.name, installedRoot, ...(scope.workspace ? { installedWorkspace: scope.workspace } : {}), canUninstall: true }]);
         setFeedback({ key: "repo.installSuccess", name: target.name });
         setModal(null);
         const refreshed = await Promise.allSettled([load(), Promise.resolve().then(() => onInstalled?.())]);
@@ -737,7 +741,7 @@ export function createRepositoryUI({ react, Modal, Input, Button, Collapse, Sour
             setFeedback({ key: "repo.uninstallSuccess", name: copy.name });
                         setModal(null);
                         const refreshed = await Promise.allSettled([load(), Promise.resolve().then(() => onInstalled?.())]);
-                        if (mounted.current && refreshed.some(result => result.status === "rejected")) setFeedback({ key: "repo.catalog.installRefreshWarning", name: copy.name });
+                        if (mounted.current && refreshed.some(result => result.status === "rejected")) setFeedback({ key: "repo.catalog.uninstallRefreshWarning", name: copy.name });
           }, false);
         }
         function renderCatalogActions(id: string, unknown: boolean, openDetail: () => void, openInstall: () => void) {
@@ -796,8 +800,13 @@ export function createRepositoryUI({ react, Modal, Input, Button, Collapse, Sour
       clawhubSearchError ? h("div", { className: "dssm-feedback dssm-error", role: "alert" }, t("repo.catalog.searchError"), h(Button, { type: "text", onClick: () => { void fetchClawHubSearch(catalogQuery.trim()); } }, t("repo.catalog.retry"))) : null
     );
 
-    const skillshView = h("div", { className: "dssm-catalog-list" },
-      skillshItems.map(item => {
+    const skillshVisible = skillshItems.filter(item => {
+          if (!skillshStatus) return true;
+          const installed = catalogInstalled(`skillsh:${item.source}/${item.skillId}`);
+          return skillshStatus === "installed" ? installed : !installed;
+        });
+        const skillshView = h("div", { className: "dssm-catalog-list" },
+          skillshVisible.map(item => {
         const skillshId = `skillsh:${item.source}/${item.skillId}`;
                 const unknown = catalogUnknownIds.includes(skillshId);
                 const metadata = [item.source, item.installs === undefined ? null : item.installs.toLocaleString() + " " + t("repo.catalog.installs")].filter(Boolean).join(" · ");
@@ -812,7 +821,7 @@ export function createRepositoryUI({ react, Modal, Input, Button, Collapse, Sour
                   renderCatalogLocations(skillshId)
                 );
       }),
-      skillshQuery.trim() && !skillshItems.length && !skillshLoading && !skillshError ? h("div", { className: "dssm-empty" }, t("repo.catalog.skillshEmpty")) : null,
+      skillshQuery.trim() && !skillshVisible.length && !skillshLoading && !skillshError ? h("div", { className: "dssm-empty" }, t("repo.catalog.skillshEmpty")) : null,
       skillshLoading ? h("div", { className: "dssm-note", role: "status", "aria-live": "polite" }, t("repo.catalog.skillshLoading")) : null,
       skillshError ? h("div", { className: "dssm-feedback dssm-error", role: "alert" }, t("repo.catalog.skillshError"), h(Button, { type: "text", onClick: () => { void fetchSkillshResults(skillshQuery.trim()); } }, t("repo.catalog.retry"))) : null
     );
@@ -828,17 +837,14 @@ export function createRepositoryUI({ react, Modal, Input, Button, Collapse, Sour
         h("div", { className: "dssm-status-filter" }, select("repo.states", status, (value) => { setStatus(value); setExpanded({}); }, ["available", "installed", "update", "conflict", "invalid"].map((s) => [s, t("repo." + s)]))),
         h(Input, { className: "dssm-search", allowClear: true, "aria-label": t("repo.search"), placeholder: t("repo.search"), value: query, onChange: (e: { target: { value: string } }) => { setQuery(e.target.value); setExpanded({}); } }),
         repositoryFilterActions()
-      ) : subsource === "clawhub" ? h("div", { className: "dssm-catalog-controls" },
-        h("div", { className: "dssm-catalog-search-row" },
-          h(Input, { className: "dssm-search", allowClear: true, maxLength: 100, "aria-label": t("repo.catalog.searchClawhub"), placeholder: t("repo.catalog.searchClawhub"), value: catalogQuery, onChange: (e: { target: { value: string } }) => updateClawHubQuery(e.target.value) })
-        ),
-        !catalogQuery.trim() ? h("div", { className: "dssm-filters dssm-catalog-filters" },
-          h("div", { className: "dssm-catalog-sort-filter" }, select("repo.subsource.popular", catalogSort, setCatalogSort, [["installs", t("repo.sort.installs")], ["name", t("repo.sort.name")]])),
-          h("div", { className: "dssm-catalog-status-filter" }, select("repo.catalog.states", catalogStatus, setCatalogStatus, [["available", t("repo.available")], ["installed", t("repo.installed")]]))
-        ) : null
-      ) : subsource === "skillsh" ? h("div", { className: "dssm-filters dssm-catalog-filters dssm-skillsh-filters" },
-        h(Input, { className: "dssm-search", allowClear: true, maxLength: 100, "aria-label": t("repo.catalog.searchSkillsh"), placeholder: t("repo.catalog.searchSkillsh"), value: skillshQuery, onChange: (e: { target: { value: string } }) => updateSkillshQuery(e.target.value) })
-      ) : null;
+      ) : subsource === "clawhub" ? h("div", { className: "dssm-filters dssm-catalog-filters" },
+              !catalogQuery.trim() ? h("div", { className: "dssm-catalog-sort-filter" }, select("repo.subsource.popular", catalogSort, setCatalogSort, [["installs", t("repo.sort.installs")], ["name", t("repo.sort.name")]])) : null,
+              !catalogQuery.trim() ? h("div", { className: "dssm-catalog-status-filter" }, select("repo.catalog.states", catalogStatus, setCatalogStatus, [["available", t("repo.available")], ["installed", t("repo.installed")]])) : null,
+              h(Input, { className: "dssm-search", allowClear: true, maxLength: 100, "aria-label": t("repo.catalog.searchClawhub"), placeholder: t("repo.catalog.searchClawhub"), value: catalogQuery, onChange: (e: { target: { value: string } }) => updateClawHubQuery(e.target.value) })
+            ) : subsource === "skillsh" ? h("div", { className: "dssm-filters dssm-catalog-filters dssm-skillsh-filters" },
+              h("div", { className: "dssm-catalog-status-filter" }, select("repo.catalog.states", skillshStatus, setSkillshStatus, [["available", t("repo.catalog.uninstalled")], ["installed", t("repo.installed")]])),
+              h(Input, { className: "dssm-search", allowClear: true, maxLength: 100, "aria-label": t("repo.catalog.searchSkillsh"), placeholder: t("repo.catalog.searchSkillsh"), value: skillshQuery, onChange: (e: { target: { value: string } }) => updateSkillshQuery(e.target.value) })
+            ) : null;
 
     const content = h("div", { key: "repositories", id: "dssm-scope-panel", role: "tabpanel", "aria-labelledby": "dssm-tab-repositories", className: "dssm-repo-panel", "aria-busy": busy }, h("style", null, CSS),
       subsourceToolbar,

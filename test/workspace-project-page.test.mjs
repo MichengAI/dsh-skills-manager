@@ -274,7 +274,8 @@ try {
   const deleteIcon = nodes(trashActions).find((node) => node.props["aria-label"] === t("btn.delete.forever"));
   assert.ok(restoreIcon && deleteIcon, "回收站行操作统一为带可访问标签的图标按钮");
   for (const button of [restoreIcon, deleteIcon]) {
-    assert.equal(button.props.type, "text", "行内图标没有描边文字按钮底色");
+    assert.notEqual(button.props.type, "text", "行内使用描边图标，不回退为工具栏 text 按钮");
+    assert.match(button.props.className, /\bdssm-row-icon\b/);
     assert.equal(button.props.size, "small");
     assert.ok(button.props.icon, "复用 16px 描边图标");
     assert.equal(button.props.style.width, 22, "操作盒与全局技能图标一致");
