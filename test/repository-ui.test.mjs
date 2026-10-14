@@ -76,6 +76,7 @@ let failInstall = false, failUninstall = false;
 let finishRefresh, finishDetail;
 let holdRefresh = false, failRefresh = false;
 let installedCalls = 0, failInstalledRefresh = false;
+let mockCatalogInstalls = ["clawhub:owner-2/skill-002"];
 const api = async (path, options) => {
   const body = options?.body ? JSON.parse(options.body) : undefined;
   calls.push({ path, body });
@@ -86,7 +87,11 @@ const api = async (path, options) => {
   }
   if (path === "/workspaces") return { items: structuredClone(workspaceRows) };
   if (path === "/catalog/detail") return { name: body.name, description: "目录技能说明", body: "# " + body.name, origin: body.catalog === "skillsh" ? body.source + "/" + body.skillId : body.owner + "/" + body.slug };
-  if (path === "/catalog/install") return { name: body.name, root: body.root || body.workspace || "dsh" };
+  if (path === "/catalog/install") {
+    const catalogId = body.catalog === "skillsh" ? `skillsh:${body.source}/${body.skillId}` : `clawhub:${body.owner}/${body.slug}`;
+    if (!mockCatalogInstalls.includes(catalogId)) mockCatalogInstalls.push(catalogId);
+    return { name: body.name, root: body.root || body.workspace || "dsh" };
+  }
   if (path.endsWith("/install")) {
     await new Promise((resolve) => { finishInstall = resolve; });
     if (failInstall) throw new Error("下载超时，请重试");
@@ -103,7 +108,7 @@ const api = async (path, options) => {
   if (path.endsWith("/preview")) return { token: "checked", commit: "a".repeat(40), localModified: true, changes: [{ kind: "modified", path: "SKILL.md" }] };
   if (path.endsWith("/update") || path.endsWith("/rollback")) repos[0].skills[0].status = "installed";
   // 每次返回独立快照，安装/卸载必须真正 reload 才能改变 UI。
-  return structuredClone({ repositories: repos, installRoots, catalogInstalls: ["clawhub:owner-2/skill-002"] });
+  return structuredClone({ repositories: repos, installRoots, catalogInstalls: mockCatalogInstalls });
 };
 const Input = Object.assign(() => {}, { TextArea: Symbol("官方只读说明框") });
 const Button = Symbol("官方按钮");
@@ -274,13 +279,16 @@ await clickNode(rowActions(catalogRow("Skill 001"))[1]);
 assert.equal(dialog()?.props.title, "repo.install", "安装沿用现有安装位置选择");
 assert.equal(radio("dsh").props.checked, true, "目录安装默认仍是 DSH，不改动后续仓库安装的选择");
 await clickModal("repo.install");
-assert.equal(calls.at(-1).path, "/catalog/install", "确认后安装这一条目录技能，不把目录订阅成仓库");
-assert.equal(calls.at(-1).body.catalog, "clawhub");
-assert.equal(calls.at(-1).body.owner, "owner-1");
-assert.equal(calls.at(-1).body.slug, "skill-001");
-assert.equal(calls.at(-1).body.root, "dsh");
+const catalogInstallCall = calls.findLast(c => c.path === "/catalog/install");
+assert.ok(catalogInstallCall, "确认后安装这一条目录技能，不把目录订阅成仓库");
+assert.equal(catalogInstallCall.body.catalog, "clawhub");
+assert.equal(catalogInstallCall.body.owner, "owner-1");
+assert.equal(catalogInstallCall.body.slug, "skill-001");
+assert.equal(catalogInstallCall.body.root, "dsh");
 assert.equal(installedCalls, 1, "目录安装完成后刷新已安装技能");
 installedCalls = 0;
+assert.deepEqual(rowActions(catalogRow("Skill 001")).map(n => n.props["aria-label"]), ["repo.detail"], "安装完成后该技能行立即变为已安装，不再显示安装按钮");
+assert.equal(nodes(catalogRow("Skill 001")).find(n => n.props.className === "dssm-catalog-installed")?.children.join(""), "repo.installed", "安装完成后该行显示已安装状态");
 const catalogSortSelect = () => nodes(find(n => n.props.className === "dssm-filters dssm-catalog-filters")).find(n => n.type === OfficialSelect && n.props.label === "repo.subsource.popular");
 catalogSortSelect().props.onChange("installs"); render();
 assert.equal(all().find(n => n.props.className === "dssm-name").children.join(""), "Skill 010", "安装量排序按 API 返回的真实计数排序");

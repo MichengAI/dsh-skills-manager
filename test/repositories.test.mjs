@@ -163,6 +163,14 @@ try {
   await mkdir(join(process.env.DSH_HOME, "skills-manager"), { recursive: true });
   await writeFile(join(process.env.DSH_HOME, "skills-manager/repositories.json"), JSON.stringify({ version: 1, repositories: [], installs: [null] }), "utf8");
   await assert.rejects(manager.add({ url: "a/b" }), /状态/, "结构损坏的来源记录同样拒绝覆盖");
+  await writeFile(join(process.env.DSH_HOME, "skills-manager/repositories.json"), JSON.stringify({ version: 1, repositories: [], installs: [] }), "utf8");
+  await manager.rememberCatalogInstall("clawhub:owner/skill-a", "pdf");
+  await manager.rememberCatalogInstall("clawhub:owner/missing-skill", "missing");
+  const initialCatalogList = await manager.list();
+  assert.deepEqual(initialCatalogList.catalogInstalls, ["clawhub:owner/skill-a"], "list() 只返回本地实际存在的技能目录标识，过滤已不存在的技能");
+  await manager.forgetCatalogInstall("pdf");
+  const clearedCatalogList = await manager.list();
+  assert.deepEqual(clearedCatalogList.catalogInstalls, [], "forgetCatalogInstall 成功清除对应技能的目录安装记录");
   await writeFile(join(process.env.DSH_HOME, "skills-manager/repositories.json"), "坏数据", "utf8");
   await assert.rejects(manager.add({ url: "a/b" }), /状态/);
   assert.equal(await readFile(join(process.env.DSH_HOME, "skills-manager/repositories.json"), "utf8"), "坏数据", "损坏状态不能被覆盖");

@@ -1,4 +1,4 @@
-import type { Archive, Repository, RepositoryInput, RepositorySkill, RepositoryState, InstallRecord, Serialize, SkillRequest, Log, CodedError, MutationOptions } from "./types.js";
+import type { Archive, Repository, RepositoryInput, RepositorySkill, RepositoryState, InstallRecord, CatalogInstallRecord, Serialize, SkillRequest, Log, CodedError, MutationOptions } from "./types.js";
 // 公开 GitHub 仓库目录：直连归档下载服务、固定内容快照安装，不执行仓库代码。
 import { promises as fs } from "node:fs";
 import { join } from "node:path";
@@ -45,6 +45,19 @@ function validateStoredState(input: unknown): asserts input is RepositoryState {
     for (const entry of record.files) {
       if (!entry || !/^[a-f0-9]{64}$/.test(entry.hash)) throw failure("仓库安装摘要无效");
       safePath(entry.path);
+    }
+  }
+  if (value.catalogInstalls !== undefined) {
+    if (!Array.isArray(value.catalogInstalls) || value.catalogInstalls.length > 500) throw failure("目录安装状态格式无效");
+    for (const item of value.catalogInstalls) {
+      if (typeof item === "string") {
+        if (!/^(?:clawhub|skillsh):[A-Za-z0-9][A-Za-z0-9._-]{0,127}(?:\/[A-Za-z0-9][A-Za-z0-9._-]{0,127}){1,2}$/.test(item)) throw failure("目录安装记录格式无效");
+      } else if (item && typeof item === "object") {
+        if (typeof item.id !== "string" || !/^(?:clawhub|skillsh):[A-Za-z0-9][A-Za-z0-9._-]{0,127}(?:\/[A-Za-z0-9][A-Za-z0-9._-]{0,127}){1,2}$/.test(item.id)) throw failure("目录安装记录格式无效");
+        if (typeof item.name !== "string" || !item.name.trim() || item.name.length > 128) throw failure("目录安装技能名称无效");
+      } else {
+        throw failure("目录安装记录格式无效");
+      }
     }
   }
 }
@@ -257,7 +270,11 @@ export function createRepositoryManager({ fetchImpl = globalThis.fetch, log, reg
         matched.set(record, signature(files) === signature(record.files));
       } catch { /* Missing or unsafe installed copies must not be deleted. */ }
     }
-    return { installRoots: await repositoryDestinations(), catalogInstalls: data.catalogInstalls || [], repositories: data.repositories.map((repo) => ({ ...repo, skills: repo.skills.map((skill) => {
+    const rawCatalogRecords: CatalogInstallRecord[] = ((data.catalogInstalls || []) as (CatalogInstallRecord | string)[]).map(r => typeof r === "string" ? { id: r, name: r.split("/").pop()! } : r);
+    const activeCatalogIds = rawCatalogRecords
+      .filter(r => skills.some(s => s.name.toLowerCase() === r.name.toLowerCase() || s.declaredName?.toLowerCase() === r.name.toLowerCase()))
+      .map(r => r.id);
+    return { installRoots: await repositoryDestinations(), catalogInstalls: activeCatalogIds, repositories: data.repositories.map((repo) => ({ ...repo, skills: repo.skills.map((skill) => {
       const found = skills.some((s) => s.name.toLowerCase() === skill.name.toLowerCase() || s.declaredName?.toLowerCase() === skill.name.toLowerCase());
 
       const { body, ...summary } = skill;
@@ -275,16 +292,36 @@ export function createRepositoryManager({ fetchImpl = globalThis.fetch, log, reg
         status: !skill.valid ? "invalid" : legacy?.status ?? (found ? "conflict" : "available") };
     }) })) };
   }
+  let catalogQueue: Promise<unknown> = Promise.resolve();
+  const serializeCatalog = <T>(task: () => Promise<T>): Promise<T> => {
+    const next = catalogQueue.then(task, task) as Promise<T>;
+    catalogQueue = next.catch(() => {});
+    return next;
+  };
   return {
     list: () => serialize(list),
-    rememberCatalogInstall: (id: string) => serialize(async () => {
+    rememberCatalogInstall: (id: string, name: string) => serializeCatalog(async () => {
       if (!/^(?:clawhub|skillsh):[A-Za-z0-9][A-Za-z0-9._-]{0,127}(?:\/[A-Za-z0-9][A-Za-z0-9._-]{0,127}){1,2}$/.test(id)) throw failure("目录安装记录无效");
+      if (typeof name !== "string" || !name.trim()) throw failure("目录安装技能名称无效");
       const data = await read();
-      if (!data.catalogInstalls?.includes(id)) {
-        data.catalogInstalls = [...(data.catalogInstalls || []), id].slice(-500);
+      const records: CatalogInstallRecord[] = ((data.catalogInstalls || []) as (CatalogInstallRecord | string)[]).map(r => typeof r === "string" ? { id: r, name: r.split("/").pop()! } : r);
+      const filtered = records.filter(r => r.id !== id);
+      filtered.push({ id, name: name.trim() });
+      data.catalogInstalls = filtered.slice(-500);
+      await write(data);
+      return { catalogInstalls: data.catalogInstalls.map(r => typeof r === "string" ? r : r.id) };
+    }),
+    forgetCatalogInstall: (nameOrId: string) => serializeCatalog(async () => {
+      const data = await read();
+      if (!data.catalogInstalls?.length) return { catalogInstalls: [] };
+      const records: CatalogInstallRecord[] = ((data.catalogInstalls || []) as (CatalogInstallRecord | string)[]).map(r => typeof r === "string" ? { id: r, name: r.split("/").pop()! } : r);
+      const target = nameOrId.toLowerCase();
+      const filtered = records.filter(r => r.id.toLowerCase() !== target && r.name.toLowerCase() !== target);
+      if (filtered.length !== records.length) {
+        data.catalogInstalls = filtered;
         await write(data);
       }
-      return { catalogInstalls: data.catalogInstalls || [] };
+      return { catalogInstalls: (data.catalogInstalls || []).map(r => typeof r === "string" ? r : r.id) };
     }),
     ...createRepositoryUpdater({ read, write, repository, download, serialize, parseRepositoryInput, registeredWorkspaces, onWorkspaceIndexBuild }),
     add: (input: RepositoryInput) => serialize(async () => {

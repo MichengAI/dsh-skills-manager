@@ -446,9 +446,11 @@ export function createRepositoryUI({ react, Modal, Input, Button, Collapse, Sour
       return perform(async () => {
         await api("/catalog/install", { method: "POST", headers, body: JSON.stringify({ ...target, ...scope }) });
         if (!mounted.current) return;
+        const catalogId = target.catalog === "skillsh" ? `skillsh:${target.source}/${target.skillId}` : `clawhub:${target.owner}/${target.slug}`;
+        setCatalogInstallIds(prev => prev.includes(catalogId) ? prev : [...prev, catalogId]);
         setFeedback({ key: "repo.installSuccess", name: target.name });
         setModal(null);
-        if (onInstalled) await onInstalled();
+        await Promise.all([load(), Promise.resolve().then(() => onInstalled?.())]);
       }, false);
     }
     react.useEffect(() => { if (active) perform(load, false); }, [active]);
@@ -699,18 +701,18 @@ export function createRepositoryUI({ react, Modal, Input, Button, Collapse, Sour
       dialog = h(Modal, { title: t("repo." + (modal.type === "catalog-detail" ? "detail" : modal.type === "catalog-install" ? "install" : modal.type === "remove" ? "remove" : modal.type)), closeLabel: t("repo.close"), onClose: close }, body);
     }
     const installedCatalogNames = new Set(installedSkills.flatMap(skill => [skill.name, skill.declaredName].filter((name): name is string => !!name).map(name => name.toLowerCase())));
-    function catalogInstalled(id: string, name: string, key: string) {
-      return catalogInstallIds.includes(id) && [name, key].some(value => installedCatalogNames.has(value.toLowerCase()));
+    function catalogInstalled(id: string) {
+      return catalogInstallIds.includes(id);
     }
     const filteredCatalogItems = catalogItems.filter(item => {
-      const installed = catalogInstalled(`clawhub:${item.owner}/${item.slug}`, item.name, item.slug);
+      const installed = catalogInstalled(`clawhub:${item.owner}/${item.slug}`);
       const matchesStatus = !catalogStatus || (catalogStatus === "installed" ? installed : !installed);
       return matchesStatus;
     });
     const catalogList = catalogSort === "installs" ? filteredCatalogItems.slice().sort((left, right) => (right.installs || 0) - (left.installs || 0)) :
       catalogSort === "name" ? filteredCatalogItems.slice().sort((left, right) => left.name.localeCompare(right.name)) : filteredCatalogItems;
     const renderCatalogItem = (item: CatalogSkillItem) => {
-      const installed = catalogInstalled(`clawhub:${item.owner}/${item.slug}`, item.name, item.slug);
+      const installed = catalogInstalled(`clawhub:${item.owner}/${item.slug}`);
       const metadata = [
         item.source,
         item.downloads === undefined ? null : item.downloads.toLocaleString() + " " + t("repo.catalog.downloads"),
@@ -747,7 +749,7 @@ export function createRepositoryUI({ react, Modal, Input, Button, Collapse, Sour
 
     const skillshView = h("div", { className: "dssm-catalog-list" },
       skillshItems.map(item => {
-        const installed = catalogInstalled(`skillsh:${item.source}/${item.skillId}`, item.name, item.skillId);
+        const installed = catalogInstalled(`skillsh:${item.source}/${item.skillId}`);
         const metadata = [item.source, item.installs === undefined ? null : item.installs.toLocaleString() + " " + t("repo.catalog.installs")].filter(Boolean).join(" · ");
         return h("div", { key: item.id, className: "dssm-repo-row" },
           h("div", { className: "dssm-repo-head" },

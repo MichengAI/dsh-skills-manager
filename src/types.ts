@@ -201,11 +201,15 @@ export interface InstallRecord {
         record: InstallRecord;
     };
 }
+export interface CatalogInstallRecord {
+    id: string;
+    name: string;
+}
 export interface RepositoryState {
     version: number;
     repositories: Repository[];
     installs: InstallRecord[];
-    catalogInstalls?: string[];
+    catalogInstalls?: (CatalogInstallRecord | string)[];
 }
 export interface RepositoryInput {
     url?: string;

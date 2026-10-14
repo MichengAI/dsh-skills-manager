@@ -986,7 +986,7 @@ ok(
   "opening import clears stale upload feedback and selection",
 );
 ok(
-  /hostButton\(t\("btn\.refresh"\),\s*function\s*\(\)\s*\{\s*refresh\(false\);/.test(source),
+  /filterActionButton\(t\("btn\.refresh"\),\s*strokeIcon\(.*refresh\(false\);/.test(source),
   "settings exposes an explicit refresh action for project file changes",
 );
 ok(

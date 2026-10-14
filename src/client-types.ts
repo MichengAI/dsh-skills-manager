@@ -11,7 +11,7 @@ export type Detail = Success<Awaited<ReturnType<typeof skillDetail>>>;
 export type TrashItem = Awaited<ReturnType<typeof listTrash>>[number];
 type Manager = ReturnType<typeof createRepositoryManager>;
 export type RepositoryRoutes = {
-    [K in keyof Manager as K extends 'sources' | 'list' | 'restoreTrash' | 'rememberCatalogInstall' ? never : `/repositories/${K}`]: Awaited<ReturnType<Manager[K]>>;
+    [K in keyof Manager as K extends 'sources' | 'list' | 'restoreTrash' | 'rememberCatalogInstall' | 'forgetCatalogInstall' ? never : `/repositories/${K}`]: Awaited<ReturnType<Manager[K]>>;
 };
 type SkillsShSearchPath = `/skills-sh/search?q=${string}`;
 type SkillsShSearchResult = { skills: { id: string; source: string; skillId: string; name: string; installs?: number }[] };

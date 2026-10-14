@@ -1,3 +1,5 @@
+import { parseSkillDoc } from "./core.js";
+
 const IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 const SAFE_PATH = /^(?!\/)(?!.*(?:^|\/)\.\.(?:\/|$))[A-Za-z0-9._/-]+$/;
 const MAX_TEXT_BYTES = 1 << 20;
@@ -62,26 +64,11 @@ async function readBounded(response: Response, limit: number) {
   return bytes;
 }
 
-function frontmatter(markdown: string) {
-  const match = markdown.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/);
-  const block = match?.[1] || "";
-  const field = (name: string) => {
-    const lines = block.split(/\r?\n/);
-    const index = lines.findIndex(line => line.startsWith(`${name}:`));
-    if (index < 0) return undefined;
-    const rest = lines[index].slice(name.length + 1).trim();
-    if (rest === ">" || rest === "|") {
-      const folded = [];
-      for (let i = index + 1; i < lines.length; i++) {
-        if (lines[i] !== "" && !/^\s/.test(lines[i])) break;
-        folded.push(lines[i].trim());
-      }
-      const text = folded.join(rest === "|" ? "\n" : " ").replace(/[ \t]{2,}/g, " ").trim();
-      return text || undefined;
-    }
-    return rest.replace(/^["']|["']$/g, "").trim() || undefined;
-  };
-  return { name: field("name"), description: field("description"), body: match ? markdown.slice(match[0].length) : markdown };
+function skillDocSummary(markdown: string) {
+  const parsed = parseSkillDoc(markdown);
+  const name = parsed.map.name?.trim();
+  const description = parsed.map.description?.trim();
+  return { name, description, body: parsed.body };
 }
 
 async function fetchFixed(url: string, fetchImpl: FetchLike, accept: string) {
@@ -95,7 +82,7 @@ export async function readCatalogSkill(input: CatalogRequest, fetchImpl: FetchLi
   if (input.catalog === "clawhub") {
     const response = await fetchFixed(urls.detail, fetchImpl, "text/markdown, text/plain");
     const markdown = new TextDecoder().decode(await readBounded(response, MAX_TEXT_BYTES));
-    const parsed = frontmatter(markdown);
+    const parsed = skillDocSummary(markdown);
     if (!parsed.name || !parsed.description) throw catalogError("目录技能说明无效", 502, "error.catalog.response");
     return { name: parsed.name, description: parsed.description, body: parsed.body, origin: urls.origin };
   }
@@ -103,7 +90,7 @@ export async function readCatalogSkill(input: CatalogRequest, fetchImpl: FetchLi
   const payload = JSON.parse(new TextDecoder().decode(await readBounded(response, MAX_TEXT_BYTES))) as { files?: { path?: unknown; contents?: unknown }[] };
   const document = payload.files?.find(file => file.path === "SKILL.md" && typeof file.contents === "string");
   if (!document || typeof document.contents !== "string") throw catalogError("目录技能说明无效", 502, "error.catalog.response");
-  const parsed = frontmatter(document.contents);
+  const parsed = skillDocSummary(document.contents);
   if (!parsed.name || !parsed.description) throw catalogError("目录技能说明无效", 502, "error.catalog.response");
   return { name: parsed.name, description: parsed.description, body: parsed.body, origin: urls.origin };
 }
@@ -124,7 +111,7 @@ export async function loadCatalogPackage(input: CatalogRequest, fetchImpl: Fetch
     return { path: file.path, data: Buffer.from(file.contents, "utf8").toString("base64") };
   });
   if (!entries.some(entry => entry.path === "SKILL.md")) throw catalogError("目录技能缺少 SKILL.md", 502, "error.catalog.response");
-  const detail = frontmatter(Buffer.from(entries.find(entry => entry.path === "SKILL.md")!.data, "base64").toString("utf8"));
+  const detail = skillDocSummary(Buffer.from(entries.find(entry => entry.path === "SKILL.md")!.data, "base64").toString("utf8"));
   if (!detail.name) throw catalogError("目录技能说明无效", 502, "error.catalog.response");
   return { name: detail.name, entries };
 }

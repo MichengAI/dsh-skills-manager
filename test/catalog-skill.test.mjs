@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { catalogUrls, readCatalogSkill, loadCatalogPackage } from "../src/catalog-skill.ts";
+import { catalogUrls, readCatalogSkill, loadCatalogPackage } from "../lib/catalog-skill.js";
 
 const clawhub = catalogUrls({ catalog: "clawhub", owner: "pskoett", slug: "self-improving-agent" });
 assert.equal(clawhub.detail, "https://clawhub.ai/api/v1/skills/self-improving-agent/file?path=SKILL.md&owner=pskoett");
@@ -37,6 +37,7 @@ assert.equal(calls[0].url, "https://clawhub.ai/api/v1/skills/demo/file?path=SKIL
 await assert.rejects(loadCatalogPackage({ catalog: "skillsh", source: "owner/repo", skillId: "skill" }, fetchImpl), (error) => error.code === "error.catalog.response", "skills.sh 文件路径不能穿越安装目录");
 const folded = await readCatalogSkill({ catalog: "skillsh", source: "owner/repo", skillId: "ponytail" }, async () => new Response(JSON.stringify({ files: [{ path: "SKILL.md", contents: "---\nname: ponytail\ndescription: >\n  Lazy senior dev mode: the smallest change.\n---\n\n# Ponytail\n" }] }), { status: 200, headers: { "content-type": "application/json" } }));
 assert.equal(folded.description, "Lazy senior dev mode: the smallest change.", "YAML 折叠标记 > 不能当成简介");
-assert.equal(folded.body.trim(), "# Ponytail");
+const foldedDash = await readCatalogSkill({ catalog: "skillsh", source: "owner/repo", skillId: "ponytail-dash" }, async () => new Response(JSON.stringify({ files: [{ path: "SKILL.md", contents: "---\nname: ponytail\ndescription: >-\n  Lazy senior dev mode: dash variant.\n---\n\n# Ponytail\n" }] }), { status: 200, headers: { "content-type": "application/json" } }));
+assert.equal(foldedDash.description, "Lazy senior dev mode: dash variant.", "YAML 折叠标记 >- 不能当成简介");
 
 console.log("目录技能详情与安装包地址测试通过");

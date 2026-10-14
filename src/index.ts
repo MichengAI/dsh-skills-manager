@@ -527,7 +527,11 @@ function apply(ctx: HostContext) {
             case "/api/dsh-skills-manager/repositories/install":
               return run(res, () => repositories.install(body, registeredWorkspacePaths(ctx)), afterWrite);
             case "/api/dsh-skills-manager/repositories/uninstall":
-              return run(res, () => repositories.uninstall(body), afterWrite);
+              return run(res, async () => {
+                const result = await repositories.uninstall(body);
+                await repositories.forgetCatalogInstall(String(body.name || ""));
+                return result;
+              }, afterWrite);
             case "/api/dsh-skills-manager/repositories/preview":
               return run(res, () => repositories.preview(body));
             case "/api/dsh-skills-manager/repositories/update":
@@ -562,7 +566,11 @@ function apply(ctx: HostContext) {
             case "/api/dsh-skills-manager/category-disable":
               return run(res, () => withScope(body, (scope) => setCategoryEnabled(String(body.root || ""), String(body.category || ""), false, log, scopedOptions(scope))), afterWrite);
             case "/api/dsh-skills-manager/delete":
-              return run(res, () => withScope(body, async (scope) => deleteSkill(await requestRoot(String(body.root || "dsh"), scope?.projectCwds), String(body.name || ""), log)), afterWrite);
+              return run(res, () => withScope(body, async (scope) => {
+                const result = await deleteSkill(await requestRoot(String(body.root || "dsh"), scope?.projectCwds), String(body.name || ""), log);
+                await repositories.forgetCatalogInstall(String(body.name || ""));
+                return result;
+              }), afterWrite);
             case "/api/dsh-skills-manager/trash-restore":
               return run(res, () => withScope(body, (scope) => repositories.restoreTrash(String(body.id || ""), { ...(scope ?? {}), registeredWorkspaces: registeredWorkspacePaths(ctx) })), afterWrite);
             case "/api/dsh-skills-manager/trash-delete":
@@ -619,7 +627,7 @@ function apply(ctx: HostContext) {
                 }
                 const installedName = imported.imported[0].name;
                 const catalogId = body.catalog === "skillsh" ? `skillsh:${body.source}/${body.skillId}` : `clawhub:${body.owner}/${body.slug}`;
-                await repositories.rememberCatalogInstall(catalogId);
+                await repositories.rememberCatalogInstall(catalogId, installedName);
                 const enabled = await setSkillEnabled(root, installedName, true, log);
                 if (enabled && typeof enabled === "object" && "ok" in enabled && enabled.ok === false) {
                   throw Object.assign(new Error(enabled.error || "技能启用状态无法写入"), { statusCode: 500, code: typeof enabled.code === "string" ? enabled.code : "error.repo.enableState" });
