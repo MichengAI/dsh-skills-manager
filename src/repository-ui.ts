@@ -735,8 +735,9 @@ export function createRepositoryUI({ react, Modal, Input, Button, Collapse, Sour
             if (!mounted.current) return;
             setCatalogCopies(prev => prev.filter(item => item !== copy && !(item.id === copy.id && item.installedRoot === copy.installedRoot && item.installedWorkspace === copy.installedWorkspace)));
             setFeedback({ key: "repo.uninstallSuccess", name: copy.name });
-            setModal(null);
-            await load();
+                        setModal(null);
+                        const refreshed = await Promise.allSettled([load(), Promise.resolve().then(() => onInstalled?.())]);
+                        if (mounted.current && refreshed.some(result => result.status === "rejected")) setFeedback({ key: "repo.catalog.installRefreshWarning", name: copy.name });
           }, false);
         }
         function renderCatalogActions(id: string, unknown: boolean, openDetail: () => void, openInstall: () => void) {
