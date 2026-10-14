@@ -148,7 +148,7 @@ try {
   const managerApi = api.replace(/\/repositories$/, '');
   const shared = (await (await fetch(managerApi + '/state')).json()).data.roots.find(root => root.key === 'agents');
   assert.equal(shared.skills.find(skill => skill.name === 'http-demo').installSource.root, 'agents', 'global source metadata follows the installation destination');
-  assert.equal((await fetch(managerApi + '/delete', { method: 'POST', headers, body: JSON.stringify({ root: 'agents', name: 'http-demo', allowSharedAgent: true }) })).status, 400, 'request cannot opt into internal Shared Agent write permission');
+  assert.equal((await fetch(managerApi + '/delete', { method: 'POST', headers, body: JSON.stringify({ root: 'codex', name: 'http-demo', allowSharedAgent: true }) })).status, 400, '请求参数不能放开其他只读 Agent 目录');
   assert.equal((await post('uninstall', { id, path: 'demo', root: 'dsh' })).status, 400, 'wrong root cannot select a Shared Agent copy');
   const uninstall = await post('uninstall', { id, path: 'demo', root: 'agents' });
   assert.equal(uninstall.status, 200);

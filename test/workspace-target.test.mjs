@@ -117,12 +117,12 @@ try {
   assert.equal(duplicate.ok, false, "同一项目目录内仍然冲突");
   assert.equal(duplicate.code, "error.create.conflict");
 
-  // 用户级写入闸：allowRepositoryRoot 只额外放行 Shared Agent，其他 Agent 目录无论如何都不可写。
+  // 用户级写入开放 Shared Agent，其他 Agent 目录无论如何都不可写。
   const sharedRoot = core.userRoots().find((item) => item.key === "agents");
   const viaAgents = await core.createSkill({ name: "via-agents", description: "x", body: "x" }, undefined, { root: sharedRoot, allowRepositoryRoot: true });
   assert.equal(viaAgents.ok, undefined, "Shared Agent 在 allowRepositoryRoot 下可创建");
   assert.equal(await lstat(join(sharedRoot.path, "via-agents", "SKILL.md")).then(() => true, () => false), true);
-  assert.equal((await core.createSkill({ name: "no-flag", description: "x", body: "x" }, undefined, { root: sharedRoot })).code, "error.root.readonly", "不带 allowRepositoryRoot 时仍然只读");
+  assert.equal((await core.createSkill({ name: "no-flag", description: "x", body: "x" }, undefined, { root: sharedRoot })).ok, undefined, "Shared Agent 普通创建无需安装特权");
   for (const key of ["codex", "claude", "gemini", "cursor"]) {
     const other = core.userRoots().find((item) => item.key === key);
     for (const flag of [false, true]) {

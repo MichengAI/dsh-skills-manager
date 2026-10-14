@@ -124,8 +124,14 @@ try {
   response = await post("enable", { root: "agents", name: "agents-created" });
   assert.equal(response.status, 200, await response.clone().text());
   response = await post("delete", { root: "agents", name: "agents-created" });
-  assert.equal(response.status >= 400, true, "普通管理页不删 Shared Agent 目录的技能");
-  assert.equal(await exists(join(agentsRoot, "agents-created", "SKILL.md")), true, "拒绝删除后文件原样保留");
+  assert.equal(response.status, 200, await response.clone().text());
+  const agentsDeleted = (await response.json()).data;
+  assert.equal(await exists(join(agentsRoot, "agents-created", "SKILL.md")), false, "普通 Shared Agent 技能无需安装记录也可回收");
+  response = await post("trash-restore", { id: agentsDeleted.id });
+  assert.equal(response.status, 200, await response.clone().text());
+  assert.equal(await exists(join(agentsRoot, "agents-created", "SKILL.md")), true, "普通 Shared Agent 技能恢复到原目录");
+  const managerState = await (await fetch(`${base}/state`)).json();
+  assert.equal(managerState.data.roots.find(root => root.key === "agents").mutable, true, "管理页应提供 Shared Agent 的普通文件操作");
   // Codex、Claude 等其他 Agent 目录仍然只读。
   for (const key of ["codex", "claude", "gemini"]) {
     response = await post("create", { name: "forbidden-" + key, description: "x", body: "x", root: key });

@@ -3,6 +3,7 @@
 ## 1.1.21 - Unreleased
 
 - Support DSH `0.2.1-alpha.3` while retaining all existing supported versions.
+- Allow ordinary user-level Shared Agent skills to be managed, trashed and restored without installation records, preserving discovery, loading and path safety while keeping other agent sources read-only.
 
 ## 1.1.20 - Unreleased
 

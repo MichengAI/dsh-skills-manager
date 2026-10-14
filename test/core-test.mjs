@@ -1478,7 +1478,8 @@ ok(
   "permanent trash deletion removes the second-stage entry",
 );
 const publicDelete = await deleteSkill(agentsRoot, "public-skill");
-ok(publicDelete.ok === false, "deleteSkill rejects public Agent directory");
+ok(!!publicDelete.id, "公共 Agent 普通技能允许移入回收站");
+await restoreTrash(publicDelete.id);
 
 // Windows 可能在 stage 内容刚写完时持续阻止目录 rename；最终发布应降级复制，不能把成功的搬运回滚掉。
 await makeSkill(
@@ -1754,19 +1755,10 @@ if (await tryLink(process.env.DSH_HOME, aliasHome, linkType)) {
     "intermediate-link overlap test skipped because this environment cannot create directory links",
   );
 }
-eq(
-  publicDelete.code,
-  "error.root.readonly",
-  "public delete carries the readonly code",
-);
-eq(
-  publicDelete.params && publicDelete.params.action,
-  "delete",
-  "public delete params.action",
-);
+ok(!!publicDelete.id, "公共 Agent 回收返回有效条目编号");
 ok(
   (await resolveEntry(agentsRoot, "public-skill")) !== null,
-  "public skill remains after rejected delete",
+  "公共 Agent 技能恢复后保留原内容",
 );
 await writeFile(
   join(dshRoot, "SKILL.md"),
@@ -3413,11 +3405,11 @@ try {
     headers: secureHeaders,
     body: JSON.stringify({ name: "http-skill", root: "agents" }),
   });
-  eq(httpDeleteAgents.status, 400, "HTTP delete rejects public Agent root");
+  eq(httpDeleteAgents.status, 400, "Shared Agent 中不存在的技能返回失败");
   eq(
     (await httpDeleteAgents.json()).code,
-    "error.root.readonly",
-    "HTTP delete with agents root is readonly",
+    "error.skill.notFound",
+    "Shared Agent 中不存在的技能不再误报只读",
   );
   ok(
     (await resolveEntry(dshRoot, "http-skill")) !== null,
@@ -3530,8 +3522,8 @@ ok(
 );
 const agentsSnap = snap.roots.find((r) => r.key === "agents");
 ok(
-  agentsSnap.mutable === false,
-  "public Agent root disallows destructive actions",
+  agentsSnap.mutable === true,
+  "公共 Agent 根开放普通文件管理",
 );
 ok(
   agentsSnap.skills.some((s) => s.name === "public-skill"),

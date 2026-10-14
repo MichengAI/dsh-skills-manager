@@ -60,10 +60,13 @@ try {
   assert.equal((await manager.sources())[installationSourceKey(root("agents").path, "shared-demo")].root, "agents");
   const policy = JSON.parse(await fs.readFile(join(process.env.DSH_HOME, "skills-manager/state.json"), "utf8"));
   assert.ok(policy.enabledSkills.agents.includes("shared-demo"));
-  assert.equal((await state()).roots.find(item => item.key === "agents").mutable, false, "general Shared Agent source stays read-only");
-  assert.equal((await deleteSkill(root("agents"), "shared-demo")).ok, false);
-  const deniedImport = await importUploadedSkill({ name: "blocked-demo", entries: [{ path: "SKILL.md", data: Buffer.from(doc("blocked-demo")).toString("base64") }] }, undefined, { root: root("agents") });
-  assert.equal(deniedImport.ok, false, "generic import cannot write an external root");
+  assert.equal((await state()).roots.find(item => item.key === "agents").mutable, true, "公共 Agent 统一开放文件管理");
+  const genericImport = await importUploadedSkill({ name: "generic-demo", entries: [{ path: "SKILL.md", data: Buffer.from(doc("generic-demo")).toString("base64") }] }, undefined, { root: root("agents") });
+  assert.notEqual(genericImport.ok, false, "普通导入无需安装入口特权");
+  const genericDeleted = await deleteSkill(root("agents"), "generic-demo");
+  assert.ok(genericDeleted.id, "普通技能无需来源记录即可删除");
+  await restoreTrash(genericDeleted.id);
+  assert.equal(await exists(join(root("agents").path, "generic-demo/SKILL.md")), true);
 
   archive = snapshot("v2");
   await manager.refresh({ id: repo.id });
@@ -164,11 +167,10 @@ try {
     assert.equal(installed.root, destination.path);
     assert.equal((await skill(name)).installedRoot, key);
     assert.equal((await manager.sources())[installationSourceKey(root(key).path, name)].root, key);
-    if (key !== 'dsh') {
-      assert.equal((await state()).roots.find(item => item.key === key).mutable, false);
-      assert.equal((await deleteSkill(root(key), name)).ok, false, 'general external deletion remains denied');
-      const denied = await importUploadedSkill({ name: `untracked-${key}`, entries: [{ path: 'SKILL.md', data: Buffer.from(doc(`untracked-${key}`)).toString('base64') }] }, undefined, { root: root(key) });
-      assert.equal(denied.ok, false, 'generic import cannot write a repository-only destination');
+    assert.equal((await state()).roots.find(item => item.key === key).mutable, true, "两个用户级安装位置均开放普通管理");
+    for (const externalRoot of userRoots().filter(item => item.key !== "dsh" && item.key !== "agents")) {
+      assert.equal(externalRoot.mutable, false, "其他 Agent 来源仍只读");
+      assert.equal((await deleteSkill(externalRoot, name)).code, "error.root.readonly");
     }
     archive = snapshot('v2'); await manager.refresh({ id: repo.id });
     const preview = await manager.preview({ id: repo.id, path });
@@ -254,7 +256,13 @@ try {
   const linkedHome = join(sandbox, "linked-home");
   await fs.symlink(outside, linkedHome, directoryLinkType);
   process.env.DSH_AGENTS_HOME = linkedHome;
-  try { await assert.rejects(manager.install({ id: repo.id, path: "blocked", root: "agents" }), error => error.code === "error.root.unsafe" && error.params?.path === linkedHome); }
+  try {
+    await assert.rejects(manager.install({ id: repo.id, path: "blocked", root: "agents" }), error => error.code === "error.root.unsafe" && error.params?.path === linkedHome);
+    const unsafeImport = await importUploadedSkill({ name: "generic-unsafe", entries: [{ path: "SKILL.md", data: Buffer.from(doc("generic-unsafe")).toString("base64") }] }, undefined, { root: root("agents") });
+    assert.equal(unsafeImport.code, "error.root.unsafe", "普通导入也拒绝祖先目录链接，不依赖安装标志");
+    assert.equal((await deleteSkill(root("agents"), "generic-unsafe")).code, "error.root.unsafe", "普通回收也拒绝祖先目录链接");
+    assert.equal(await exists(join(outside, "skills/generic-unsafe")), false);
+  }
   finally { process.env.DSH_AGENTS_HOME = safeAgentsHome; }
   assert.equal(await exists(join(outside, "skills/blocked-demo")), false);
 

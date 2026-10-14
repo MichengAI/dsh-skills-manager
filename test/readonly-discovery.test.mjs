@@ -61,7 +61,8 @@ try {
   );
   assert.equal(
     (await core.deleteSkill(agents.path, "alias")).code,
-    "error.root.readonly",
+    "error.root.unsafe",
+    "开放 Shared Agent 不允许回收外部目录链接",
   );
 
   await link(external, join(codex.path, "group", "other-alias"));

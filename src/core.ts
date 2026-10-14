@@ -142,7 +142,7 @@ export function userRoots(): SkillRoot[] {
       key: "agents",
       path: join(resolveAgentsHome(), "skills"),
       label: "公共 Agent",
-      mutable: false,
+      mutable: true,
       toggleable: true,
       native: true,
       rank: 450,
@@ -696,14 +696,14 @@ function rootByKey(key: string): SkillRoot | null | undefined {
   return userRoots().find((item) => item.key === key) || null;
 }
 
-/** 只允许用户 DSH 根，或由活动 Session 推导出的项目 DSH 根参与文件写入。 */
-function writableRootDefinition(root: RootInput, allowRepositoryRoot = false) {
+/** 只允许用户 DSH、Shared Agent，或由活动 Session 推导出的项目 DSH 根参与文件写入。 */
+function writableRootDefinition(root: RootInput) {
   const definition = rootDefinition(root);
-  // 普通管理页仍只写 DSH。仓库安装只能额外写入已核对的公共 Agent 目录。
-  if (allowRepositoryRoot && definition?.key === "agents") {
+  // Shared Agent 统一开放管理，但仍必须是当前配置的规范目录。
+  if (definition?.key === "agents") {
     const canonical = rootByKey("agents");
     return canonical && resolve(definition.path) === resolve(canonical.path)
-      ? { ...canonical, mutable: true }
+      ? canonical
       : null;
   }
   if (!definition || definition.mutable !== true) return null;
@@ -726,8 +726,8 @@ function writableRootDefinition(root: RootInput, allowRepositoryRoot = false) {
 }
 
 async function checkedWritableRootDefinition(root: RootInput, allowRepositoryRoot = false): Promise<SkillRoot | OperationError | null | undefined> {
-  const definition = writableRootDefinition(root, allowRepositoryRoot);
-  if (definition && definition.scope !== "project" && allowRepositoryRoot) {
+  const definition = writableRootDefinition(root);
+  if (definition && definition.scope !== "project" && (definition.key === "agents" || allowRepositoryRoot)) {
     // 公共 Agent 的祖先目录也不能是链接，避免确认安装后写到配置路径之外。
     for (let path = resolve(definition.path); ; path = dirname(path)) {
       const st = await lstatOrNull(path);
@@ -1085,7 +1085,7 @@ export function parseBoolValue(raw: unknown) {
 /** 按名称解析条目（bundle 优先，其次 flat）。找不到返回 null。 */
 export async function resolveEntry(root: RootInput, name: string): Promise<DiscoveredEntry | null> {
   const definition = rootDefinition(root);
-  if (definition && !definition.mutable) {
+  if (definition && (!definition.mutable || definition.key === "agents")) {
     if (!validDiscoveryName(name)) return null;
     return (
       (await discoverReadonlyEntries(definition.path)).entries.find(
@@ -1208,7 +1208,7 @@ export function scanEntries(root: RootInput, options: {metadataOnly: true}): Pro
 export function scanEntries(root: RootInput, options?: {metadataOnly?: false}): Promise<Scan>;
 export async function scanEntries(root: RootInput, options: {metadataOnly?: boolean} = {}): Promise<Scan | MetadataScan> {
   const definition = rootDefinition(root);
-  if (definition && !definition.mutable) {
+  if (definition && (!definition.mutable || definition.key === "agents")) {
     const discovered = await discoverReadonlyEntries(definition.path);
     if (options.metadataOnly) return discovered;
     const entries = [];
@@ -2113,6 +2113,12 @@ export async function deleteSkill(root: RootInput, name: string, log?: Log, opti
   const targets = (await safeExistingEntryPaths(definition.path, name))
     .filter(target => !options.repositoryEntryOnly || target.fileName === name);
   if (!targets.length) return { ok: false, error: `技能不存在: ${name}`, code: "error.skill.notFound", params: { name } };
+  if (definition.key === "agents") {
+    for (const target of targets) {
+      if ((await lstatOrNull(target.path))?.isSymbolicLink())
+        return { ok: false, error: `技能目录不安全，拒绝写入: ${target.path}`, code: "error.root.unsafe", params: { path: target.path } };
+    }
+  }
   const id = options.repositoryTrash?.id || options.catalogTrash?.id || `${Date.now()}-${randomUUID()}`;
   if (!/^\d+-[a-f0-9-]{36}$/.test(id)) throw codedError("回收站条目编号非法", "error.trash.invalid", { id });
   const trashRoot = trashRootPath();
@@ -3133,7 +3139,8 @@ export async function listProviderCandidates(options: ScopeOptions = {}) {
     const hasExplicitDisable = group.some((item) => item.policy.override === false);
     if (!hasNativeCopy && !hasExplicitDisable && !policy.sourceEnabled) continue;
     const project = root.scope === "project";
-    const policyOnly = root.mutable;
+    // Shared Agent 继续由 manager 提供递归发现与链接副本，不因开放文件管理而丢失调用候选。
+    const policyOnly = root.mutable && root.key !== "agents";
     // 回退副本也必须覆盖组内更高优先级的原生条目，防止宿主重新选中已停用副本。
     const overlayRank = group.length > 1
       ? Math.min(...group.map((item) => Math.min(item.root.rank, item.entry.providerRank ?? item.root.rank))) - 1
