@@ -71,6 +71,8 @@ export interface SessionSnapshot {
 export interface SectionProps {
     t: Translate;
     useSessions?: (selector: (snapshot?: SessionSnapshot) => string | undefined) => string | undefined;
+    /** 宿主订阅 store 的实现：嵌入面走这条，与 useSessions 语义一致。 */
+    useSyncExternalStore?: <T>(subscribe: (cb: () => void) => () => void, getSnapshot: () => T) => T;
 }
 export interface Filters {
     query: string;
@@ -105,6 +107,22 @@ export interface ClientContext {
             locale: string;
         }, component: React.ComponentType<SectionProps>) => unknown;
     };
+    /** 宿主服务发布（dsh-market 收编范式同款）：有 provide 时发布 skillsManager 嵌入面。 */
+    provide?: (name: string, face: SkillsManagerFace) => unknown;
+    /** 会话服务：嵌入面 render 用它取当前会话快照，项目页签在宿主面板里才可用。 */
+    sessions?: {
+        list?: {
+            getSnapshot?: () => SessionSnapshot;
+            subscribe?: (cb: () => void) => () => void;
+        };
+    };
+}
+/** 供其他插件（如 dsh-mcp-studio 扩展面板）嵌入的本插件界面服务面。 */
+export interface SkillsManagerFace {
+    version: number;
+    render: (props?: { snapshot?: SessionSnapshot }) => React.ReactElement;
+    setSettingsVisible: (visible: boolean) => void;
+    settingsVisible: () => boolean;
 }
 interface Require {
     (id: 'react'): typeof React;

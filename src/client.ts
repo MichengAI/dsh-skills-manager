@@ -1,5 +1,5 @@
 import * as React from "react";
-import type { Translate, ApiRoutes, ModalProps, SessionSnapshot, SectionProps, ViewProps, Filters, ClientContext, ManagerSnapshot, Detail, TrashItem } from './client-types.js';
+import type { Translate, ApiRoutes, ModalProps, SessionSnapshot, SectionProps, ViewProps, Filters, ClientContext, ManagerSnapshot, Detail, TrashItem, SkillsManagerFace } from './client-types.js';
 import type { SkillView, RootView, SkillRoot, CodedError, ImportResult, Diagnostic } from './types.js';
 type SearchSkill = Partial<SkillView> & {kindLabel?: string; statusLabel?: string; rootKey?: string; rootLabel?: string};
 type UploadFile = File & {_dssmPath?: string};
@@ -803,6 +803,54 @@ import { antdLocaleFromDocument } from "./antd-locale.js";
       return h(AntdProvider, { locale: antdLocaleFromDocument() }, h("section", { className: "dssm-section" }, content));
     }
 
-    var inject = ["slots", "locale"];
-    function apply(ctx: ClientContext) { localeService = ctx.locale; ctx.effect(function () { return ctx.locale.register(NS, DICT); }); ctx.effect(function () { return observePluginUpdate({ endpoint: "/api/michengai/dsh-skills-manager/update", packageName: "@michengai/dsh-skills-manager", titleRowSelector: ".dssm-title-row", linksSelector: ".dssm-feedback-links", zhName: "技能", enName: "Skills", createIcon: createPluginUpdateIcon }); }, "skills-manager: plugin update ui"); ctx.slots.inject("settings.section", function () { return ctx.slots.register({ name: "settings.section", id: "skills-manager", order: 25, label: function () { return ctx.locale.bind(NS)("title"); }, icon: "skill", locale: NS }, SkillManagerSection); }); }
+    // sessions 供 face 的 render 取会话快照（未声明时 cordis 反射代理读取会抛错，
+    // 见 dsh-mcp-studio 1.0.3 的 layout 教训）；读取处仍包 try/catch 兜底旧宿主。
+    var inject = ["slots", "locale", "sessions"];
+    // settings.section 的可逆注册：宿主插件（如 dsh-mcp-studio 扩展面板）收编本界面时，
+    // 需要一个能注销再恢复的入口开关，而不是注册完就放手。见 SkillsManagerFace。
+    // 注销后重新显示走 ctx.slots.register 直连（dshmarket sectionGate 同款姿势），
+    // 不再嵌套 inject——外层 inject 工厂必须同步返回注册结果，宿主的 disposer 与测试的
+    // 注册断言都取这一个返回值。
+    function createSectionGate(ctx: ClientContext) {
+      var wanted = true, mounted = false, dispose: unknown = null;
+      function factory() {
+        return ctx.slots.register({ name: "settings.section", id: "skills-manager", order: 25, label: function () { return ctx.locale.bind(NS)("title"); }, icon: "skill", locale: NS }, SkillManagerSection);
+      }
+      return {
+        /** 首帧挂载：由外层 inject 工厂调用，返回值兼作宿主 disposer。 */
+        initial: function () { if (wanted && dispose === null) dispose = factory(); mounted = true; return dispose; },
+        setVisible: function (visible: boolean) {
+          wanted = visible !== false;
+          if (!wanted && dispose !== null) { var stop = dispose; dispose = null; try { if (typeof stop === "function") stop(); } catch (_e) { /* 宿主已自行清理 */ } }
+          else if (wanted && mounted && dispose === null) { dispose = factory(); }
+        },
+        visible: function () { return dispose !== null; },
+      };
+    }
+    // 嵌入面：把整份管理界面交给宿主面板渲染，并让出设置页入口。
+    // 与 dsh-market 的 ctx.provide("market", face) 同款约定——同页同 React 实例
+    // （ModuleLoader module table 解析 require("react")），返回元素可挂进宿主任意位置。
+    function createSkillsManagerFace(ctx: ClientContext, gate: ReturnType<typeof createSectionGate>): SkillsManagerFace {
+      var translate = ctx.locale.bind(NS);
+      return {
+        version: 1,
+        render: function (props) {
+          var snapshot = props && props.snapshot;
+          if (snapshot === undefined) {
+            try { snapshot = ctx.sessions?.list?.getSnapshot?.(); } catch (_e) { snapshot = undefined; }
+          }
+          return h(SkillManagerSection, { t: translate, useSessions: function (selector) { try { return selector(snapshot); } catch (_e) { return undefined; } } });
+        },
+        settingsVisible: function () { return gate.visible(); },
+        setSettingsVisible: function (visible) { gate.setVisible(visible); },
+      };
+    }
+    function apply(ctx: ClientContext) {
+      localeService = ctx.locale;
+      ctx.effect(function () { return ctx.locale.register(NS, DICT); });
+      ctx.effect(function () { return observePluginUpdate({ endpoint: "/api/michengai/dsh-skills-manager/update", packageName: "@michengai/dsh-skills-manager", titleRowSelector: ".dssm-title-row", linksSelector: ".dssm-feedback-links", zhName: "技能", enName: "Skills", createIcon: createPluginUpdateIcon }); }, "skills-manager: plugin update ui");
+      var gate = createSectionGate(ctx);
+      ctx.slots.inject("settings.section", function () { return gate.initial(); });
+      try { if (typeof ctx.provide === "function") ctx.provide("skillsManager", createSkillsManagerFace(ctx, gate)); } catch (_e) { /* 宿主不支持服务发布时退回纯设置页形态 */ }
+    }
     module.exports.formatTrashTime = formatTrashTime; module.exports.DICT = DICT; module.exports.translateError = translateError; module.exports.parseApiResponse = parseApiResponse; module.exports.isSkillEnabled = isSkillEnabled; module.exports.countKey = countKey; module.exports.rootDisplayName = rootDisplayName; module.exports.summarizeImportResult = summarizeImportResult; module.exports.normalizeSkillQuery = normalizeSkillQuery; module.exports.matchSkillQuery = matchSkillQuery; module.exports.filterSkills = filterSkills; module.exports.visibleSkillRoots = visibleSkillRoots; module.exports.scopeSkillRoots = scopeSkillRoots; module.exports.skillStatus = skillStatus; module.exports.countSkillStatuses = countSkillStatuses; module.exports.currentSessionId = currentSessionId; module.exports.canToggleSource = canToggleSource; module.exports.recoverModalFocus = recoverModalFocus; module.exports.trapModalFocus = trapModalFocus; module.exports.inspectUploadSelection = inspectUploadSelection; module.exports.apply = apply; module.exports.inject = inject;
