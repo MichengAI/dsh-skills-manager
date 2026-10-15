@@ -423,8 +423,10 @@ export function createRepositoryManager({ fetchImpl = globalThis.fetch, log, reg
       const previousCatalog = data.catalogInstalls;
       let intent: CatalogInstallRecord | undefined;
       let reusedLegacy = false;
+      // 下载或状态读写可能让出执行权；在实际写入前再次校验目标路径。
+      await recordInstallRoot(location, requestIndex().registered);
       const imported = await importUploadedSkill(pack, log, {
-        conflict: "skip", root, allowRepositoryRoot: !location.workspace,
+        conflict: "skip", root,
         beforeImport: async (pending, conflicts, failed) => {
           const legacy = (data.catalogInstalls || []).some(record => typeof record === "string" ? record === id : record.id === id && !record.root);
           const candidate = pending.length === 1 && !conflicts.length ? pending[0] :
@@ -468,12 +470,12 @@ export function createRepositoryManager({ fetchImpl = globalThis.fetch, log, reg
       const data = await read();
       const records = root ? catalogCopies(data, root, name) : [];
       if (!records.length) return deleteSkill(root, name, log);
-      const allowRepositoryRoot = root?.key === "agents";
+
       const id = `${Date.now()}-${randomUUID()}`;
       for (const record of records) record.trashId = id;
       await write(data);
       try {
-        const result = await deleteSkill(root, name, log, { allowRepositoryRoot, catalogTrash: { id, ids: records.map(record => record.id) } });
+        const result = await deleteSkill(root, name, log, { catalogTrash: { id, ids: records.map(record => record.id) } });
         if ("ok" in result && result.ok === false) {
           for (const record of records) delete record.trashId;
           await write(data);
@@ -650,7 +652,8 @@ export function createRepositoryManager({ fetchImpl = globalThis.fetch, log, reg
       for (const item of catalog) item.trashId = trashId;
       await write(data);
       try {
-        const result = await deleteSkill(root, record.name, log, { allowRepositoryRoot: !record.workspace, repositoryEntryOnly: true, repositoryTrash: { id: trashId, repository: { id, path } }, ...(catalog.length ? { catalogTrash: { id: trashId, ids: catalog.map(item => item.id) } } : {}) });
+        await recordInstallRoot(record, index.registered, await indexedFor(record));
+        const result = await deleteSkill(root, record.name, log, { repositoryEntryOnly: true, repositoryTrash: { id: trashId, repository: { id, path } }, ...(catalog.length ? { catalogTrash: { id: trashId, ids: catalog.map(item => item.id) } } : {}) });
         if ("ok" in result && result.ok === false) throw failure(result.error, typeof result.code === "string" ? result.code : "error.repo.invalid", result.params);
         return result;
       } catch (error) {
@@ -672,7 +675,7 @@ export function createRepositoryManager({ fetchImpl = globalThis.fetch, log, reg
         // 保留真实的项目根 key（project-dsh:<hash>）：启用策略与回收站都按它认根。
         root = (target as { root: any }).root;
         workspaceRoot = root.projectRoot;
-      } else root = repositoryInstallRoot(requestedRoot);
+      } else root = await recordInstallRoot({ root: requestedRoot });
       const data = await read(), repo = repository(data, id);
       const skill = repo.skills.find((s) => s.path === path);
       if (!skill || !skill.valid) throw failure("技能不存在或格式无效");
@@ -694,7 +697,8 @@ export function createRepositoryManager({ fetchImpl = globalThis.fetch, log, reg
       await write(data);
       let copied = false;
       try {
-        const result = await importUploadedSkill({ name: skill.name, entries }, log, { conflict: "skip", root, allowRepositoryRoot: !workspaceRoot });
+        await recordInstallRoot({ root: requestedRoot, workspace: workspaceRoot }, registered);
+        const result = await importUploadedSkill({ name: skill.name, entries }, log, { conflict: "skip", root });
         if (result.ok === false || !result.imported?.length) throw failure(result.error || "技能安装失败或遇到同名冲突", typeof result.code === "string" ? result.code : "error.repo.conflict", result.params);
         copied = true;
         // 界面默认显示已启用，但斜杠菜单只会收到显式启用覆盖项。安装完成后走与手动开启相同的策略写入。

@@ -214,6 +214,7 @@ try {
   assert.match(css, /\.dssm-skill-desc\{[^}]*--dsw-alias-label-tertiary/, "描述用次级文字色");
   assert.match(css, /\.dssm-row-icon\.ant-btn\{[^}]*background:transparent[^}]*border-color:var\(--dsw-alias-border-l2/, "行内描边使用宿主主题令牌和透明底色");
   assert.match(css, /\.dssm-row-icon\.ant-btn:not\(:disabled\):not\(\.dssm-icon-danger\):hover\{[^}]*--ant-btn-text-color:var\(--dsw-alias-link,[^)]+\)/, "普通图标悬停优先使用宿主链接色，危险按钮排除");
+  assert.doesNotMatch(css, /#1677ff\b|rgba?\(\s*22\s*[, ]\s*119\s*[, ]\s*255\b/i, "禁止重新引入 antd 默认蓝色");
   assert.match(css, /\.dssm-stat\{[^}]*padding:4px 10px/, "顶部统计格子更矮");
   assert.match(css, /\.dssm-icon-btn\{[^}]*width:22px/, "图标按钮同一尺寸");
 

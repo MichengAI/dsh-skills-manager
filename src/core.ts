@@ -725,17 +725,20 @@ function writableRootDefinition(root: RootInput) {
   return definition;
 }
 
-async function checkedWritableRootDefinition(root: RootInput, allowRepositoryRoot = false): Promise<SkillRoot | OperationError | null | undefined> {
-  const definition = writableRootDefinition(root);
-  if (definition && definition.scope !== "project" && (definition.key === "agents" || allowRepositoryRoot)) {
-    // 公共 Agent 的祖先目录也不能是链接，避免确认安装后写到配置路径之外。
-    for (let path = resolve(definition.path); ; path = dirname(path)) {
-      const st = await lstatOrNull(path);
-      if (st && (!st.isDirectory() || st.isSymbolicLink()))
-        return { ok: false, error: `技能目录不安全，拒绝写入: ${path}`, code: "error.root.unsafe", params: { path } };
-      if (dirname(path) === path) break;
-    }
+/** 用户级安装目标及 Shared Agent 普通写入均禁止祖先目录链接。 */
+async function checkedUserRootAncestors(definition: SkillRoot): Promise<SkillRoot | OperationError> {
+  for (let path = resolve(definition.path); ; path = dirname(path)) {
+    const st = await lstatOrNull(path);
+    if (st && (!st.isDirectory() || st.isSymbolicLink()))
+      return { ok: false, error: `技能目录不安全，拒绝写入: ${path}`, code: "error.root.unsafe", params: { path } };
+    if (dirname(path) === path) break;
   }
+  return definition;
+}
+
+async function checkedWritableRootDefinition(root: RootInput): Promise<SkillRoot | OperationError | null | undefined> {
+  const definition = writableRootDefinition(root);
+  if (definition?.key === "agents") return checkedUserRootAncestors(definition);
   if (!definition || definition.scope !== "project") return definition;
   if (await overlapsUserSkillRoot(definition.path)) {
     return {
@@ -760,13 +763,20 @@ async function checkedWritableRootDefinition(root: RootInput, allowRepositoryRoo
   return definition;
 }
 
+/** 仓库安装目标统一检查祖先路径；不改变普通 DSH 管理对迁移 Home 的兼容。 */
+export async function checkedRepositoryRootDefinition(root: RootInput): Promise<SkillRoot | OperationError | null | undefined> {
+  const definition = await checkedWritableRootDefinition(root);
+  if (!definition || definition.ok === false || definition.scope === "project" || definition.key === "agents") return definition;
+  return checkedUserRootAncestors(definition);
+}
+
 /** 仓库可选的安装位置：全局 DSH，以及已配置的公共 Agent 目录。 */
 export async function repositoryDestinations(): Promise<RepositoryDestination[]> {
   const result: RepositoryDestination[] = [];
   for (const root of userRoots().filter(item => item.key === "dsh" || item.key === "agents")) {
     let error: Diagnostic | undefined;
     try {
-      const checked = await checkedWritableRootDefinition(root, true);
+      const checked = await checkedRepositoryRootDefinition(root);
       if (!checked || checked.ok === false) error = checked || { code: "error.root.unsafe", error: "技能安装位置不可用" };
     } catch (caught) { const exception = caught as CodedError; error = { code: "error.root.unsafe", error: exception.message, params: { path: root.path } }; }
     result.push({ key: root.key as RepositoryDestination['key'], path: resolve(root.path), label: root.label, localeKey: root.localeKey, available: !error, ...(error ? { error } : {}) });
@@ -2068,7 +2078,7 @@ async function restoreRootDefinition(metadata: TrashMetadata, options: MutationO
   // version 1 entries predate scoped Trash and always belong to $DSH_HOME/skills.
   if (!metadata.root) return rootByKey("dsh");
   if (metadata.root.scope === "user" && rootByKey(metadata.root.key))
-    return checkedWritableRootDefinition(rootByKey(metadata.root.key), metadata.root.key !== "dsh");
+    return checkedWritableRootDefinition(rootByKey(metadata.root.key));
   if (
     metadata.root.scope !== "project" ||
     metadata.root.kind !== "project-dsh" ||
@@ -2099,7 +2109,7 @@ async function restoreRootDefinition(metadata: TrashMetadata, options: MutationO
 
 /** 把用户或活动项目的 DSH 根中的单个技能移入 manager-owned 回收站。 */
 export async function deleteSkill(root: RootInput, name: string, log?: Log, options: MutationOptions = {}) {
-  const definition = await checkedWritableRootDefinition(root, options.allowRepositoryRoot === true);
+  const definition = await checkedWritableRootDefinition(root);
   if (definition && definition.ok === false) return definition;
   if (!definition) return readonlyError("delete");
   const resolved = await resolveEntry(definition, name);
@@ -2566,7 +2576,7 @@ async function replaceWithCopy(source: string, dest: string, isDir: boolean, exi
  */
 export async function importSkill(source: string, log?: Log, options: MutationOptions = {}): Promise<ImportResult> {
   const requestedRoot = Object.prototype.hasOwnProperty.call(options, "root") ? options.root : rootByKey("dsh");
-  const definition = await checkedWritableRootDefinition(requestedRoot, options.allowRepositoryRoot === true);
+  const definition = await checkedWritableRootDefinition(requestedRoot);
   if (definition && definition.ok === false) return definition;
   if (!definition) return readonlyError("create");
   const targetRoot = definition.path;
@@ -3010,7 +3020,7 @@ export async function createSkill(input: CreateInput, log?: Log, options: Mutati
   const requestedRoot = Object.prototype.hasOwnProperty.call(options, "root")
     ? options.root
     : rootByKey("dsh");
-  const definition = await checkedWritableRootDefinition(requestedRoot, options.allowRepositoryRoot === true);
+  const definition = await checkedWritableRootDefinition(requestedRoot);
   if (definition && definition.ok === false) return definition;
   if (!definition) return readonlyError("create");
   const root = definition.path;

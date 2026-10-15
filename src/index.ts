@@ -447,8 +447,6 @@ function apply(ctx: HostContext) {
         return { projectCwds: (target as { root: SkillRoot }).root.workspaceCwds ?? [] };
       };
       const scopedOptions = (scope: { projectCwds: string[] } | null) => scope ?? projectOptions();
-      /** 用户级写入只开放 DSH 与 Shared Agent 两处；带工作区的请求一律只写项目 DSH。 */
-      const userWriteOptions = (body: RequestBody, target: unknown) => ({ allowRepositoryRoot: !target && body.root === "agents" });
       const requestRoot = async (key: string, cwds?: string[]) => cwds ? (await projectRoots(cwds)).find((root) => root.key === key) : rootByKey[key] || (await projectRoots(projectOptions().projectCwds)).find((root) => root.key === key);
       /** 单项操作的统一入口：有 workspace 就在其作用域内解析根，无则沿用当前会话。 */
       const withScope = async <T>(body: RequestBody, action: (scope: { projectCwds: string[] } | null) => Promise<T>) => {
@@ -602,7 +600,7 @@ function apply(ctx: HostContext) {
                 return createSkill(
                   { name: body.name, description: body.description, body: body.body },
                   log,
-                  { root: target ? (target as { root: SkillRoot }).root : await requestRoot(String(body.root || "dsh")), ...userWriteOptions(body, target) },
+                  { root: target ? (target as { root: SkillRoot }).root : await requestRoot(String(body.root || "dsh")) },
                 );
               }, afterWrite);
             case "/api/dsh-skills-manager/import":
@@ -613,7 +611,6 @@ function apply(ctx: HostContext) {
                   conflict: body.conflict === "overwrite" ? "overwrite" : "skip",
                   dryRun: body.dryRun === true,
                   ...(target ? { root: (target as { root: SkillRoot }).root } : body.root === "agents" ? { root: await requestRoot("agents") } : {}),
-                  ...userWriteOptions(body, target),
                 });
               }, body.dryRun === true ? undefined : afterWrite);
             case "/api/dsh-skills-manager/upload":
@@ -623,7 +620,6 @@ function apply(ctx: HostContext) {
                 return importUploadedSkill({ name: body.name, entries: body.entries, zip: body.zip }, log, {
                   conflict: body.conflict === "overwrite" ? "overwrite" : "skip",
                   ...(target ? { root: (target as { root: SkillRoot }).root } : body.root === "agents" ? { root: await requestRoot("agents") } : {}),
-                  ...userWriteOptions(body, target),
                 });
               }, afterWrite);
             default:

@@ -1,5 +1,8 @@
 // 验证真实 hooks/事件的筛选、折叠、安装位置选择、回收站卸载和更新行为。
 import assert from "node:assert/strict";
+import { mock } from "node:test";
+// 只接管防抖 timer，保留 setImmediate 驱动异步渲染。
+mock.timers.enable({ apis: ["setTimeout"] });
 import { readFile } from "node:fs/promises";
 import { createRepositoryUI, repositoryLocales } from "../src/repository-ui.ts";
 import { createDestinationKit, destinationLocales } from "../src/destination-picker.ts";
@@ -68,12 +71,6 @@ const catalogFetch = async (input) => {
     status: 200,
     json: async () => ({ items, nextCursor: offset + 10 < 100 ? String(offset + 10) : null }),
   };
-};
-const intersections = [];
-globalThis.IntersectionObserver = class {
-  constructor(callback) { this.callback = callback; intersections.push(this); }
-  observe() {}
-  disconnect() {}
 };
 globalThis.fetch = async () => { throw new Error("目录客户端不得直连外部网络"); };
 let workspaceRows = [];
@@ -257,7 +254,7 @@ assert.equal(skillshStatus.props.options[1].label, "repo.catalog.uninstalled", "
 const skillshSearch = find(n => n.props["aria-label"] === "repo.catalog.searchSkillsh");
 assert.equal(skillshSearch.type, Input, "skills.sh 使用官方输入框查询目录结果");
 skillshSearch.props.onChange({ target: { value: "react" } }); render();
-await new Promise(resolve => setTimeout(resolve, 350)); await settle();
+mock.timers.tick(300); await settle();
 assert.equal(skillshCalls.length, 1, "输入关键词后调用本地安全代理查询一次");
 assert.equal(skillshCalls[0].searchParams.get("q"), "react", "查询关键词正确传递");
 assert.deepEqual(all().filter(n => n.props.className === "dssm-name").map(n => n.children.join("")), ["React Skill"], "列表展示 skills.sh 查询接口返回的数据");
@@ -346,8 +343,12 @@ const names = all().filter(n => n.props.className === "dssm-name").map(n => n.ch
 assert.deepEqual(names, [...names].sort((left, right) => left.localeCompare(right)), "名称排序按技能名称升序");
 const catalogSearch = find(n => n.props["aria-label"] === "repo.catalog.searchClawhub");
 assert.equal(catalogSearch.props.maxLength, 100, "ClawHub 关键词受长度限制");
-catalogSearch.props.onChange({ target: { value: "gill" } }); render();
-await new Promise(resolve => setTimeout(resolve, 350)); await settle();
+catalogSearch.props.onChange({ target: { value: "gi" } }); render(); flushEffects();
+mock.timers.tick(200);
+catalogSearch.props.onChange({ target: { value: "gill" } }); render(); flushEffects();
+mock.timers.tick(299); await settle();
+assert.equal(catalogSearchCalls.length, 0, "连续输入取消旧 timer，最新输入满 300ms 前不请求");
+mock.timers.tick(1); await settle();
 assert.equal(catalogSearchCalls.length, 1, "输入关键词后调用 ClawHub 搜索接口，而非筛选已加载榜单");
 assert.equal(catalogSearchCalls[0].searchParams.get("q"), "gill", "真实搜索接口收到完整关键词");
 assert.equal(catalogSearchCalls[0].searchParams.get("limit"), "100", "ClawHub 搜索结果请求上限为 100 条");
@@ -362,7 +363,7 @@ catalogSearch.props.onChange({ target: { value: "" } }); render(); await settle(
 assert.deepEqual(all().filter(n => n.props.className === "dssm-name").map(n => n.children.join("")), Array.from({ length: 10 }, (_value, index) => "Skill " + String(index + 1).padStart(3, "0")), "清空关键词返回排行榜，而不是保留查询结果");
 const sentinel = () => find(n => n.props.className === "dssm-catalog-sentinel");
 assert.equal(catalogCalls.length, 1, "进入榜单后只自动加载第一页");
-if (intersections.length) intersections.at(-1).callback([{ isIntersecting: true }]);
+assert.doesNotMatch(repoSource, /IntersectionObserver/, "目录不再依赖观察器自动翻页");
 await settle();
 assert.equal(catalogCalls.length, 1, "哨兵出现在视口内不能自动连翻，必须等用户向下滚动");
 const catalogWheel = (deltaY, overrides = {}) => {
@@ -817,7 +818,7 @@ assert.ok(dialog() && locationSelect(), "重关联必须先选择明确安装位
 await clickModal("repo.cancel");
 await selectSubsource("repo.subsource.skillsh");
 find(n => n.props["aria-label"] === "repo.catalog.searchSkillsh").props.onChange({ target: { value: "react" } }); render();
-await new Promise(resolve => setTimeout(resolve, 350)); await settle();
+mock.timers.tick(300); await settle();
 assert.ok(nodes(catalogRow("React Skill")).some(n => n.children.includes("repo.catalog.unknownLocation")), "skills.sh 旧身份标注位置未知");
 assert.ok(nodes(catalogRow("React Skill")).some(n => isAction(n, "repo.catalog.reassociate") && !n.props.disabled), "skills.sh 未知身份也保留重关联");
 mockCatalogUnknownIds = []; mockCatalogWarnings = [];
@@ -828,7 +829,7 @@ await selectSubsource("repo.subsource.clawhub");
 const failedRankingCalls = catalogCalls.length;
 failCatalogRanking = false;
 find(n => n.props["aria-label"] === "repo.catalog.searchClawhub").props.onChange({ target: { value: "gill" } }); render();
-await new Promise(resolve => setTimeout(resolve, 350)); await settle();
+mock.timers.tick(300); await settle();
 find(n => n.props["aria-label"] === "repo.catalog.searchClawhub").props.onChange({ target: { value: "" } }); render(); await settle();
 assert.equal(catalogCalls.length, failedRankingCalls + 1, "清空搜索使用新关键词状态重试失败的榜单");
 assert.equal(all().filter(n => n.props.className === "dssm-repo-row").length, 10, "清空后恢复真实榜单第一页");
@@ -841,7 +842,7 @@ for (const kind of ["list", "clawhub", "skillsh"]) {
     await selectSubsource(kind === "skillsh" ? "repo.subsource.skillsh" : "repo.subsource.clawhub");
     if (kind !== "list") {
       find(n => n.props["aria-label"] === (kind === "skillsh" ? "repo.catalog.searchSkillsh" : "repo.catalog.searchClawhub")).props.onChange({ target: { value: "held" } });
-      render(); await new Promise(resolve => setTimeout(resolve, 350)); await settle();
+      render(); mock.timers.tick(300); await settle();
     }
     const old = pendingCatalog.at(-1);
     assert.ok(old, "必须启动真实请求");
@@ -853,10 +854,10 @@ for (const kind of ["list", "clawhub", "skillsh"]) {
     else { active = true; render(); flushEffects(); await settle(); }
     await selectSubsource("repo.subsource.github");
     await selectSubsource(kind === "skillsh" ? "repo.subsource.skillsh" : "repo.subsource.clawhub");
-    await new Promise(resolve => setTimeout(resolve, 350)); await settle();
+    mock.timers.tick(300); await settle();
     if (exit === "unmount" && kind !== "list") {
       find(n => n.props["aria-label"] === (kind === "skillsh" ? "repo.catalog.searchSkillsh" : "repo.catalog.searchClawhub")).props.onChange({ target: { value: "held" } }); render();
-      await new Promise(resolve => setTimeout(resolve, 350)); await settle();
+      mock.timers.tick(300); await settle();
     }
     const fresh = pendingCatalog.at(-1);
     assert.notEqual(fresh, old, "旧请求不能阻挡重新进入");
@@ -879,9 +880,10 @@ for (const kind of ["clawhub", "skillsh"]) {
     if (exit === "source") await selectSubsource("repo.subsource.github");
     else if (exit === "inactive") { active = false; render(); flushEffects(); }
     else unmount();
-    await new Promise(resolve => setTimeout(resolve, 350));
+    mock.timers.tick(300);
     assert.equal(kind === "skillsh" ? skillshCalls.length : catalogSearchCalls.length, before, `${kind}/${exit} 必须清理防抖 timer`);
   }
 }
 unmount();
+mock.timers.reset();
 console.log("仓库界面及目录生命周期专项测试通过");

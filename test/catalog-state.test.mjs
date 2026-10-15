@@ -12,6 +12,8 @@ process.env.DSH_HOME = join(sandbox, "home");
 process.env.DSH_AGENTS_HOME = join(sandbox, "agents");
 process.env.HOME = process.env.USERPROFILE = join(sandbox, "user");
 const { createRepositoryManager } = await import("../lib/repositories.js");
+const { readManagerState } = await import("../lib/core.js");
+const initialPolicy = (await readManagerState()).state;
 const statePath = join(process.env.DSH_HOME, "skills-manager/repositories.json");
 const stored = async () => JSON.parse(await readFile(statePath, "utf8"));
 const document = strToU8("---\nname: actual-name\ndescription: 测试技能\n---\n正文\n");
@@ -169,12 +171,17 @@ try {
     const skill = join(process.env.DSH_HOME, "skills", name);
     await mkdir(skill, { recursive: true });
     await writeFile(join(skill, "SKILL.md"), content, "utf8");
+    await mkdir(join(process.env.DSH_HOME, "skills-manager"), { recursive: true });
+    await writeFile(statePath, JSON.stringify({ version: 1, repositories: [], installs: [], catalogInstalls: [] }), "utf8");
+    const policyPath = join(process.env.DSH_HOME, "skills-manager/state.json");
+    const policyBefore = JSON.stringify(initialPolicy);
+    await writeFile(policyPath, policyBefore, "utf8");
+    assert.equal((await readManagerState()).writable, true, "前置策略必须合法，不能靠失败关闭掩盖误写");
     const data = await stored();
     data.catalogInstalls.push({ id: "skillsh:owner/skills/metadata", name, root: "dsh", complete: false, files: [{ path: "SKILL.md", hash: createHash("sha256").update(content).digest("hex") }] });
     await writeFile(statePath, JSON.stringify(data), "utf8");
     const manager = createRepositoryManager();
     await manager.sources();
-    const policy = JSON.parse(await readFile(join(process.env.DSH_HOME, "skills-manager/state.json"), "utf8"));
-    assert.ok(!policy.enabledSkills.dsh.includes(name), "来源元数据读取不能在本地写入队列外写启用策略");
+    assert.equal(await readFile(policyPath, "utf8"), policyBefore, "来源元数据读取不得改写任何启用策略");
   });
 } finally { await rm(sandbox, { recursive: true, force: true }); }

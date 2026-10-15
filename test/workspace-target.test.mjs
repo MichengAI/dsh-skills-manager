@@ -119,17 +119,14 @@ try {
 
   // 用户级写入开放 Shared Agent，其他 Agent 目录无论如何都不可写。
   const sharedRoot = core.userRoots().find((item) => item.key === "agents");
-  const viaAgents = await core.createSkill({ name: "via-agents", description: "x", body: "x" }, undefined, { root: sharedRoot, allowRepositoryRoot: true });
-  assert.equal(viaAgents.ok, undefined, "Shared Agent 在 allowRepositoryRoot 下可创建");
+  const viaAgents = await core.createSkill({ name: "via-agents", description: "x", body: "x" }, undefined, { root: sharedRoot });
+  assert.equal(viaAgents.ok, undefined, "Shared Agent 普通创建无需安装特权");
   assert.equal(await lstat(join(sharedRoot.path, "via-agents", "SKILL.md")).then(() => true, () => false), true);
-  assert.equal((await core.createSkill({ name: "no-flag", description: "x", body: "x" }, undefined, { root: sharedRoot })).ok, undefined, "Shared Agent 普通创建无需安装特权");
   for (const key of ["codex", "claude", "gemini", "cursor"]) {
     const other = core.userRoots().find((item) => item.key === key);
-    for (const flag of [false, true]) {
-      const refused = await core.createSkill({ name: "never-" + key, description: "x", body: "x" }, undefined, { root: other, allowRepositoryRoot: flag });
-      assert.equal(refused.ok, false, key + " 不可写（allowRepositoryRoot=" + flag + "）");
-      assert.equal(await lstat(join(other.path, "never-" + key)).then(() => true, () => false), false);
-    }
+    const refused = await core.createSkill({ name: "never-" + key, description: "x", body: "x" }, undefined, { root: other });
+    assert.equal(refused.ok, false, key + " 不可写");
+    assert.equal(await lstat(join(other.path, "never-" + key)).then(() => true, () => false), false);
   }
 
   let directBuilds = 0;

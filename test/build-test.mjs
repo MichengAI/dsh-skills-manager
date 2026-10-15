@@ -60,6 +60,11 @@ await ok(typeConfig.compilerOptions?.strict === true && typeConfig.compilerOptio
 await ok(typeConfig.compilerOptions?.erasableSyntaxOnly === true, "源码使用 Node 原生可擦除的 TypeScript 语法");
 await ok(!(await readdir(new URL("../src/", import.meta.url))).some(name => name.endsWith(".js")), "维护源码不再混入未检查的 JavaScript 模块");
 
+for (const name of ["types", "core", "index", "repositories"]) {
+  const source = await readFile(new URL(`../src/${name}.ts`, import.meta.url), "utf8");
+  await ok(!/allowRepositoryRoot|userWriteOptions/.test(source), `${name} 不再依赖旧的仓库写入放行参数`);
+}
+
 const projectRoot = new URL("../", import.meta.url);
 const ignoreRules = await readFile(new URL("../.gitignore", import.meta.url), "utf8");
 const ignoresLib = ignoreRules.split(/\r?\n/u).some((line) => line === "lib" || line === "lib/" || line === "/lib/");

@@ -30,13 +30,13 @@ try {
   const files = new Set(pack.files.map(file => file.path));
   const manifest = JSON.parse(await readFile(join(sandbox, 'package.json'), 'utf8'));
   assert.equal(pack.version, manifest.version);
-  for (const name of ['index', 'client', 'core', 'readonly-discovery', 'plugin-updater', 'repositories', 'repository-updates']) {
+  for (const name of ['index', 'client', 'core', 'readonly-discovery', 'plugin-updater', 'repositories', 'repository-updates', 'skills-sh-catalog', 'catalog-skill', 'clawhub-catalog']) {
     assert.ok(files.has(`lib/${name}.js`), `发布包必须包含 ${name} 产物`);
   }
   assert.ok(files.has('cordis.patch.yml'), '发布包必须包含宿主注册补丁');
   assert.ok(![...files].some(file => /^(?:src|test|scripts)\//.test(file) || file.endsWith('.ts') || file === 'tsconfig.json'), '发布包不含源码、测试和开发配置');
   await run(process.execPath, ['--input-type=module', '-e', "await import('./lib/index.js')"], { cwd: sandbox, windowsHide: true });
-  console.log('干净目录打包通过：自动生成七项产物，发布入口可加载，无开发文件。');
+  console.log('干净目录打包通过：自动生成全部十项产物，发布入口可加载，无开发文件。');
 } finally {
   // 先移除依赖链接，清理临时目录绝不递归进入真实 node_modules。
   await rm(join(sandbox, 'node_modules'), { force: true, recursive: process.platform === 'win32' });

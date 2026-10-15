@@ -4,7 +4,7 @@ import type { Archive, FileDigest, RepositoryDependencies, SkillRequest, Install
 import { promises as fs } from "node:fs";
 import { join, dirname, resolve } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
-import { managerHomePath, userRoots, projectRootForRecord, resolveWorkspaceTarget, createWorkspaceIndex, type indexRegisteredWorkspaces } from "./core.js";
+import { managerHomePath, userRoots, checkedRepositoryRootDefinition, projectRootForRecord, resolveWorkspaceTarget, createWorkspaceIndex, type indexRegisteredWorkspaces } from "./core.js";
 
 const hash = (bytes: string | Uint8Array) => createHash("sha256").update(bytes).digest("hex");
 const repositoryInstallKeys = new Set(["dsh", "agents"]);
@@ -21,7 +21,13 @@ export function repositoryInstallRoot(key: unknown = "dsh") {
  * 返回值的 path 即技能所在目录；工作区路径失效时抛出明确错误，不回退到全局。
  */
 export async function recordInstallRoot(record: { root?: unknown; workspace?: string }, registered?: string[], indexed?: Awaited<ReturnType<typeof indexRegisteredWorkspaces>>) {
-  if (record.workspace === undefined) return repositoryInstallRoot(record.root);
+  if (record.workspace === undefined) {
+    const root = repositoryInstallRoot(record.root);
+    const checked = await checkedRepositoryRootDefinition(root);
+    if (!checked) throw failure("技能安装位置不可用", "error.root.unsafe");
+    if (checked.ok === false) throw Object.assign(failure(checked.error, checked.code || "error.root.unsafe"), { params: checked.params });
+    return root;
+  }
   const resolved = await projectRootForRecord(record.workspace, registered, indexed);
   if ("ok" in resolved && resolved.ok === false) throw Object.assign(failure(resolved.error, resolved.code || "error.workspace.unavailable"), { params: resolved.params });
   return (resolved as { root: any }).root;

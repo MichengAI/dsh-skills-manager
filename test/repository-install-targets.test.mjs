@@ -13,7 +13,7 @@ for (const agent of ['CODEX', 'CLAUDE', 'GEMINI', 'OPENCODE', 'CURSOR', 'COPILOT
   process.env[`DSH_${agent}_HOME`] = join(sandbox, `configured-${agent.toLowerCase()}`);
 const { createRepositoryManager } = await import("../lib/repositories.js");
 const { installationSourceKey } = await import("../lib/repository-updates.js");
-const { userRoots, state, listTrash, permanentlyDeleteTrash, deleteSkill, importUploadedSkill } = await import("../lib/core.js");
+const { userRoots, repositoryDestinations, state, listTrash, permanentlyDeleteTrash, deleteSkill, importUploadedSkill } = await import("../lib/core.js");
 const doc = name => strToU8(`---\nname: ${name}\ndescription: Test install destinations\n---\nTest instructions\n`);
 let archive;
 const snapshot = text => zipSync({
@@ -207,7 +207,7 @@ try {
   assert.equal((await manager.list()).installRoots.find(item => item.key === "codex"), undefined);
   await assert.rejects(manager.install({ id: repo.id, path: "locations/codex", root: "codex" }), error => error.code === "error.repo.invalid");
   assert.equal(await exists(join(process.env.DSH_CODEX_HOME, "skills/location-codex")), false);
-  const forged = await deleteSkill({ ...root("claude"), path: outside, mutable: true }, "important", undefined, { allowRepositoryRoot: true });
+  const forged = await deleteSkill({ ...root("claude"), path: outside, mutable: true }, "important", undefined);
   assert.equal(forged.ok, false, "even internal opt-in only accepts the canonical Shared Agent path");
 
   const legacy = await manager.install({ id: repo.id, path: "default" });
@@ -227,6 +227,9 @@ try {
   await fs.symlink(originalDshHome, linkedDshHome, directoryLinkType);
   process.env.DSH_HOME = linkedDshHome;
   try {
+    const destination = (await repositoryDestinations()).find(item => item.key === "dsh");
+    assert.equal(destination.available, false, "仓库目标拒绝祖先链接，但普通管理仍兼容迁移 Home");
+    await assert.rejects(manager.install({ id: repo.id, path: "default", root: "dsh" }), error => error.code === "error.root.unsafe", "仓库写入必须复用目标列表的祖先链接校验");
     const deleted = await deleteSkill(root("dsh"), "default-demo");
     assert.ok(deleted.id);
     const healthyRepositories = await fs.readFile(stateFile, "utf8");

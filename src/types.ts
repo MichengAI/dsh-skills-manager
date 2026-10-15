@@ -260,8 +260,6 @@ export interface RenameOptions {
 export interface MutationOptions extends ScopeOptions {
     /** 宿主登记的工作区路径列表，由路由从 workspaceRegistry 读取；缺省表示不允许写项目。 */
     registeredWorkspaces?: string[];
-    /** Internal repository operations only; never taken from HTTP request bodies. */
-    allowRepositoryRoot?: boolean;
     repositoryEntryOnly?: boolean;
     repositoryTrash?: { id: string; repository: { id: string; path: string } };
     /** 内部目录副本回收凭据，不从 HTTP 请求体读取。 */
