@@ -205,9 +205,8 @@ try {
   assert.ok(nodes(work).some((node) => node.props.className === "dssm-skill-desc" && node.children[0] === "DESC_kept"), "第二行只有描述");
   assert.equal(nodes(work).some((node) => node.props.className === "dssm-row-source"), false, "技能行不再另起来源标签");
   const keptToggle = nodes(work).find((node) => node.props["aria-label"] === t("skill.toggle") + " kept");
-  assert.equal(keptToggle.props.checked, true, "已启用的技能开关是开的");
+  assert.equal(keptToggle.props.role, "switch", "技能启停使用 switch 角色");
   assert.equal(keptToggle.props["aria-checked"], true, "已启用的技能开关 aria 状态为 true");
-  assert.equal(keptToggle.props.size, "small", "技能启停用最小号 Switch");
   const css = nodes().filter((node) => node.type === "style").map((node) => node.children.join("")).join("");
   assert.match(css, /\.dssm-enable-switch\[aria-checked=true\]\{background:var\(--dsw-alias-brand-primary/, "开启使用宿主品牌色");
   assert.match(css, /\.dssm-skill-row\{[^}]*padding:11px 13px/, "技能行留白对齐仓库行");
@@ -227,7 +226,7 @@ try {
   assert.ok(projectSource, "找到项目来源卡片");
   assert.equal(projectSource.props.className, "dssm-source", "项目来源仍是来源卡片");
   assert.ok(nodes(projectSource).some((node) => node.props.className === "dssm-cat" && node.props["aria-label"] === "项目工作"), "项目来源内部再套分类");
-  nodes(projectSource).find((node) => node.props["aria-label"] === t("category.toggle") + " 项目工作").props.onChange();
+  nodes(projectSource).find((node) => node.props["aria-label"] === t("category.toggle") + " 项目工作").props.onClick();
   await tick(); await tick(); render();
   const projectToggle = calls.filter((call) => call.url.endsWith("/category-disable")).at(-1);
   assert.equal(projectToggle.body.root, "project-dsh:a");
@@ -270,7 +269,7 @@ try {
   render();
   const searched = nodes(sources().find((node) => textOf(node).includes("kept"))).find((node) => node.props.className === "dssm-cat" && node.props["aria-label"] === "工作");
   assert.deepEqual(nodes(searched).filter((node) => node.props.className === "dssm-name").map((node) => node.children[0]), ["kept"], "搜索只显示匹配技能");
-  assert.equal(nodes(searched).find((node) => node.props["aria-label"] === t("category.toggle") + " 工作").props.checked, false, "搜索不能把分类开关显示成整组已开启");
+  assert.equal(nodes(searched).find((node) => node.props["aria-label"] === t("category.toggle") + " 工作").props["aria-checked"], false, "搜索不能把分类开关显示成整组已开启");
   assert.ok(textOf(searched).includes(t("category.progress", { count: 2, enabled: 1, usable: 2 })), "分类数量仍按整组计算");
 
   console.log("categories ui ok");

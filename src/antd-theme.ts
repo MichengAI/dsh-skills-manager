@@ -83,9 +83,10 @@ export const antdThemeCss = `
 .dssm-theme.ant-modal{--dssm-ant-border-radius-lg:var(--dsw-radius-panel,28px)}
 .dssm-theme .ant-modal-container{position:relative;isolation:isolate;border:0;border-radius:var(--dsw-radius-panel,28px);background:transparent;box-shadow:var(--dsw-elevation-panel,none)}
 .dssm-theme .ant-modal-container::before{content:"";position:absolute;inset:0;z-index:-1;border-radius:inherit;background:var(--dsw-specific-menu,var(--dsw-alias-bg-layer-3));backdrop-filter:var(--dsw-menu-backdrop-filter,none);pointer-events:none}
-.dssm-theme.ant-select,.dssm-theme.ant-select:hover,.dssm-theme.ant-select.ant-select-focused{--dssm-ant-select-background-color:var(--dsw-alias-bg-layer-1);--ant-select-background-color:var(--dsw-alias-bg-layer-1);box-shadow:none}
+.dssm-theme.ant-select,.dssm-theme.ant-select:hover{--dssm-ant-select-background-color:var(--dsw-alias-bg-layer-1);--ant-select-background-color:var(--dsw-alias-bg-layer-1)}
+.dssm-theme.ant-select.ant-select-focused{--dssm-ant-select-background-color:var(--dsw-alias-bg-layer-1);--ant-select-background-color:var(--dsw-alias-bg-layer-1);box-shadow:0 0 0 var(--dsw-focus-ring-width,1px) var(--dsw-focus-ring-color,var(--dsw-alias-brand-primary))}
 .dssm-theme.ant-select-dropdown,.dssm-theme.ant-dropdown{isolation:isolate}
-.dssm-theme.ant-select-dropdown,.dssm-theme.ant-dropdown .ant-dropdown-menu{border:0;border-radius:var(--dsw-radius-lg,16px);background:transparent;box-shadow:var(--dsw-elevation-panel,none)}
+.dssm-theme.ant-select-dropdown,.dssm-theme.ant-dropdown .ant-dropdown-menu{border:0;border-radius:var(--dsw-radius-lg,16px);background:transparent;--dsw-elevation-stroke-color:var(--dsw-alias-border-l1);box-shadow:var(--dsw-elevation-prominent,none)}
 .dssm-theme.ant-select-dropdown::before,.dssm-theme.ant-dropdown::before{content:"";position:absolute;inset:0;z-index:-1;border-radius:var(--dsw-radius-lg,16px);background:var(--dsw-menu-surface-fill,var(--dsw-specific-menu));backdrop-filter:var(--dsw-menu-backdrop-filter,none);pointer-events:none}
 .dssm-theme.ant-dropdown .ant-dropdown-menu-item,.dssm-theme.ant-select-dropdown .ant-select-item{border-radius:var(--dsw-radius-md,12px)}
 .dssm-theme.ant-select-dropdown{--dssm-ant-select-option-selected-bg:var(--dsw-alias-state-business-tertiary);--dssm-ant-select-option-selected-color:var(--dsw-alias-label-primary);--dssm-ant-select-option-active-bg:var(--dsw-alias-interactive-bg-hover)}
