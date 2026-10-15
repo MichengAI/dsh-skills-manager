@@ -121,11 +121,8 @@ try {
   const work = nodes(dsh).find((node) => node.props.className === "dssm-cat" && node.props["aria-label"] === "工作");
   assert.deepEqual(nodes(work).filter((node) => node.props.className === "dssm-name").map((node) => node.children[0]), ["kept", "other"], "只列出归入该分类的技能");
   const workSwitch = nodes(work).find((node) => node.props["aria-label"] === t("category.toggle") + " 工作");
-  assert.equal(workSwitch.props.checked, false, "没有全部开启时分类开关显示关");
-  assert.equal(workSwitch.props.checkedChildren, "开", "开关开启显示开");
-  assert.equal(workSwitch.props.unCheckedChildren, "关", "开关关闭显示关");
-  assert.equal(workSwitch.props.size, "small", "分类启停用最小号 Switch");
-  assert.match(workSwitch.props.styles({ props: { checked: false } }).root.backgroundColor, /border-l3/, "关闭是中性深灰底色");
+  assert.equal(workSwitch.props["aria-checked"], false, "没有全部开启时分类开关显示关");
+  assert.equal(workSwitch.props.role, "switch", "分类启停用 switch 角色");
   assert.ok(textOf(work).includes(t("category.progress", { count: 2, enabled: 1, usable: 2 })), "部分开启写在数量里");
   const loose = nodes(dsh).find((node) => node.props.className === "dssm-cat" && node.props["aria-label"] === t("category.uncategorized"));
   assert.deepEqual(nodes(loose).filter((node) => node.props.className === "dssm-name").map((node) => node.children[0]), ["loose"]);
@@ -209,9 +206,10 @@ try {
   assert.equal(nodes(work).some((node) => node.props.className === "dssm-row-source"), false, "技能行不再另起来源标签");
   const keptToggle = nodes(work).find((node) => node.props["aria-label"] === t("skill.toggle") + " kept");
   assert.equal(keptToggle.props.checked, true, "已启用的技能开关是开的");
+  assert.equal(keptToggle.props["aria-checked"], true, "已启用的技能开关 aria 状态为 true");
   assert.equal(keptToggle.props.size, "small", "技能启停用最小号 Switch");
-  assert.match(keptToggle.props.styles({ props: { checked: true } }).root.backgroundColor, /state-success-primary/, "打开是绿色");
   const css = nodes().filter((node) => node.type === "style").map((node) => node.children.join("")).join("");
+  assert.match(css, /\.dssm-enable-switch\[aria-checked=true\]\{background:var\(--dsw-alias-brand-primary/, "开启使用宿主品牌色");
   assert.match(css, /\.dssm-skill-row\{[^}]*padding:11px 13px/, "技能行留白对齐仓库行");
   assert.match(css, /\.dssm-skill-desc\{[^}]*--dsw-alias-label-tertiary/, "描述用次级文字色");
   assert.match(css, /\.dssm-row-icon\.ant-btn\{[^}]*background:transparent[^}]*border-color:var\(--dsw-alias-border-l2/, "行内描边使用宿主主题令牌和透明底色");
