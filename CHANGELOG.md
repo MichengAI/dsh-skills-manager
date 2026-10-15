@@ -1,12 +1,9 @@
 # Changelog
 
-## 1.1.21 - Unreleased
+## 1.1.21 - 2026-10-15
 
 - Support DSH `0.2.1-alpha.3` while retaining all existing supported versions.
 - Allow ordinary user-level Shared Agent skills to be managed, trashed and restored without installation records, preserving discovery, loading and path safety while keeping other agent sources read-only.
-
-## 1.1.20 - Unreleased
-
 - Add real ClawHub / skills.sh search and individual skill installation, with ten-item download-ranking pages and an explicit load-more button.
 - Fix concurrent repository operations overwriting catalog state, lost workspace installation badges, and interference between same-name copies; preserve source identity through trash and restore.
 - Allow installation beyond 500 source records without discarding active copies or recoverable trash identities; retain the state file's byte-size limit.
