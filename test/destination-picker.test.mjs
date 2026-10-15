@@ -39,8 +39,8 @@ assert.match(selectRule, /(?:^|;)width:100%(?:;|$)/, "目标下拉必须铺满�
 assert.match(selectRule, /min-width:0(?:;|$)/, "长工作区名称不能撑破表单列");
 const pathRule = rule(".dssm-destination-path");
 assert.match(pathRule, /padding:8px 10px/, "路径框保留内边距");
-assert.match(pathRule, /border:1px solid/, "路径框保留边框");
-assert.match(pathRule, /border-radius:7px/, "路径框保留圆角");
+assert.match(pathRule, /border:0\.5px solid/, "路径框采用官方发丝线边框");
+assert.match(pathRule, /border-radius:var\(--dsw-radius-lg,16px\)/, "路径框采用官方嵌套内容圆角");
 assert.match(pathRule, /background:var\(--dsw-alias-bg-layer-1/, "路径框使用宿主背景令牌");
 
 // 2. 默认：用户目录、DSH，路径来自后端配置，不写死。

@@ -425,7 +425,7 @@ globalThis.window = savedWindow;
 await selectSubsource("repo.subsource.github");
 
 const toolbarCss = all().filter(n => n.type === "style").map(n => n.children.join("")).join("");
-assert.match(toolbarCss, /\.dssm-catalog-list\{[^}]*border:1px solid var\(--dsw-alias-border-l2[^}]*border-radius:10px[^}]*background:transparent/, "目录结果列表沿用来源面板的边框、圆角与透明底色");
+assert.match(toolbarCss, /\.dssm-catalog-list\{[^}]*border:0\.5px solid var\(--dsw-alias-border-l2[^}]*border-radius:var\(--dsw-radius-xl,20px\)[^}]*background:transparent/, "目录结果列表沿用来源面板的边框、圆角与透明底色");
 assert.doesNotMatch(toolbarCss, /\.dssm-repo-filters/, "删除旧仓库等宽筛选 CSS，而不是叠加覆盖");
 assert.match(toolbarCss, /\.dssm-filters\.dssm-catalog-filters \.dssm-search\{flex:1 1 160px;min-width:0;max-width:none\}/, "目录搜索填满筛选下拉后的剩余宽度，不受工具栏 180px 上限");
 assert.doesNotMatch(toolbarCss, /\.dssm-catalog-search-row/, "目录搜索不再单独成行");

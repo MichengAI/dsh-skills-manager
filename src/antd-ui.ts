@@ -3,6 +3,7 @@ import darkAlgorithmImport from "antd/es/theme/themes/dark/index.js";
 import defaultAlgorithmImport from "antd/es/theme/themes/default/index.js";
 import type { ButtonProps } from "antd/es/button/Button.js";
 import { useHostDark } from "./host-theme.js";
+import { antdThemeConfig, antdThemeCss } from "./antd-theme.js";
 import ButtonImport from "antd/es/button/index.js";
 import type { ConfigProviderProps } from "antd/es/config-provider/index.js";
 import ConfigProviderImport from "antd/es/config-provider/index.js";
@@ -40,9 +41,9 @@ const TextArea = unwrap<React.ComponentType<TextAreaProps>>(TextAreaImport);
 export const Input = Object.assign(unwrap<React.ComponentType<InputProps>>(InputImport), { TextArea });
 const AntButton = unwrap<React.ComponentType<ButtonProps>>(ButtonImport);
 
-/** 页面操作按钮默认用圆角。调用处传入的 shape、size 可以覆盖。 */
+/** 普通按钮跟随宿主尺寸与圆角，只有显式指定时才使用胶囊形。 */
 export function Button(props: ButtonProps): React.ReactElement {
-  return React.createElement(AntButton, { shape: "round", ...props });
+  return React.createElement(AntButton, props);
 }
 type AntdCollapse = React.ComponentType<CollapseProps> & { Panel: React.ComponentType<Record<string, unknown>> };
 type AntdListItem = React.ComponentType<Record<string, unknown>> & { Meta: React.ComponentType<Record<string, unknown>> };
@@ -61,12 +62,12 @@ export const Tooltip = unwrap<React.ComponentType<TooltipProps>>(TooltipImport);
 const darkAlgorithm = unwrap<NonNullable<ConfigProviderProps["theme"]> extends { algorithm?: infer Algorithm } ? Algorithm : never>(darkAlgorithmImport);
 const defaultAlgorithm = unwrap<NonNullable<ConfigProviderProps["theme"]> extends { algorithm?: infer Algorithm } ? Algorithm : never>(defaultAlgorithmImport);
 
-/** 按钮不插汉字空格，亮暗跟随宿主的 data-ds-dark-theme。主色保持 Ant Design 默认蓝。 */
+/** 明暗算法提供兼容兜底，实际颜色与几何由 DSH 语义变量桥接，弹层共享同一作用域。 */
 export function AntdProvider(props: { locale?: Locale; children?: React.ReactNode }): React.ReactElement {
   const dark = useHostDark();
   return React.createElement(ConfigProvider, {
     locale: props.locale,
     button: { autoInsertSpace: false },
-    theme: { algorithm: dark ? darkAlgorithm : defaultAlgorithm },
-  }, props.children);
+    theme: { ...antdThemeConfig, algorithm: dark ? darkAlgorithm : defaultAlgorithm },
+  }, React.createElement("style", { "data-plugin": "@michengai/dsh-skills-manager" }, antdThemeCss), props.children);
 }

@@ -123,7 +123,7 @@ try {
   const workSwitch = nodes(work).find((node) => node.props["aria-label"] === t("category.toggle") + " 工作");
   assert.equal(workSwitch.props.checked, false, "没有全部开启时分类开关显示关");
   assert.equal(workSwitch.props.size, "small", "分类启停用最小号 Switch");
-  assert.match(workSwitch.props.styles({ props: { checked: false } }).root.backgroundColor, /state-error-primary/, "关闭是红色");
+  assert.match(workSwitch.props.styles({ props: { checked: false } }).root.backgroundColor, /border-l3/, "关闭是中性深灰底色");
   assert.ok(textOf(work).includes(t("category.progress", { count: 2, enabled: 1, usable: 2 })), "部分开启写在数量里");
   const loose = nodes(dsh).find((node) => node.props.className === "dssm-cat" && node.props["aria-label"] === t("category.uncategorized"));
   assert.deepEqual(nodes(loose).filter((node) => node.props.className === "dssm-name").map((node) => node.children[0]), ["loose"]);

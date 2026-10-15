@@ -284,7 +284,7 @@ try {
   }
   assert.equal(deleteIcon.props.danger, true, "永久删除保留危险图标语义");
   const css = nodes().filter((node) => node.type === "style").map((node) => node.children.join("")).join("");
-  assert.match(css, /\.dssm-trash-item\{[^}]*border:1px solid var\(--dsw-alias-border-l2/, "回收站条目有宿主主题细边框");
+  assert.match(css, /\.dssm-trash-item\{[^}]*border:0\.5px solid var\(--dsw-alias-border-l2/, "回收站条目有宿主主题细边框");
   assert.match(css, /\.dssm-trash-item\{[^}]*background:transparent/, "回收站和全局技能一样使用透明背景");
   assert.match(css, /\.dssm-trash-item\{[^}]*padding:11px 13px/, "回收站留白与技能行一致");
   assert.match(css, /\.dssm-trash-source\{[^}]*background:transparent/, "来源信息不再另铺偏亮的标签底色");

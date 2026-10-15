@@ -2,6 +2,12 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { handleSourceMenuEscape } from "../src/source-select-model.ts";
+import { antdThemeConfig, antdThemeCss } from "../src/antd-theme.ts";
+
+assert.deepEqual(antdThemeConfig.cssVar, { key: "dssm-theme", prefix: "dssm-ant" }, "Ant 变量必须隔离于宿主及其他插件");
+assert.deepEqual([antdThemeConfig.token.borderRadiusXS, antdThemeConfig.token.borderRadiusSM, antdThemeConfig.token.borderRadius, antdThemeConfig.token.borderRadiusLG], [4, 8, 12, 16], "兜底圆角显式采用官方尺度，不依赖 Ant 自动派生");
+assert.ok(!/data-dsh-glass|data-ds-dark-theme/.test(antdThemeCss), "适配层不认领第三方主题作用域，也不新增独立明暗配色");
+assert.ok(antdThemeCss.includes("--dsw-menu-surface-fill") && antdThemeCss.includes("--dsw-elevation-panel"), "浮层材质归宿主主题所有");
 
 const selectSource = await readFile(new URL("../src/source-select.ts", import.meta.url), "utf8");
 assert.ok(selectSource.includes("popupMatchSelectWidth: false"), "筛选下拉按内容展开，不跟触发器等宽");
@@ -38,4 +44,14 @@ assert.match(
   /\.dssm-source\{[^}]*background:transparent/,
   "来源卡片背景与技能列表一致，透出页面底色，不再另铺 layer-2",
 );
-console.log("Ant Design 筛选与残留样式检查通过");
+const repository = await readFile(new URL("../src/repository-ui.ts", import.meta.url), "utf8");
+const destination = await readFile(new URL("../src/destination-picker.ts", import.meta.url), "utf8");
+assert.match(source, /\.dssm-source\{[^}]*border-radius:var\(--dsw-radius-xl/, "独立来源卡片采用官方卡片档位");
+assert.match(source, /\.dssm-summary\{[^}]*background:var\(--dsw-alias-bg-layer-1\)/, "统计条直接使用当前作用域的背景层，不能用 body 上已解析成实色的设置卡片填充");
+assert.doesNotMatch(source, /\.dssm-summary\{[^}]*settings-card-fill/, "统计条不能回退到实心设置卡片填充");
+assert.match(repository, /\.dssm-catalog-list\{[^}]*border-radius:var\(--dsw-radius-xl/, "发现列表与来源容器采用同一档位");
+assert.match(destination, /\.dssm-destination-path\{[^}]*border-radius:var\(--dsw-radius-lg/, "路径预览与嵌套内容使用同一档位");
+assert.match(updater, /\.mpi-command\{[^}]*border-radius:var\(--dsw-radius-lg/, "更新弹窗代码框采用官方代码块档位");
+assert.ok(!/background:var\(--dsw-alias-bg-layer-\d,#[\da-f]+\)/i.test(source + repository + destination + updater), "背景不再引入独立的深色实心兜底");
+assert.ok(!/borderRadius: 6/.test(source + selectSource + repository), "行内按钮不能以内联值绕过统一圆角");
+console.log("Ant Design 筛选与宿主样式契约检查通过");

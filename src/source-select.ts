@@ -28,7 +28,7 @@ export function createSourceSelect(react: typeof React) {
           items: props.options.map((option) => ({ key: option.value, label: option.label, disabled: option.disabled, danger: option.danger })),
           onClick: (info: { key: string }) => props.onChange(String(info.key)),
         },
-      }, h(Button, { disabled: props.disabled, size: props.icon ? "small" : undefined, className: props.icon ? "dssm-row-icon" : undefined, style: props.icon ? { width: 22, minWidth: 22, height: 22, padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center", borderRadius: 6 } : undefined, "aria-label": props.label, title: props.label, icon: props.icon }, props.icon ? null : props.label));
+      }, h(Button, { disabled: props.disabled, size: props.icon ? "small" : undefined, className: props.icon ? "dssm-row-icon" : undefined, style: props.icon ? { width: 22, minWidth: 22, height: 22, padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center", borderRadius: "var(--dsw-radius-sm, 8px)" } : undefined, "aria-label": props.label, title: props.label, icon: props.icon }, props.icon ? null : props.label));
     }
     return h(Select, {
       className: "dssm-antd-select",
