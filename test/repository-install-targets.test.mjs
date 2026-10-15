@@ -208,7 +208,7 @@ try {
   await assert.rejects(manager.install({ id: repo.id, path: "locations/codex", root: "codex" }), error => error.code === "error.repo.invalid");
   assert.equal(await exists(join(process.env.DSH_CODEX_HOME, "skills/location-codex")), false);
   const forged = await deleteSkill({ ...root("claude"), path: outside, mutable: true }, "important", undefined);
-  assert.equal(forged.ok, false, "even internal opt-in only accepts the canonical Shared Agent path");
+  assert.equal(forged.ok, false, "伪造可写标记和路径不能将只读 Agent 根变为可写目标");
 
   const legacy = await manager.install({ id: repo.id, path: "default" });
   assert.equal(legacy.root, root("dsh").path);

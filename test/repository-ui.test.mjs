@@ -1,7 +1,7 @@
 // 验证真实 hooks/事件的筛选、折叠、安装位置选择、回收站卸载和更新行为。
 import assert from "node:assert/strict";
 import { mock } from "node:test";
-// 只接管防抖 timer，保留 setImmediate 驱动异步渲染。
+// 文件内所有 setTimeout 均受控（含未来请求超时，需显式 tick），setImmediate 保持真实以驱动异步渲染。
 mock.timers.enable({ apis: ["setTimeout"] });
 import { readFile } from "node:fs/promises";
 import { createRepositoryUI, repositoryLocales } from "../src/repository-ui.ts";

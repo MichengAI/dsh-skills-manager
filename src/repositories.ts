@@ -470,7 +470,6 @@ export function createRepositoryManager({ fetchImpl = globalThis.fetch, log, reg
       const data = await read();
       const records = root ? catalogCopies(data, root, name) : [];
       if (!records.length) return deleteSkill(root, name, log);
-
       const id = `${Date.now()}-${randomUUID()}`;
       for (const record of records) record.trashId = id;
       await write(data);
