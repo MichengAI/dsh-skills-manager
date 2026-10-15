@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.22 - 2026-10-16
+
+- Official DSH Design & Token Alignment: Align completely with official DSH design tokens and bridge Ant Design styles to host semantic CSS variables; adopt the official radius scale (R4/R8/R12/R16/R20/R28) and ensure seamless light/dark and frosted glass theme adaptation (#41).
+- Accessible Switch & Primitive Alignment: Refactor skill and category toggle switches to match host Switch primitive dimensions and interactions; replace forced red disabled states with host neutral dark tokens and brand active colors for WCAG contrast and full WAI-ARIA support; unify events on native onClick and align focus-ring tokens (#42).
+- Dropdown Polish: Elevate Select trigger style specificity to eliminate hover/open background flashes; align active focus state with host focus rings and apply prominent elevation tokens to popup menus.
+
 ## 1.1.21 - 2026-10-15
 
 - Support DSH `0.2.1-alpha.3` while retaining all existing supported versions.
