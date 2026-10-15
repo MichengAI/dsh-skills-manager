@@ -79,6 +79,8 @@ createRoot(document.getElementById('root')).render(React.createElement(React.Fra
     assert.equal((await style(page.getByRole("button", { name: "主要操作" }))).background, "rgb(37, 78, 118)", "主按钮消费宿主填充色而不是 Ant 默认蓝");
     assert.equal((await style(page.locator(".ant-select").first())).background, "rgba(220, 230, 240, 0.35)", "筛选下拉触发器跟随当前作用域背景，不能保持 Ant 实心白底");
     await page.getByRole("combobox", { name: "筛选", exact: true }).click();
+    const selectBg = await page.locator(".ant-select").first().evaluate((e) => getComputedStyle(e).backgroundColor);
+    assert.equal(selectBg, "rgba(220, 230, 240, 0.35)", "展开或聚焦状态下，下拉框依然保持半透明背景不闪白");
     const popup = page.locator(".ant-select-dropdown:visible");
     await popup.waitFor();
     assert.equal((await style(popup)).radius, "16px");
