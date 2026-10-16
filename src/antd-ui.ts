@@ -44,31 +44,80 @@ export interface UnifiedButtonProps extends React.ButtonHTMLAttributes<HTMLButto
   danger?: boolean;
   loading?: boolean;
   block?: boolean;
-  size?: "md" | "sm" | any;
+  size?: "md" | "sm" | "small" | any;
   icon?: React.ReactNode;
   shape?: string;
   href?: string;
   target?: string;
+  rel?: string;
 }
 
 export type ButtonProps = UnifiedButtonProps;
 
+function createSpinner() {
+  return React.createElement("svg", {
+    className: "dssm-btn-spinner",
+    viewBox: "0 0 16 16",
+    width: 14,
+    height: 14,
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 2,
+    strokeLinecap: "round",
+    style: { marginRight: 6, display: "inline-block", verticalAlign: "-2px", animation: "dssm-spin 0.8s linear infinite" },
+    "aria-hidden": "true",
+  }, React.createElement("path", { d: "M8 1.5a6.5 6.5 0 1 0 6.5 6.5" }));
+}
+
 /** 桥接官方宿主原语 Button，自动映射 Antd 常用属性（type="primary", danger, block 等），统一弹窗与全局按钮颜色与质感 */
-export function Button({ variant, type, danger, loading, block, size, shape, className, children, ...props }: UnifiedButtonProps): React.ReactElement {
+export function Button({ variant, type, danger, loading, block, size, shape, className, children, href, target, rel, icon, ...props }: UnifiedButtonProps): React.ReactElement {
   let mappedVariant: ButtonVariant = variant ?? "outline";
   if (type === "primary") mappedVariant = "primary";
   else if (type === "text" || type === "link") mappedVariant = "ghost";
 
+  const isPrimary = mappedVariant === "primary";
+  const mappedSize = (size === "small" || size === "sm") ? "sm" : "md";
+
   const classes = [
     "ant-btn",
     "dssm-theme",
+    href ? "dssm-link-btn" : "",
     className,
-    danger ? "is-danger" : "",
+    isPrimary ? "is-primary primary ant-btn-primary" : "",
+    danger ? "is-danger dssm-btn-danger" : "",
+    (danger && isPrimary) ? "dssm-btn-danger-primary" : "",
     block ? "is-block" : "",
     loading ? "is-loading" : "",
   ].filter(Boolean).join(" ");
 
-  const mappedSize = (size === "small" || size === "sm") ? "sm" : "md";
+  const hasChildren = children !== undefined && children !== null && children !== false;
+  const iconElement = loading
+    ? createSpinner()
+    : (icon ? React.createElement("span", {
+        key: "icon",
+        className: "ant-btn-icon",
+        style: {
+          display: "inline-flex",
+          alignItems: "center",
+          marginRight: (hasChildren && !href) ? 6 : undefined,
+        }
+      }, icon) : null);
+  const content = [
+    iconElement,
+    children
+  ];
+
+  if (href) {
+    return React.createElement("a", {
+      ...(props as unknown as React.AnchorHTMLAttributes<HTMLAnchorElement>),
+      href,
+      target,
+      rel: rel || (target === "_blank" ? "noreferrer" : undefined),
+      className: classes || undefined,
+      "aria-label": props["aria-label"],
+      style: Object.assign({ display: "inline-flex", alignItems: "center", justifyContent: "center", textDecoration: "none" }, props.style),
+    }, content);
+  }
 
   return React.createElement(PrimitiveButton, {
     ...props,
@@ -76,7 +125,8 @@ export function Button({ variant, type, danger, loading, block, size, shape, cla
     size: mappedSize,
     className: classes || undefined,
     disabled: props.disabled || loading,
-  }, children);
+    icon: undefined,
+  }, content);
 }
 type AntdCollapse = React.ComponentType<CollapseProps> & { Panel: React.ComponentType<Record<string, unknown>> };
 type AntdListItem = React.ComponentType<Record<string, unknown>> & { Meta: React.ComponentType<Record<string, unknown>> };

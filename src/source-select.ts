@@ -80,7 +80,7 @@ export function createSourceSelect(react: typeof React) {
         align: "start",
         portal: true,
         dense: true,
-        className: "dssm-source-select-menu",
+        listClassName: "dssm-source-select-menu",
         anchor: h(Button, {
           variant: "outline",
           size: "sm",

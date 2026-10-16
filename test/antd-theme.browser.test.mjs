@@ -40,6 +40,10 @@ React.createElement('div',null,
 React.createElement(Button,{'aria-label':'普通按钮',onClick:()=>setOpen(true)},'普通按钮'),
 React.createElement(Button,{'aria-label':'紧凑按钮',size:'small'},'紧凑按钮'),
 React.createElement(Button,{'aria-label':'主要操作',type:'primary'},'主要操作'),
+React.createElement(Button,{'aria-label':'链接按钮',href:'https://example.com',icon:React.createElement('span',{id:'doc-icon'},'#')},'文档'),
+React.createElement(Button,{'aria-label':'纯图标链接',href:'https://example.com/icon',icon:React.createElement('span',{id:'pure-icon'},'@')}),
+React.createElement(Button,{'aria-label':'危险主操作',type:'primary',danger:true},'危险主操作'),
+React.createElement(Button,{'aria-label':'加载操作',loading:true},'加载中'),
 React.createElement(Input,{'aria-label':'搜索',placeholder:'搜索'}),
 React.createElement(Select,{'aria-label':'筛选',options:[{value:'a',label:'来源 A'},{value:'b',label:'来源 B'}],value:'a',style:{width:160}}),
 React.createElement(Dropdown,{menu:{items:[{key:'info',label:'查看详情'},{key:'delete',label:'删除',danger:true}]},trigger:['click']},React.createElement(Button,{'aria-label':'更多'},'更多')),
@@ -69,6 +73,24 @@ createRoot(document.getElementById('root')).render(React.createElement(React.Fra
     assert.equal((await style(page.getByRole("button", { name: "紧凑按钮", exact: true }))).radius, "8px", "紧凑按钮使用官方 R8");
     assert.equal((await style(page.getByRole("button", { name: "普通按钮", exact: true }))).height, "36px");
     assert.equal((await style(page.getByRole("button", { name: "紧凑按钮", exact: true }))).height, "28px");
+    
+    // 验证链接按钮、纯图标链接、危险主操作和加载动画
+    const linkBtn = page.getByRole("link", { name: "链接按钮", exact: true });
+    assert.equal(await linkBtn.evaluate((el) => el.tagName), "A", "带 href 按钮渲染为原生 A 标签");
+    assert.equal(await linkBtn.evaluate((el) => el.matches(".dssm-link-btn")), true, "带 href 按钮包含 dssm-link-btn 钩子");
+    assert.equal(await linkBtn.evaluate((el) => el.hasAttribute("role")), false, "外链移除错误的 role=button 属性");
+    assert.equal(await linkBtn.locator("#doc-icon").count(), 1, "外链图标正常渲染");
+    
+    const iconOnlyLink = page.locator('a[href="https://example.com/icon"]');
+    assert.equal(await iconOnlyLink.locator("#pure-icon").count(), 1, "href 纯图标不丢图标");
+
+    const dangerPrimaryBtn = page.getByRole("button", { name: "危险主操作", exact: true });
+    assert.equal(await dangerPrimaryBtn.evaluate((el) => el.classList.contains("dssm-btn-danger-primary")), true, "危险主按钮吐出专属 dssm-btn-danger-primary 类名");
+    assert.equal(await dangerPrimaryBtn.evaluate((el) => el.classList.contains("is-primary")), true, "危险主按钮包含 is-primary 类名");
+
+    const loadingBtn = page.getByRole("button", { name: "加载操作", exact: true });
+    assert.equal(await loadingBtn.evaluate((el) => el.hasAttribute("disabled")), true, "loading 状态自动禁用按钮");
+    assert.equal(await loadingBtn.locator(".dssm-btn-spinner").count(), 1, "loading 状态渲染旋转菊花动画图标");
     const input = page.getByRole("textbox", { name: "搜索", exact: true });
     assert.equal((await style(input)).radius, "12px");
     assert.equal((await style(input)).color, "rgb(32, 40, 50)");

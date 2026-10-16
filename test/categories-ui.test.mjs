@@ -251,7 +251,7 @@ try {
     }
     find(node => node.props["aria-label"] === t("filter.workspace")).props.onChange("D:/work/empty");
     await settle();
-    nodes().filter(node => node.children.includes(t(action)) && node.props.onClick).at(-1).props.onClick();
+    nodes().filter(node => (node.children.includes(t(action)) || node.children.includes(t("btn.confirm"))) && node.props.onClick).at(-1).props.onClick();
     await settle();
     const call = calls.filter(call => call.url.endsWith(route)).at(-1);
     try { assert.equal(call?.body.workspace, "D:/work/alpha", route + " 保留原工作区"); }
