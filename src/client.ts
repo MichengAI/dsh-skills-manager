@@ -531,14 +531,11 @@ import { antdLocaleFromDocument } from "./antd-locale.js";
       // 下拉菜单筛选：只保留技能数量 > 0 的来源
       var options = ([{
         value: "",
-        label: h("span", { style: { display: "inline-flex", alignItems: "center" } },
-          h("span", { "aria-hidden": true, style: { display: "inline-flex", width: 16, height: 16, flexShrink: 0, marginRight: 6 } }),
-          t("filter.all") as React.ReactNode
-        )
+        label: t("filter.all") as React.ReactNode
       }] as { value: string; label: React.ReactNode }[]).concat(filteredOptionsRoots.map(function (root) {
         return {
           value: root.key,
-          label: h("span", { style: { display: "inline-flex", alignItems: "center" } }, renderRootIcon(root.key), t("filter.option", { name: rootDisplayName(t, root), count: root.skills.length }))
+          label: t("filter.option", { name: rootDisplayName(t, root), count: root.skills.length })
         };
       }));
 
