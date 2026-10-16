@@ -10,10 +10,10 @@ assert.ok(!/data-dsh-glass|data-ds-dark-theme/.test(antdThemeCss), "适配层不
 assert.ok(antdThemeCss.includes("--dsw-menu-surface-fill") && antdThemeCss.includes("--dsw-elevation-panel"), "浮层材质归宿主主题所有");
 
 const selectSource = await readFile(new URL("../src/source-select.ts", import.meta.url), "utf8");
-assert.ok(selectSource.includes("popupMatchSelectWidth: false"), "筛选下拉按内容展开，不跟触发器等宽");
-assert.ok(selectSource.includes("danger: option.danger"), "操作菜单保留危险标记");
+assert.ok(selectSource.includes("align: \"start\""), "筛选下拉对齐触发器起始边缘展开");
+assert.ok(selectSource.includes("danger: opt.danger"), "操作菜单保留危险标记");
 assert.ok(selectSource.includes("handleSourceMenuEscape"), "打开的筛选或操作菜单把 Escape 交给独立处理函数");
-assert.ok(!selectSource.includes("dsh-client-ui-primitives"), "下拉不再使用宿主菜单");
+assert.ok(selectSource.includes("@deepseek-ai/dsh-client-ui-primitives"), "下拉使用宿主官方 Menu 原语");
 
 const escapeCalls = [];
 assert.equal(handleSourceMenuEscape({

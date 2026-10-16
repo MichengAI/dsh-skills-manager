@@ -56,6 +56,12 @@ try {
     if (id === "react") return react;
     if (id === "react/jsx-runtime") return { jsx: react.createElement, jsxs: react.createElement, Fragment: react.Fragment };
     if (id.startsWith("react-dom")) return { createPortal: (node) => node };
+    if (id === "@deepseek-ai/dsh-client-ui-primitives") {
+      return {
+        Button: (props) => react.createElement("button", props, props.children),
+        Menu: (props) => react.createElement("div", { "data-menu-open": props.open }, props.anchor, props.open ? props.items?.map(it => react.createElement("button", { key: it.id, onClick: () => props.onSelect(it.id) }, it.label)) : null),
+      };
+    }
     throw new Error("unexpected require: " + id);
   });
   client.apply({ effect() {}, slots: { inject(name, fn) { fn(); }, register(options, fn) { component = fn; } } });

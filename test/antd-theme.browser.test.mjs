@@ -49,6 +49,7 @@ createRoot(document.getElementById('root')).render(React.createElement(React.Fra
       resolveDir: process.cwd(), sourcefile: "antd-theme-fixture.ts",
     },
     bundle: true, write: false, platform: "browser", format: "iife", define: { "process.env.NODE_ENV": '"production"' },
+    alias: { "@deepseek-ai/dsh-client-ui-primitives": "./test/runtime-modules.ts" },
   });
   const server = createServer((request, response) => {
     response.setHeader("Content-Type", request.url === "/app.js" ? "text/javascript; charset=utf-8" : "text/html; charset=utf-8");

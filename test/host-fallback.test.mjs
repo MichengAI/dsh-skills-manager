@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 
 const built = await readFile(new URL("../lib/client.js", import.meta.url), "utf8");
 const source = await readFile(new URL("../src/client.ts", import.meta.url), "utf8");
-assert.equal(built.includes("@deepseek-ai/dsh-client-ui-primitives"), false);
+assert.ok(built.includes("@deepseek-ai/dsh-client-ui-primitives"));
 assert.equal(built.includes("dssm-fallback-tabs"), false);
 assert.equal(built.includes("dssm-fallback-switch"), false);
 assert.equal(built.includes("dssm-host-modal{"), false);

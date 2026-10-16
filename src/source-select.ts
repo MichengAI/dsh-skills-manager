@@ -1,15 +1,21 @@
 import type * as React from "react";
 import type { SourceSelectProps } from "./client-types.js";
-import { Button, Dropdown, Select } from "./antd-ui.js";
+import { Menu, Button, type MenuEntry } from "@deepseek-ai/dsh-client-ui-primitives";
 import { handleSourceMenuEscape } from "./source-select-model.js";
 
-/** 筛选用 Ant Design Select，操作菜单用 Dropdown。宽度跟选项走，不铺满整行。打开时在 window 捕获阶段吃掉 Escape，避免关掉宿主设置页。 */
+/**
+ * 宿主官方原语 Menu 规范封装的筛选与操作菜单。
+ * 1. 筛选下拉：触发器采用宿主 Button (variant="outline", size="sm")，右侧配旋转小箭头，弹出层为宿主原生 <Menu>；
+ * 2. 更多操作：触发器为小号图标按钮，弹出层同样对齐宿主原生 <Menu>；
+ * 3. 彻底摆脱 Ant Design Select 及其内部虚拟列表的白底与白边限制。
+ */
 export function createSourceSelect(react: typeof React) {
   const h = react.createElement;
   return function SourceSelect(props: SourceSelectProps) {
     const openState = react.useState(false);
     const open = openState[0];
     const setOpen = openState[1];
+
     react.useEffect(function () {
       if (!open || typeof window === "undefined") return undefined;
       function onKey(event: KeyboardEvent) {
@@ -18,28 +24,91 @@ export function createSourceSelect(react: typeof React) {
       window.addEventListener("keydown", onKey, true);
       return function () { window.removeEventListener("keydown", onKey, true); };
     }, [open]);
-    function onOpenChange(next: boolean) { setOpen(next); }
+
+    const items = react.useMemo<readonly MenuEntry[]>(function () {
+      return props.options.map(function (opt) {
+        return {
+          id: opt.value,
+          label: opt.label,
+          disabled: opt.disabled,
+          danger: opt.danger,
+        };
+      });
+    }, [props.options]);
+
     if (props.action) {
-      return h(Dropdown, {
-        trigger: ["click"],
-        open: open,
-        onOpenChange: onOpenChange,
-        menu: {
-          items: props.options.map((option) => ({ key: option.value, label: option.label, disabled: option.disabled, danger: option.danger })),
-          onClick: (info: { key: string }) => props.onChange(String(info.key)),
-        },
-      }, h(Button, { disabled: props.disabled, size: props.icon ? "small" : undefined, className: props.icon ? "dssm-row-icon" : undefined, style: props.icon ? { width: 22, minWidth: 22, height: 22, padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center", borderRadius: "var(--dsw-radius-sm, 8px)" } : undefined, "aria-label": props.label, title: props.label, icon: props.icon }, props.icon ? null : props.label));
+      return h("div", { className: "dssm-action-menu-wrap", style: { display: "inline-block" } },
+        h(Menu, {
+          open: open,
+          onClose: function () { setOpen(false); },
+          onSelect: function (id: string) {
+            props.onChange(id);
+            setOpen(false);
+          },
+          align: "end",
+          portal: true,
+          anchor: h(Button, {
+            variant: "outline",
+            size: "sm",
+            disabled: props.disabled,
+            className: props.icon ? "dssm-row-icon" : undefined,
+            style: props.icon ? { width: 22, minWidth: 22, height: 22, padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center", borderRadius: "var(--dsw-radius-sm, 8px)" } : undefined,
+            "aria-label": props.label,
+            title: props.label,
+            onClick: function () {
+              if (!props.disabled) setOpen(function (prev) { return !prev; });
+            },
+            icon: props.icon,
+          }, props.icon ? null : props.label),
+          items: items,
+        })
+      );
     }
-    return h(Select, {
-      className: "dssm-antd-select",
-      "aria-label": props.label,
-      disabled: props.disabled,
-      open: open,
-      onOpenChange: onOpenChange,
-      value: props.value ?? "",
-      popupMatchSelectWidth: false,
-      options: props.options.map((option) => ({ value: option.value, label: option.label, disabled: option.disabled })),
-      onChange: (value: unknown) => props.onChange(String(value)),
-    });
+
+    const selectedOption = props.options.find(function (opt) { return opt.value === props.value; });
+    const currentText = selectedOption ? selectedOption.label : props.label;
+
+    return h("div", { className: "dssm-menu-select-wrap ant-select dssm-antd-select" },
+      h(Menu, {
+        open: open,
+        onClose: function () { setOpen(false); },
+        onSelect: function (id: string) {
+          props.onChange(id);
+          setOpen(false);
+        },
+        selectedId: props.value,
+        align: "start",
+        portal: true,
+        dense: true,
+        className: "dssm-source-select-menu",
+        anchor: h(Button, {
+          variant: "outline",
+          size: "sm",
+          role: "combobox",
+          "aria-label": props.label,
+          "aria-expanded": open,
+          disabled: props.disabled,
+          className: "dssm-menu-select-trigger ant-select-selector" + (open ? " is-open" : ""),
+          onClick: function () {
+            if (!props.disabled) setOpen(function (prev) { return !prev; });
+          },
+        },
+          h("span", { className: "dssm-menu-select-label" }, currentText),
+          h("svg", {
+            className: "dssm-menu-select-arrow",
+            viewBox: "0 0 16 16",
+            width: 12,
+            height: 12,
+            fill: "none",
+            stroke: "currentColor",
+            strokeWidth: 1.8,
+            strokeLinecap: "round",
+            strokeLinejoin: "round",
+            style: { marginLeft: 4, transition: "transform 150ms ease", transform: open ? "rotate(180deg)" : "none" },
+          }, h("path", { d: "m4 6 4 4 4-4" }))
+        ),
+        items: items,
+      })
+    );
   };
 }

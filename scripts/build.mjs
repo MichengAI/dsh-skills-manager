@@ -39,7 +39,7 @@ try {
     format: "cjs",
     platform: "browser",
     target: "es2022",
-    external: ["react", "react-dom", "react/jsx-runtime", "react-dom/client"],
+    external: ["react", "react-dom", "react/jsx-runtime", "react-dom/client", "@deepseek-ai/dsh-client-ui-primitives"],
     minify: true,
     define: { "process.env.NODE_ENV": "\"production\"" },
     banner: {

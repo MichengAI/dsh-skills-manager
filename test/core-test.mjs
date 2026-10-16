@@ -368,8 +368,8 @@ ok(
   "筛选器在独立组件中提供可访问标签",
 );
 ok(
-  (await readFile(new URL("../src/source-select.ts", import.meta.url), "utf8")).includes("popupMatchSelectWidth"),
-  "筛选下拉使用 Ant Design Select",
+  (await readFile(new URL("../src/source-select.ts", import.meta.url), "utf8")).includes("@deepseek-ai/dsh-client-ui-primitives"),
+  "筛选下拉使用宿主官方原语 Menu",
 );
 const packageJson = JSON.parse(
   await readFile(new URL("../package.json", import.meta.url), "utf8"),

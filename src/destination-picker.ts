@@ -56,6 +56,7 @@ export const destinationCss = [
   // 两列等宽且控件铺满，避免筛选下拉按文字收缩留下大块空白；窄屏时上下排列。
     ".dssm-destination-pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}",
   ".dssm-destination-pair .dssm-antd-select{width:100%;min-width:0}",
+  ".dssm-destination-pair .dssm-source-select-menu,.dssm-destination-pair span[class*=\"_root_\"],.dssm-destination-pair .dssm-menu-select-wrap,.dssm-destination-pair .dssm-menu-select-trigger{display:flex!important;width:100%!important;min-width:0!important;height:36px!important;border-radius:var(--dsw-radius-md,10px)!important;padding:0 12px!important;box-sizing:border-box!important}",
   "@media (max-width:420px){.dssm-destination-pair{grid-template-columns:minmax(0,1fr)}}",
   ".dssm-destination-path{display:block;box-sizing:border-box;width:100%;padding:8px 10px;border:0.5px solid var(--dsw-alias-border-l2,rgba(127,127,127,.2));border-radius:var(--dsw-radius-lg,16px);background:var(--dsw-alias-bg-layer-1,rgba(127,127,127,.06));overflow-wrap:anywhere;font-size:12px;line-height:18px}",
   ".dssm-destination-unavailable{display:flex;flex-direction:column;gap:2px}",
