@@ -10,6 +10,7 @@
  */
 
 export const NAV_ICON_MARKER = "data-dssm-nav-icon";
+export const NAV_ICON_ORIGINAL = "data-dssm-nav-original";
 export const NAV_ROW_SELECTOR = "[role=\"dialog\"] nav button";
 
 /** 100% 对齐 dsh-codex-ui 官方的技能专属矢量路径（viewBox: 0 0 16 16） */
@@ -19,7 +20,7 @@ export function isOwnNavRow(rowText: string | null | undefined, wantedLabel: str
   const wanted = String(wantedLabel ?? "").trim();
   if (wanted.length === 0) return false;
   const current = String(rowText ?? "").trim();
-  return current === wanted || current === "技能" || current === "Skills";
+  return current === wanted;
 }
 
 export function applySettingsNavIcon(button: Element, wantedLabel: () => string): boolean {
@@ -28,11 +29,35 @@ export function applySettingsNavIcon(button: Element, wantedLabel: () => string)
   if (!svg) return false;
   if (svg.getAttribute("data-dssm-nav-icon") === "skills") return false;
 
+  if (!svg.getAttribute(NAV_ICON_ORIGINAL)) {
+    svg.setAttribute(NAV_ICON_ORIGINAL, JSON.stringify({
+      innerHTML: svg.innerHTML,
+      viewBox: svg.getAttribute("viewBox"),
+      fill: svg.getAttribute("fill"),
+    }));
+  }
   svg.setAttribute("data-dssm-nav-icon", "skills");
   svg.setAttribute("viewBox", "0 0 16 16");
   svg.setAttribute("fill", "none");
   svg.innerHTML = SKILL_PATHS;
   button.setAttribute(NAV_ICON_MARKER, "");
+  return true;
+}
+
+export function restoreSettingsNavIcon(button: Element): boolean {
+  const svg = button.querySelector("svg");
+  button.removeAttribute(NAV_ICON_MARKER);
+  if (!svg) return false;
+  const raw = svg.getAttribute(NAV_ICON_ORIGINAL);
+  svg.removeAttribute("data-dssm-nav-icon");
+  svg.removeAttribute(NAV_ICON_ORIGINAL);
+  if (!raw) return false;
+  const saved = JSON.parse(raw) as { innerHTML: string; viewBox: string | null; fill: string | null };
+  svg.innerHTML = saved.innerHTML;
+  if (saved.viewBox == null) svg.removeAttribute("viewBox");
+  else svg.setAttribute("viewBox", saved.viewBox);
+  if (saved.fill == null) svg.removeAttribute("fill");
+  else svg.setAttribute("fill", saved.fill);
   return true;
 }
 
@@ -69,7 +94,7 @@ export function installSettingsNavIcon(ctx: NavIconContext, resolveLabel: () => 
       disposed = true;
       observer.disconnect();
       for (const row of document.querySelectorAll(`[${NAV_ICON_MARKER}]`)) {
-        row.removeAttribute(NAV_ICON_MARKER);
+        restoreSettingsNavIcon(row);
       }
     };
   }, "skills-manager: settings nav icon");
