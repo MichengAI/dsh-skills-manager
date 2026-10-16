@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.1.23 - 2026-10-16
+
+- Dialog actions now share one layout: cancel is an outline button, ordinary confirm is solid, and destructive confirm is solid red.
+- Renaming a category asks you to confirm, and the button stays disabled until the name changes.
+- Source filter choices are text only. Filter controls keep even spacing, and the search field uses the remaining width. Dialog dropdowns use the host menu and fill their column.
+- The settings entry uses the same skill icon as Codex UI. It no longer changes another dialog row that merely says Skills, and disabling the plugin restores the original gear.
+- GitHub, feedback, and check for updates use the same host outline buttons.
+
 ## 1.1.22 - 2026-10-16
 
 - Official DSH Design & Token Alignment: Align completely with official DSH design tokens and bridge Ant Design styles to host semantic CSS variables; adopt the official radius scale (R4/R8/R12/R16/R20/R28) and ensure seamless light/dark and frosted glass theme adaptation (#41).
