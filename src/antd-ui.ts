@@ -4,6 +4,7 @@ import defaultAlgorithmImport from "antd/es/theme/themes/default/index.js";
 import { useHostDark } from "./host-theme.js";
 import { antdThemeConfig, antdThemeCss } from "./antd-theme.js";
 import { Button as PrimitiveButton, type ButtonVariant } from "@deepseek-ai/dsh-client-ui-primitives";
+export { PrimitiveButton };
 import type { ConfigProviderProps } from "antd/es/config-provider/index.js";
 import ConfigProviderImport from "antd/es/config-provider/index.js";
 import type { DropdownProps } from "antd/es/dropdown/dropdown.js";

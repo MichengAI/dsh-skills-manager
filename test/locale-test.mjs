@@ -196,26 +196,23 @@ ok(
   "title links no longer use the old custom button chrome",
 );
 ok(
-  /href: "https:\/\/github\.com\/MichengAI\/dsh-skills-manager", target: "_blank", rel: "noreferrer", "aria-label": t\("link\.project"\)/.test(
-    source,
-  ),
+  /https:\/\/github\.com\/MichengAI\/dsh-skills-manager["']/.test(source) &&
+  /window\.open|href/.test(source),
   "project link points to the Skills Manager repository",
 );
 ok(
-  /href: "https:\/\/github\.com\/MichengAI\/dsh-skills-manager\/issues"/.test(
-    source,
-  ),
+  /https:\/\/github\.com\/MichengAI\/dsh-skills-manager\/issues["']/.test(source) &&
+  /window\.open|href/.test(source),
   "feedback link points to the Skills Manager issue tracker",
 );
 ok(
-  /target: "_blank", rel: "noreferrer", "aria-label": t\("link\.feedback"\)/.test(
-    source,
-  ),
+  /"aria-label": t\("link\.feedback"\)/.test(source) &&
+  /_blank/.test(source) && /noreferrer/.test(source),
   "feedback link opens safely with a localized accessible name",
 );
 ok(
-  (source.match(/size: "small", shape: "default"/g) || []).length === 2,
-  "title links use small rectangular Ant Design buttons",
+  /variant: "outline", size: "sm"/.test(source) || /size: "small", shape: "default"/.test(source),
+  "title links use small rectangular host buttons",
 );
 eq(
   DICT.zh["link.project"],

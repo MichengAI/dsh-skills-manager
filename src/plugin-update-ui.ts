@@ -1,7 +1,7 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
 import { antdLocaleFromDocument } from "./antd-locale.js";
-import { AntdProvider, Button, Modal, Progress } from "./antd-ui.js";
+import { AntdProvider, Button, PrimitiveButton, Modal, Progress } from "./antd-ui.js";
 import { createUpdateFlow, handlePluginUpdateEscape, manualPluginUpdateCommand, pluginUpdateCopy, type UpdatePayload } from "./plugin-update-model.js";
 
 interface UpdateUIOptions { endpoint: string; packageName: string; titleRowSelector: string; linksSelector: string; zhName: string; enName: string; createIcon: (name: "refresh" | "download" | "copy" | "close") => HTMLElement }
@@ -104,9 +104,9 @@ function observePluginUpdate(options: UpdateUIOptions) {
     if (buttonRoot === undefined) return;
     if (iconNode === undefined) iconNode = options.createIcon("refresh");
     const icon = iconNode;
-    buttonRoot.render(React.createElement(AntdProvider, { locale: antdLocaleFromDocument() }, React.createElement(Button, {
-      size: "small", shape: "default", onClick: openDialog, icon: React.createElement(HostIcon, { node: icon }),
-    }, React.createElement("span", { "data-mpi-label": "" }, pluginUpdateCopy(document.documentElement.lang).check))));
+    buttonRoot.render(React.createElement(PrimitiveButton, {
+      variant: "outline", size: "sm", onClick: openDialog, icon: React.createElement(HostIcon, { node: icon }),
+    }, React.createElement("span", { "data-mpi-label": "" }, pluginUpdateCopy(document.documentElement.lang).check)));
   }
   function closeDialog() { dialogRoot?.unmount(); dialogRoot = undefined; dialogHost?.remove(); dialogHost = undefined; }
   function openDialog() {
