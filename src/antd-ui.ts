@@ -99,7 +99,6 @@ export function Button({ variant, type, danger, loading, block, size, shape, cla
         style: {
           display: "inline-flex",
           alignItems: "center",
-          marginRight: (hasChildren && !href) ? 6 : undefined,
         }
       }, icon) : null);
   const content = [
@@ -115,7 +114,7 @@ export function Button({ variant, type, danger, loading, block, size, shape, cla
       rel: rel || (target === "_blank" ? "noreferrer" : undefined),
       className: classes || undefined,
       "aria-label": props["aria-label"],
-      style: Object.assign({ display: "inline-flex", alignItems: "center", justifyContent: "center", textDecoration: "none" }, props.style),
+      style: props.style,
     }, content);
   }
 

@@ -251,7 +251,10 @@ try {
     }
     find(node => node.props["aria-label"] === t("filter.workspace")).props.onChange("D:/work/empty");
     await settle();
-    nodes().filter(node => (node.children.includes(t(action)) || node.children.includes(t("btn.confirm"))) && node.props.onClick).at(-1).props.onClick();
+    const expectedConfirmText = action === "category.rename" ? t("btn.confirm") : t(action);
+    const confirmBtn = nodes().filter(node => node.children.includes(expectedConfirmText) && node.props.onClick).at(-1);
+    assert.ok(confirmBtn, `应严格找到文案为「${expectedConfirmText}」的模态确认按钮`);
+    confirmBtn.props.onClick();
     await settle();
     const call = calls.filter(call => call.url.endsWith(route)).at(-1);
     try { assert.equal(call?.body.workspace, "D:/work/alpha", route + " 保留原工作区"); }

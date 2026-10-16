@@ -80,6 +80,15 @@ createRoot(document.getElementById('root')).render(React.createElement(React.Fra
     assert.equal(await linkBtn.evaluate((el) => el.matches(".dssm-link-btn")), true, "带 href 按钮包含 dssm-link-btn 钩子");
     assert.equal(await linkBtn.evaluate((el) => el.hasAttribute("role")), false, "外链移除错误的 role=button 属性");
     assert.equal(await linkBtn.locator("#doc-icon").count(), 1, "外链图标正常渲染");
+    const linkBtnStyle = await linkBtn.evaluate((el) => {
+      const s = getComputedStyle(el);
+      return { height: s.height, radius: s.borderRadius, display: s.display, alignItems: s.alignItems, justifyContent: s.justifyContent, fontSize: s.fontSize };
+    });
+    assert.equal(linkBtnStyle.height, "28px", "外链按钮物理计算高度为 28px");
+    assert.equal(linkBtnStyle.radius, "8px", "外链按钮物理计算圆角为 8px");
+    assert.equal(linkBtnStyle.display, "inline-flex", "外链按钮为 inline-flex 布局");
+    assert.equal(linkBtnStyle.justifyContent, "center", "外链按钮内容水平居中");
+    assert.equal(linkBtnStyle.fontSize, "12px", "外链按钮字号为统一的 12px");
     
     const iconOnlyLink = page.locator('a[href="https://example.com/icon"]');
     assert.equal(await iconOnlyLink.locator("#pure-icon").count(), 1, "href 纯图标不丢图标");
@@ -87,6 +96,13 @@ createRoot(document.getElementById('root')).render(React.createElement(React.Fra
     const dangerPrimaryBtn = page.getByRole("button", { name: "危险主操作", exact: true });
     assert.equal(await dangerPrimaryBtn.evaluate((el) => el.classList.contains("dssm-btn-danger-primary")), true, "危险主按钮吐出专属 dssm-btn-danger-primary 类名");
     assert.equal(await dangerPrimaryBtn.evaluate((el) => el.classList.contains("is-primary")), true, "危险主按钮包含 is-primary 类名");
+    const dangerStyle = await dangerPrimaryBtn.evaluate((el) => {
+      const s = getComputedStyle(el);
+      const expectedBg = getComputedStyle(document.body).getPropertyValue("--dsw-alias-state-error-primary").trim();
+      return { bg: s.backgroundColor, color: s.color, expectedBg };
+    });
+    assert.equal(dangerStyle.color, "rgb(255, 255, 255)", "危险主按钮文字计算颜色为纯白");
+    assert.equal(dangerStyle.bg, "rgb(212, 53, 70)", "危险主按钮计算背景严格等于 token 指定的错误色");
 
     const loadingBtn = page.getByRole("button", { name: "加载操作", exact: true });
     assert.equal(await loadingBtn.evaluate((el) => el.hasAttribute("disabled")), true, "loading 状态自动禁用按钮");

@@ -100,4 +100,14 @@ export const antdThemeCss = `
 .dssm-theme.ant-select-dropdown{--dssm-ant-select-option-selected-bg:var(--dsw-alias-state-business-tertiary);--dssm-ant-select-option-selected-color:var(--dsw-alias-label-primary);--dssm-ant-select-option-active-bg:var(--dsw-alias-interactive-bg-hover)}
 .dssm-theme.ant-segmented{--dssm-ant-segmented-track-bg:var(--dsw-alias-interactive-bg-hover);--dssm-ant-segmented-item-selected-bg:var(--dsw-alias-bg-layer-1);--dssm-ant-segmented-item-selected-color:var(--dsw-alias-label-primary);--dssm-ant-segmented-item-color:var(--dsw-alias-label-secondary);border-radius:var(--dsw-radius-md,12px);padding:4px}
 .dssm-theme.ant-segmented .ant-segmented-item,.dssm-theme.ant-segmented .ant-segmented-thumb{border-radius:var(--dsw-radius-sm,8px)}
+@keyframes dssm-spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+.dssm-btn-spinner{display:inline-block;vertical-align:-2px;animation:dssm-spin 0.8s linear infinite}
+.dssm-link-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:28px;padding:0 10px;border:0.5px solid var(--dsw-alias-border-l2,#494949);border-radius:var(--dsw-radius-sm,8px);background:transparent;color:var(--dsw-alias-label-secondary,#b9b9b9);font:inherit;font-size:12px;line-height:20px;text-decoration:none;cursor:pointer;user-select:none;box-sizing:border-box;transition:border-color 120ms ease,color 120ms ease,background 120ms ease}
+.dssm-link-btn:hover{border-color:var(--dsw-alias-border-l3,#555);color:var(--dsw-alias-label-primary,#eee);background:var(--dsw-alias-interactive-bg-hover,rgba(128,128,128,.12))}
+.dssm-link-btn:focus-visible{outline:var(--dsw-focus-ring-width,1px) solid var(--dsw-focus-ring-color,var(--dsw-alias-brand-primary));outline-offset:0}
+.dssm-link-btn svg{display:block;width:14px;height:14px}
+.dssm-btn-danger{color:var(--dsw-alias-state-error-primary)!important;border-color:var(--dsw-alias-state-error-primary)!important}
+.dssm-btn-danger:hover:not(:disabled){color:var(--dsw-alias-state-error-primary)!important;border-color:var(--dsw-alias-state-error-primary)!important;opacity:0.85}
+.dssm-btn-danger-primary,.dssm-btn-danger.dssm-btn-danger-primary{background:var(--dsw-alias-state-error-primary)!important;border-color:var(--dsw-alias-state-error-primary)!important;color:#fff!important}
+.dssm-btn-danger-primary:hover:not(:disabled){opacity:0.9}
 `;

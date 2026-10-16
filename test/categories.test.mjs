@@ -134,5 +134,15 @@ const movedToLoose = await moveSkillInCategory("dsh", "order-alpha", "", "loose-
 assert.deepEqual(movedToLoose.order, ["broken-skill", "kept-skill", "loose-skill", "order-alpha", "purge-skill"], "技能跨分类后接入目标分类现有顺序");
 assert.equal((await state()).roots.find((root) => root.key === "dsh").skills.find((item) => item.name === "order-alpha").categoryId, null, "排序落点同时更新分类归属");
 
+// 边界测试：空分类名、纯空白、前后空格 trim 以及重名冲突
+const emptyName = await createCategory("dsh", "   ");
+assert.equal(emptyName.code, "error.category.name", "纯空白分类名应被拒绝");
+const trimmedCategory = await createCategory("dsh", "  去空格分类  ");
+assert.equal(trimmedCategory.category.name, "去空格分类", "分类名应自动 trim 掉首尾空格");
+const duplicateName = await createCategory("dsh", "去空格分类");
+assert.equal(duplicateName.code, "error.category.duplicate", "同来源下已存在的同名分类应报错拒绝");
+const selfRename = await renameCategory("dsh", trimmedCategory.category.id, "去空格分类");
+assert.equal(selfRename.category.name, "去空格分类", "重命名为自身名称保持幂等");
+
 await rm(temporary, { recursive: true, force: true });
 console.log("categories ok");
