@@ -30,6 +30,8 @@ else
     manifest,
     "package.json 与 hosts.mjs 不一致；运行 node scripts/sync-hosts.mjs --write",
   );
+const latestHost = supportedHosts.at(-1);
+const shieldsHost = latestHost.replace(/(\d)-/g, "$1--");
 for (const [file, pattern, line] of [
   [
     "README.md",
@@ -40,6 +42,26 @@ for (const [file, pattern, line] of [
     "README.zh-CN.md",
     /^- `[^`]+` 已验证兼容 DeepSeek Harness .*$/m,
     `- \`${manifest.version}\` 已验证兼容 DeepSeek Harness ${supportedHosts.map((v) => "`" + v + "`").join("、")}。`,
+  ],
+  [
+    "README.md",
+    /^This README describes \*\*[^*]+\*\*\. Released changes are in the \[changelog\]\(CHANGELOG\.md\)\.$/m,
+    `This README describes **${manifest.version}**. Released changes are in the [changelog](CHANGELOG.md).`,
+  ],
+  [
+    "README.zh-CN.md",
+    /^本文描述 \*\*[^*]+\*\*。已发布变更见\[更新日志\]\(CHANGELOG\.zh-CN\.md\)。$/m,
+    `本文描述 **${manifest.version}**。已发布变更见[更新日志](CHANGELOG.zh-CN.md)。`,
+  ],
+  [
+    "README.md",
+    /^  \[!\[DSH supported through [^[]+\]\(https:\/\/img\.shields\.io\/badge\/DSH-up%20to%20[^)]+\)\]\(#installation\)$/m,
+    `  [![DSH supported through ${latestHost}](https://img.shields.io/badge/DSH-up%20to%20${shieldsHost}-2563eb.svg)](#installation)`,
+  ],
+  [
+    "README.zh-CN.md",
+    /^  \[!\[DSH 支持至 [^[]+\]\(https:\/\/img\.shields\.io\/badge\/DSH-%E6%94%AF%E6%8C%81%E8%87%B3%20[^)]+\)\]\(#安装\)$/m,
+    `  [![DSH 支持至 ${latestHost}](https://img.shields.io/badge/DSH-%E6%94%AF%E6%8C%81%E8%87%B3%20${shieldsHost}-2563eb.svg)](#安装)`,
   ],
 ]) {
   const url = new URL("../" + file, import.meta.url);

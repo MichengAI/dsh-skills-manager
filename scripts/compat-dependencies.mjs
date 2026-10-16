@@ -38,9 +38,15 @@ export function cordisPin(hostVersion) {
   return pin;
 }
 
+export function pluginPins(cordis) {
+  const plugins = CORDIS_PLUGIN_PINS[cordis];
+  if (!plugins) throw new Error(`缺少 ${cordis} 的插件 pin`);
+  return plugins;
+}
+
 export function hostCordisOverrides(hostVersion) {
   const cordis = cordisPin(hostVersion);
-  const overrides = { "@deepseek-ai/cordis": cordis, ...CORDIS_PLUGIN_PINS[cordis] };
+  const overrides = { "@deepseek-ai/cordis": cordis, ...pluginPins(cordis) };
   if (hostVersion === "0.2.1-alpha.1" || hostVersion === "0.2.1-alpha.2") {
     overrides["@deepseek-ai/schemastery"] = "3.18.5-alpha.1";
   }

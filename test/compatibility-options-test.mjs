@@ -8,7 +8,7 @@ import { mkdtemp, readdir, rm, readFile } from "node:fs/promises";
 import { parseOptions } from "../scripts/compatibility-options.mjs";
 import { sameExistingPath, resolveTempRoot } from "../scripts/compat-paths.mjs";
 import { assertHostPeers, supportedHosts, peerRange, developmentHost } from "../scripts/hosts.mjs";
-import { cordisPin, hostCordisOverrides, pinHostDependencies } from "../scripts/compat-dependencies.mjs";
+import { cordisPin, hostCordisOverrides, pinHostDependencies, pluginPins } from "../scripts/compat-dependencies.mjs";
 const mixed = { dependencies: { "@deepseek-ai/dsh-app-boot": "^0.1.6-alpha.1", other: "^2" }, peerDependencies: { "@deepseek-ai/dsh-base": "*" } };
 const pinned = pinHostDependencies(mixed, "0.1.6-alpha.1");
 assert.equal(pinned.dependencies["@deepseek-ai/dsh-app-boot"], "0.1.6-alpha.1");
@@ -33,7 +33,12 @@ assert.equal(hostCordisOverrides("0.2.1-alpha.1")["@deepseek-ai/cordis-plugin-gr
 assert.equal(hostCordisOverrides("0.2.1-alpha.1")["@deepseek-ai/cordis-plugin-hmr"], "1.0.20-alpha.1");
 assert.equal(hostCordisOverrides("0.2.1-alpha.2")["@deepseek-ai/cordis-plugin-group"], "1.0.5-alpha.1");
 assert.equal(hostCordisOverrides("0.2.0-rc.1")["@deepseek-ai/cordis-plugin-hmr"], "1.0.19");
-assert.equal(hostCordisOverrides("0.2.0-rc.2")["@deepseek-ai/cordis-plugin-hmr"], "1.0.19");
+assert.throws(() => pluginPins("9.9.9"), /缺少 9\.9\.9 的插件 pin/);
+const requiredPins = ["@deepseek-ai/cordis", "@deepseek-ai/cordis-plugin-group", "@deepseek-ai/cordis-plugin-hmr", "@deepseek-ai/cordis-plugin-include", "@deepseek-ai/cordis-plugin-loader", "@deepseek-ai/cordis-plugin-timer"];
+for (const host of supportedHosts) {
+  const overrides = hostCordisOverrides(host);
+  for (const name of requiredPins) assert.ok(overrides[name], `${host} 缺少 ${name}`);
+}
 assert.equal(developmentHost, "0.2.0-rc.2");
 assert.deepEqual(supportedHosts, ["0.2.0-rc.1", "0.2.0-rc.2", "0.2.1-alpha.1", "0.2.1-alpha.2", "0.2.1-alpha.3", "0.2.1-alpha.4", "0.2.1-alpha.5"]);
 assert.equal(supportedHosts.some((version) => version.includes("0.1.6-alpha") || version.includes("0.1.7-alpha")), false);
