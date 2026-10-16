@@ -1,12 +1,14 @@
-// 0.1.7-rc.1、0.1.7-rc.2、0.2.0-rc.1 与 0.2.0-rc.2 都依赖 Cordis ~4.0.4；更早的已验证 rc 宿主继续锁定 4.0.2。
-// 官方 Cordis 插件的最新版只接受 ~4.0.4。旧宿主若让它们浮动，HMR 服务不会注册，补丁监听会直接退出。
+// 0.2.0 的 RC 依赖 Cordis ~4.0.4；0.2.1 alpha 按宿主自己的 Cordis 范围钉死，避免浮动后 HMR 不注册。
 const CORDIS_PINS = Object.freeze({
   "0.1.7-rc.1": "4.0.4",
   "0.1.7-rc.2": "4.0.4",
   "0.2.0-rc.1": "4.0.4",
   "0.2.0-rc.2": "4.0.4",
+  "0.2.1-alpha.1": "4.0.5-alpha.1",
   "0.2.1-alpha.2": "4.0.5-alpha.1",
   "0.2.1-alpha.3": "4.0.5-alpha.2",
+  "0.2.1-alpha.4": "4.0.5-alpha.2",
+  "0.2.1-alpha.5": "4.0.5-alpha.2",
 });
 const CORDIS_PLUGIN_PINS = Object.freeze({
   "4.0.2": {
@@ -46,10 +48,10 @@ export function cordisPin(hostVersion) {
 export function hostCordisOverrides(hostVersion) {
   const cordis = cordisPin(hostVersion);
   const overrides = { "@deepseek-ai/cordis": cordis, ...CORDIS_PLUGIN_PINS[cordis] };
-  if (hostVersion === "0.2.1-alpha.2") {
+  if (hostVersion === "0.2.1-alpha.1" || hostVersion === "0.2.1-alpha.2") {
     overrides["@deepseek-ai/schemastery"] = "3.18.5-alpha.1";
   }
-  if (hostVersion === "0.2.1-alpha.3") {
+  if (hostVersion === "0.2.1-alpha.3" || hostVersion === "0.2.1-alpha.4" || hostVersion === "0.2.1-alpha.5") {
     overrides["@deepseek-ai/schemastery"] = "3.18.5-alpha.2";
   }
   return overrides;
