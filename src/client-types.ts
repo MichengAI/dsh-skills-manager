@@ -66,7 +66,6 @@ export interface SourceSelectProps {
     onChange: (value: string) => void;
 }
 export interface SessionSnapshot {
-    current?: string;
     ids?: string[];
     byId?: Record<string, {
         retainedBy?: {

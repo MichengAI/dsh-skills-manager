@@ -408,7 +408,6 @@ import { installSettingsNavIcon } from "./settings-nav-icon.js";
 
     function currentSessionId(snapshot?: SessionSnapshot) {
       if (!snapshot) return undefined;
-      if (typeof snapshot.current === "string" && snapshot.current) return snapshot.current;
       var byId = snapshot.byId || {};
       var ids = Array.isArray(snapshot.ids) && snapshot.ids.length ? snapshot.ids : Object.keys(byId);
       for (var i = 0; i < ids.length; i++) {

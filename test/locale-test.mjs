@@ -733,7 +733,7 @@ eq(
   "shadow hints use the localized source display name",
 );
 ok(typeof bundle.currentSessionId === "function", "factory exports currentSessionId");
-eq(bundle.currentSessionId({ current: "legacy-session" }), "legacy-session", "currentSessionId reads the pre-alpha.2 current field");
+eq(bundle.currentSessionId({ current: "legacy-session" }), undefined, "currentSessionId ignores the pre-0.2 current field");
 eq(
   bundle.currentSessionId({
     ids: ["other", "main"],
@@ -743,15 +743,15 @@ eq(
     },
   }),
   "main",
-  "currentSessionId follows retainedBy.mainView on 0.1.6-alpha.2",
+  "currentSessionId follows retainedBy.mainView",
 );
 eq(
   bundle.currentSessionId({
     current: "legacy-session",
     byId: { main: { retainedBy: { mainView: 1 } } },
   }),
-  "legacy-session",
-  "currentSessionId prefers the legacy current field when both exist",
+  "main",
+  "currentSessionId ignores a legacy current field when mainView is present",
 );
 eq(bundle.currentSessionId({ byId: { other: { retainedBy: { sidebar: 1 } } } }), undefined, "currentSessionId ignores non-main retains");
 eq(bundle.currentSessionId({}), undefined, "currentSessionId is absent without a current session");
