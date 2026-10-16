@@ -1,7 +1,5 @@
-// 0.2.0 的 RC 依赖 Cordis ~4.0.4；0.2.1 alpha 按宿主自己的 Cordis 范围钉死，避免浮动后 HMR 不注册。
+// 只给当前支持的宿主钉 Cordis。插件版本跟该宿主自己的 Cordis 线，不把 4.0.4 的插件抄到 4.0.5。
 const CORDIS_PINS = Object.freeze({
-  "0.1.7-rc.1": "4.0.4",
-  "0.1.7-rc.2": "4.0.4",
   "0.2.0-rc.1": "4.0.4",
   "0.2.0-rc.2": "4.0.4",
   "0.2.1-alpha.1": "4.0.5-alpha.1",
@@ -11,13 +9,6 @@ const CORDIS_PINS = Object.freeze({
   "0.2.1-alpha.5": "4.0.5-alpha.2",
 });
 const CORDIS_PLUGIN_PINS = Object.freeze({
-  "4.0.2": {
-    "@deepseek-ai/cordis-plugin-group": "1.0.2",
-    "@deepseek-ai/cordis-plugin-hmr": "1.0.17",
-    "@deepseek-ai/cordis-plugin-include": "1.0.7",
-    "@deepseek-ai/cordis-plugin-loader": "1.0.3",
-    "@deepseek-ai/cordis-plugin-timer": "1.1.4",
-  },
   "4.0.4": {
     "@deepseek-ai/cordis-plugin-group": "1.0.4",
     "@deepseek-ai/cordis-plugin-hmr": "1.0.19",
@@ -26,8 +17,8 @@ const CORDIS_PLUGIN_PINS = Object.freeze({
     "@deepseek-ai/cordis-plugin-timer": "1.1.6",
   },
   "4.0.5-alpha.1": {
-    "@deepseek-ai/cordis-plugin-group": "1.0.4",
-    "@deepseek-ai/cordis-plugin-hmr": "1.0.19",
+    "@deepseek-ai/cordis-plugin-group": "1.0.5-alpha.1",
+    "@deepseek-ai/cordis-plugin-hmr": "1.0.20-alpha.1",
     "@deepseek-ai/cordis-plugin-include": "1.0.10-alpha.1",
     "@deepseek-ai/cordis-plugin-loader": "1.0.6-alpha.1",
     "@deepseek-ai/cordis-plugin-timer": "1.1.7-alpha.1",
@@ -42,7 +33,9 @@ const CORDIS_PLUGIN_PINS = Object.freeze({
 });
 
 export function cordisPin(hostVersion) {
-  return CORDIS_PINS[hostVersion] ?? "4.0.2";
+  const pin = CORDIS_PINS[hostVersion];
+  if (!pin) throw new Error(`未支持的宿主：${hostVersion}`);
+  return pin;
 }
 
 export function hostCordisOverrides(hostVersion) {
