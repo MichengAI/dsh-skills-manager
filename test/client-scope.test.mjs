@@ -59,6 +59,8 @@ try {
     if (id === "@deepseek-ai/dsh-client-ui-primitives") {
       return {
         Button: (props) => react.createElement("button", props, props.children),
+        Input: (props) => react.createElement("span", { className: props.className }, react.createElement("input", props)),
+        Modal: (props) => props.open ? react.createElement("div", { role: "dialog", title: props.title }, props.children, props.footer) : null,
         Menu: (props) => react.createElement("div", { "data-menu-open": props.open }, props.anchor, props.open ? props.items?.map(it => react.createElement("button", { key: it.id, onClick: () => props.onSelect(it.id) }, it.label)) : null),
       };
     }
@@ -107,11 +109,11 @@ try {
   const find = (predicate) => nodes().find(predicate);
   const rows = () => nodes().filter((node) => node.props.className === "dssm-name").map((node) => node.children[0]);
   const change = (label, value) => { find((node) => node.props["aria-label"] === label).props.onChange({ target: { value } }); render(); };
-  const tab = (name) => { const tabs = find((node) => node.props?.block === true && Array.isArray(node.props.options)); const option = tabs.props.options.find((item) => item.label === name || (Array.isArray(item.label) && item.label.includes(name))); tabs.props.onChange(option.value); render(); };
+  const tab = (name) => { const tabs = find((node) => node.props?.className === "dssm-scope-tabs" && Array.isArray(node.props.items)); const option = tabs.props.items.find((item) => item.label === name || (Array.isArray(item.label) && item.label.includes(name))); tabs.props.onChange(option.value); render(); };
   render(); effects.splice(0).forEach((effect) => effect());
   await new Promise((resolve) => setImmediate(resolve)); render();
-  const groups = () => nodes().filter((node) => node.props.className === "dssm-source" && Array.isArray(node.props.items));
-  const expandAll = () => { groups().filter((node) => ![].concat(node.props.activeKey || []).includes(node.props.items[0].key)).forEach((node) => node.props.onChange([node.props.items[0].key])); render(); };
+  const groups = () => nodes().filter((node) => node.props.className === "dssm-source");
+  const expandAll = () => { groups().forEach((node) => { const toggle = nodes(node).find((child) => child.props.className === "dssm-source-toggle"); if (toggle?.props["aria-expanded"] !== true) toggle.props.onClick(); }); render(); };
   assert.deepEqual(rows(), [], "来源默认折叠，不平铺所有技能");
   assert.equal(groups().length, 2, "全局按来源分组");
   assert.ok(nodes(groups()[0]).some((node) => node.children.includes("1 个技能")), "来源数量使用翻译文案");
@@ -133,13 +135,13 @@ try {
   assert.ok(find((node) => node.props.title === t("confirm.trash.title")), "回收菜单仍先打开确认弹窗");
   find((node) => node.children.includes(t("btn.cancel"))).props.onClick(); render();
   assert.ok(JSON.stringify(nodes()).includes("LONG_DESCRIPTION_global-one"), "展开来源后显示技能简介");
-  groups()[0].props.onChange([]); render();
+  nodes(groups()[0]).find((node) => node.props.className === "dssm-source-toggle").props.onClick(); render();
   assert.deepEqual(rows(), ["global-two"], "来源可独立折叠");
   change(t("search"), "two");
   assert.deepEqual(rows(), ["global-two"]);
   let toggleRequest;
   render();
-  assert.equal(find((node) => node.props?.block === true).props.options.length, 4, "仓库、回收站与两个技能视图同级");
+  assert.equal(find((node) => node.props.className === "dssm-scope-tabs").props.items.length, 4, "仓库、回收站与两个技能视图同级");
   data.trash.push(
     { id: "trash-a", name: "removed-a", deletedAt: "2026-09-12T00:00:00Z", root: { scope: "project", projectName: "A" } },
     { id: "trash-b", name: "removed-b", deletedAt: "2026-09-12T00:00:00Z", root: { scope: "user" } },
@@ -157,7 +159,7 @@ try {
   assert.equal(find((node) => node.props.className === "dssm-summary"), undefined);
   assert.equal(find((node) => node.children.includes(t("btn.create"))), undefined);
   assert.equal(find((node) => node.props.role === "tabpanel").props["aria-labelledby"], "dssm-tab-trash");
-  const trashTab = find((node) => node.props?.block === true).props.options.find((item) => item.value === "trash");
+  const trashTab = find((node) => node.props.className === "dssm-scope-tabs").props.items.find((item) => item.value === "trash");
   assert.equal([].concat(trashTab.label).find((node) => node?.props?.className === "dssm-trash-count").children[0], 2);
   find((node) => node.props["aria-label"] === t("btn.restore")).props.onClick();
   await new Promise((resolve) => setImmediate(resolve)); render();

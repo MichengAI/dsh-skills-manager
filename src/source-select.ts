@@ -68,7 +68,7 @@ export function createSourceSelect(react: typeof React) {
     const selectedOption = props.options.find(function (opt) { return opt.value === props.value; });
     const currentText = selectedOption ? selectedOption.label : props.label;
 
-    return h("div", { className: "dssm-menu-select-wrap ant-select dssm-antd-select" },
+    return h("div", { className: "dssm-menu-select-wrap" },
       h(Menu, {
         open: open,
         onClose: function () { setOpen(false); },
@@ -88,7 +88,7 @@ export function createSourceSelect(react: typeof React) {
           "aria-label": props.label,
           "aria-expanded": open,
           disabled: props.disabled,
-          className: "dssm-menu-select-trigger ant-select-selector" + (open ? " is-open" : ""),
+          className: "dssm-menu-select-trigger" + (open ? " is-open" : ""),
           onClick: function () {
             if (!props.disabled) setOpen(function (prev) { return !prev; });
           },

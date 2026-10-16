@@ -189,7 +189,8 @@ assert.doesNotMatch(clientSource, /installedSkills:\s*allRoots\.flatMap/, "客�
 assert.equal(repoSource.includes('.dssm-repo-row:first-child{border-top:0}'), false, "仓库第一条技能必须保留标题下方分隔线");
 assert.equal(/\.dssm-repo-description\{[^}]*line-height:18px/.test(repoSource), true, "仓库描述行高与全局技能的 18px 一致");
 assert.equal(repoSource.includes("▾") || repoSource.includes("▸"), false, "仓库折叠不再用文字三角");
-assert.match(repoSource, /h\(Collapse,/, "仓库折叠使用和全局技能相同的 Collapse，带箭头和展开动画");
+assert.match(repoSource, /dssm-source-toggle/, "仓库折叠是受控按钮，展开状态立刻落地");
+assert.doesNotMatch(repoSource, /h\(Collapse,/, "仓库折叠不再使用 Ant Collapse");
 assert.deepEqual(Object.keys(repositoryLocales.en).sort(), Object.keys(repositoryLocales.zh).sort(), "中英文词条必须同步");
 assert.equal(repoSource.includes("SKILLSH_TOP10") || repoSource.includes("CLAWHUB_TOP10"), false, "线上目录榜单不再硬编码静态条目");
 const allowedDestinationKeys = ["dsh", "agents"];
@@ -226,10 +227,11 @@ assert.deepEqual(toolbar.children[1].children[0].props.options.map(o => o.value)
 assert.equal(toolbar.children[2].type, Input);
 assert.equal(toolbar.children[2].props.allowClear, true, "保留搜索清空按钮");
 for (const action of toolbar.children[3].children) {
-  assert.equal(action.props.type, "text", "发现页搜索旁按钮使用中性图标样式");
+  assert.equal(action.props.variant, "outline", "发现页搜索旁按钮与技能行同为带框样式");
+  assert.equal(action.props.className, "dssm-row-icon", "发现页搜索旁按钮复用技能行边框样式");
   assert.equal(action.props.style.backgroundColor, undefined, "发现页搜索旁按钮不设置强调底色");
-  assert.equal(action.props.style.width, 28, "发现页搜索旁按钮尺寸统一");
-  assert.equal(action.props.style.color, "var(--dsw-alias-label-secondary, #b9b9b9)", "发现页搜索旁按钮不使用强调色");
+  assert.equal(action.props.style.width, 22, "发现页搜索旁按钮与技能行同尺寸");
+  assert.equal(action.props.style.color, undefined, "发现页搜索旁按钮不内联强调色");
 }
 assert.equal(ui.content.children.some(n => n.props?.className === "dssm-search"), false, "搜索不再独占工具栏外的一行");
 const selectSubsource = async (key) => {
@@ -267,12 +269,13 @@ assert.ok(all().some(n => n.props.className === "dssm-meta-origin" && n.children
 const skillshRow = all().find(n => n.props.className === "dssm-repo-row" && nodes(n).some(child => child.props.className === "dssm-name" && child.children.join("") === "React Skill"));
 const skillshActions = nodes(skillshRow).filter(n => n.props["aria-label"] === "repo.detail" || n.props["aria-label"] === "repo.install");
 assert.deepEqual(skillshActions.map(n => n.props["aria-label"]), ["repo.detail", "repo.install"], "skills.sh 每一行右侧是详情和安装");
-assert.ok(skillshActions.every(button => button.props.icon && button.children.length === 0 && button.props.type !== "text" && button.props.size === "small" && button.props.className === "dssm-row-icon" && button.props.style.width === 22 && button.props.style.height === 22), "目录行操作使用和图2相同的描边图标按钮");
+assert.ok(skillshActions.every(button => button.props.icon && button.children.length === 0 && button.props.type !== "text" && (button.props.size === "small" || button.props.size === "sm") && button.props.className.includes("dssm-row-icon") && button.props.style.width === 22 && button.props.style.height === 22), "目录行操作使用和图2相同的描边图标按钮");
 assert.match(repoSource, /\.dssm-repo-head \.dssm-repo-actions\{[^}]*gap:8px/, "发现页行内按钮间距和回收站一样是 8px");
 assert.match(repoSource, /\.dssm-repo-actions>\.dssm-repo-copy-actions\{display:contents\}/, "卸载不能再套一层掉到安装位置下一行");
 assert.doesNotMatch(repoSource, /\.dssm-repo-head \.dssm-repo-actions\{[^}]*align-self:flex-start/, "行内按钮和标题说明垂直居中，不贴在标题顶上");
 assert.doesNotMatch(repoSource, /\.dssm-repo-row:has\(\.dssm-repo-head\)\{[^}]*padding-right:8px/, "发现页右侧留白和回收站一样，不收成 8px");
-assert.match(repoSource, /\.dssm-row-icon\.ant-btn:not\(:disabled\):not\(\.dssm-icon-danger\):hover\{[^}]*--dsw-alias-link/, "行内图标悬停变蓝");
+assert.match(repoSource, /\.dssm-row-icon:not\(:disabled\):not\(\.dssm-icon-danger\):hover\{[^}]*--dsw-alias-link/, "行内图标悬停变蓝");
+assert.doesNotMatch(repoSource, /ant-btn|ant-collapse|ant-select|dssm-antd-select/, "仓库界面不再保留 ant 选择器");
 await clickNode(skillshActions[0]);
 assert.deepEqual(calls.at(-1), { path: "/catalog/detail", body: { catalog: "skillsh", source: "owner/skills", skillId: "react-skill", name: "React Skill" } }, "详情读取这一条 skills.sh 技能，不订阅仓库");
 assert.equal(modalNodes().find(n => n.type === Input.TextArea)?.props.value, "# React Skill", "详情展示该技能的真实说明");
@@ -456,7 +459,7 @@ assert.notEqual(rowAction("repo.install").props.type, "primary", "安装按钮�
 assert.ok(rowAction("repo.detail").props.icon && rowAction("repo.install").props.icon, "仓库行的详情和安装是图标");
 assert.equal(rowAction("repo.detail").children.includes("repo.detail"), false, "详情不显示文字");
 assert.equal(rowAction("repo.install").children.includes("repo.install"), false, "安装不显示文字");
-assert.equal(toolbar.children[3].children.find(n => isAction(n, "repo.add")).props.type, "text", "搜索旁添加仓库按钮使用中性图标样式");
+assert.equal(toolbar.children[3].children.find(n => isAction(n, "repo.add")).props.variant, "outline", "搜索旁添加仓库按钮与技能行同为带框样式");
 assert.doesNotMatch(all().filter(n => n.type === "style").map(n => n.children.join("")).join(""), /\.dssm-repo-emphasis/, "主按钮不再套灰描边");
 assert.ok(rowAction("repo.conflict").props.disabled, "未跟踪的同名冲突不能卸载");
 assert.equal(rowAction("repo.uninstall"), undefined);
@@ -491,10 +494,11 @@ const manageActions = nodes(manageRow).find(n => n.props.className === "dssm-rep
 assert.ok(manageActions, "管理仓库的刷新和移除必须在标题右侧操作区");
 assert.equal(manageRow.children.at(-1), manageActions, "按钮不能单独堆在说明下面");
 for (const key of ["repo.refresh", "repo.remove"]) assert.ok(manageActions.children.some(n => isAction(n, key)), key + " 必须和仓库信息同一行");
+assert.ok(manageActions.children.every(n => n.props.icon && !n.children.includes("repo.refresh") && !n.children.includes("repo.remove")), "管理仓库行使用纯图标，不显示文字按钮");
 assert.match(repoSource, /\.dssm-repo-manage-row\{[^}]*flex-direction:row/, "管理仓库行横向排列，按钮不能被拉成整行");
 holdRefresh = true; failRefresh = true;
 await clickModal("repo.refresh");
-assert.ok(modalNodes().some(n => n.props.className === "dssm-repo-spinner"), "管理弹窗中的当前仓库也显示动画");
+assert.ok(modalNodes().some(n => n.props.className === "dssm-repo-spinner" || n.props.icon?.props?.className === "dssm-repo-spinner"), "管理弹窗中的当前仓库也显示动画");
 finishRefresh(); await settle(); holdRefresh = false; failRefresh = false;
 assert.equal(find(n => n.props.className === "dssm-repo-spinner"), undefined, "失败后停止动画");
 assert.ok(find(n => n.props.role === "alert" && n.children.includes("仓库网络失败")), "失败提示保留");

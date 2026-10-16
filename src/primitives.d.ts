@@ -44,4 +44,43 @@ declare module '@deepseek-ai/dsh-client-ui-primitives' {
     className?: string
     listClassName?: string
   }): ReactElement
+
+  import type { InputHTMLAttributes } from 'react'
+  export function Input(props: {
+    icon?: ReactNode
+    className?: string
+    allowClear?: boolean
+    onPressEnter?: (event: React.KeyboardEvent<HTMLInputElement>) => void
+  } & InputHTMLAttributes<HTMLInputElement>): ReactElement
+
+  export interface SegmentedTab<Value extends string = string> {
+    value: Value
+    label: ReactNode
+    id: string
+    panelId: string
+  }
+  export function SegmentedTabs<Value extends string>(props: {
+    items: readonly SegmentedTab<Value>[]
+    value: Value
+    onChange: (value: Value) => void
+    label: string
+    className?: string
+  }): ReactElement
+
+  export function Modal(props: {
+    open?: boolean
+    onClose?: () => void
+    title?: ReactNode
+    closeLabel?: string
+    description?: string
+    children?: ReactNode
+    footer?: ReactNode
+    className?: string
+    contentClassName?: string
+    headless?: boolean
+    width?: number | string
+    zIndex?: number
+    backdropBlur?: boolean
+    keyboard?: boolean
+  }): ReactElement | null
 }

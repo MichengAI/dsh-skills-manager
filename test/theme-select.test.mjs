@@ -1,13 +1,7 @@
-// 筛选下拉和操作菜单走 Ant Design，不再自绘触发器。
+// 筛选下拉走宿主 Menu。设置页不再引入 Ant。
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { handleSourceMenuEscape } from "../src/source-select-model.ts";
-import { antdThemeConfig, antdThemeCss } from "../src/antd-theme.ts";
-
-assert.deepEqual(antdThemeConfig.cssVar, { key: "dssm-theme", prefix: "dssm-ant" }, "Ant 变量必须隔离于宿主及其他插件");
-assert.deepEqual([antdThemeConfig.token.borderRadiusXS, antdThemeConfig.token.borderRadiusSM, antdThemeConfig.token.borderRadius, antdThemeConfig.token.borderRadiusLG], [4, 8, 12, 16], "兜底圆角显式采用官方尺度，不依赖 Ant 自动派生");
-assert.ok(!/data-dsh-glass|data-ds-dark-theme/.test(antdThemeCss), "适配层不认领第三方主题作用域，也不新增独立明暗配色");
-assert.ok(antdThemeCss.includes("--dsw-menu-surface-fill") && antdThemeCss.includes("--dsw-elevation-panel"), "浮层材质归宿主主题所有");
 
 const selectSource = await readFile(new URL("../src/source-select.ts", import.meta.url), "utf8");
 assert.ok(selectSource.includes("align: \"start\""), "筛选下拉对齐触发器起始边缘展开");
@@ -36,7 +30,7 @@ assert.ok(!source.includes('h("input", { className: "dssm-control'), "可见文�
 assert.ok(!source.includes("dssm-fallback-switch"), "开关不再保留自绘兜底");
 assert.ok(!source.includes("dssm-host-modal"), "弹窗不再套一层自绘外壳");
 assert.ok(source.includes('className: "dssm-row-state"'), "状态与开关必须在同一组");
-assert.ok(!source.includes("dsh-client-ui-primitives"), "设置页不再依赖宿主界面组件");
+assert.ok(source.includes("@deepseek-ai/dsh-client-ui-primitives"), "设置页直接使用宿主原语");
 const updater = await readFile(new URL("../src/plugin-update-ui.ts", import.meta.url), "utf8");
 assert.ok(updater.includes("handlePluginUpdateEscape"), "更新弹窗仍拦截 Escape");
 assert.match(
@@ -54,4 +48,4 @@ assert.match(destination, /\.dssm-destination-path\{[^}]*border-radius:var\(--ds
 assert.match(updater, /\.mpi-command\{[^}]*border-radius:var\(--dsw-radius-lg/, "更新弹窗代码框采用官方代码块档位");
 assert.ok(!/background:var\(--dsw-alias-bg-layer-\d,#[\da-f]+\)/i.test(source + repository + destination + updater), "背景不再引入独立的深色实心兜底");
 assert.ok(!/borderRadius: 6/.test(source + selectSource + repository), "行内按钮不能以内联值绕过统一圆角");
-console.log("Ant Design 筛选与宿主样式契约检查通过");
+console.log("宿主筛选与样式契约检查通过");

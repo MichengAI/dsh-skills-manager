@@ -346,7 +346,8 @@ ok(
   "search sits on the same row after the compact source and status menus",
 );
 ok(
-  clientSource.includes("block: true") &&
+  clientSource.includes("SegmentedTabs") &&
+    clientSource.includes("dssm-scope-tabs") &&
     clientSource.includes('className: "dssm-sources"'),
   "settings panel separates scopes and renders a skill list",
 );

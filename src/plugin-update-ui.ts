@@ -1,7 +1,6 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
-import { antdLocaleFromDocument } from "./antd-locale.js";
-import { AntdProvider, Button, PrimitiveButton, Modal, Progress } from "./antd-ui.js";
+import { Button as PrimitiveButton, Modal } from "@deepseek-ai/dsh-client-ui-primitives";
 import { createUpdateFlow, handlePluginUpdateEscape, manualPluginUpdateCommand, pluginUpdateCopy, type UpdatePayload } from "./plugin-update-model.js";
 
 interface UpdateUIOptions { endpoint: string; packageName: string; titleRowSelector: string; linksSelector: string; zhName: string; enName: string; createIcon: (name: "refresh" | "download" | "copy" | "close") => HTMLElement }
@@ -10,7 +9,12 @@ const UPDATE_HEADER = "x-michengai-plugin-update";
 const STYLE_ID = "michengai-plugin-update-ui";
 const CSS = `
 .mpi-version{margin-left:8px;color:var(--dsw-alias-label-tertiary,#a0a0a0);font-family:inherit;font-size:12px;font-weight:500;line-height:18px;letter-spacing:0;white-space:nowrap;vertical-align:baseline}.mpi-check-host{display:inline-flex;align-items:center}.mpi-icon{display:inline-flex;flex:0 0 auto;width:16px;height:16px;align-items:center;justify-content:center;pointer-events:none}.mpi-icon svg{display:block;width:16px;height:16px}
-.mpi-intro{margin:0 0 16px;color:var(--dsw-alias-label-secondary,#b9b9b9);font-size:13px;line-height:20px}.mpi-meta{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:8px 18px;margin:0 0 16px;font-size:12px;line-height:18px}.mpi-meta dt{color:var(--dsw-alias-label-secondary,#b9b9b9)}.mpi-meta dd{margin:0}.mpi-mono{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}.mpi-latest{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 10px}.mpi-status{font-size:13px;font-weight:600;line-height:18px}.mpi-status[data-kind=error]{color:var(--dsw-alias-state-error-primary,#ef7272)}.mpi-status[data-kind=success]{color:var(--dsw-alias-state-success-primary,#51b976)}.mpi-status[data-kind=update]{color:#e8b15a !important}.mpi-manual{border-top:0.5px solid var(--dsw-alias-border-l2,#494949);padding-top:16px}.mpi-manual h3{margin:0 0 6px;font-size:14px;line-height:20px}.mpi-manual p{margin:0 0 10px;color:var(--dsw-alias-label-secondary,#b9b9b9);font-size:12px;line-height:18px}.mpi-command{display:flex;align-items:flex-start;gap:8px;border:0.5px solid var(--dsw-alias-border-l2,#494949);border-radius:var(--dsw-radius-lg,16px);padding:10px;background:var(--dsw-alias-bg-layer-1,var(--dsw-alias-interactive-bg-hover,transparent))}.mpi-command code{min-width:0;flex:1;overflow:visible;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:12px;line-height:18px;white-space:pre-wrap;overflow-wrap:anywhere}@media(max-width:560px){.mpi-meta{grid-template-columns:1fr;gap:2px}.mpi-meta dd{margin-bottom:6px}}
+.mpi-intro{margin:0 0 16px;color:var(--dsw-alias-label-secondary,#b9b9b9);font-size:13px;line-height:20px}.mpi-meta{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:8px 18px;margin:0 0 16px;font-size:12px;line-height:18px}.mpi-meta dt{color:var(--dsw-alias-label-secondary,#b9b9b9)}.mpi-meta dd{margin:0}.mpi-mono{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}.mpi-latest{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 10px}.mpi-status{font-size:13px;font-weight:600;line-height:18px}.mpi-status[data-kind=error]{color:var(--dsw-alias-state-error-primary,#ef7272)}.mpi-status[data-kind=success]{color:var(--dsw-alias-state-success-primary,#51b976)}.mpi-status[data-kind=update]{color:#e8b15a !important}.mpi-manual{border-top:0.5px solid var(--dsw-alias-border-l2,#494949);padding-top:16px}.mpi-manual h3{margin:0 0 6px;font-size:14px;line-height:20px}.mpi-manual p{margin:0 0 10px;color:var(--dsw-alias-label-secondary,#b9b9b9);font-size:12px;line-height:18px}.mpi-command{display:flex;align-items:flex-start;gap:8px;border:0.5px solid var(--dsw-alias-border-l2,#494949);border-radius:var(--dsw-radius-lg,16px);padding:10px;background:var(--dsw-alias-bg-layer-1,var(--dsw-alias-interactive-bg-hover,transparent))}.mpi-command code{min-width:0;flex:1;overflow:visible;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:12px;line-height:18px;white-space:pre-wrap;overflow-wrap:anywhere}
+.dssm-update-progress{height:4px;border-radius:2px;background:var(--dsw-alias-border-l1,#3a3a3a);overflow:hidden;margin:12px 0;position:relative}
+.dssm-update-progress-bar{height:100%;width:40%;background:var(--dsw-alias-button-primary-fill,#4176e6);border-radius:2px;animation:dssm-progress-slide 1.4s ease-in-out infinite}
+@keyframes dssm-progress-slide{0%{transform:translateX(-100%)}100%{transform:translateX(300%)}}
+@media (prefers-reduced-motion:reduce){.dssm-update-progress-bar{animation:none;width:100%;opacity:.6}}
+@media(max-width:560px){.mpi-meta{grid-template-columns:1fr;gap:2px}.mpi-meta dd{margin-bottom:6px}}
 `;
 function ensureStyle() {
   if (document.getElementById(STYLE_ID) !== null) return;
@@ -61,12 +65,11 @@ function UpdateDialog(props: { flow: ReturnType<typeof createUpdateFlow>; packag
   const name = lang.toLowerCase().startsWith("zh") ? props.zhName : props.enName;
   const command = manualPluginUpdateCommand(view.profileRaw, props.packageName, view.latestRaw);
   const copyLabel = copyState === "copied" ? view.copy.copied : copyState === "failed" ? view.copy.copyFailed : view.copy.copy;
-  return React.createElement(AntdProvider, { locale: antdLocaleFromDocument() }, React.createElement(Modal, {
-    open: true, className: "mpi-dialog", width: 680, zIndex: 1200, title: `${name} ${view.copy.update}`, keyboard: false, destroyOnHidden: true, onCancel: props.onClose,
-    afterOpenChange: (open: boolean) => { if (open && bodyRef.current) { bodyRef.current.tabIndex = -1; bodyRef.current.focus(); } },
+  return React.createElement(Modal, {
+    open: true, className: "mpi-dialog", width: 680, zIndex: 1200, title: `${name} ${view.copy.update}`, keyboard: false, onClose: props.onClose, closeLabel: "Close",
     footer: [
-      React.createElement(Button, { key: "check", disabled: view.busy, loading: view.busy && !view.loading, onClick: () => { void props.flow.check(); } }, view.copy.recheck),
-      React.createElement(Button, { key: "update", type: "primary", disabled: view.disabled, loading: view.loading, onClick: () => { void props.flow.update(); } }, view.updateLabel),
+      React.createElement(PrimitiveButton, { key: "check", variant: "outline", size: "sm", disabled: view.busy, onClick: () => { void props.flow.check(); } }, view.copy.recheck),
+      React.createElement(PrimitiveButton, { key: "update", variant: "primary", size: "sm", disabled: view.disabled, onClick: () => { void props.flow.update(); } }, view.updateLabel),
     ],
   }, React.createElement("div", { ref: bodyRef },
     React.createElement("p", { className: "mpi-intro" }, view.copy.intro),
@@ -74,17 +77,19 @@ function UpdateDialog(props: { flow: ReturnType<typeof createUpdateFlow>; packag
       React.createElement("dt", null, view.copy.current), React.createElement("dd", null, React.createElement("span", { className: "mpi-mono" }, view.currentVersion)),
       React.createElement("dt", null, view.copy.latestLabel), React.createElement("dd", { className: "mpi-latest" }, React.createElement("span", { className: "mpi-mono" }, view.latestVersion), React.createElement("span", { className: "mpi-status", role: "status", "data-kind": view.kind, ...(view.kind === "update" ? { style: { color: "#e8b15a" } } : {}) }, view.message)),
       React.createElement("dt", null, view.copy.profile), React.createElement("dd", null, React.createElement("span", { className: "mpi-mono" }, view.profileName))),
-    view.busy ? React.createElement(Progress, { percent: 100, showInfo: false, status: "active" }) : null,
+    view.busy ? React.createElement("div", { className: "dssm-update-progress", role: "progressbar", "aria-busy": "true" },
+      React.createElement("div", { className: "dssm-update-progress-bar" })
+    ) : null,
     React.createElement("section", { className: "mpi-manual" },
       React.createElement("h3", null, view.copy.manual),
       React.createElement("p", null, view.copy.manualHint),
       React.createElement("div", { className: "mpi-command" },
         React.createElement("code", null, command),
-        React.createElement(Button, { disabled: view.busy, onClick: () => {
+        React.createElement(PrimitiveButton, { variant: "outline", size: "sm", disabled: view.busy, onClick: () => {
           const write = navigator.clipboard?.writeText(command);
           if (write === undefined) { setCopyState("failed"); return; }
           void write.then(() => { setCopyState("copied"); window.setTimeout(() => setCopyState("idle"), 1400); }).catch(() => setCopyState("failed"));
-        } }, copyLabel))))));
+        } }, copyLabel)))));
 }
 
 function observePluginUpdate(options: UpdateUIOptions) {

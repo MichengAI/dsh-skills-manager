@@ -34,7 +34,7 @@ for (const locale of Object.values(destinationLocales)) assert.equal(Object.keys
 // 1b. 写入表单不是紧凑筛选栏：两列等宽，下拉铺满，实际路径保留独立框。
 const rule = (selector) => destinationCss.slice(destinationCss.indexOf(selector + "{") + selector.length + 1).split("}")[0];
 assert.match(rule(".dssm-destination-pair"), /grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/, "两个下拉的表单列必须等宽");
-const selectRule = rule(".dssm-destination-pair .dssm-antd-select");
+const selectRule = rule(".dssm-destination-pair .dssm-menu-select-wrap");
 assert.match(selectRule, /(?:^|;)width:100%(?:;|$)/, "目标下拉必须铺满各自列，不能按文字收缩");
 assert.match(selectRule, /min-width:0(?:;|$)/, "长工作区名称不能撑破表单列");
 const pathRule = rule(".dssm-destination-path");

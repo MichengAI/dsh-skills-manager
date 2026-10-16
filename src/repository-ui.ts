@@ -13,7 +13,7 @@ type InstallRoot = RepositoryRoot;
 type Installation = Feedback & CopyTarget & {id: string; path: string; pending?: boolean; action?: 'install' | 'uninstall'};
 type CatalogCopy = { id: string; name: string; installedRoot: RepositoryRoot; installedWorkspace?: string; canUninstall?: boolean };
 type RepoModal = {type: 'add' | 'manage'} | {type: 'remove'; repo: RepoView} | {type: 'install' | 'uninstall'; repo: RepoView; skill: RepoSkill; copy?: RepoCopy} | {type: 'detail'; repo: RepoView; detail?: ApiRoutes['/repositories/detail']; loading?: boolean; failed?: boolean} | {type: 'catalog-detail'; detail?: ApiRoutes['/catalog/detail']; loading?: boolean; failed?: boolean} | {type: 'catalog-install'; target: CatalogTarget} | {type: 'catalog-uninstall'; copy: CatalogCopy} | {type: 'review' | 'rollback'; repo: RepoView; skill: RepoSkill; copy: RepoCopy; detail: ApiRoutes['/repositories/preview']};
-interface Dependencies {react: typeof React; Modal: React.ComponentType<ModalProps>; Input: React.ComponentType<any> & { TextArea: React.ComponentType<any> }; Button: React.ComponentType<any>; Collapse: React.ComponentType<any>; SourceSelect: React.ComponentType<SourceSelectProps>; destination: DestinationKit; api: ApiCall; headers: Record<string, string>; translateError: (t: Translate, error: unknown) => string; getLocale?: () => string | undefined}
+interface Dependencies {react: typeof React; Modal: React.ComponentType<ModalProps>; Input: React.ComponentType<any> & { TextArea: React.ComponentType<any> }; Button: React.ComponentType<any>; SourceSelect: React.ComponentType<SourceSelectProps>; destination: DestinationKit; api: ApiCall; headers: Record<string, string>; translateError: (t: Translate, error: unknown) => string; getLocale?: () => string | undefined}
 import type { CodedError } from "./types.js";
 // 仓库页复用宿主技能面板组件；只在进入页签时读取本地目录缓存。
 export const repositoryLocales = {
@@ -77,7 +77,7 @@ const CSS = `
 .dssm-catalog-sentinel{height:1px}.dssm-catalog-loading{display:flex;align-items:center;justify-content:center;gap:8px;padding:12px 13px;color:var(--dsw-alias-label-tertiary,#a0a0a0);font-size:12px;border-top:0.5px solid var(--dsw-alias-border-l1,#3a3a3a)}.dssm-catalog-loading .dssm-repo-spinner{margin-right:0}
 .dssm-meta-origin{color:var(--dsw-alias-label-secondary,#8e8e8e);font-size:11px;margin-top:2px}
 .dssm-status-badge{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:var(--dsw-radius-sm,8px)}
-.dssm-repo-row .dssm-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;font-weight:650;color:var(--dsw-alias-label-primary,#eeeeee)}.dssm-repo-row{display:flex;flex-direction:column;gap:6px;padding:11px 13px;border-top:0.5px solid var(--dsw-alias-border-l1,#3a3a3a);background:transparent}.dssm-repo-head{display:flex;align-items:center;gap:8px;min-width:0;flex-wrap:nowrap}.dssm-repo-actions{display:flex;align-items:center;gap:8px;flex:none;flex-wrap:nowrap}.dssm-repo-actions button{flex:none}.dssm-repo-actions .dssm-repo-copy-actions{gap:8px;margin-left:0}.dssm-repo-main{flex:1;min-width:0}.dssm-repo-main>.dssm-repo-metadata{margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dssm-repo-description{margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--dsw-alias-label-tertiary,#a0a0a0);font-size:12px;line-height:18px}.dssm-repo-copies{display:flex;flex-direction:column;gap:2px;min-width:0}.dssm-repo-copy{display:flex;align-items:center;gap:8px;min-width:0;padding:0;border:0;background:transparent}.dssm-repo-copy .dssm-repo-metadata{font-size:12px;line-height:18px}.dssm-repo-copy-actions{display:flex;align-items:center;gap:8px;margin-left:auto;flex:none}.dssm-repo-spinner{display:inline-block;width:12px;height:12px;margin-right:6px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;corner-shape:round;animation:dssm-repo-spin .8s linear infinite}@keyframes dssm-repo-spin{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.dssm-repo-spinner{animation:none}}.dssm-repo-commit-badge{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,\"Liberation Mono\",\"Courier New\",monospace;font-size:11px;line-height:16px;padding:1px 6px;border-radius:var(--dsw-radius-xs,4px);background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-secondary,#b9b9b9);border:0.5px solid var(--dsw-alias-border-l1,#3a3a3a);margin-left:12px;white-space:nowrap;user-select:all}.dssm-repo-panel{display:flex;flex-direction:column;gap:12px;min-width:0}.dssm-repo-panel .dssm-desc{margin:0}.dssm-repo-metadata{font-size:11px;color:var(--dsw-alias-label-tertiary,#a0a0a0);overflow-wrap:anywhere}.dssm-repo-panel .dssm-source{flex-shrink:0;overflow:hidden;border:0.5px solid var(--dsw-alias-border-l2,#494949);border-radius:var(--dsw-radius-xl,20px);background:transparent}.dssm-repo-panel .dssm-source .ant-collapse-header{align-items:center}.dssm-repo-panel .dssm-source-title{font-size:14px;font-weight:650;overflow-wrap:anywhere;display:inline-flex;align-items:center;gap:7px}.dssm-repo-panel .dssm-source-brand{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;flex-shrink:0;color:var(--dsw-alias-label-secondary,#b9b9b9)}.dssm-repo-panel .dssm-source-brand svg{width:16px;height:16px;display:block}.dssm-repo-panel .dssm-source-path{min-width:0;margin-left:auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--dsw-alias-label-tertiary,#a0a0a0);font-size:11px}.dssm-repo-panel .dssm-count{padding:1px 6px;border-radius:999px;corner-shape:round;background:var(--dsw-alias-bg-layer-2,rgba(255,255,255,0.08));font-size:11px;color:var(--dsw-alias-label-secondary,#b9b9b9)}.dssm-repo-manage-row{flex-direction:row;align-items:center;justify-content:space-between;gap:12px}.dssm-repo-manage-row .dssm-repo-main{flex:1}.dssm-repo-manage-row .dssm-repo-actions{margin-left:auto}.dssm-repo-manage-row .dssm-repo-actions button{width:auto;flex:none}.dssm-repo-head .dssm-repo-actions{gap:8px}.dssm-repo-actions>.dssm-repo-copy-actions{display:contents}.dssm-row-icon.ant-btn{width:22px;min-width:22px;height:22px;padding:0;border-radius:var(--dsw-radius-sm,8px);background:transparent;color:var(--dsw-alias-label-secondary,#b9b9b9);border-color:var(--dsw-alias-border-l2,#494949)}.dssm-row-icon.ant-btn:not(:disabled):not(.dssm-icon-danger):hover{--ant-btn-text-color:var(--dsw-alias-link,#4176e6);--ant-btn-border-color:var(--dsw-alias-link,#4176e6);color:var(--dsw-alias-link,#4176e6)!important;border-color:var(--dsw-alias-link,#4176e6)!important}.dssm-row-icon.dssm-icon-danger,.dssm-row-icon.ant-btn-dangerous{color:var(--dsw-alias-state-error-primary,#ef7272);border-color:var(--dsw-alias-state-error-primary,#ef7272)}.dssm-repo-copies{display:flex;flex-direction:column;gap:4px;width:100%;margin-top:2px}.dssm-repo-copy{display:flex;align-items:center;gap:8px;width:100%;min-width:0;box-sizing:border-box;padding:4px 4px 4px 8px;border-radius:var(--dsw-radius-md,12px);background:var(--dsw-alias-bg-layer-1,rgba(255,255,255,0.04))}.dssm-repo-copy .dssm-repo-metadata{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dssm-repo-copy .dssm-repo-copy-actions{margin-left:0}.dssm-repo-copy .dssm-row-icon.dssm-icon-danger{border-color:var(--dsw-alias-border-l2,#494949)}.dssm-repo-copy .dssm-row-icon.dssm-icon-danger:not(:disabled):hover{--ant-btn-text-color:var(--dsw-alias-state-error-primary,#ef7272);--ant-btn-border-color:var(--dsw-alias-state-error-primary,#ef7272);color:var(--dsw-alias-state-error-primary,#ef7272)!important;border-color:var(--dsw-alias-state-error-primary,#ef7272)!important}`;
+.dssm-repo-row .dssm-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;font-weight:650;color:var(--dsw-alias-label-primary,#eeeeee)}.dssm-repo-row{display:flex;flex-direction:column;gap:6px;padding:11px 13px;border-top:0.5px solid var(--dsw-alias-border-l1,#3a3a3a);background:transparent}.dssm-repo-head{display:flex;align-items:center;gap:8px;min-width:0;flex-wrap:nowrap}.dssm-repo-actions{display:flex;align-items:center;gap:8px;flex:none;flex-wrap:nowrap}.dssm-repo-actions button{flex:none}.dssm-repo-actions .dssm-repo-copy-actions{gap:8px;margin-left:0}.dssm-repo-main{flex:1;min-width:0}.dssm-repo-main>.dssm-repo-metadata{margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dssm-repo-description{margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--dsw-alias-label-tertiary,#a0a0a0);font-size:12px;line-height:18px}.dssm-repo-copies{display:flex;flex-direction:column;gap:2px;min-width:0}.dssm-repo-copy{display:flex;align-items:center;gap:8px;min-width:0;padding:0;border:0;background:transparent}.dssm-repo-copy .dssm-repo-metadata{font-size:12px;line-height:18px}.dssm-repo-copy-actions{display:flex;align-items:center;gap:8px;margin-left:auto;flex:none}.dssm-repo-spinner{display:inline-block;width:12px;height:12px;margin-right:6px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;corner-shape:round;animation:dssm-repo-spin .8s linear infinite}@keyframes dssm-repo-spin{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.dssm-repo-spinner{animation:none}}.dssm-repo-commit-badge{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,\"Liberation Mono\",\"Courier New\",monospace;font-size:11px;line-height:16px;padding:1px 6px;border-radius:var(--dsw-radius-xs,4px);background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-secondary,#b9b9b9);border:0.5px solid var(--dsw-alias-border-l1,#3a3a3a);margin-left:12px;white-space:nowrap;user-select:all}.dssm-repo-panel{display:flex;flex-direction:column;gap:12px;min-width:0}.dssm-repo-panel .dssm-desc{margin:0}.dssm-repo-metadata{font-size:11px;color:var(--dsw-alias-label-tertiary,#a0a0a0);overflow-wrap:anywhere}.dssm-repo-panel .dssm-source{flex-shrink:0;overflow:hidden;border:0.5px solid var(--dsw-alias-border-l2,#494949);border-radius:var(--dsw-radius-xl,20px);background:transparent}.dssm-repo-panel .dssm-source-title{font-size:14px;font-weight:650;overflow-wrap:anywhere;display:inline-flex;align-items:center;gap:7px}.dssm-repo-panel .dssm-source-brand{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;flex-shrink:0;color:var(--dsw-alias-label-secondary,#b9b9b9)}.dssm-repo-panel .dssm-source-brand svg{width:16px;height:16px;display:block}.dssm-repo-panel .dssm-source-path{min-width:0;margin-left:auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--dsw-alias-label-tertiary,#a0a0a0);font-size:11px}.dssm-repo-panel .dssm-count{padding:1px 6px;border-radius:999px;corner-shape:round;background:var(--dsw-alias-bg-layer-2,rgba(255,255,255,0.08));font-size:11px;color:var(--dsw-alias-label-secondary,#b9b9b9)}.dssm-repo-manage-row{flex-direction:row;align-items:center;justify-content:space-between;gap:12px}.dssm-repo-manage-row .dssm-repo-main{flex:1}.dssm-repo-manage-row .dssm-repo-actions{margin-left:auto}.dssm-repo-manage-row .dssm-repo-actions button{width:auto;flex:none}.dssm-repo-head .dssm-repo-actions{gap:8px}.dssm-repo-actions>.dssm-repo-copy-actions{display:contents}.dssm-row-icon{width:22px;min-width:22px;height:22px;padding:0;border-radius:var(--dsw-radius-sm,8px);background:transparent;color:var(--dsw-alias-label-secondary,#b9b9b9);border-color:var(--dsw-alias-border-l2,#494949)}.dssm-row-icon:not(:disabled):not(.dssm-icon-danger):hover{color:var(--dsw-alias-link,#4176e6)!important;border-color:var(--dsw-alias-link,#4176e6)!important}.dssm-row-icon.dssm-icon-danger{color:var(--dsw-alias-state-error-primary,#ef7272);border-color:var(--dsw-alias-state-error-primary,#ef7272)}.dssm-repo-copies{display:flex;flex-direction:column;gap:4px;width:100%;margin-top:2px}.dssm-repo-copy{display:flex;align-items:center;gap:8px;width:100%;min-width:0;box-sizing:border-box;padding:4px 4px 4px 8px;border-radius:var(--dsw-radius-md,12px);background:var(--dsw-alias-bg-layer-1,rgba(255,255,255,0.04))}.dssm-repo-copy .dssm-repo-metadata{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dssm-repo-copy .dssm-repo-copy-actions{margin-left:0}.dssm-repo-copy .dssm-row-icon.dssm-icon-danger{border-color:var(--dsw-alias-border-l2,#494949)}.dssm-repo-copy .dssm-row-icon.dssm-icon-danger:not(:disabled):hover{color:var(--dsw-alias-state-error-primary,#ef7272)!important;border-color:var(--dsw-alias-state-error-primary,#ef7272)!important}`;
 
 /** 返回动作区与内容区，使现有标题、页签顺序保持不变。 */
 
@@ -121,8 +121,12 @@ type ClawHubApiSearchResult = {
 };
 type ClawHubApiSearchResponse = { results?: ClawHubApiSearchResult[] };
 
-export function createRepositoryUI({ react, Modal, Input, Button, Collapse, SourceSelect, destination, api, headers, translateError, getLocale }: Dependencies) {
+export function createRepositoryUI({ react, Modal, Input, Button, SourceSelect, destination, api, headers, translateError, getLocale }: Dependencies) {
   const h = react.createElement;
+  function foldChevron(open: boolean) {
+    return h("svg", { className: "dssm-fold-chevron" + (open ? " is-open" : ""), viewBox: "0 0 16 16", width: 12, height: 12, fill: "none", stroke: "currentColor", strokeWidth: 1.5, "aria-hidden": true }, h("path", { d: "M4 6l4 4 4-4", strokeLinecap: "round", strokeLinejoin: "round" }));
+  }
+  const PrimitiveButton = Button;
   const { DestinationPicker, defaultDestination, destinationPayload, destinationReady } = destination;
   return function useRepositoryUI({ active, t, onInstalled }: {active: boolean; t: Translate; onInstalled?: () => unknown}) {
     const [repos, setRepos] = react.useState<RepoView[]>([]);
@@ -481,20 +485,47 @@ export function createRepositoryUI({ react, Modal, Input, Button, Collapse, Sour
         if (mounted.current) setCatalogLoading(false);
       };
     }, [active, subsource]);
-    function button(key: string, action: () => unknown, secondary = true, disabled = false, danger = false) { return h(Button, { type: secondary ? "default" : "primary", danger, disabled: busy || disabled, onClick: action }, t(key)); }
+    function button(key: string, action: () => unknown, secondary = true, disabled = false, danger = false) {
+      return h(PrimitiveButton, { variant: secondary ? "outline" : "primary", className: danger ? "dssm-btn-danger" : undefined, danger: danger ? true : undefined, disabled: busy || disabled, onClick: action }, t(key));
+    }
     function rowGlyph(d: string) {
       return h("svg", { viewBox: "0 0 16 16", width: 16, height: 16, "aria-hidden": true, focusable: "false" }, h("path", { d: d, fill: "none", stroke: "currentColor", strokeWidth: 1.5, strokeLinecap: "round", strokeLinejoin: "round" }));
     }
     function rowIcon(key: string, action: () => unknown, disabled = false) {
-      var danger = key === "repo.uninstall" || key === "repo.uninstalling";
+      var danger = key === "repo.uninstall" || key === "repo.uninstalling" || key === "repo.remove";
       var isSuccess = key === "repo.installed" || key === "repo.installedSuccess";
       var isWarn = key === "repo.conflict";
-      var icon = key === "repo.detail" ? "M4 2.5h5.2L12.5 5.8V13.5H4zM9.2 2.8V6h3.2" : key === "repo.installElsewhere" ? "M8 3v10M3 8h10" : key === "repo.installed" ? "M3.5 8.2 6.5 11.2 12.5 4.8" : key === "repo.review" ? "M2.5 8s2.2-3.5 5.5-3.5S13.5 8 13.5 8s-2.2 3.5-5.5 3.5S2.5 8 2.5 8M8 6.3a1.7 1.7 0 1 1 0 3.4 1.7 1.7 0 0 1 0-3.4" : key === "repo.rollback" ? "M3.5 6.5A4.5 4.5 0 1 1 5 11.5M3.5 3.5v3h3" : danger ? "M3.5 4.5h9M6.2 4.5V3.2h3.6v1.3M4.4 4.5l.6 8h6l.6-8" : isWarn ? "M8 2.5l5.5 10.5H2.5L8 2.5zm0 3.5v3.5m0 2v.5" : "M8 2.5v7M5.2 7.2 8 10l2.8-2.8M3.5 13.5h9";
-            return h(Button, Object.assign({ size: "small", className: "dssm-row-icon" + (danger ? " dssm-icon-danger" : isSuccess ? " dssm-icon-success" : isWarn ? " dssm-icon-warn" : ""), "aria-label": t(key), title: t(key), icon: rowGlyph(icon), disabled: busy || disabled, onClick: action, style: Object.assign({ width: 22, minWidth: 22, height: 22, padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center", borderRadius: "var(--dsw-radius-sm, 8px)" }, danger ? { color: "var(--dsw-alias-state-error-primary, #ef7272)" } : {}) }, danger ? { danger: true } : {}));
+      var icon = key === "repo.refresh" || key === "repo.refreshing" ? "M13.5 8A5.5 5.5 0 118 2.5c2.3 0 4.3 1.4 5.1 3.5m.4-3.5v3.5H10" : key === "repo.detail" ? "M4 2.5h5.2L12.5 5.8V13.5H4zM9.2 2.8V6h3.2" : key === "repo.installElsewhere" ? "M8 3v10M3 8h10" : key === "repo.installed" ? "M3.5 8.2 6.5 11.2 12.5 4.8" : key === "repo.review" ? "M2.5 8s2.2-3.5 5.5-3.5S13.5 8 13.5 8s-2.2 3.5-5.5 3.5S2.5 8 2.5 8M8 6.3a1.7 1.7 0 1 1 0 3.4 1.7 1.7 0 0 1 0-3.4" : key === "repo.rollback" ? "M3.5 6.5A4.5 4.5 0 1 1 5 11.5M3.5 3.5v3h3" : danger ? "M3.5 4.5h9M6.2 4.5V3.2h3.6v1.3M4.4 4.5l.6 8h6l.6-8" : isWarn ? "M8 2.5l5.5 10.5H2.5L8 2.5zm0 3.5v3.5m0 2v.5" : "M8 2.5v7M5.2 7.2 8 10l2.8-2.8M3.5 13.5h9";
+      return h(PrimitiveButton, Object.assign({ variant: "outline", size: "sm", className: "dssm-row-icon" + (danger ? " dssm-icon-danger" : isSuccess ? " dssm-icon-success" : isWarn ? " dssm-icon-warn" : ""), "aria-label": t(key), title: t(key), icon: rowGlyph(icon), disabled: busy || disabled, onClick: action, style: Object.assign({ width: 22, minWidth: 22, height: 22, padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center", borderRadius: "var(--dsw-radius-sm, 8px)" }, danger ? { color: "var(--dsw-alias-state-error-primary, #ef7272)" } : {}) }, danger ? { danger: true } : {}));
+    }
+    function openRemove(repo: RepoView) {
+      setModal({ type: "remove", repo });
+    }
+    function manageRefreshIcon(repo: RepoView) {
+      const pending = refreshing && refreshing.id === repo.id;
+      if (!pending) return rowIcon("repo.refresh", () => refresh([repo]));
+      return h(PrimitiveButton, {
+        variant: "outline",
+        size: "sm",
+        className: "dssm-row-icon",
+        disabled: true,
+        "aria-busy": true,
+        "aria-label": t("repo.refreshing"),
+        title: t("repo.refreshing"),
+        icon: h("span", { className: "dssm-repo-spinner", "aria-hidden": true }),
+        style: { width: 22, minWidth: 22, height: 22, padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center", borderRadius: "var(--dsw-radius-sm, 8px)" }
+      });
+    }
+    function manageRows() {
+      if (!repos.length) return h("div", { className: "dssm-empty" }, t("repo.empty"));
+      return repos.map((repo) => h("div", { key: repo.id, className: "dssm-repo-row dssm-repo-manage-row" },
+        h("div", { className: "dssm-repo-main" }, h("div", { className: "dssm-name" }, repo.owner + "/" + repo.name), h("div", { className: "dssm-note" }, [repo.ref || t("repo.defaultBranch"), repo.subdirectory].filter(Boolean).join(" · ")), h("div", { className: "dssm-repo-metadata" }, repo.refreshedAt ? t("repo.updated") + " · " + new Date(repo.refreshedAt).toLocaleString(getLocale?.() || t("format.locale")) : t("repo.notScanned"))),
+        h("div", { className: "dssm-repo-actions" }, manageRefreshIcon(repo), rowIcon("repo.remove", () => openRemove(repo)))
+      ));
     }
     function refreshButton(selected: RepoView[], row = false) {
       const pending = refreshing && (!row || refreshing.id === selected[0]?.id);
-      return h(Button, { type: "default", disabled: busy || !selected.length, "aria-busy": !!pending, onClick: () => refresh(selected) },
+      return h(PrimitiveButton, { variant: "outline", disabled: busy || !selected.length, "aria-busy": !!pending, onClick: () => refresh(selected) },
         pending ? h("span", { className: "dssm-repo-spinner", "aria-hidden": true }) : null, t(pending ? "repo.refreshing" : "repo.refresh"));
     }
     function close() { if (!locked.current) setModal(null); }
@@ -555,48 +586,47 @@ export function createRepositoryUI({ react, Modal, Input, Button, Collapse, Sour
       });
     }
     function toolbarIconButton(key: string, iconD: string, action: () => unknown) {
-      return h(Button, {
-        className: "dssm-icon-btn",
-        type: "text",
-        size: "small",
+      return h(PrimitiveButton, {
+        className: "dssm-row-icon",
+        variant: "outline",
+        size: "sm",
         disabled: busy,
         "aria-label": t(key),
         title: t(key),
         icon: rowGlyph(iconD),
         style: {
-          width: 28,
-          minWidth: 28,
-          height: 28,
+          width: 22,
+          minWidth: 22,
+          height: 22,
           padding: 0,
           display: "inline-flex",
           alignItems: "center",
           justifyContent: "center",
-          borderRadius: "var(--dsw-radius-sm, 8px)",
-          color: "var(--dsw-alias-label-secondary, #b9b9b9)"
+          borderRadius: "var(--dsw-radius-sm, 8px)"
         },
         onClick: action
       });
     }
     function refreshIconButton(selected: RepoView[]) {
       const pending = refreshing && refreshing.id === selected[0]?.id;
-      return h(Button, {
-        className: "dssm-icon-btn",
-        type: "text",
-        size: "small",
+      return h(PrimitiveButton, {
+        className: "dssm-row-icon",
+        variant: "outline",
+        size: "sm",
         disabled: busy || !selected.length,
         "aria-busy": !!pending,
         "aria-label": t(pending ? "repo.refreshing" : "repo.refresh"),
         title: t(pending ? "repo.refreshing" : "repo.refresh"),
         icon: pending ? h("span", { className: "dssm-repo-spinner", "aria-hidden": true }) : rowGlyph("M13.5 8A5.5 5.5 0 118 2.5c2.3 0 4.3 1.4 5.1 3.5m.4-3.5v3.5H10"),
         style: {
-          width: 28,
-          minWidth: 28,
-          height: 28,
+          width: 22,
+          minWidth: 22,
+          height: 22,
           padding: 0,
           display: "inline-flex",
           alignItems: "center",
           justifyContent: "center",
-          color: "var(--dsw-alias-label-secondary, #b9b9b9)"
+          borderRadius: "var(--dsw-radius-sm, 8px)"
         },
         onClick: () => refresh(selected)
       });
@@ -646,12 +676,9 @@ export function createRepositoryUI({ react, Modal, Input, Button, Collapse, Sour
                       copies.length ? h("div", { className: "dssm-repo-copies" }, copies.map(copy => renderCopy(repo, skill, copy))) : null);
       }) : h("div", { className: "dssm-empty" }, t("repo.noSkills"))) : null;
       return h("div", { key: repo.id },
-        h(Collapse, {
-          className: "dssm-source", bordered: false, styles: { body: { padding: 0 } }, activeKey: open ? [repo.id] : [],
-          onChange: (keys: string | string[]) => { const list = Array.isArray(keys) ? keys : [keys]; setExpanded({ ...expanded, [repo.id]: list.includes(repo.id) }); },
-          items: [{
-            key: repo.id,
-            label: h("div", { className: "dssm-source-label" },
+        h("section", { className: "dssm-source" },
+          h("div", { className: "dssm-source-head" },
+            h("button", { type: "button", className: "dssm-source-toggle", "aria-expanded": open, onClick: () => setExpanded({ ...expanded, [repo.id]: !open }) }, foldChevron(open), h("div", { className: "dssm-source-label" },
               h("span", { className: "dssm-source-brand", title: "GitHub Repository" },
                 h("svg", { viewBox: "0 0 16 16", width: 16, height: 16, fill: "currentColor" },
                   h("path", { d: "M8 0a8 8 0 0 0-2.53 15.59c.4.074.547-.173.547-.385 0-.19-.007-.693-.01-1.36-2.226.484-2.695-1.073-2.695-1.073-.364-.924-.89-1.17-.89-1.17-.726-.496.055-.486.055-.486.803.056 1.225.824 1.225.824.714 1.223 1.872.87 2.328.665.072-.517.28-.87.508-1.07-1.777-.202-3.645-.888-3.645-3.956 0-.874.31-1.588.823-2.148-.083-.202-.357-1.017.078-2.12 0 0 .672-.215 2.2.82A7.65 7.65 0 0 1 8 4.8c.68.003 1.365.092 2.004.27 1.527-1.035 2.197-.82 2.197-.82.437 1.103.162 1.918.08 2.12.513.56.822 1.274.822 2.148 0 3.076-1.872 3.752-3.654 3.95.288.248.544.735.544 1.482 0 1.07-.01 1.932-.01 2.195 0 .214.144.463.55.384A8.001 8.001 0 0 0 8 0Z" })
@@ -660,11 +687,9 @@ export function createRepositoryUI({ react, Modal, Input, Button, Collapse, Sour
               h("span", { className: "dssm-source-title" }, repo.owner + "/" + repo.name),
               h("span", { className: "dssm-count" }, skills.length),
               h("span", { className: "dssm-source-path", title: repo.owner + "/" + repo.name }, [repo.ref || t("repo.defaultBranchLabel"), repo.subdirectory].filter(Boolean).join(" · ") || (repo.owner + "/" + repo.name))
-            ),
-            extra: h("span", { className: "dssm-repo-commit-badge", title: repo.commit || t("repo.notScanned") }, repo.commit ? repo.commit.slice(0, 7) : t("repo.notScanned")),
-            children: body
-          }],
-        }),
+            )),
+            h("span", { className: "dssm-repo-commit-badge", title: repo.commit || t("repo.notScanned") }, repo.commit ? repo.commit.slice(0, 7) : t("repo.notScanned"))),
+          open ? h("div", { className: "dssm-source-body", role: "region" }, body) : null),
         repo.error ? h("div", { className: "dssm-feedback dssm-error", role: "alert" }, message(repo.error)) : null);
     });
     function select(label: string, value: string, change: (value: string) => void, options: string[][]) {
@@ -701,9 +726,7 @@ export function createRepositoryUI({ react, Modal, Input, Button, Collapse, Sour
       if (modal.type === "add") body = h("form", { className: "dssm-form", onSubmit: (e: React.FormEvent<HTMLFormElement>) => { e.preventDefault(); if (!form.url.trim()) return; perform(async () => { const repo = await post("add", form); await refreshRepo(repo.id); setModal(null); }); } },
         [["url", "repo.url", "https://github.com/owner/repo"], ["ref", "repo.ref", t("repo.defaultBranch")], ["subdirectory", "repo.directory", t("repo.directoryHint")]].map(([key, label, placeholder]) => h("label", { className: "dssm-field", key }, h("span", { className: "dssm-label" }, t(label)), h(Input, { "aria-label": t(label), value: form[key], placeholder, maxLength: key === "url" ? 2048 : 512, required: key === "url", disabled: busy, onChange: (e: { target: { value: string } }) => setForm({ ...form, [key]: e.target.value }) }))),
         feedbackNode, h("div", { className: "dssm-modal-actions" }, button("repo.cancel", close), button("repo.save", () => { if (form.url.trim()) perform(async () => { const repo = await post("add", form); await refreshRepo(repo.id); setModal(null); }); }, false, !form.url.trim())));
-      if (modal.type === "manage") body = h("div", { className: "dssm-repo-panel" }, h("p", { className: "dssm-desc" }, t("repo.removeHint")), refreshProgress, feedbackNode, repos.length ? repos.map((repo) => h("div", { key: repo.id, className: "dssm-repo-row dssm-repo-manage-row" },
-              h("div", { className: "dssm-repo-main" }, h("div", { className: "dssm-name" }, repo.owner + "/" + repo.name), h("div", { className: "dssm-note" }, [repo.ref || t("repo.defaultBranch"), repo.subdirectory].filter(Boolean).join(" · ")), h("div", { className: "dssm-repo-metadata" }, repo.refreshedAt ? t("repo.updated") + " · " + new Date(repo.refreshedAt).toLocaleString(getLocale?.() || t("format.locale")) : t("repo.notScanned"))),
-              h("div", { className: "dssm-repo-actions" }, refreshButton([repo], true), button("repo.remove", () => setModal({ type: "remove", repo }), true, false, true)))) : h("div", { className: "dssm-empty" }, t("repo.empty")));
+      if (modal.type === "manage") body = h("div", { className: "dssm-repo-panel" }, h("p", { className: "dssm-desc" }, t("repo.removeHint")), refreshProgress, feedbackNode, manageRows());
       if (modal.type === "remove") body = h("div", null, h("p", { className: "dssm-desc" }, modal.repo.owner + "/" + modal.repo.name), h("p", { className: "dssm-desc" }, t("repo.removeHint")), feedbackNode,
         h("div", { className: "dssm-modal-actions" }, button("repo.cancel", () => setModal({ type: "manage" })), button("repo.removeConfirm", () => perform(async () => { await post("remove", { id: (modal as Extract<RepoModal, {type: "remove"}>).repo.id }); if (source === (modal as Extract<RepoModal, {type: "remove"}>).repo.id) setSource(""); setModal({ type: "manage" }); }), false, false, true)));
       if (modal.type === "catalog-detail" && modal.detail) body = h("div", { className: "dssm-repo-panel" }, h("div", { className: "dssm-name" }, modal.detail.name), h("p", { className: "dssm-desc" }, modal.detail.description), h("div", { className: "dssm-detail-path" }, modal.detail.origin), h("p", { className: "dssm-note" }, t("repo.installHint")), h(Input.TextArea, { readOnly: true, value: modal.detail.body || "", autoSize: { minRows: 6, maxRows: 16 } }));
@@ -789,15 +812,15 @@ export function createRepositoryUI({ react, Modal, Input, Button, Collapse, Sour
       catalogList.map(renderCatalogItem),
       !catalogList.length && !catalogLoading && !catalogError ? h("div", { className: "dssm-empty" }, t("repo.catalog.empty")) : null,
       catalogLoading ? h("div", { className: "dssm-catalog-loading", role: "status", "aria-live": "polite" }, h("span", { className: "dssm-repo-spinner", "aria-hidden": true }), catalogItems.length ? t("repo.catalog.loadingMore") : t("repo.catalog.loading")) : null,
-      catalogError ? h("div", { className: "dssm-feedback dssm-error", role: "alert" }, t("repo.catalog.loadError"), h(Button, { type: "text", onClick: () => { void loadClawHubPage(); } }, t("repo.catalog.retry"))) : null,
+      catalogError ? h("div", { className: "dssm-feedback dssm-error", role: "alert" }, t("repo.catalog.loadError"), h(PrimitiveButton, { variant: "ghost", size: "sm", onClick: () => { void loadClawHubPage(); } }, t("repo.catalog.retry"))) : null,
       subsource === "clawhub" && !catalogQuery.trim() && catalogHasMore && !catalogError ? h("div", { className: "dssm-catalog-sentinel", ref: catalogSentinel, "aria-hidden": true }) : null,
-      subsource === "clawhub" && !catalogQuery.trim() && catalogHasMore && !catalogError && !catalogLoading ? h("div", { className: "dssm-catalog-loading" }, h(Button, { type: "text", onClick: () => { void loadClawHubPage(false, true); } }, t("repo.catalog.loadMore"))) : null
+      subsource === "clawhub" && !catalogQuery.trim() && catalogHasMore && !catalogError && !catalogLoading ? h("div", { className: "dssm-catalog-loading" }, h(PrimitiveButton, { variant: "ghost", size: "sm", onClick: () => { void loadClawHubPage(false, true); } }, t("repo.catalog.loadMore"))) : null
     );
     const clawhubSearchView = h("div", { className: "dssm-catalog-list" },
       clawhubSearchItems.map(renderCatalogItem),
       catalogQuery.trim() && !clawhubSearchItems.length && !clawhubSearchLoading && !clawhubSearchError ? h("div", { className: "dssm-empty" }, t("repo.catalog.searchEmpty")) : null,
       clawhubSearchLoading ? h("div", { className: "dssm-note", role: "status", "aria-live": "polite" }, t("repo.catalog.searchLoading")) : null,
-      clawhubSearchError ? h("div", { className: "dssm-feedback dssm-error", role: "alert" }, t("repo.catalog.searchError"), h(Button, { type: "text", onClick: () => { void fetchClawHubSearch(catalogQuery.trim()); } }, t("repo.catalog.retry"))) : null
+      clawhubSearchError ? h("div", { className: "dssm-feedback dssm-error", role: "alert" }, t("repo.catalog.searchError"), h(PrimitiveButton, { variant: "ghost", size: "sm", onClick: () => { void fetchClawHubSearch(catalogQuery.trim()); } }, t("repo.catalog.retry"))) : null
     );
 
     const skillshVisible = skillshItems.filter(item => {
@@ -807,24 +830,24 @@ export function createRepositoryUI({ react, Modal, Input, Button, Collapse, Sour
         });
         const skillshView = h("div", { className: "dssm-catalog-list" },
           skillshVisible.map(item => {
-        const skillshId = `skillsh:${item.source}/${item.skillId}`;
-                const unknown = catalogUnknownIds.includes(skillshId);
-                const metadata = [item.source, item.installs === undefined ? null : item.installs.toLocaleString() + " " + t("repo.catalog.installs")].filter(Boolean).join(" · ");
-                return h("div", { key: item.id, className: "dssm-repo-row" },
-                  h("div", { className: "dssm-repo-head" },
-                    h("div", { className: "dssm-repo-main" },
-                      h("div", { className: "dssm-name" }, item.name),
-                      h("div", { className: "dssm-meta-origin" }, metadata)
-                    ),
-                    renderCatalogActions(skillshId, unknown, () => openCatalogDetail({ catalog: "skillsh", source: item.source, skillId: item.skillId, name: item.name }), () => openCatalogInstall({ catalog: "skillsh", source: item.source, skillId: item.skillId, name: item.name }))
-                  ),
-                  renderCatalogLocations(skillshId)
-                );
-      }),
-      skillshQuery.trim() && !skillshVisible.length && !skillshLoading && !skillshError ? h("div", { className: "dssm-empty" }, t("repo.catalog.skillshEmpty")) : null,
-      skillshLoading ? h("div", { className: "dssm-note", role: "status", "aria-live": "polite" }, t("repo.catalog.skillshLoading")) : null,
-      skillshError ? h("div", { className: "dssm-feedback dssm-error", role: "alert" }, t("repo.catalog.skillshError"), h(Button, { type: "text", onClick: () => { void fetchSkillshResults(skillshQuery.trim()); } }, t("repo.catalog.retry"))) : null
-    );
+            const skillshId = `skillsh:${item.source}/${item.skillId}`;
+            const unknown = catalogUnknownIds.includes(skillshId);
+            const metadata = [item.source, item.installs === undefined ? null : item.installs.toLocaleString() + " " + t("repo.catalog.installs")].filter(Boolean).join(" · ");
+            return h("div", { key: item.id, className: "dssm-repo-row" },
+              h("div", { className: "dssm-repo-head" },
+                h("div", { className: "dssm-repo-main" },
+                  h("div", { className: "dssm-name" }, item.name),
+                  h("div", { className: "dssm-meta-origin" }, metadata)
+                ),
+                renderCatalogActions(skillshId, unknown, () => openCatalogDetail({ catalog: "skillsh", source: item.source, skillId: item.skillId, name: item.name }), () => openCatalogInstall({ catalog: "skillsh", source: item.source, skillId: item.skillId, name: item.name }))
+              ),
+              renderCatalogLocations(skillshId)
+            );
+          }),
+          skillshQuery.trim() && !skillshVisible.length && !skillshLoading && !skillshError ? h("div", { className: "dssm-empty" }, t("repo.catalog.skillshEmpty")) : null,
+          skillshLoading ? h("div", { className: "dssm-note", role: "status", "aria-live": "polite" }, t("repo.catalog.skillshLoading")) : null,
+          skillshError ? h("div", { className: "dssm-feedback dssm-error", role: "alert" }, t("repo.catalog.skillshError"), h(PrimitiveButton, { variant: "ghost", size: "sm", onClick: () => { void fetchSkillshResults(skillshQuery.trim()); } }, t("repo.catalog.retry"))) : null
+        );
 
     const subsourceToolbar = h("div", { className: "dssm-subsources" },
       h("button", { type: "button", className: "dssm-subsource-btn" + (subsource === "github" ? " on" : ""), "aria-pressed": subsource === "github", onClick: () => selectSubsource("github") }, t("repo.subsource.github") + " (" + repos.length + ")"),

@@ -59,6 +59,8 @@ try {
     if (id === "@deepseek-ai/dsh-client-ui-primitives") {
       return {
         Button: (props) => react.createElement("button", props, props.children),
+        Input: (props) => react.createElement("span", { className: props.className }, react.createElement("input", props)),
+        Modal: (props) => props.open ? react.createElement("div", { role: "dialog", title: props.title }, props.children, props.footer) : null,
         Menu: (props) => react.createElement("div", { "data-menu-open": props.open }, props.anchor, props.open ? props.items?.map(it => react.createElement("button", { key: it.id, onClick: () => props.onSelect(it.id) }, it.label)) : null),
       };
     }
@@ -94,12 +96,12 @@ try {
   const rows = () => nodes().filter((node) => node.props.className === "dssm-name").map((node) => node.children[0]);
   const settle = async () => { render(); effects.splice(0).forEach((effect) => effect()); await tick(); await tick(); render(); };
   const tab = async (name) => {
-    const tabs = find((node) => node.props?.block === true && Array.isArray(node.props.options));
-    tabs.props.onChange(tabs.props.options.find((item) => item.label === name || (Array.isArray(item.label) && item.label.includes(name))).value);
+    const tabs = find((node) => node.props?.className === "dssm-scope-tabs" && Array.isArray(node.props.items));
+    tabs.props.onChange(tabs.props.items.find((item) => item.label === name || (Array.isArray(item.label) && item.label.includes(name))).value);
     await settle();
   };
-  const sources = () => nodes().filter((node) => node.props.className === "dssm-source" && Array.isArray(node.props.items));
-  const expand = (group) => { group.props.onChange([group.props.items[0].key]); render(); };
+  const sources = () => nodes().filter((node) => node.props.className === "dssm-source");
+  const expand = (group) => { const toggle = nodes(group).find((node) => node.props.className === "dssm-source-toggle"); if (toggle?.props["aria-expanded"] !== true) toggle.props.onClick(); render(); };
   const textOf = (node) => JSON.stringify(nodes(node).flatMap((item) => item.children.filter((child) => typeof child === "string")));
 
   await settle();
@@ -217,18 +219,18 @@ try {
   assert.match(css, /\.dssm-enable-switch\[aria-checked=true\]\{background:var\(--dsw-alias-brand-primary/, "开启使用宿主品牌色");
   assert.match(css, /\.dssm-skill-row\{[^}]*padding:11px 13px/, "技能行留白对齐仓库行");
   assert.match(css, /\.dssm-skill-desc\{[^}]*--dsw-alias-label-tertiary/, "描述用次级文字色");
-  assert.match(css, /\.dssm-row-icon\.ant-btn\{[^}]*background:transparent[^}]*border-color:var\(--dsw-alias-border-l2/, "行内描边使用宿主主题令牌和透明底色");
-  assert.match(css, /\.dssm-row-icon\.ant-btn:not\(:disabled\):not\(\.dssm-icon-danger\):hover\{[^}]*--ant-btn-text-color:var\(--dsw-alias-link,[^)]+\)/, "普通图标悬停优先使用宿主链接色，危险按钮排除");
+  assert.match(css, /\.dssm-row-icon\{[^}]*background:transparent[^}]*border-color:var\(--dsw-alias-border-l2/, "行内描边使用宿主主题令牌和透明底色");
+  assert.match(css, /\.dssm-row-icon:not\(:disabled\):not\(\.dssm-icon-danger\):hover\{[^}]*color:var\(--dsw-alias-link/, "普通图标悬停优先使用宿主链接色，危险按钮排除");
+  assert.doesNotMatch(css, /ant-btn|ant-select|ant-collapse|dssm-antd-select|dssm-icon-btn/, "样式不再保留 ant 选择器或旧图标按钮类");
   assert.doesNotMatch(css, /#1677ff\b|rgba?\(\s*22\s*[, ]\s*119\s*[, ]\s*255\b/i, "禁止重新引入 antd 默认蓝色");
   assert.match(css, /\.dssm-stat\{[^}]*padding:4px 10px/, "顶部统计格子更矮");
-  assert.match(css, /\.dssm-icon-btn\{[^}]*width:22px/, "图标按钮同一尺寸");
 
   await tab("项目技能");
   const picker = find(node => node.props["aria-label"] === t("filter.workspace"));
   assert.ok(picker, "项目页使用顶部工作区选择器");
   assert.ok(picker.props.options.some(option => option.label === "empty-notes"), "空工作区也列在浏览下拉中");
   assert.equal(nodes().some(node => node.props.className === "dssm-workspace"), false, "移除外层工作区折叠");
-  const projectSource = sources().find((node) => String(node.props.items?.[0]?.key) === "project-dsh:a");
+  const projectSource = sources().find((node) => node.props["data-source-key"] === "project-dsh:a");
   assert.ok(projectSource, "找到项目来源卡片");
   assert.equal(projectSource.props.className, "dssm-source", "项目来源仍是来源卡片");
   assert.ok(nodes(projectSource).some((node) => node.props.className === "dssm-cat" && node.props["aria-label"] === "项目工作"), "项目来源内部再套分类");

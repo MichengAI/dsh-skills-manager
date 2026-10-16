@@ -55,7 +55,7 @@ export const destinationCss = [
   ".dssm-destination .dssm-field{display:flex;flex-direction:column;gap:6px;min-width:0}",
   // 两列等宽且控件铺满，避免筛选下拉按文字收缩留下大块空白；窄屏时上下排列。
     ".dssm-destination-pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}",
-  ".dssm-destination-pair .dssm-antd-select{width:100%;min-width:0}",
+  ".dssm-destination-pair .dssm-menu-select-wrap{width:100%;min-width:0}",
   ".dssm-destination-pair .dssm-menu-select-wrap,.dssm-destination-pair span[class*=\"_root_\"],.dssm-destination-pair .dssm-source-select-menu{display:flex!important;width:100%!important;min-width:0!important;height:auto!important;padding:0!important;margin:0!important;border:0!important;background:transparent!important}",
   ".dssm-destination-pair .dssm-menu-select-trigger{display:flex!important;width:100%!important;min-width:0!important;height:36px!important;border-radius:var(--dsw-radius-md,10px)!important;padding:0 12px!important;box-sizing:border-box!important}",
   "@media (max-width:420px){.dssm-destination-pair{grid-template-columns:minmax(0,1fr)}}",

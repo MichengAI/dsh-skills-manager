@@ -6,7 +6,6 @@ export function Button(props: any) {
   const isPrimary = variant === "primary";
   const cls = [
     className,
-    isPrimary ? "ant-btn-primary" : "",
     variant ? `btn-${variant}` : "",
     size ? `btn-${size}` : "",
     danger ? "is-danger" : "",
@@ -34,5 +33,22 @@ export function Menu(props: any) {
         }, item.label)
       )
     ) : null
+  );
+}
+
+export function Input(props: any) {
+  const { icon, className, ...rest } = props;
+  return React.createElement("span", { className: ["dsh-input-wrapper", className].filter(Boolean).join(" ") },
+    icon ? React.createElement("span", { className: "dsh-input-icon" }, icon) : null,
+    React.createElement("input", { ...rest, className: "dsh-input-native" })
+  );
+}
+
+export function Modal(props: any) {
+  if (!props.open) return null;
+  return React.createElement("div", { role: "dialog", "aria-modal": "true", className: ["dsh-modal", props.className].filter(Boolean).join(" ") },
+    props.title ? React.createElement("div", { className: "dsh-modal-header" }, props.title) : null,
+    React.createElement("div", { className: ["dsh-modal-body", props.contentClassName].filter(Boolean).join(" ") }, props.children),
+    props.footer ? React.createElement("div", { className: "dsh-modal-footer" }, props.footer) : null
   );
 }

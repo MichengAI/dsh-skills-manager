@@ -82,6 +82,8 @@ const bundle = loaded.factory((id) => {
   if (id === "@deepseek-ai/dsh-client-ui-primitives") {
     return {
       Button: (props) => react.createElement("button", props, props.children),
+      Input: (props) => react.createElement("span", { className: props.className }, react.createElement("input", props)),
+      Modal: (props) => props.open ? react.createElement("div", { role: "dialog", title: props.title }, props.children, props.footer) : null,
       Menu: (props) => react.createElement("div", { "data-menu-open": props.open }, props.anchor, props.open ? props.items?.map(it => react.createElement("button", { key: it.id, onClick: () => props.onSelect(it.id) }, it.label)) : null),
     };
   }
@@ -171,9 +173,8 @@ ok(
   "settings title groups the project and feedback links together",
 );
 ok(
-  (await readFile(new URL("../src/antd-ui.ts", import.meta.url), "utf8")).includes("ConfigProvider") &&
-    (await readFile(new URL("../src/host-theme.ts", import.meta.url), "utf8")).includes("data-ds-dark-theme"),
-  "settings controls use Ant Design and follow the host color scheme",
+  !(await readFile(new URL("../src/plugin-ui.ts", import.meta.url), "utf8")).includes("from \"antd"),
+  "设置页不再挂 Ant",
 );
 ok(
   /function GithubMark16\(\)/.test(source),
@@ -1056,8 +1057,8 @@ ok(
   "source toggles stay in the collapsible source header",
 );
 ok(
-  source.includes("Segmented") && source.includes("block: true"),
-  "settings separates scopes with a full-width segmented control",
+  source.includes("SegmentedTabs") && source.includes("dssm-scope-tabs"),
+  "范围页签使用宿主分段页签并铺满",
 );
 
 let registerOptions = null;

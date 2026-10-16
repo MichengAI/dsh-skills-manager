@@ -8,7 +8,7 @@ function assertSourceCleanup() {
   assert.doesNotMatch(projectCss, /\.dssm-filters \.dssm-search\{[^}]*margin-left:auto/, "搜索框紧跟筛选，不被推到工具栏最右侧");
   assert.match(projectCss, /\.dssm-filter-actions\{[^}]*margin-left:auto/, "搜索旁按钮组对齐到工具栏最右侧");
   assert.match(projectCss, /\.dssm-filter-actions\{[^}]*display:flex[^}]*gap:8px;flex:none/, "搜索右侧图标按钮组间距稳定");
-  assert.match(projectCss, /\.dssm-source\.ant-collapse\{[^}]*background:transparent/, "复用全局来源卡片背景");
+  assert.match(projectCss, /\.dssm-source\{[^}]*background:transparent/, "来源卡片背景透出页面底色");
 }
 
 let definition, component, cursor = 0, state = [];
@@ -78,6 +78,8 @@ try {
     if (id === "@deepseek-ai/dsh-client-ui-primitives") {
       return {
         Button: (props) => react.createElement("button", props, props.children),
+        Input: (props) => react.createElement("span", { className: props.className }, react.createElement("input", props)),
+        Modal: (props) => props.open ? react.createElement("div", { role: "dialog", title: props.title }, props.children, props.footer) : null,
         Menu: (props) => react.createElement("div", { "data-menu-open": props.open }, props.anchor, props.open ? props.items?.map(it => react.createElement("button", { key: it.id, onClick: () => props.onSelect(it.id) }, it.label)) : null),
       };
     }
@@ -114,8 +116,8 @@ try {
   const rows = () => nodes().filter((node) => node.props.className === "dssm-name").map((node) => node.children[0]);
   const settle = async () => { render(); effects.splice(0).forEach((effect) => effect()); await tick(); await tick(); render(); };
   const tab = async (name) => {
-    const tabs = find((node) => node.props?.block === true && Array.isArray(node.props.options));
-    const option = tabs.props.options.find((item) => item.label === name || (Array.isArray(item.label) && item.label.includes(name)));
+    const tabs = find((node) => node.props?.className === "dssm-scope-tabs" && Array.isArray(node.props.items));
+    const option = tabs.props.items.find((item) => item.label === name || (Array.isArray(item.label) && item.label.includes(name)));
     tabs.props.onChange(option.value); await settle();
   };
   const workspaceGroups = () => nodes().filter((node) => node.props.className === "dssm-workspace");
@@ -131,12 +133,13 @@ try {
     assert.ok(action.props.icon, "全局技能操作按钮使用图标");
     assert.equal(action.children.length, 0, "全局技能操作按钮不显示可见文字");
     assert.ok(action.props.title, "全局技能图标按钮保留悬停提示");
-    assert.equal(action.props.style.width, 28, "工具栏图标按钮尺寸一致");
+    assert.equal(action.props.style.width, 22, "工具栏图标按钮与技能行同尺寸");
+    assert.equal(action.props.variant, "outline", "工具栏图标按钮与技能行同为带框样式");
+    assert.equal(action.props.className, "dssm-row-icon", "工具栏图标按钮复用技能行边框样式");
   }
   const createAction = nodes(globalActions).find(node => node.props["aria-label"] === t("btn.create"));
-  assert.equal(createAction.props.type, "text", "搜索旁的创建按钮使用中性图标样式");
   assert.equal(createAction.props.style.backgroundColor, undefined, "搜索旁的创建按钮不覆盖主题背景色");
-  assert.equal(createAction.props.style.color, "var(--dsw-alias-label-secondary, #b9b9b9)", "搜索旁的按钮不使用强调色");
+  assert.equal(createAction.props.style.color, undefined, "搜索旁的按钮不内联强调色");
   await tab("项目技能");
 
   // 默认只读选择首个可用登记项，不依赖当前会话，不扫其他项目。
@@ -161,8 +164,9 @@ try {
     assert.ok(action.props.icon, "操作按钮使用图标");
     assert.equal(action.children.length, 0, "操作按钮不再显示可见文字");
     assert.ok(action.props.title, "图标按钮保留悬停提示");
-    assert.equal(action.props.style.width, 28, "项目页工具栏图标按钮尺寸一致");
-    assert.equal(action.props.type, "text", "项目页搜索旁按钮使用中性样式");
+    assert.equal(action.props.style.width, 22, "项目页工具栏图标按钮与技能行同尺寸");
+    assert.equal(action.props.variant, "outline", "项目页搜索旁按钮与技能行同为带框样式");
+    assert.equal(action.props.className, "dssm-row-icon", "项目页搜索旁按钮复用技能行边框样式");
     assert.equal(action.props.style.backgroundColor, undefined, "项目页搜索旁按钮不设置强调底色");
   }
   await choose("D:/work/ghost");
@@ -282,13 +286,13 @@ try {
   for (const button of [restoreIcon, deleteIcon]) {
     assert.notEqual(button.props.type, "text", "行内使用描边图标，不回退为工具栏 text 按钮");
     assert.match(button.props.className, /\bdssm-row-icon\b/);
-    assert.equal(button.props.size, "small");
+    assert.ok(button.props.size === "sm" || button.props.size === "small", "图标按钮使用紧凑尺寸");
     assert.ok(button.props.icon, "复用 16px 描边图标");
     assert.equal(button.props.style.width, 22, "操作盒与全局技能图标一致");
     assert.equal(button.props.title, button.props["aria-label"], "悬停与无障碍名称保留原动作说明");
     assert.equal(button.children.length, 0, "行内不再绘制文字按钮");
   }
-  assert.equal(deleteIcon.props.danger, true, "永久删除保留危险图标语义");
+  assert.ok(deleteIcon.props.danger === true || deleteIcon.props.className.includes("danger"), "永久删除保留危险图标语义");
   const css = nodes().filter((node) => node.type === "style").map((node) => node.children.join("")).join("");
   assert.match(css, /\.dssm-trash-item\{[^}]*border:0\.5px solid var\(--dsw-alias-border-l2/, "回收站条目有宿主主题细边框");
   assert.match(css, /\.dssm-trash-item\{[^}]*background:transparent/, "回收站和全局技能一样使用透明背景");
@@ -398,7 +402,7 @@ try {
   // 9. 全局页不受影响，仍是用户级来源。
   await tab("全局技能");
   assert.equal(workspaceGroups().length, 0);
-  assert.equal(find((node) => node.props.className === "dssm-source" && Array.isArray(node.props.items)) !== undefined, true);
+  assert.equal(find((node) => node.props.className === "dssm-source-toggle") !== undefined, true);
 
   // 10. 登记列表读取失败：项目页提示，不抛错、不回退到当前会话。
   const previous = globalThis.fetch;
