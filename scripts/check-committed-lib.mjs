@@ -18,7 +18,7 @@ async function hashLib() {
   const hash = createHash("sha256");
   for (const path of await filesIn("lib")) {
     hash.update(path);
-    hash.update(await readFile(path));
+    hash.update((await readFile(path)).toString("utf8").replaceAll("\r\n", "\n"));
   }
   return hash.digest("hex");
 }
