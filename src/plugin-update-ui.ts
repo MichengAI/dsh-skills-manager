@@ -66,7 +66,7 @@ function UpdateDialog(props: { flow: ReturnType<typeof createUpdateFlow>; packag
   const command = manualPluginUpdateCommand(view.profileRaw, props.packageName, view.latestRaw);
   const copyLabel = copyState === "copied" ? view.copy.copied : copyState === "failed" ? view.copy.copyFailed : view.copy.copy;
   return React.createElement(Modal, {
-    open: true, className: "mpi-dialog", width: 680, zIndex: 1200, title: `${name} ${view.copy.update}`, keyboard: false, onClose: props.onClose, closeLabel: "Close",
+    open: true, className: "mpi-dialog", title: `${name} ${view.copy.update}`, onClose: props.onClose, closeLabel: "Close",
     footer: [
       React.createElement(PrimitiveButton, { key: "check", variant: "outline", size: "sm", disabled: view.busy, onClick: () => { void props.flow.check(); } }, view.copy.recheck),
       React.createElement(PrimitiveButton, { key: "update", variant: "primary", size: "sm", disabled: view.disabled, onClick: () => { void props.flow.update(); } }, view.updateLabel),

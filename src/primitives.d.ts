@@ -78,9 +78,6 @@ declare module '@deepseek-ai/dsh-client-ui-primitives' {
     className?: string
     contentClassName?: string
     headless?: boolean
-    width?: number | string
-    zIndex?: number
     backdropBlur?: boolean
-    keyboard?: boolean
   }): ReactElement | null
 }
