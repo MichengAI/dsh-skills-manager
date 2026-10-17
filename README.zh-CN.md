@@ -19,7 +19,7 @@
 
 > DSH Skills Manager 是社区维护的 DeepSeek Harness（DSH）插件，并非 DeepSeek AI 官方产品。
 
-本文描述 **1.2.4**。已发布变更见[更新日志](CHANGELOG.zh-CN.md)。
+本文描述 **1.2.5**。已发布变更见[更新日志](CHANGELOG.zh-CN.md)。
 
 ## 功能概览
 
@@ -75,7 +75,7 @@ dsh plugin --profile web add @michengai/dsh-skills-manager@latest --registry=htt
 
 安装后重启 DSH 并刷新页面，打开「设置 → 技能」即可使用。更新时可点击「检查更新」，或重新执行安装命令。
 
-- `1.2.4` 已验证兼容 DeepSeek Harness `0.2.0-rc.1`、`0.2.0-rc.2`、`0.2.1-rc.1`、`0.2.1-rc.2`。
+- `1.2.5` 已验证兼容 DeepSeek Harness `0.2.0-rc.1`、`0.2.0-rc.2`、`0.2.1-rc.1`、`0.2.1-rc.2`。
 - 不再支持 `0.2.0` 之前的宿主。仍在使用 `0.1.x` 的，请安装插件 `1.1.23`，不要装 `@latest`。
 
 ## 使用说明
@@ -94,7 +94,7 @@ dsh plugin --profile web add @michengai/dsh-skills-manager@latest --registry=htt
 
 - **按已登记工作区查看**：项目页顶部下拉列出 DSH 里已登记的工作区，选中后只读取并显示这一项的技能，搜索也只针对所选工作区。Git 仓库使用最近的 Git 根目录；普通文件夹使用工作区目录，无需 `git init`。没有技能的工作区也可选择，失效目录不可选。
 - **同名技能独立启停**：停用项目副本后，其他已启用副本仍可接管，页面会提示实际来源。要完全关闭该技能，需停用全部副本。
-- **文件管理范围**：用户级 DSH 和公共 Agent（Shared Agent）来源的普通技能均可从管理页移入回收站并恢复，不要求安装来源记录；项目 Shared Agent 仍只读。公共 Agent 保留递归发现和链接读取，链接条目及不安全路径不允许文件写入；从仓库安装到 DSH、公共 Agent 或已登记工作区的副本也可从「技能仓库」卸载。Codex、Claude 等其他外部技能仍只读。创建、文件导入和仓库安装可以写入用户目录下的 DSH skills 或公共 Agent（Shared Agent），也可以写入某个已登记工作区的 `.dsh/skills`。创建、导入和安装时，工作区不会被预先选中，也不能选 Shared Agent；项目页的只读查看选择不作为写入目标。
+- **文件管理范围**：用户级 DSH 和公共 Agent（Shared Agent）来源的普通技能均可从管理页移入回收站并恢复，不要求安装来源记录。用户级和项目 DSH 的顶层目录链接也会列出，可以查看和启停，不能删除或覆盖；项目 Shared Agent 仍只读。公共 Agent 保留递归发现和链接读取，链接条目及不安全路径不允许文件写入；从仓库安装到 DSH、公共 Agent 或已登记工作区的副本也可从「技能仓库」卸载。Codex、Claude 等其他外部技能仍只读。创建、文件导入和仓库安装可以写入用户目录下的 DSH skills 或公共 Agent（Shared Agent），也可以写入某个已登记工作区的 `.dsh/skills`。创建、导入和安装时，工作区不会被预先选中，也不能选 Shared Agent；项目页的只读查看选择不作为写入目标。
 - **恢复**：已卸载副本的仓库来源绑定到具体回收站条目；仅显式恢复后重新启用来源、安装位置和更新/恢复历史。其他同名技能不会继承仓库管理权限。卸载公共 Agent 副本会影响使用该目录的所有 Agent。
 
 ### 仓库使用边界

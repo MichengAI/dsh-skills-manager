@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.5 - 2026-10-17
+
+- List top-level directory links in writable DSH skill folders (`~/.dsh/skills` and project `.dsh/skills`) as read-only entries. Details and enable/disable work; delete, overwrite, and import replacement are refused (#45).
+
 ## 1.2.4 - 2026-10-17
 
 - Align confirmation dialog destructive action styling with host warning patterns, using red outlined buttons for deletion and uninstallation.

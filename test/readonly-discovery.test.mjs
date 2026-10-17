@@ -267,11 +267,20 @@ try {
   );
 
   await link(external, join(dsh.path, "external"));
+  const writableLink = await core.resolveEntry(dsh.path, "external");
+  assert.equal(writableLink?.linked, true, "可写 DSH 只读发现顶层目录链接");
   assert.equal(
-    await core.resolveEntry(dsh.path, "external"),
-    null,
-    "可写 DSH 继续拒绝目录链接",
+    (await core.skillDetail("dsh", "external")).body,
+    "external-review 正文",
   );
+  const linkedDoc = await readFile(join(external, "SKILL.md"), "utf8");
+  assert.equal(
+    (await core.deleteSkill(dsh.path, "external")).code,
+    "error.skill.linked",
+    "可写 DSH 拒绝删除目录链接",
+  );
+  assert.equal(await readFile(join(external, "SKILL.md"), "utf8"), linkedDoc);
+  assert.equal((await core.setSkillEnabled(dsh.path, "external", false)).enabled, false);
   await rm(join(agents.path, "alias"));
   const replacement = await skill(join(temp, "replacement"), "external-review");
   await link(replacement, join(agents.path, "alias"));

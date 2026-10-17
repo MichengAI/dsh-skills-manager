@@ -4,7 +4,7 @@ import type { SkillRoot, RepositoryDestination, RootInput, Diagnostic, Operation
 // 覆盖 DSH 用户级与活动 Session 项目级技能根：
 //   - 用户根目录：~/.dsh/skills 与常见 Agent 用户目录
 //   - 项目根目录：DSH 可创建、回收；公共 Agent 与各应用目录支持本地策略启停，源文件只读
-//   - 条目形态：<root>/<name>/SKILL.md（bundle）或 <root>/<name>.md（flat），只读来源递归发现，可写来源只扫一层
+//   - 条目形态：<root>/<name>/SKILL.md（bundle）或 <root>/<name>.md（flat），只读来源递归发现，可写来源只扫一层；顶层目录链接只读列出
 //   - 前端展示 name、description 与启停状态，不做格式检查或自动修复
 //
 // 所有函数返回普通结果对象，业务校验失败返回 { ok: false, error, code?, params? }；
@@ -1092,6 +1092,58 @@ export function parseBoolValue(raw: unknown) {
 
 // ── 条目定位 / 扫描 ─────────────────────────────────────────────────────────
 
+function linkedWriteError(path: string): OperationError {
+  return {
+    ok: false,
+    error: `目录链接不能删除或覆盖: ${path}`,
+    code: "error.skill.linked",
+    params: { path },
+  };
+}
+
+async function readlinkOrNull(path: string) {
+  try {
+    return await fs.readlink(path);
+  } catch {
+    return null;
+  }
+}
+
+/** 目录软链接，或 Windows 上 readlink 能解开的 junction。文件链接和普通目录不是。 */
+async function isDirectoryLink(path: string) {
+  const st = await lstatOrNull(path);
+  if (!st) return false;
+  if (st.isSymbolicLink()) {
+    try {
+      return (await fs.stat(path)).isDirectory();
+    } catch {
+      return false;
+    }
+  }
+  if (process.platform !== "win32" || !st.isDirectory()) return false;
+  return (await readlinkOrNull(path)) !== null;
+}
+
+/**
+ * 可写根的顶层目录链接。只接受指向目录、且 SKILL.md 本身是普通文件的 bundle。
+ * 不是目录链接时返回 null，调用方继续按真实目录处理。
+ */
+async function linkedDirectoryBundle(directory: string, name: string): Promise<DiscoveredEntry | null> {
+  const bundlePath = entryPath(directory, name);
+  if (bundlePath === null || !(await isDirectoryLink(bundlePath))) return null;
+  const docPath = join(bundlePath, "SKILL.md");
+  const docStat = await lstatOrNull(docPath);
+  if (!docStat?.isFile() || docStat.isSymbolicLink()) return null;
+  return {
+    kind: "bundle",
+    docPath,
+    entryPath: bundlePath,
+    realDocPath: await fs.realpath(docPath),
+    realEntryPath: await fs.realpath(bundlePath),
+    linked: true,
+  };
+}
+
 /** 按名称解析条目（bundle 优先，其次 flat）。找不到返回 null。 */
 export async function resolveEntry(root: RootInput, name: string): Promise<DiscoveredEntry | null> {
   const definition = rootDefinition(root);
@@ -1112,6 +1164,8 @@ export async function resolveEntry(root: RootInput, name: string): Promise<Disco
     if (!rootStat || !rootStat.isDirectory() || rootStat.isSymbolicLink())
       return null;
     const rootReal = await resolvedPath(rootPath);
+    const linked = await linkedDirectoryBundle(directory, name);
+    if (linked) return linked;
     const bundleStat = await lstatOrNull(bundlePath);
     if (
       bundleStat &&
@@ -1213,7 +1267,7 @@ function entryOf(name: string, kind: string, docPath: string, doc: Pick<ParsedSk
   };
 }
 
-/** 只读来源递归发现；可写 DSH 根维持顶层扫描及链接写边界。 */
+/** 只读来源递归发现。可写 DSH 根只扫一层；顶层目录链接只读列出，写入不跟随。 */
 export function scanEntries(root: RootInput, options: {metadataOnly: true}): Promise<MetadataScan>;
 export function scanEntries(root: RootInput, options?: {metadataOnly?: false}): Promise<Scan>;
 export async function scanEntries(root: RootInput, options: {metadataOnly?: boolean} = {}): Promise<Scan | MetadataScan> {
@@ -1253,7 +1307,20 @@ export async function scanEntries(root: RootInput, options: {metadataOnly?: bool
   const rootReal = await resolvedPath(directory);
   for (const it of items) {
     try {
-      if (it.isSymbolicLink()) continue;
+      if (it.isSymbolicLink() || (process.platform === "win32" && it.isDirectory())) {
+        const linked = await linkedDirectoryBundle(directory, it.name);
+        if (linked) {
+          const doc = options.metadataOnly
+            ? { map: {}, hasFrontmatter: false }
+            : parseSkillDoc(await fs.readFile(linked.realDocPath, "utf8"));
+          byName.set(it.name, {
+            ...entryOf(it.name, "bundle", linked.docPath, doc),
+            ...linked,
+          });
+          continue;
+        }
+        if (it.isSymbolicLink()) continue;
+      }
       if (it.isDirectory() && entryPath(directory, it.name) !== null) {
         const docPath = join(directory, it.name, "SKILL.md");
         const st = await lstatOrNull(docPath);
@@ -2128,6 +2195,9 @@ export async function deleteSkill(root: RootInput, name: string, log?: Log, opti
       if ((await lstatOrNull(target.path))?.isSymbolicLink())
         return { ok: false, error: `技能目录不安全，拒绝写入: ${target.path}`, code: "error.root.unsafe", params: { path: target.path } };
     }
+  } else {
+    const bundle = entryPath(definition.path, name);
+    if (bundle && (await isDirectoryLink(bundle))) return linkedWriteError(bundle);
   }
   const id = options.repositoryTrash?.id || options.catalogTrash?.id || `${Date.now()}-${randomUUID()}`;
   if (!/^\d+-[a-f0-9-]{36}$/.test(id)) throw codedError("回收站条目编号非法", "error.trash.invalid", { id });
@@ -2522,6 +2592,10 @@ async function copyToTemporary(source: string, target: string, isDir: boolean) {
 
 /** 临时副本就绪后再替换；替换失败时尽力恢复旧条目。 */
 async function replaceWithCopy(source: string, dest: string, isDir: boolean, existing: string[] = []) {
+  for (const path of [dest, ...existing]) {
+    if (await isDirectoryLink(path))
+      throw codedError(`目录链接不能删除或覆盖: ${path}`, "error.skill.linked", { path });
+  }
   const stage = await copyToTemporary(source, dest, isDir);
   const backups = [];
   try {
@@ -2678,6 +2752,16 @@ export async function importSkill(source: string, log?: Log, options: MutationOp
         error: `批量来源中存在多个同名插件: ${c.kebab}`,
         code: "error.import.duplicateName",
         params: { name: c.kebab },
+      });
+      continue;
+    }
+    const linkPath = join(targetRoot, c.kebab);
+    if (await isDirectoryLink(linkPath)) {
+      failed.push({
+        source: c.source,
+        error: `目录链接不能删除或覆盖: ${linkPath}`,
+        code: "error.skill.linked",
+        params: { path: linkPath },
       });
       continue;
     }
@@ -3119,7 +3203,7 @@ export async function skillDetail(key: string, name: string, options: ScopeOptio
       : null,
     diagnostics: summary.diagnostics,
     loadable: summary.loadable,
-    sourceReadOnly: !root.mutable,
+    sourceReadOnly: !root.mutable || entry.linked === true,
   };
 }
 
@@ -3195,8 +3279,8 @@ export async function listProviderCandidates(options: ScopeOptions = {}) {
       metadata: {
         dshSkillsManager: {
           root: root.key,
-          readOnly: !root.mutable,
-          sourceReadOnly: !root.mutable,
+          readOnly: !root.mutable || entry.linked === true,
+          sourceReadOnly: !root.mutable || entry.linked === true,
           policyOnly,
         },
       },
@@ -3460,6 +3544,7 @@ export async function state(options: ScopeOptions = {}) {
         diagnostics: e.diagnostics,
         path: e.docPath,
         categoryId: policyResult.state.categoryMembers[root.key]?.[e.name] || null,
+        linked: e.linked === true,
       });
       all.push({
         root,

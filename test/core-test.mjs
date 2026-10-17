@@ -1124,19 +1124,114 @@ if (await tryLink(ccswitchSkill, linkedCcSwitchSkill, providerLinkType)) {
     "trusted user-source link tests skipped because this environment cannot create directory links",
   );
 }
+const writableLinkOutside = await makeSkill(
+  join(tmp, "writable-link-outside"),
+  "ccswitch-linked-dsh",
+  "---\nname: ccswitch-linked-dsh\ndescription: Linked into DSH.\n---\nLinked body",
+);
 const writableTrustedLink = join(dshRoot, "ccswitch-linked-dsh");
-if (await tryLink(ccswitchSkill, writableTrustedLink, providerLinkType)) {
-  eq(
-    await resolveEntry(dshRoot, "ccswitch-linked-dsh"),
-    null,
-    "writable DSH roots still reject trusted linked bundles",
+if (await tryLink(writableLinkOutside, writableTrustedLink, providerLinkType)) {
+  const linkedWritable = await resolveEntry(dshRoot, "ccswitch-linked-dsh");
+  ok(
+    linkedWritable && linkedWritable.linked === true,
+    "writable DSH roots list a top-level directory link without following it for writes",
+  );
+  const scannedLink = (await scanEntries(dshRoot)).entries.find(
+    (entry) => entry.name === "ccswitch-linked-dsh",
   );
   ok(
-    !(await scanEntries(dshRoot)).entries.some(
-      (entry) => entry.name === "ccswitch-linked-dsh",
-    ),
-    "writable DSH scans also hide trusted linked bundles",
+    scannedLink && scannedLink.linked === true,
+    "writable DSH scans show the linked bundle",
   );
+  const linkedView = (await state()).roots
+    .find((root) => root.key === "dsh")
+    .skills.find((skill) => skill.name === "ccswitch-linked-dsh");
+  eq(linkedView && linkedView.linked, true, "skill list marks the directory link");
+  const linkedDetail = await skillDetail("dsh", "ccswitch-linked-dsh");
+  eq(linkedDetail.body, "Linked body", "detail reads the linked skill");
+  eq(linkedDetail.sourceReadOnly, true, "detail marks the linked skill read-only");
+  const linkedTargetBefore = await readFile(join(writableLinkOutside, "SKILL.md"), "utf8");
+  const refusedDelete = await deleteSkill(dshRoot, "ccswitch-linked-dsh");
+  eq(refusedDelete.code, "error.skill.linked", "delete refuses a writable-root directory link");
+  ok(
+    await resolveEntry(dshRoot, "ccswitch-linked-dsh"),
+    "the directory link remains after a refused delete",
+  );
+  const replacementDir = await makeSkill(
+    join(tmp, "link-overwrite-source"),
+    "ccswitch-linked-dsh",
+    "---\nname: ccswitch-linked-dsh\ndescription: Should not replace the link.\n---\nnope",
+  );
+  const refusedImport = await importSkill(replacementDir, null, {
+    conflict: "overwrite",
+  });
+  eq(refusedImport.ok, false, "import does not overwrite a directory link");
+  eq(
+    refusedImport.failed && refusedImport.failed[0] && refusedImport.failed[0].code,
+    "error.skill.linked",
+    "import reports the directory link",
+  );
+  const refusedCreate = await createSkill({
+    name: "ccswitch-linked-dsh",
+    description: "Should not replace the link.",
+    body: "nope",
+  });
+  eq(refusedCreate.code, "error.create.conflict", "create does not replace a directory link");
+  const disabledLink = await setSkillEnabled(dshRoot, "ccswitch-linked-dsh", false);
+  eq(disabledLink.enabled, false, "disable only changes manager policy");
+  await setSkillEnabled(dshRoot, "ccswitch-linked-dsh", true);
+  eq(
+    await readFile(join(writableLinkOutside, "SKILL.md"), "utf8"),
+    linkedTargetBefore,
+    "refused writes leave the link target unchanged",
+  );
+  const fileLinkType = process.platform === "win32" ? "file" : undefined;
+  if (await tryLink(join(writableLinkOutside, "SKILL.md"), join(dshRoot, "linked-flat.md"), fileLinkType)) {
+    ok(
+      !(await scanEntries(dshRoot)).entries.some((entry) => entry.name === "linked-flat"),
+      "writable DSH scans still hide a flat markdown symlink",
+    );
+    await rm(join(dshRoot, "linked-flat.md"), { force: true });
+  } else {
+    ok(true, "flat markdown symlink test skipped because this environment cannot create file links");
+  }
+  const docLinkTarget = join(tmp, "doc-link-target");
+  await mkdir(docLinkTarget, { recursive: true });
+  const docLink = join(dshRoot, "doc-link-skill");
+  if (
+    await tryLink(join(writableLinkOutside, "SKILL.md"), join(docLinkTarget, "SKILL.md"), fileLinkType) &&
+    await tryLink(docLinkTarget, docLink, providerLinkType)
+  ) {
+    ok(
+      !(await scanEntries(dshRoot)).entries.some((entry) => entry.name === "doc-link-skill"),
+      "writable DSH scans still hide a directory link whose SKILL.md is itself a link",
+    );
+    await rm(docLink, { force: true });
+  } else {
+    ok(true, "linked SKILL.md test skipped because this environment cannot create the links");
+  }
+  const projectSkills = join(tmp, "linked-project", ".dsh", "skills");
+  await mkdir(projectSkills, { recursive: true });
+  const projectTarget = await makeSkill(
+    join(tmp, "project-link-outside"),
+    "proj-linked",
+    "---\nname: proj-linked\ndescription: Project link.\n---\nProject body",
+  );
+  if (await tryLink(projectTarget, join(projectSkills, "proj-linked"), providerLinkType)) {
+    const projectEntry = (await scanEntries({
+      key: "project-dsh:test",
+      path: projectSkills,
+      mutable: true,
+      label: "Project DSH",
+      rank: 100,
+      native: true,
+      toggleable: true,
+    })).entries.find((entry) => entry.name === "proj-linked");
+    ok(
+      projectEntry && projectEntry.linked === true,
+      "project DSH roots list a top-level directory link",
+    );
+  }
   await rm(writableTrustedLink, { recursive: true, force: true });
 } else {
   ok(
@@ -1714,27 +1809,36 @@ const outsidePayload = await makeSkill(
 const plantedLink = join(dshRoot, "evil-link");
 const linkType = process.platform === "win32" ? "junction" : undefined;
 if (await tryLink(outsidePayload, plantedLink, linkType)) {
-  eq(
-    await resolveEntry(dshRoot, "evil-link"),
-    null,
-    "resolveEntry ignores a symlink bundle that leaves the skill root",
+  const planted = await resolveEntry(dshRoot, "evil-link");
+  ok(
+    planted && planted.linked === true,
+    "resolveEntry lists an outside directory link as read-only",
   );
+  ok(
+    (await scanEntries(dshRoot)).entries.some(
+      (item) => item.name === "evil-link" && item.linked === true,
+    ),
+    "scan lists symlink bundles as linked entries",
+  );
+  const outsideDoc = await readFile(join(outsidePayload, "SKILL.md"), "utf8");
   const linkedToggle = await setSkillEnabled(dshRoot, "evil-link", false);
   ok(
     linkedToggle.ok === false,
-    "enable/disable refuses a symlink planted in the skill root",
+    "enable/disable refuses a directory link whose skill is not loadable",
   );
-  const outsideDoc = await readFile(join(outsidePayload, "SKILL.md"), "utf8");
-  ok(
-    !outsideDoc.includes("disable-model-invocation: true"),
+  eq(
+    await readFile(join(outsidePayload, "SKILL.md"), "utf8"),
+    outsideDoc,
     "symlink toggle does not rewrite files outside the skill root",
   );
-  ok(
-    !(await scanEntries(dshRoot)).entries.some(
-      (item) => item.name === "evil-link",
-    ),
-    "scan hides symlink bundles",
+  const plantedDelete = await deleteSkill(dshRoot, "evil-link");
+  eq(plantedDelete.code, "error.skill.linked", "delete refuses a directory link that leaves the skill root");
+  eq(
+    await readFile(join(outsidePayload, "SKILL.md"), "utf8"),
+    outsideDoc,
+    "refused delete does not follow the directory link",
   );
+  await rm(plantedLink, { force: true });
 } else {
   ok(
     true,

@@ -119,6 +119,8 @@ export interface SkillView extends Omit<SkillEntry, 'docPath' | 'entryPath' | 'r
     };
     installSource?: InstallSource | null;
     categoryId?: string | null;
+    /** 可写根里的顶层目录链接。详情和启停可用，删除与覆盖不可用。 */
+    linked?: boolean;
 }
 export interface RootView extends SkillRoot {
     exists: boolean;
