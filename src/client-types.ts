@@ -47,6 +47,8 @@ export interface ModalProps {
     title: string;
     closeLabel: string;
     onClose: () => void;
+    description?: string;
+    footer?: React.ReactNode;
     children?: React.ReactNode;
     wide?: boolean;
     className?: string;

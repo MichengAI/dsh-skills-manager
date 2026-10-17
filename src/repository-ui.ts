@@ -729,36 +729,45 @@ export function createRepositoryUI({ react, Modal, Input, Button, SourceSelect, 
     const refreshProgress = refreshing ? h("div", { className: "dssm-note", role: "status", "aria-live": "polite" }, t("repo.refreshing") + " " + refreshing.index + "/" + refreshing.total + " · " + refreshing.name) : null;
     let dialog;
     if (modal) {
-      let body;
-      if (modal.type === 'install') body = h('div', { className: 'dssm-repo-panel', 'aria-busy': busy },
-        h('div', { className: 'dssm-name' }, modal.skill.name),
-        h(DestinationPicker, { t, value: destination, disabled: busy, allowAgents: true, workspaces, userDestinations: installRoots,
-          onChange: (next: Partial<DestinationValue>) => { if (!locked.current) setDestination({ ...destination, ...next }); } }),
-        h('p', { className: 'dssm-note' }, t('repo.installLocationsHint')),
-        h('p', { className: 'dssm-note' }, t('repo.installHint')),
-        busy ? h('div', { role: 'status', 'aria-live': 'polite' }, t('repo.installProgress')) : null, feedbackNode,
-        h('div', { className: 'dssm-modal-actions' }, button('repo.cancel', close), button(busy ? 'repo.installing' : 'repo.install', changeInstallation, false, !destinationReady(destination, workspaces, installRoots))));
-      if (modal.type === 'uninstall') body = h('div', { className: 'dssm-repo-panel', 'aria-busy': busy },
-        h('div', { className: 'dssm-name' }, modal.skill.name),
-        modal.copy ? h('div', { className: 'dssm-repo-metadata' }, copyName(modal.copy)) : null,
-        h('p', { className: 'dssm-desc' }, t('repo.uninstallHint')),
-        modal.copy?.installedRoot === 'agents' && !modal.copy.installedWorkspace ? h('p', { className: 'dssm-feedback dssm-warning', role: 'alert' }, t('repo.uninstallExternalWarning')) : null,
-        busy ? h('div', { role: 'status', 'aria-live': 'polite' }, t('repo.uninstallProgress')) : null, feedbackNode,
-        h('div', { className: 'dssm-modal-actions' }, button('repo.cancel', close), button(busy ? 'repo.uninstalling' : 'repo.confirmUninstall', changeInstallation, false, !modal.copy || !copyTarget(modal.copy))));
-      if (modal.type === "review" || modal.type === "rollback") body = h("div", { className: "dssm-repo-panel" },
-        h("div", { className: "dssm-name" }, modal.skill.name),
-        h('div', { className: 'dssm-repo-metadata' }, copyName(modal.copy)),
-        h("div", { className: "dssm-repo-metadata" }, modal.repo.owner + "/" + modal.repo.name + " · " + modal.detail.commit?.slice(0, 7)),
-        modal.detail.localModified ? h("p", { className: "dssm-feedback dssm-warning", role: "alert" }, t("repo.modified")) : null,
-        modal.detail.changes.length ? h("ul", { style: { maxHeight: "240px", overflow: "auto", overflowWrap: "anywhere", paddingLeft: "20px" } }, modal.detail.changes.map(change => h("li", { key: change.path }, t("repo." + (change.kind === "modified" ? "modifiedFile" : change.kind)) + " · " + change.path))) : h("p", null, t("repo.noChanges")),
-        busy ? h("div", { role: "status" }, t("repo.updateProgress")) : null, feedbackNode,
-        h("div", { className: "dssm-modal-actions" }, button("repo.cancel", close), button(modal.detail.localModified ? "repo.overwrite" : modal.type === "rollback" ? "repo.confirmRollback" : "repo.confirmUpdate", update, false, !modal.detail.changes.length || !copyTarget(modal.copy))));
+      let body: React.ReactNode;
+            let description: string | undefined;
+            let footer: React.ReactNode;
+            if (modal.type === 'install') body = h('div', { className: 'dssm-repo-panel', 'aria-busy': busy },
+              h('div', { className: 'dssm-name' }, modal.skill.name),
+              h(DestinationPicker, { t, value: destination, disabled: busy, allowAgents: true, workspaces, userDestinations: installRoots,
+                onChange: (next: Partial<DestinationValue>) => { if (!locked.current) setDestination({ ...destination, ...next }); } }),
+              h('p', { className: 'dssm-note' }, t('repo.installLocationsHint')),
+              h('p', { className: 'dssm-note' }, t('repo.installHint')),
+              busy ? h('div', { role: 'status', 'aria-live': 'polite' }, t('repo.installProgress')) : null, feedbackNode,
+              h('div', { className: 'dssm-modal-actions' }, button('repo.cancel', close), button(busy ? 'repo.installing' : 'repo.install', changeInstallation, false, !destinationReady(destination, workspaces, installRoots))));
+            if (modal.type === 'uninstall') {
+              description = t('repo.uninstallHint');
+              body = h('div', { className: 'dssm-repo-panel', 'aria-busy': busy },
+                h('div', { className: 'dssm-name' }, modal.skill.name),
+                modal.copy ? h('div', { className: 'dssm-repo-metadata' }, copyName(modal.copy)) : null,
+                modal.copy?.installedRoot === 'agents' && !modal.copy.installedWorkspace ? h('p', { className: 'dssm-feedback dssm-warning', role: 'alert' }, t('repo.uninstallExternalWarning')) : null,
+                busy ? h('div', { role: 'status', 'aria-live': 'polite' }, t('repo.uninstallProgress')) : null, feedbackNode);
+              footer = [button('repo.cancel', close), button(busy ? 'repo.uninstalling' : 'repo.confirmUninstall', changeInstallation, false, !modal.copy || !copyTarget(modal.copy))];
+            }
+            if (modal.type === "review" || modal.type === "rollback") {
+              body = h("div", { className: "dssm-repo-panel" },
+                h("div", { className: "dssm-name" }, modal.skill.name),
+                h('div', { className: 'dssm-repo-metadata' }, copyName(modal.copy)),
+                h("div", { className: "dssm-repo-metadata" }, modal.repo.owner + "/" + modal.repo.name + " · " + modal.detail.commit?.slice(0, 7)),
+                modal.detail.localModified ? h("p", { className: "dssm-feedback dssm-warning", role: "alert" }, t("repo.modified")) : null,
+                modal.detail.changes.length ? h("ul", { style: { maxHeight: "240px", overflow: "auto", overflowWrap: "anywhere", paddingLeft: "20px" } }, modal.detail.changes.map(change => h("li", { key: change.path }, t("repo." + (change.kind === "modified" ? "modifiedFile" : change.kind)) + " · " + change.path))) : h("p", null, t("repo.noChanges")),
+                busy ? h("div", { role: "status" }, t("repo.updateProgress")) : null, feedbackNode);
+              footer = [button("repo.cancel", close), button(modal.detail.localModified ? "repo.overwrite" : modal.type === "rollback" ? "repo.confirmRollback" : "repo.confirmUpdate", update, false, !modal.detail.changes.length || !copyTarget(modal.copy))];
+            }
       if (modal.type === "add") body = h("form", { className: "dssm-form", onSubmit: (e: React.FormEvent<HTMLFormElement>) => { e.preventDefault(); if (!form.url.trim()) return; perform(async () => { const repo = await post("add", form); await refreshRepo(repo.id); setModal(null); }); } },
         [["url", "repo.url", "https://github.com/owner/repo"], ["ref", "repo.ref", t("repo.defaultBranch")], ["subdirectory", "repo.directory", t("repo.directoryHint")]].map(([key, label, placeholder]) => h("label", { className: "dssm-field", key }, h("span", { className: "dssm-label" }, t(label)), h(Input, { "aria-label": t(label), value: form[key], placeholder, maxLength: key === "url" ? 2048 : 512, required: key === "url", disabled: busy, onChange: (e: { target: { value: string } }) => setForm({ ...form, [key]: e.target.value }) }))),
         feedbackNode, h("div", { className: "dssm-modal-actions" }, button("repo.cancel", close), button("repo.save", () => { if (form.url.trim()) perform(async () => { const repo = await post("add", form); await refreshRepo(repo.id); setModal(null); }); }, false, !form.url.trim())));
       if (modal.type === "manage") body = h("div", { className: "dssm-repo-panel" }, h("p", { className: "dssm-desc" }, t("repo.removeHint")), refreshProgress, feedbackNode, manageRows());
-      if (modal.type === "remove") body = h("div", null, h("p", { className: "dssm-desc" }, modal.repo.owner + "/" + modal.repo.name), h("p", { className: "dssm-desc" }, t("repo.removeHint")), feedbackNode,
-        h("div", { className: "dssm-modal-actions" }, button("repo.cancel", () => setModal({ type: "manage" })), button("repo.removeConfirm", () => perform(async () => { await post("remove", { id: (modal as Extract<RepoModal, {type: "remove"}>).repo.id }); if (source === (modal as Extract<RepoModal, {type: "remove"}>).repo.id) setSource(""); setModal({ type: "manage" }); }), false, false)));
+      if (modal.type === "remove") {
+              description = t("repo.removeHint");
+              body = h("div", null, h("div", { className: "dssm-name" }, modal.repo.owner + "/" + modal.repo.name), feedbackNode);
+              footer = [button("repo.cancel", () => setModal({ type: "manage" })), button("repo.removeConfirm", () => perform(async () => { await post("remove", { id: (modal as Extract<RepoModal, {type: "remove"}>).repo.id }); if (source === (modal as Extract<RepoModal, {type: "remove"}>).repo.id) setSource(""); setModal({ type: "manage" }); }), false, false)];
+            }
       if (modal.type === "catalog-detail" && modal.detail) body = h("div", { className: "dssm-repo-panel" }, h("div", { className: "dssm-name" }, modal.detail.name), h("p", { className: "dssm-desc" }, modal.detail.description), h("div", { className: "dssm-detail-path" }, modal.detail.origin), h("p", { className: "dssm-note" }, t("repo.installHint")), h(Input.TextArea, { readOnly: true, value: modal.detail.body || "", autoSize: { minRows: 6, maxRows: 16 } }));
       if (modal.type === "catalog-detail" && !modal.detail) body = h("div", { role: "status", className: "dssm-repo-panel" }, modal.loading ? t("repo.detailLoading") : null, modal.failed ? feedbackNode : null);
       if (modal.type === "catalog-install") body = h("div", { className: "dssm-repo-panel", "aria-busy": busy },
@@ -768,16 +777,18 @@ export function createRepositoryUI({ react, Modal, Input, Button, SourceSelect, 
         h("p", { className: "dssm-note" }, t("repo.installHint")),
         busy ? h("div", { role: "status", "aria-live": "polite" }, t("repo.installProgress")) : null, feedbackNode,
         h("div", { className: "dssm-modal-actions" }, button("repo.cancel", close), button(busy ? "repo.installing" : "repo.install", confirmCatalogInstall, false, !destinationReady(destination, workspaces, installRoots))));
-      if (modal.type === "catalog-uninstall") body = h("div", { className: "dssm-repo-panel", "aria-busy": busy },
-        h("div", { className: "dssm-name" }, modal.copy.name),
-        h("div", { className: "dssm-repo-metadata" }, catalogCopyName(modal.copy)),
-        h("p", { className: "dssm-desc" }, t("repo.uninstallHint")),
-        modal.copy.installedRoot === "agents" && !modal.copy.installedWorkspace ? h("p", { className: "dssm-feedback dssm-warning", role: "alert" }, t("repo.uninstallExternalWarning")) : null,
-        busy ? h("div", { role: "status", "aria-live": "polite" }, t("repo.uninstallProgress")) : null, feedbackNode,
-        h("div", { className: "dssm-modal-actions" }, button("repo.cancel", close), button(busy ? "repo.uninstalling" : "repo.confirmUninstall", confirmCatalogUninstall, false, false)));
+      if (modal.type === "catalog-uninstall") {
+              description = t("repo.uninstallHint");
+              body = h("div", { className: "dssm-repo-panel", "aria-busy": busy },
+                h("div", { className: "dssm-name" }, modal.copy.name),
+                h("div", { className: "dssm-repo-metadata" }, catalogCopyName(modal.copy)),
+                modal.copy.installedRoot === "agents" && !modal.copy.installedWorkspace ? h("p", { className: "dssm-feedback dssm-warning", role: "alert" }, t("repo.uninstallExternalWarning")) : null,
+                busy ? h("div", { role: "status", "aria-live": "polite" }, t("repo.uninstallProgress")) : null, feedbackNode);
+              footer = [button("repo.cancel", close), button(busy ? "repo.uninstalling" : "repo.confirmUninstall", confirmCatalogUninstall, false, false)];
+            }
       if (modal.type === "detail" && modal.detail) body = h("div", { className: "dssm-repo-panel" }, h("div", { className: "dssm-name" }, modal.detail.name), h("p", { className: "dssm-desc" }, modal.detail.description), h("div", { className: "dssm-detail-path" }, modal.repo.owner + "/" + modal.repo.name + " · " + modal.detail.path), h("div", { className: "dssm-repo-metadata" }, t("repo.commit") + " · " + modal.detail.commit), h("p", { className: "dssm-note" }, t("repo.installHint")), h(Input.TextArea, { readOnly: true, value: modal.detail.body || "", autoSize: { minRows: 6, maxRows: 16 } }));
       if (modal.type === "detail" && !modal.detail) body = h("div", { role: "status", className: "dssm-repo-panel" }, modal.loading ? t("repo.detailLoading") : null, modal.failed ? feedbackNode : null);
-      dialog = h(Modal, { title: t("repo." + (modal.type === "catalog-detail" ? "detail" : modal.type === "catalog-install" ? "install" : modal.type === "catalog-uninstall" ? "uninstall" : modal.type === "remove" ? "remove" : modal.type)), closeLabel: t("repo.close"), onClose: close }, body);
+      dialog = h(Modal, { title: t("repo." + (modal.type === "catalog-detail" ? "detail" : modal.type === "catalog-install" ? "install" : modal.type === "catalog-uninstall" ? "uninstall" : modal.type === "remove" ? "remove" : modal.type)), description, footer, closeLabel: t("repo.close"), onClose: close }, body);
     }
 
     function catalogInstalled(id: string) { return catalogInstallIds.includes(id) || catalogCopiesOf(id).length > 0; }

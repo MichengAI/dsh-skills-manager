@@ -149,8 +149,11 @@ function render() { cursor = 0; ui = useUI({ active, t, onInstalled: async () =>
 // 目标选择器是函数组件：带 userDestinations 的节点展开成它渲染出的子树，其余沿用原遍历。
 function nodes(node) {
   if (!node || typeof node !== "object") return [];
+  if (Array.isArray(node)) return node.flatMap(nodes);
   if (typeof node.type === "function" && node.props && ("userDestinations" in node.props || Array.isArray(node.props.items))) return nodes(node.type(node.props));
-  return [node, ...node.children.flatMap(nodes)];
+  const children = Array.isArray(node.children) ? node.children : [];
+    const extra = node.props && node.props.footer ? [node.props.footer] : [];
+    return [node, ...children.flatMap(nodes), ...extra.flatMap(nodes)];
 }
 const all = () => [...nodes(ui.actions), ...nodes(ui.content)];
 const find = (predicate) => all().find(predicate);
@@ -580,7 +583,9 @@ assert.equal(countCalls("/repositories/uninstall"), 0, "打开卸载确认不删
 assert.equal(dialog().props.title, "repo.uninstall");
 assert.ok(modalNodes().some(n => n.props.className === "dssm-repo-metadata" && n.children.includes("repo.scope.user · repo.source.agents /configured/shared agent/skills")), "卸载确认显示全局-来源和路径");
 assert.ok(modalNodes().some(n => n.props.role === "alert" && n.children.includes("repo.uninstallExternalWarning")));
-assert.ok(modalNodes().some(n => n.children.includes("repo.uninstallHint")), "提示仅删除跟踪副本且可以恢复");
+assert.equal(dialog().props.description, "repo.uninstallHint", "卸载说明走宿主 description，不再塞进正文");
+assert.equal(modalNodes().some(n => n.props.className === "dssm-desc"), false, "确认说明不再用页面描述样式撑下去");
+assert.ok(Array.isArray(dialog().props.footer) || dialog().props.footer, "确认按钮放在宿主 footer");
 assert.equal(modalAction("repo.confirmUninstall").props.variant, "primary", "文字确认用宿主主按钮，不再套危险皮");
 assert.equal(modalAction("repo.confirmUninstall").props.className, undefined, "文字按钮不挂自定义危险类");
 assert.equal(modalAction("repo.cancel").props.variant, "outline", "取消保持宿主描边");
@@ -707,7 +712,7 @@ await click("repo.refresh");
 assert.equal(rowAction("repo.uninstall").props.disabled, false, "含本地修改的完整跟踪副本仍可卸载");
 assert.ok(rowAction("repo.review"), "本地修改仍可预览更新");
 await click("repo.uninstall");
-assert.ok(modalNodes().some(n => n.children.includes("repo.uninstallHint")));
+assert.equal(dialog().props.description, "repo.uninstallHint");
 await clickModal("repo.cancel");
 Object.assign(repos[0].skills[0], { status: "installed", canUninstall: false, installedRoot: null, canRollback: false });
 await click("repo.refresh");

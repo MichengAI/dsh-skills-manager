@@ -60,7 +60,7 @@ try {
       return {
         Button: (props) => react.createElement("button", props, props.children),
         Input: (props) => react.createElement("span", { className: props.className }, react.createElement("input", props)),
-        Modal: (props) => props.open ? react.createElement("div", { role: "dialog", title: props.title }, props.children, props.footer) : null,
+        Modal: (props) => props.open ? react.createElement("div", { role: "dialog", title: props.title, description: props.description }, props.description, props.children, props.footer) : null,
         Menu: (props) => react.createElement("div", { "data-menu-open": props.open }, props.anchor, props.open ? props.items?.map(it => react.createElement("button", { key: it.id, onClick: () => props.onSelect(it.id) }, it.label)) : null),
       };
     }
@@ -136,6 +136,9 @@ try {
   assert.equal(nodes().some((node) => node.props["aria-label"] === t("btn.trash") && node.props.icon), false, "技能行不再单独放删除图标");
   more.props.onChange({ target: { value: "trash" } }); render();
   assert.ok(find((node) => node.props.title === t("confirm.trash.title")), "回收菜单仍先打开确认弹窗");
+  const trashDialog = find((node) => node.props.title === t("confirm.trash.title"));
+  assert.equal(trashDialog.props.description, t("confirm.trash.desc", { name: "global-one" }), "回收说明走宿主 description");
+  assert.equal(nodes(trashDialog).some((node) => node.props.className === "dssm-desc"), false, "确认说明不再塞进正文");
   const trashConfirm = find((node) => node.children.includes(t("btn.trash")) && node.props.variant === "primary");
     assert.ok(trashConfirm, "技能回收确认用宿主主按钮");
     assert.equal(trashConfirm.props.className, undefined, "文字确认不挂危险类");
