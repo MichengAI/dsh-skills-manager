@@ -80,7 +80,10 @@ let finishRefresh, finishDetail;
 let holdRefresh = false, failRefresh = false;
 let installedCalls = 0, failInstalledRefresh = false, failRepositoryList = false;
 let mockCatalogInstalls = ["clawhub:owner-2/skill-002"];
-let mockCatalogCopies = [{ id: "clawhub:owner-2/skill-002", name: "Skill 002", installedRoot: "dsh", canUninstall: true }];
+let mockCatalogCopies = [
+  { id: "clawhub:owner-2/skill-002", name: "Skill 002", installedRoot: "dsh", installedWorkspace: "D:/work/beta", canUninstall: true },
+  { id: "clawhub:owner-2/skill-002", name: "Skill 002", installedRoot: "dsh", canUninstall: true },
+];
 let mockCatalogUnknownIds = [], mockCatalogWarnings = [];
 let holdCatalogPath = "", pendingCatalog = [];
 const api = async (path, options) => {
@@ -228,7 +231,7 @@ assert.equal(toolbar.children[2].type, Input);
 assert.equal(toolbar.children[2].props.allowClear, true, "保留搜索清空按钮");
 for (const action of toolbar.children[3].children) {
   assert.equal(action.props.variant, "outline", "发现页搜索旁按钮与技能行同为带框样式");
-  assert.equal(action.props.className, "dssm-row-icon", "发现页搜索旁按钮复用技能行边框样式");
+  assert.equal(action.props.className, "dssm-icon-action", "发现页搜索旁按钮复用技能行边框样式");
   assert.equal(action.props.style.backgroundColor, undefined, "发现页搜索旁按钮不设置强调底色");
   assert.equal(action.props.style.width, 22, "发现页搜索旁按钮与技能行同尺寸");
   assert.equal(action.props.style.color, undefined, "发现页搜索旁按钮不内联强调色");
@@ -269,12 +272,12 @@ assert.ok(all().some(n => n.props.className === "dssm-meta-origin" && n.children
 const skillshRow = all().find(n => n.props.className === "dssm-repo-row" && nodes(n).some(child => child.props.className === "dssm-name" && child.children.join("") === "React Skill"));
 const skillshActions = nodes(skillshRow).filter(n => n.props["aria-label"] === "repo.detail" || n.props["aria-label"] === "repo.install");
 assert.deepEqual(skillshActions.map(n => n.props["aria-label"]), ["repo.detail", "repo.install"], "skills.sh 每一行右侧是详情和安装");
-assert.ok(skillshActions.every(button => button.props.icon && button.children.length === 0 && button.props.type !== "text" && (button.props.size === "small" || button.props.size === "sm") && button.props.className.includes("dssm-row-icon") && button.props.style.width === 22 && button.props.style.height === 22), "目录行操作使用和图2相同的描边图标按钮");
+assert.ok(skillshActions.every(button => button.props.icon && button.children.length === 0 && button.props.type !== "text" && (button.props.size === "small" || button.props.size === "sm") && button.props.className.includes("dssm-icon-action") && button.props.style.width === 22 && button.props.style.height === 22), "目录行操作使用和图2相同的描边图标按钮");
 assert.match(repoSource, /\.dssm-repo-head \.dssm-repo-actions\{[^}]*gap:8px/, "发现页行内按钮间距和回收站一样是 8px");
 assert.match(repoSource, /\.dssm-repo-actions>\.dssm-repo-copy-actions\{display:contents\}/, "卸载不能再套一层掉到安装位置下一行");
 assert.doesNotMatch(repoSource, /\.dssm-repo-head \.dssm-repo-actions\{[^}]*align-self:flex-start/, "行内按钮和标题说明垂直居中，不贴在标题顶上");
 assert.doesNotMatch(repoSource, /\.dssm-repo-row:has\(\.dssm-repo-head\)\{[^}]*padding-right:8px/, "发现页右侧留白和回收站一样，不收成 8px");
-assert.match(repoSource, /\.dssm-row-icon:not\(:disabled\):not\(\.dssm-icon-danger\):hover\{[^}]*--dsw-alias-link/, "行内图标悬停变蓝");
+assert.match(repoSource, /\.dssm-icon-action:not\(:disabled\):not\(\.dssm-icon-danger\):hover\{[^}]*--dsw-alias-link/, "行内图标悬停变蓝");
 assert.doesNotMatch(repoSource, /ant-btn|ant-collapse|ant-select|dssm-antd-select/, "仓库界面不再保留 ant 选择器");
 await clickNode(skillshActions[0]);
 assert.deepEqual(calls.at(-1), { path: "/catalog/detail", body: { catalog: "skillsh", source: "owner/skills", skillId: "react-skill", name: "React Skill" } }, "详情读取这一条 skills.sh 技能，不订阅仓库");
@@ -305,8 +308,14 @@ assert.deepEqual(rowActions(catalogRow("Skill 001")).map(n => n.props["aria-labe
 assert.deepEqual(rowActions(catalogRow("Skill 002")).map(n => n.props["aria-label"]), ["repo.detail"], "已安装技能行不重复放安装按钮");
 assert.equal(nodes(catalogRow("Skill 002")).find(n => n.props.className === "dssm-catalog-installed"), undefined, "已安装目录技能不再只用一行绿色文字代替副本");
 assert.ok(nodes(catalogRow("Skill 002")).some(n => isAction(n, "repo.installElsewhere")), "已安装目录技能仍可安装到其他位置");
-assert.ok(nodes(catalogRow("Skill 002")).some(n => n.props.className === "dssm-repo-metadata" && String(n.children.join("")).includes("repo.rootDsh")), "目录副本显示安装位置");
-assert.ok(nodes(catalogRow("Skill 002")).some(n => isAction(n, "repo.uninstall")), "每个目录安装位置都可以卸载");
+assert.equal(nodes(catalogRow("Skill 002")).find(n => n.props.className === "dssm-repo-metadata")?.props.title, "repo.scope.user · repo.source.dsh /configured/DSH Home/skills", "全局左边是范围-来源，路径在标题里");
+assert.deepEqual(nodes(catalogRow("Skill 002")).filter(n => n.props.className === "dssm-location-lead").map(n => n.children.join("")), ["repo.scope.user · repo.source.dsh", "repo.scope.project · beta · repo.source.dsh"], "已安装位置先全局，再项目");
+assert.equal(nodes(catalogRow("Skill 002")).find(n => n.props.className === "dssm-location-path")?.children.join(""), "/configured/DSH Home/skills", "路径靠右单独显示");
+assert.equal(nodes(catalogRow("Skill 002")).find(n => n.props.className === "dssm-location-path")?.props.title, "/configured/DSH Home/skills");
+const catalogTrash = nodes(catalogRow("Skill 002")).find(n => isAction(n, "repo.uninstall"));
+assert.equal(catalogTrash.props.title, "repo.scope.user · repo.source.dsh /configured/DSH Home/skills", "垃圾桶提示与位置行同一串");
+assert.equal(catalogTrash.props["aria-label"], "repo.uninstall", "垃圾桶仍是卸载图标");
+assert.equal(catalogTrash.children.includes("repo.uninstall"), false, "垃圾桶不显示文字");
 await clickNode(rowActions(catalogRow("Skill 001"))[0]);
 assert.deepEqual(calls.at(-1), { path: "/catalog/detail", body: { catalog: "clawhub", owner: "owner-1", slug: "skill-001", name: "Skill 001" } }, "详情按作者和 slug 读取这一条 ClawHub 技能");
 assert.equal(modalNodes().find(n => n.type === Input.TextArea)?.props.value, "# Skill 001", "详情展示 ClawHub 返回的技能说明");
@@ -569,10 +578,13 @@ languagePrefix = ""; render();
 await click("repo.uninstall");
 assert.equal(countCalls("/repositories/uninstall"), 0, "打开卸载确认不删除");
 assert.equal(dialog().props.title, "repo.uninstall");
-assert.ok(modalNodes().some(n => n.props.className === "dssm-repo-metadata" && n.children.includes("repo.rootAgents")), "共享位置元数据显示正确名称");
+assert.ok(modalNodes().some(n => n.props.className === "dssm-repo-metadata" && n.children.includes("repo.scope.user · repo.source.agents /configured/shared agent/skills")), "卸载确认显示全局-来源和路径");
 assert.ok(modalNodes().some(n => n.props.role === "alert" && n.children.includes("repo.uninstallExternalWarning")));
 assert.ok(modalNodes().some(n => n.children.includes("repo.uninstallHint")), "提示仅删除跟踪副本且可以恢复");
-assert.ok(modalAction("repo.confirmUninstall").props.danger);
+assert.equal(modalAction("repo.confirmUninstall").props.variant, "primary", "文字确认用宿主主按钮，不再套危险皮");
+assert.equal(modalAction("repo.confirmUninstall").props.className, undefined, "文字按钮不挂自定义危险类");
+assert.equal(modalAction("repo.cancel").props.variant, "outline", "取消保持宿主描边");
+assert.equal(modalAction("repo.cancel").props.className, undefined, "取消不挂自定义类");
 await clickModal("repo.cancel");
 assert.equal(countCalls("/repositories/uninstall"), 0);
 await click("repo.uninstall");
@@ -761,10 +773,17 @@ workspaceRows = [
   { name: "beta", path: "D:/work/beta", projectRoot: "D:/work/beta", registeredPaths: ["D:/work/beta/sub"], available: true, skillCount: 1 },
 ];
 const copy = (installedRoot, installedWorkspace) => ({ installedRoot, ...(installedWorkspace ? { installedWorkspace } : {}), tracked: true, status: "update", updateAvailable: true, canRollback: true, canUninstall: true });
-Object.assign(repos[0].skills[0], { name: "pdf", status: "update", installedRoot: "dsh", tracked: true, canUninstall: true, installations: [copy("dsh"), copy("agents"), copy("dsh", "d:/WORK/alpha/"), copy("dsh", "D:/work/beta"), copy("dsh", "D:/gone"), { installedRoot: "dsh", installedWorkspace: "D:/missing", tracked: false, status: "available", canUninstall: false }] });
+Object.assign(repos[0].skills[0], { name: "pdf", status: "update", installedRoot: "dsh", tracked: true, canUninstall: true, installations: [copy("dsh", "d:/WORK/alpha/"), copy("dsh"), copy("dsh", "D:/work/beta"), copy("agents"), copy("dsh", "D:/gone"), { installedRoot: "dsh", installedWorkspace: "D:/missing", tracked: false, status: "available", canUninstall: false }] });
 await click("repo.refresh");
 const copies = () => all().filter(n => n.props.className === "dssm-repo-copy");
 assert.equal(copies().length, 5, "文件已不在的安装记录不能再显示成已安装位置");
+assert.deepEqual(copies().map(node => nodes(node).find(n => n.props.className === "dssm-location-lead").children.join("")), ["repo.scope.user · repo.source.dsh", "repo.scope.user · repo.source.agents", "repo.scope.project · alpha · repo.source.dsh", "repo.scope.project · beta · repo.source.dsh", "repo.scope.project · gone · repo.source.dsh"], "仓库副本也是先全局，再项目");
+assert.equal(nodes(copies()[1]).find(n => n.props.className === "dssm-repo-metadata").props.title, "repo.scope.user · repo.source.agents /configured/shared agent/skills", "Shared Agent 也是全局-来源");
+assert.equal(nodes(copies()[3]).find(n => n.props.className === "dssm-location-lead").children.join(""), "repo.scope.project · beta · repo.source.dsh", "项目左边是项目-工作区名称-来源");
+assert.equal(nodes(copies()[3]).find(n => n.props.className === "dssm-location-path").children.join(""), "D:/work/beta", "项目路径靠右，不写进左侧连字符");
+assert.equal(nodes(copies()[3]).find(n => isAction(n, "repo.uninstall")).props.title, "repo.scope.project · beta · repo.source.dsh D:/work/beta", "项目垃圾桶提示与位置行同一串");
+assert.match(all().filter(n => n.type === "style").map(n => n.children.join("")).join(""), /\.dssm-location-path\{[^}]*max-width:50%/, "位置路径不超过右半边");
+assert.match(all().filter(n => n.type === "style").map(n => n.children.join("")).join(""), /\.dssm-location-path\{[^}]*margin-left:auto/, "路径靠右");
 const installedRow = all().find(n => n.props.className === "dssm-repo-row" && nodes(n).some(c => c.props.className === "dssm-repo-copy"));
 assert.equal(nodes(installedRow).find(n => n.props.className === "dssm-repo-main").children.some(n => n?.props?.className === "dssm-repo-copies"), false, "已安装位置不塞进文字列，才能和右侧图标对齐");
 const copyCss = all().filter(n => n.type === "style").map(n => n.children.join("")).join("");

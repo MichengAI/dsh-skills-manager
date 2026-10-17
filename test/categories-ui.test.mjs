@@ -219,8 +219,8 @@ try {
   assert.match(css, /\.dssm-enable-switch\[aria-checked=true\]\{background:var\(--dsw-alias-brand-primary/, "开启使用宿主品牌色");
   assert.match(css, /\.dssm-skill-row\{[^}]*padding:11px 13px/, "技能行留白对齐仓库行");
   assert.match(css, /\.dssm-skill-desc\{[^}]*--dsw-alias-label-tertiary/, "描述用次级文字色");
-  assert.match(css, /\.dssm-row-icon\{[^}]*background:transparent[^}]*border-color:var\(--dsw-alias-border-l2/, "行内描边使用宿主主题令牌和透明底色");
-  assert.match(css, /\.dssm-row-icon:not\(:disabled\):not\(\.dssm-icon-danger\):hover\{[^}]*color:var\(--dsw-alias-link/, "普通图标悬停优先使用宿主链接色，危险按钮排除");
+  assert.match(css, /\.dssm-icon-action\{[^}]*background:transparent[^}]*border-color:var\(--dsw-alias-border-l2/, "行内描边使用宿主主题令牌和透明底色");
+  assert.match(css, /\.dssm-icon-action:not\(:disabled\):not\(\.dssm-icon-danger\):hover\{[^}]*color:var\(--dsw-alias-link/, "普通图标悬停优先使用宿主链接色，危险按钮排除");
   assert.doesNotMatch(css, /ant-btn|ant-select|ant-collapse|dssm-antd-select|dssm-icon-btn/, "样式不再保留 ant 选择器或旧图标按钮类");
   assert.doesNotMatch(css, /#1677ff\b|rgba?\(\s*22\s*[, ]\s*119\s*[, ]\s*255\b/i, "禁止重新引入 antd 默认蓝色");
   assert.match(css, /\.dssm-stat\{[^}]*padding:4px 10px/, "顶部统计格子更矮");

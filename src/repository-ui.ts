@@ -24,7 +24,7 @@ export const repositoryLocales = {
     "repo.catalog.loadMore": "再加载 10 条",
     "repo.catalog.installRefreshWarning": "技能已安装并启用，但列表刷新失败。请重新打开发现页；不要重复安装。",
     "repo.catalog.uninstallRefreshWarning": "技能已移入回收站，但列表刷新失败。请刷新技能列表或重新打开设置页；不要重复卸载。",
-    "repo.installElsewhere": "安装到其他位置", "repo.destinationUnavailable": "原项目未登记或目录不可用，无法管理此副本。请在侧栏重新登记原项目后刷新。", "repo.projectDestination": "项目 DSH · {path}",
+    "repo.installElsewhere": "安装到其他位置", "repo.destinationUnavailable": "原项目未登记或目录不可用，无法管理此副本。请在侧栏重新登记原项目后刷新。", "repo.projectDestination": "项目 DSH · {path}", "repo.scope.user": "全局", "repo.scope.project": "项目", "repo.source.dsh": "DSH", "repo.source.agents": "Shared Agent",
     "repo.refreshing": "正在检查更新…", "repo.refreshed": "刷新与更新检查完成", "repo.detailLoading": "正在读取技能说明…",
     "repo.local": "本机", "repo.source": "安装来源", "repo.update": "可更新", "repo.review": "查看更新", "repo.rollback": "恢复上一版", "repo.confirmUpdate": "备份并更新", "repo.confirmRollback": "备份并恢复", "repo.overwrite": "备份本地修改并替换", "repo.modified": "检测到本地修改。替换会覆盖当前文件，原文件将完整备份，可恢复。", "repo.noChanges": "文件内容没有变化。", "repo.added": "新增", "repo.removed": "删除", "repo.modifiedFile": "修改", "repo.updating": "更新中…", "repo.updateProgress": "正在校验、备份并替换，请稍候…", "repo.updateSuccess": "更新完成，已保留上一版备份。", "repo.rollbackSuccess": "已恢复上一版。", "repo.manageUpdate": "管理更新", "error.repo.modified": "存在本地修改，请预览并确认备份后替换。",
     "scope.repositories": "发现技能", "repo.add": "添加仓库", "repo.manage": "管理仓库", "repo.refresh": "刷新并检查更新", "repo.save": "添加并扫描",
@@ -47,7 +47,7 @@ export const repositoryLocales = {
     "repo.catalog.loadMore": "Load 10 more",
     "repo.catalog.installRefreshWarning": "Installed and enabled, but the list could not refresh. Reopen Discover Skills; do not install again.",
     "repo.catalog.uninstallRefreshWarning": "Moved to trash, but the list could not refresh. Refresh the skill list or reopen Settings; do not uninstall again.",
-    "repo.installElsewhere": "Install elsewhere", "repo.destinationUnavailable": "The original project is unregistered or unavailable. Re-register it in the sidebar and refresh to manage this copy.", "repo.projectDestination": "Project DSH · {path}",
+    "repo.installElsewhere": "Install elsewhere", "repo.destinationUnavailable": "The original project is unregistered or unavailable. Re-register it in the sidebar and refresh to manage this copy.", "repo.projectDestination": "Project DSH · {path}", "repo.scope.user": "Global", "repo.scope.project": "Project", "repo.source.dsh": "DSH", "repo.source.agents": "Shared Agent",
     "repo.refreshing": "Checking updates…", "repo.refreshed": "Refresh and update check completed", "repo.detailLoading": "Loading skill instructions…",
     "repo.local": "Local", "repo.source": "Installed from", "repo.update": "Update available", "repo.review": "Review update", "repo.rollback": "Restore previous version", "repo.confirmUpdate": "Back up and update", "repo.confirmRollback": "Back up and restore", "repo.overwrite": "Back up local edits and replace", "repo.modified": "Local edits detected. Replacement overwrites current files and keeps a complete backup for restoration.", "repo.noChanges": "No file changes.", "repo.added": "Added", "repo.removed": "Removed", "repo.modifiedFile": "Modified", "repo.updating": "Updating…", "repo.updateProgress": "Verifying, backing up and replacing files. Please wait…", "repo.updateSuccess": "Updated. Previous version backed up.", "repo.rollbackSuccess": "Previous version restored.", "repo.manageUpdate": "Manage updates", "error.repo.modified": "Local edits detected. Review and confirm replacement with a backup.",
     "scope.repositories": "Discover Skills", "repo.add": "Add repository", "repo.manage": "Manage repositories", "repo.refresh": "Refresh & check updates", "repo.save": "Add and scan",
@@ -77,7 +77,7 @@ const CSS = `
 .dssm-catalog-sentinel{height:1px}.dssm-catalog-loading{display:flex;align-items:center;justify-content:center;gap:8px;padding:12px 13px;color:var(--dsw-alias-label-tertiary,#a0a0a0);font-size:12px;border-top:0.5px solid var(--dsw-alias-border-l1,#3a3a3a)}.dssm-catalog-loading .dssm-repo-spinner{margin-right:0}
 .dssm-meta-origin{color:var(--dsw-alias-label-secondary,#8e8e8e);font-size:11px;margin-top:2px}
 .dssm-status-badge{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:var(--dsw-radius-sm,8px)}
-.dssm-repo-row .dssm-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;font-weight:650;color:var(--dsw-alias-label-primary,#eeeeee)}.dssm-repo-row{display:flex;flex-direction:column;gap:6px;padding:11px 13px;border-top:0.5px solid var(--dsw-alias-border-l1,#3a3a3a);background:transparent}.dssm-repo-head{display:flex;align-items:center;gap:8px;min-width:0;flex-wrap:nowrap}.dssm-repo-actions{display:flex;align-items:center;gap:8px;flex:none;flex-wrap:nowrap}.dssm-repo-actions button{flex:none}.dssm-repo-actions .dssm-repo-copy-actions{gap:8px;margin-left:0}.dssm-repo-main{flex:1;min-width:0}.dssm-repo-main>.dssm-repo-metadata{margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dssm-repo-description{margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--dsw-alias-label-tertiary,#a0a0a0);font-size:12px;line-height:18px}.dssm-repo-copies{display:flex;flex-direction:column;gap:2px;min-width:0}.dssm-repo-copy{display:flex;align-items:center;gap:8px;min-width:0;padding:0;border:0;background:transparent}.dssm-repo-copy .dssm-repo-metadata{font-size:12px;line-height:18px}.dssm-repo-copy-actions{display:flex;align-items:center;gap:8px;margin-left:auto;flex:none}.dssm-repo-spinner{display:inline-block;width:12px;height:12px;margin-right:6px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;corner-shape:round;animation:dssm-repo-spin .8s linear infinite}@keyframes dssm-repo-spin{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.dssm-repo-spinner{animation:none}}.dssm-repo-commit-badge{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,\"Liberation Mono\",\"Courier New\",monospace;font-size:11px;line-height:16px;padding:1px 6px;border-radius:var(--dsw-radius-xs,4px);background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-secondary,#b9b9b9);border:0.5px solid var(--dsw-alias-border-l1,#3a3a3a);margin-left:12px;white-space:nowrap;user-select:all}.dssm-repo-panel{display:flex;flex-direction:column;gap:12px;min-width:0}.dssm-repo-panel .dssm-desc{margin:0}.dssm-repo-metadata{font-size:11px;color:var(--dsw-alias-label-tertiary,#a0a0a0);overflow-wrap:anywhere}.dssm-repo-panel .dssm-source{flex-shrink:0;overflow:hidden;border:0.5px solid var(--dsw-alias-border-l2,#494949);border-radius:var(--dsw-radius-xl,20px);background:transparent}.dssm-repo-panel .dssm-source-title{font-size:14px;font-weight:650;overflow-wrap:anywhere;display:inline-flex;align-items:center;gap:7px}.dssm-repo-panel .dssm-source-brand{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;flex-shrink:0;color:var(--dsw-alias-label-secondary,#b9b9b9)}.dssm-repo-panel .dssm-source-brand svg{width:16px;height:16px;display:block}.dssm-repo-panel .dssm-source-path{min-width:0;margin-left:auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--dsw-alias-label-tertiary,#a0a0a0);font-size:11px}.dssm-repo-panel .dssm-count{padding:1px 6px;border-radius:999px;corner-shape:round;background:var(--dsw-alias-bg-layer-2,rgba(255,255,255,0.08));font-size:11px;color:var(--dsw-alias-label-secondary,#b9b9b9)}.dssm-repo-manage-row{flex-direction:row;align-items:center;justify-content:space-between;gap:12px}.dssm-repo-manage-row .dssm-repo-main{flex:1}.dssm-repo-manage-row .dssm-repo-actions{margin-left:auto}.dssm-repo-manage-row .dssm-repo-actions button{width:auto;flex:none}.dssm-repo-head .dssm-repo-actions{gap:8px}.dssm-repo-actions>.dssm-repo-copy-actions{display:contents}.dssm-row-icon{width:22px;min-width:22px;height:22px;padding:0;border-radius:var(--dsw-radius-sm,8px);background:transparent;color:var(--dsw-alias-label-secondary,#b9b9b9);border-color:var(--dsw-alias-border-l2,#494949)}.dssm-row-icon:not(:disabled):not(.dssm-icon-danger):hover{color:var(--dsw-alias-link,#4176e6)!important;border-color:var(--dsw-alias-link,#4176e6)!important}.dssm-row-icon.dssm-icon-danger{color:var(--dsw-alias-state-error-primary,#ef7272);border-color:var(--dsw-alias-state-error-primary,#ef7272)}.dssm-repo-copies{display:flex;flex-direction:column;gap:4px;width:100%;margin-top:2px}.dssm-repo-copy{display:flex;align-items:center;gap:8px;width:100%;min-width:0;box-sizing:border-box;padding:4px 4px 4px 8px;border-radius:var(--dsw-radius-md,12px);background:var(--dsw-alias-bg-layer-1,rgba(255,255,255,0.04))}.dssm-repo-copy .dssm-repo-metadata{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dssm-repo-copy .dssm-repo-copy-actions{margin-left:0}.dssm-repo-copy .dssm-row-icon.dssm-icon-danger{border-color:var(--dsw-alias-border-l2,#494949)}.dssm-repo-copy .dssm-row-icon.dssm-icon-danger:not(:disabled):hover{color:var(--dsw-alias-state-error-primary,#ef7272)!important;border-color:var(--dsw-alias-state-error-primary,#ef7272)!important}`;
+.dssm-repo-row .dssm-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;font-weight:650;color:var(--dsw-alias-label-primary,#eeeeee)}.dssm-repo-row{display:flex;flex-direction:column;gap:6px;padding:11px 13px;border-top:0.5px solid var(--dsw-alias-border-l1,#3a3a3a);background:transparent}.dssm-repo-head{display:flex;align-items:center;gap:8px;min-width:0;flex-wrap:nowrap}.dssm-repo-actions{display:flex;align-items:center;gap:8px;flex:none;flex-wrap:nowrap}.dssm-repo-actions button{flex:none}.dssm-repo-actions .dssm-repo-copy-actions{gap:8px;margin-left:0}.dssm-repo-main{flex:1;min-width:0}.dssm-repo-main>.dssm-repo-metadata{margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dssm-repo-description{margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--dsw-alias-label-tertiary,#a0a0a0);font-size:12px;line-height:18px}.dssm-repo-copies{display:flex;flex-direction:column;gap:2px;min-width:0}.dssm-repo-copy{display:flex;align-items:center;gap:8px;min-width:0;padding:0;border:0;background:transparent}.dssm-repo-copy .dssm-repo-metadata{font-size:12px;line-height:18px}.dssm-repo-copy-actions{display:flex;align-items:center;gap:8px;margin-left:auto;flex:none}.dssm-repo-spinner{display:inline-block;width:12px;height:12px;margin-right:6px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;corner-shape:round;animation:dssm-repo-spin .8s linear infinite}@keyframes dssm-repo-spin{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.dssm-repo-spinner{animation:none}}.dssm-repo-commit-badge{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,\"Liberation Mono\",\"Courier New\",monospace;font-size:11px;line-height:16px;padding:1px 6px;border-radius:var(--dsw-radius-xs,4px);background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-secondary,#b9b9b9);border:0.5px solid var(--dsw-alias-border-l1,#3a3a3a);margin-left:12px;white-space:nowrap;user-select:all}.dssm-repo-panel{display:flex;flex-direction:column;gap:12px;min-width:0}.dssm-repo-panel .dssm-desc{margin:0}.dssm-repo-metadata{font-size:11px;color:var(--dsw-alias-label-tertiary,#a0a0a0);overflow-wrap:anywhere}.dssm-repo-panel .dssm-source{flex-shrink:0;overflow:hidden;border:0.5px solid var(--dsw-alias-border-l2,#494949);border-radius:var(--dsw-radius-xl,20px);background:transparent}.dssm-repo-panel .dssm-source-title{font-size:14px;font-weight:650;overflow-wrap:anywhere;display:inline-flex;align-items:center;gap:7px}.dssm-repo-panel .dssm-source-brand{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;flex-shrink:0;color:var(--dsw-alias-label-secondary,#b9b9b9)}.dssm-repo-panel .dssm-source-brand svg{width:16px;height:16px;display:block}.dssm-repo-panel .dssm-source-path{min-width:0;margin-left:auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--dsw-alias-label-tertiary,#a0a0a0);font-size:11px}.dssm-repo-panel .dssm-count{padding:1px 6px;border-radius:999px;corner-shape:round;background:var(--dsw-alias-bg-layer-2,rgba(255,255,255,0.08));font-size:11px;color:var(--dsw-alias-label-secondary,#b9b9b9)}.dssm-repo-manage-row{flex-direction:row;align-items:center;justify-content:space-between;gap:12px}.dssm-repo-manage-row .dssm-repo-main{flex:1}.dssm-repo-manage-row .dssm-repo-actions{margin-left:auto}.dssm-repo-manage-row .dssm-repo-actions button{width:auto;flex:none}.dssm-repo-head .dssm-repo-actions{gap:8px}.dssm-repo-actions>.dssm-repo-copy-actions{display:contents}.dssm-icon-action{width:22px;min-width:22px;height:22px;padding:0;border-radius:var(--dsw-radius-sm,8px);background:transparent;color:var(--dsw-alias-label-secondary,#b9b9b9);border-color:var(--dsw-alias-border-l2,#494949)}.dssm-icon-action:not(:disabled):not(.dssm-icon-danger):hover{color:var(--dsw-alias-link,#4176e6)!important;border-color:var(--dsw-alias-link,#4176e6)!important}.dssm-icon-action.dssm-icon-danger{color:var(--dsw-alias-state-error-primary,#ef7272);border-color:var(--dsw-alias-state-error-primary,#ef7272)}.dssm-repo-copies{display:flex;flex-direction:column;gap:4px;width:100%;margin-top:2px}.dssm-repo-copy{display:flex;align-items:center;gap:8px;width:100%;min-width:0;box-sizing:border-box;padding:4px 4px 4px 8px;border-radius:var(--dsw-radius-md,12px);background:var(--dsw-alias-bg-layer-1,rgba(255,255,255,0.04))}.dssm-repo-copy .dssm-repo-metadata{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dssm-repo-copy .dssm-repo-copy-actions{margin-left:0}.dssm-repo-copy .dssm-icon-action.dssm-icon-danger{border-color:var(--dsw-alias-border-l2,#494949)}.dssm-repo-copy .dssm-icon-action.dssm-icon-danger:not(:disabled):hover{color:var(--dsw-alias-state-error-primary,#ef7272)!important;border-color:var(--dsw-alias-state-error-primary,#ef7272)!important}.dssm-repo-copy .dssm-repo-metadata{display:flex;align-items:center;min-width:0;flex:1;overflow:hidden;white-space:nowrap}.dssm-location-lead{flex:0 1 auto;max-width:50%;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dssm-location-path{margin-left:auto;min-width:0;max-width:50%;flex:0 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right}`;
 
 /** 返回动作区与内容区，使现有标题、页签顺序保持不变。 */
 
@@ -204,8 +204,38 @@ export function createRepositoryUI({ react, Modal, Input, Button, SourceSelect, 
       }
       return copy.installedRoot === 'dsh' || copy.installedRoot === 'agents' ? { root: copy.installedRoot } : null;
     }
-    function copyName(copy: RepoCopy) { return copy.installedWorkspace ? t('repo.projectDestination', { path: copy.installedWorkspace }) : copy.installedRoot ? installedDestination(copy.installedRoot) : ''; }
-    function copiesOf(skill: RepoSkill): RepoCopy[] { return (skill.installations ?? (skill.installedRoot ? [skill] : [])).filter(copy => copy.tracked === true); }
+    function copyName(copy: RepoCopy) { return copy.installedWorkspace || copy.installedRoot ? locationLabel(copy) : ''; }
+        function pathIdentity(path: string) { const value = path.replace(/\\/g, "/").replace(/\/+$/, ""); return /^(?:[a-z]:\/|\/\/)/i.test(value) ? value.toLowerCase() : value; }
+        function workspaceName(installedWorkspace: string) {
+          const row = workspaces.find(item => item.projectRoot && pathIdentity(item.projectRoot) === pathIdentity(installedWorkspace));
+          if (row?.name) return row.name;
+          const trimmed = installedWorkspace.replace(/[\\/]+$/, "");
+          const slash = Math.max(trimmed.lastIndexOf("/"), trimmed.lastIndexOf("\\"));
+          return slash >= 0 ? trimmed.slice(slash + 1) : trimmed;
+        }
+        function locationParts(copy: { installedRoot: RepositoryRoot | null; installedWorkspace?: string }) {
+          const project = !!copy.installedWorkspace;
+          const root = project ? "dsh" : copy.installedRoot;
+          const source = root === "agents" ? t("repo.source.agents") : t("repo.source.dsh");
+          const scope = project ? t("repo.scope.project") : t("repo.scope.user");
+          const path = project ? copy.installedWorkspace || "" : installRoots.find(item => item.key === root)?.path || "";
+          const lead = project ? [scope, workspaceName(copy.installedWorkspace || ""), source].filter(Boolean).join(" · ") : [scope, source].filter(Boolean).join(" · ");
+          return { lead, path };
+        }
+        function locationLabel(copy: { installedRoot: RepositoryRoot | null; installedWorkspace?: string }) {
+          const parts = locationParts(copy);
+          return parts.path ? parts.lead + " " + parts.path : parts.lead;
+        }
+        function renderLocation(copy: { installedRoot: RepositoryRoot | null; installedWorkspace?: string }) {
+          const parts = locationParts(copy);
+          return h("div", { className: "dssm-repo-metadata", title: locationLabel(copy) },
+            h("span", { className: "dssm-location-lead" }, parts.lead),
+            parts.path ? h("span", { className: "dssm-location-path", title: parts.path }, parts.path) : null);
+        }
+    function sortCopies<T extends { installedWorkspace?: string }>(copies: T[]): T[] {
+      return copies.slice().sort((left, right) => Number(!!left.installedWorkspace) - Number(!!right.installedWorkspace));
+    }
+    function copiesOf(skill: RepoSkill): RepoCopy[] { return sortCopies((skill.installations ?? (skill.installedRoot ? [skill] : [])).filter(copy => copy.tracked === true)); }
     function message(error: unknown) {
       const item = error as Diagnostic & {message?: string};
       const translated = translateError(t, error) || item.message || String(error);
@@ -485,18 +515,18 @@ export function createRepositoryUI({ react, Modal, Input, Button, SourceSelect, 
         if (mounted.current) setCatalogLoading(false);
       };
     }, [active, subsource]);
-    function button(key: string, action: () => unknown, secondary = true, disabled = false, danger = false) {
-      return h(PrimitiveButton, { variant: secondary ? "outline" : "primary", className: danger ? "dssm-btn-danger" : undefined, danger: danger ? true : undefined, disabled: busy || disabled, onClick: action }, t(key));
-    }
+    function button(key: string, action: () => unknown, secondary = true, disabled = false) {
+          return h(PrimitiveButton, { variant: secondary ? "outline" : "primary", disabled: busy || disabled, onClick: action }, t(key));
+        }
     function rowGlyph(d: string) {
       return h("svg", { viewBox: "0 0 16 16", width: 16, height: 16, "aria-hidden": true, focusable: "false" }, h("path", { d: d, fill: "none", stroke: "currentColor", strokeWidth: 1.5, strokeLinecap: "round", strokeLinejoin: "round" }));
     }
-    function rowIcon(key: string, action: () => unknown, disabled = false) {
+    function rowIcon(key: string, action: () => unknown, disabled = false, hint?: string) {
       var danger = key === "repo.uninstall" || key === "repo.uninstalling" || key === "repo.remove";
       var isSuccess = key === "repo.installed" || key === "repo.installedSuccess";
       var isWarn = key === "repo.conflict";
       var icon = key === "repo.refresh" || key === "repo.refreshing" ? "M13.5 8A5.5 5.5 0 118 2.5c2.3 0 4.3 1.4 5.1 3.5m.4-3.5v3.5H10" : key === "repo.detail" ? "M4 2.5h5.2L12.5 5.8V13.5H4zM9.2 2.8V6h3.2" : key === "repo.installElsewhere" ? "M8 3v10M3 8h10" : key === "repo.installed" ? "M3.5 8.2 6.5 11.2 12.5 4.8" : key === "repo.review" ? "M2.5 8s2.2-3.5 5.5-3.5S13.5 8 13.5 8s-2.2 3.5-5.5 3.5S2.5 8 2.5 8M8 6.3a1.7 1.7 0 1 1 0 3.4 1.7 1.7 0 0 1 0-3.4" : key === "repo.rollback" ? "M3.5 6.5A4.5 4.5 0 1 1 5 11.5M3.5 3.5v3h3" : danger ? "M3.5 4.5h9M6.2 4.5V3.2h3.6v1.3M4.4 4.5l.6 8h6l.6-8" : isWarn ? "M8 2.5l5.5 10.5H2.5L8 2.5zm0 3.5v3.5m0 2v.5" : "M8 2.5v7M5.2 7.2 8 10l2.8-2.8M3.5 13.5h9";
-      return h(PrimitiveButton, Object.assign({ variant: "outline", size: "sm", className: "dssm-row-icon" + (danger ? " dssm-icon-danger" : isSuccess ? " dssm-icon-success" : isWarn ? " dssm-icon-warn" : ""), "aria-label": t(key), title: t(key), icon: rowGlyph(icon), disabled: busy || disabled, onClick: action, style: Object.assign({ width: 22, minWidth: 22, height: 22, padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center", borderRadius: "var(--dsw-radius-sm, 8px)" }, danger ? { color: "var(--dsw-alias-state-error-primary, #ef7272)" } : {}) }, danger ? { danger: true } : {}));
+      return h(PrimitiveButton, Object.assign({ variant: "outline", size: "sm", className: "dssm-icon-action" + (danger ? " dssm-icon-danger" : isSuccess ? " dssm-icon-success" : isWarn ? " dssm-icon-warn" : ""), "aria-label": t(key), title: hint || t(key), icon: rowGlyph(icon), disabled: busy || disabled, onClick: action, style: Object.assign({ width: 22, minWidth: 22, height: 22, padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center", borderRadius: "var(--dsw-radius-sm, 8px)" }, danger ? { color: "var(--dsw-alias-state-error-primary, #ef7272)" } : {}) }, danger ? { danger: true } : {}));
     }
     function openRemove(repo: RepoView) {
       setModal({ type: "remove", repo });
@@ -507,7 +537,7 @@ export function createRepositoryUI({ react, Modal, Input, Button, SourceSelect, 
       return h(PrimitiveButton, {
         variant: "outline",
         size: "sm",
-        className: "dssm-row-icon",
+        className: "dssm-icon-action",
         disabled: true,
         "aria-busy": true,
         "aria-label": t("repo.refreshing"),
@@ -587,7 +617,7 @@ export function createRepositoryUI({ react, Modal, Input, Button, SourceSelect, 
     }
     function toolbarIconButton(key: string, iconD: string, action: () => unknown) {
       return h(PrimitiveButton, {
-        className: "dssm-row-icon",
+        className: "dssm-icon-action",
         variant: "outline",
         size: "sm",
         disabled: busy,
@@ -610,7 +640,7 @@ export function createRepositoryUI({ react, Modal, Input, Button, SourceSelect, 
     function refreshIconButton(selected: RepoView[]) {
       const pending = refreshing && refreshing.id === selected[0]?.id;
       return h(PrimitiveButton, {
-        className: "dssm-row-icon",
+        className: "dssm-icon-action",
         variant: "outline",
         size: "sm",
         disabled: busy || !selected.length,
@@ -649,14 +679,14 @@ export function createRepositoryUI({ react, Modal, Input, Button, SourceSelect, 
       return h('div', { className: 'dssm-repo-copy-actions' },
           copy.tracked && (copy.updateAvailable || copy.status === 'conflict') ? rowIcon('repo.review', () => preview(repo, skill, copy), !target) : null,
           copy.canRollback ? rowIcon('repo.rollback', () => preview(repo, skill, copy, true), !target) : null,
-          copy.canUninstall ? rowIcon(pending && installation.action === 'uninstall' ? 'repo.uninstalling' : 'repo.uninstall', () => openInstallation('uninstall', repo, skill, copy), !target) : null);
+          copy.canUninstall ? rowIcon(pending && installation.action === 'uninstall' ? 'repo.uninstalling' : 'repo.uninstall', () => openInstallation('uninstall', repo, skill, copy), !target, locationLabel(copy)) : null);
     }
     function renderCopy(repo: RepoView, skill: RepoSkill, copy: RepoCopy) {
       const target = copyTarget(copy);
-      return h('div', { className: 'dssm-repo-copy', key: JSON.stringify([copy.installedRoot, copy.installedWorkspace || '']) },
-        h('div', { className: 'dssm-repo-metadata' }, copyName(copy)),
-        renderCopyActions(repo, skill, copy),
-        !target ? h('div', { className: 'dssm-note', role: 'status' }, t('repo.destinationUnavailable')) : null);
+      return h("div", { className: "dssm-repo-copy", key: JSON.stringify([copy.installedRoot, copy.installedWorkspace || ""]) },
+              renderLocation(copy),
+              renderCopyActions(repo, skill, copy),
+              !target ? h("div", { className: "dssm-note", role: "status" }, t("repo.destinationUnavailable")) : null);
     }
     const groups = visibleRepos.map((repo) => {
       const search = query.trim().toLowerCase();
@@ -714,7 +744,7 @@ export function createRepositoryUI({ react, Modal, Input, Button, SourceSelect, 
         h('p', { className: 'dssm-desc' }, t('repo.uninstallHint')),
         modal.copy?.installedRoot === 'agents' && !modal.copy.installedWorkspace ? h('p', { className: 'dssm-feedback dssm-warning', role: 'alert' }, t('repo.uninstallExternalWarning')) : null,
         busy ? h('div', { role: 'status', 'aria-live': 'polite' }, t('repo.uninstallProgress')) : null, feedbackNode,
-        h('div', { className: 'dssm-modal-actions' }, button('repo.cancel', close), button(busy ? 'repo.uninstalling' : 'repo.confirmUninstall', changeInstallation, false, !modal.copy || !copyTarget(modal.copy), true)));
+        h('div', { className: 'dssm-modal-actions' }, button('repo.cancel', close), button(busy ? 'repo.uninstalling' : 'repo.confirmUninstall', changeInstallation, false, !modal.copy || !copyTarget(modal.copy))));
       if (modal.type === "review" || modal.type === "rollback") body = h("div", { className: "dssm-repo-panel" },
         h("div", { className: "dssm-name" }, modal.skill.name),
         h('div', { className: 'dssm-repo-metadata' }, copyName(modal.copy)),
@@ -728,7 +758,7 @@ export function createRepositoryUI({ react, Modal, Input, Button, SourceSelect, 
         feedbackNode, h("div", { className: "dssm-modal-actions" }, button("repo.cancel", close), button("repo.save", () => { if (form.url.trim()) perform(async () => { const repo = await post("add", form); await refreshRepo(repo.id); setModal(null); }); }, false, !form.url.trim())));
       if (modal.type === "manage") body = h("div", { className: "dssm-repo-panel" }, h("p", { className: "dssm-desc" }, t("repo.removeHint")), refreshProgress, feedbackNode, manageRows());
       if (modal.type === "remove") body = h("div", null, h("p", { className: "dssm-desc" }, modal.repo.owner + "/" + modal.repo.name), h("p", { className: "dssm-desc" }, t("repo.removeHint")), feedbackNode,
-        h("div", { className: "dssm-modal-actions" }, button("repo.cancel", () => setModal({ type: "manage" })), button("repo.removeConfirm", () => perform(async () => { await post("remove", { id: (modal as Extract<RepoModal, {type: "remove"}>).repo.id }); if (source === (modal as Extract<RepoModal, {type: "remove"}>).repo.id) setSource(""); setModal({ type: "manage" }); }), false, false, true)));
+        h("div", { className: "dssm-modal-actions" }, button("repo.cancel", () => setModal({ type: "manage" })), button("repo.removeConfirm", () => perform(async () => { await post("remove", { id: (modal as Extract<RepoModal, {type: "remove"}>).repo.id }); if (source === (modal as Extract<RepoModal, {type: "remove"}>).repo.id) setSource(""); setModal({ type: "manage" }); }), false, false)));
       if (modal.type === "catalog-detail" && modal.detail) body = h("div", { className: "dssm-repo-panel" }, h("div", { className: "dssm-name" }, modal.detail.name), h("p", { className: "dssm-desc" }, modal.detail.description), h("div", { className: "dssm-detail-path" }, modal.detail.origin), h("p", { className: "dssm-note" }, t("repo.installHint")), h(Input.TextArea, { readOnly: true, value: modal.detail.body || "", autoSize: { minRows: 6, maxRows: 16 } }));
       if (modal.type === "catalog-detail" && !modal.detail) body = h("div", { role: "status", className: "dssm-repo-panel" }, modal.loading ? t("repo.detailLoading") : null, modal.failed ? feedbackNode : null);
       if (modal.type === "catalog-install") body = h("div", { className: "dssm-repo-panel", "aria-busy": busy },
@@ -744,15 +774,15 @@ export function createRepositoryUI({ react, Modal, Input, Button, SourceSelect, 
         h("p", { className: "dssm-desc" }, t("repo.uninstallHint")),
         modal.copy.installedRoot === "agents" && !modal.copy.installedWorkspace ? h("p", { className: "dssm-feedback dssm-warning", role: "alert" }, t("repo.uninstallExternalWarning")) : null,
         busy ? h("div", { role: "status", "aria-live": "polite" }, t("repo.uninstallProgress")) : null, feedbackNode,
-        h("div", { className: "dssm-modal-actions" }, button("repo.cancel", close), button(busy ? "repo.uninstalling" : "repo.confirmUninstall", confirmCatalogUninstall, false, false, true)));
+        h("div", { className: "dssm-modal-actions" }, button("repo.cancel", close), button(busy ? "repo.uninstalling" : "repo.confirmUninstall", confirmCatalogUninstall, false, false)));
       if (modal.type === "detail" && modal.detail) body = h("div", { className: "dssm-repo-panel" }, h("div", { className: "dssm-name" }, modal.detail.name), h("p", { className: "dssm-desc" }, modal.detail.description), h("div", { className: "dssm-detail-path" }, modal.repo.owner + "/" + modal.repo.name + " · " + modal.detail.path), h("div", { className: "dssm-repo-metadata" }, t("repo.commit") + " · " + modal.detail.commit), h("p", { className: "dssm-note" }, t("repo.installHint")), h(Input.TextArea, { readOnly: true, value: modal.detail.body || "", autoSize: { minRows: 6, maxRows: 16 } }));
       if (modal.type === "detail" && !modal.detail) body = h("div", { role: "status", className: "dssm-repo-panel" }, modal.loading ? t("repo.detailLoading") : null, modal.failed ? feedbackNode : null);
       dialog = h(Modal, { title: t("repo." + (modal.type === "catalog-detail" ? "detail" : modal.type === "catalog-install" ? "install" : modal.type === "catalog-uninstall" ? "uninstall" : modal.type === "remove" ? "remove" : modal.type)), closeLabel: t("repo.close"), onClose: close }, body);
     }
 
     function catalogInstalled(id: string) { return catalogInstallIds.includes(id) || catalogCopiesOf(id).length > 0; }
-    function catalogCopiesOf(id: string) { return catalogCopies.filter(copy => copy.id === id); }
-        function catalogCopyName(copy: CatalogCopy) { return copy.installedWorkspace ? t("repo.projectDestination", { path: copy.installedWorkspace }) : t(copy.installedRoot === "agents" ? "repo.rootAgents" : "repo.rootDsh"); }
+    function catalogCopiesOf(id: string) { return sortCopies(catalogCopies.filter(copy => copy.id === id)); }
+        function catalogCopyName(copy: CatalogCopy) { return locationLabel(copy); }
         function openCatalogUninstall(copy: CatalogCopy) { if (!locked.current && copy.canUninstall) { setFeedback(null); setModal({ type: "catalog-uninstall", copy }); } }
         function confirmCatalogUninstall() {
           if (!modal || modal.type !== "catalog-uninstall") return;
@@ -778,8 +808,8 @@ export function createRepositoryUI({ react, Modal, Input, Button, SourceSelect, 
           const copies = catalogCopiesOf(id);
           if (!copies.length) return null;
           return h("div", { className: "dssm-repo-copies" }, copies.map(copy => h("div", { className: "dssm-repo-copy", key: JSON.stringify([copy.id, copy.installedRoot, copy.installedWorkspace || ""]) },
-            h("div", { className: "dssm-repo-metadata" }, catalogCopyName(copy)),
-            copy.canUninstall ? rowIcon("repo.uninstall", () => openCatalogUninstall(copy)) : null)));
+                      renderLocation(copy),
+                      copy.canUninstall ? rowIcon("repo.uninstall", () => openCatalogUninstall(copy), false, locationLabel(copy)) : null)));
         }
     const filteredCatalogItems = catalogItems.filter(item => {
       const installed = catalogInstalled(`clawhub:${item.owner}/${item.slug}`);

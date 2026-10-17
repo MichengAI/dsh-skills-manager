@@ -12,7 +12,7 @@ function assertSourceCleanup() {
   assert.match(projectCss, /\.dssm-source-title\{[^}]*white-space:nowrap[^}]*flex:none/, "来源标题不因长路径折行");
   assert.doesNotMatch(projectCss, /\.dssm-source-title\{[^}]*overflow-wrap:anywhere/, "来源标题不再任意折行");
   assert.match(projectCss, /\.dssm-count\{[^}]*white-space:nowrap[^}]*flex:none/, "技能数量不因长路径折行");
-  assert.match(projectCss, /\.dssm-source-path\{[^}]*min-width:0[^}]*max-width:180px[^}]*text-overflow:ellipsis/, "全局和项目来源路径固定缩短并省略");
+  assert.match(projectCss, /\.dssm-source-path\{[^}]*min-width:0[^}]*max-width:50%[^}]*text-overflow:ellipsis/, "全局和项目来源路径不超过右半边并省略");
   assert.doesNotMatch(projectCss, /\.dssm-source-path\{max-width:320px\}/, "窄容器不再把路径放宽到 320px");
   assert.match(projectCss, /\.dssm-source-toggle\{[^}]*overflow:hidden/, "来源头裁切溢出的路径，避免盖住加号");
 }
@@ -141,7 +141,7 @@ try {
     assert.ok(action.props.title, "全局技能图标按钮保留悬停提示");
     assert.equal(action.props.style.width, 22, "工具栏图标按钮与技能行同尺寸");
     assert.equal(action.props.variant, "outline", "工具栏图标按钮与技能行同为带框样式");
-    assert.equal(action.props.className, "dssm-row-icon", "工具栏图标按钮复用技能行边框样式");
+    assert.equal(action.props.className, "dssm-icon-action", "工具栏图标按钮复用技能行边框样式");
   }
   const createAction = nodes(globalActions).find(node => node.props["aria-label"] === t("btn.create"));
   assert.equal(createAction.props.style.backgroundColor, undefined, "搜索旁的创建按钮不覆盖主题背景色");
@@ -172,7 +172,7 @@ try {
     assert.ok(action.props.title, "图标按钮保留悬停提示");
     assert.equal(action.props.style.width, 22, "项目页工具栏图标按钮与技能行同尺寸");
     assert.equal(action.props.variant, "outline", "项目页搜索旁按钮与技能行同为带框样式");
-    assert.equal(action.props.className, "dssm-row-icon", "项目页搜索旁按钮复用技能行边框样式");
+    assert.equal(action.props.className, "dssm-icon-action", "项目页搜索旁按钮复用技能行边框样式");
     assert.equal(action.props.style.backgroundColor, undefined, "项目页搜索旁按钮不设置强调底色");
   }
   await choose("D:/work/ghost");
@@ -291,7 +291,7 @@ try {
   assert.ok(restoreIcon && deleteIcon, "回收站行操作统一为带可访问标签的图标按钮");
   for (const button of [restoreIcon, deleteIcon]) {
     assert.notEqual(button.props.type, "text", "行内使用描边图标，不回退为工具栏 text 按钮");
-    assert.match(button.props.className, /\bdssm-row-icon\b/);
+    assert.match(button.props.className, /\bdssm-icon-action\b/);
     assert.ok(button.props.size === "sm" || button.props.size === "small", "图标按钮使用紧凑尺寸");
     assert.ok(button.props.icon, "复用 16px 描边图标");
     assert.equal(button.props.style.width, 22, "操作盒与全局技能图标一致");

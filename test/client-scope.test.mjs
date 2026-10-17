@@ -136,6 +136,10 @@ try {
   assert.equal(nodes().some((node) => node.props["aria-label"] === t("btn.trash") && node.props.icon), false, "技能行不再单独放删除图标");
   more.props.onChange({ target: { value: "trash" } }); render();
   assert.ok(find((node) => node.props.title === t("confirm.trash.title")), "回收菜单仍先打开确认弹窗");
+  const trashConfirm = find((node) => node.children.includes(t("btn.trash")) && node.props.variant === "primary");
+    assert.ok(trashConfirm, "技能回收确认用宿主主按钮");
+    assert.equal(trashConfirm.props.className, undefined, "文字确认不挂危险类");
+  assert.equal(find((node) => node.children.includes(t("btn.cancel")) && node.props.variant === "outline").props.className, undefined, "取消不套危险类");
   find((node) => node.children.includes(t("btn.cancel"))).props.onClick(); render();
   assert.ok(JSON.stringify(nodes()).includes("LONG_DESCRIPTION_global-one"), "展开来源后显示技能简介");
   nodes(groups()[0]).find((node) => node.props.className === "dssm-source-toggle").props.onClick(); render();

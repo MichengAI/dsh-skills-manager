@@ -51,7 +51,7 @@ export function createSourceSelect(react: typeof React) {
             variant: "outline",
             size: "sm",
             disabled: props.disabled,
-            className: props.icon ? "dssm-row-icon" : undefined,
+            className: props.icon ? "dssm-icon-action" : undefined,
             style: props.icon ? { width: 22, minWidth: 22, height: 22, padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center", borderRadius: "var(--dsw-radius-sm, 8px)" } : undefined,
             "aria-label": props.label,
             title: props.label,
