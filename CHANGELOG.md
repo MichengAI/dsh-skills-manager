@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.3 - 2026-10-17
+
+- Support DeepSeek Harness `0.2.1-rc.2` while retaining all existing supported versions.
+
 ## 1.2.2 - 2026-10-17
 
 - Support DeepSeek Harness `0.2.1-rc.1`; supported host versions are `0.2.0-rc.1`, `0.2.0-rc.2`, and `0.2.1-rc.1`.

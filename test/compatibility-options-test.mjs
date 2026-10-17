@@ -20,7 +20,9 @@ assert.throws(() => hostCordisOverrides("0.1.7-rc.1"), /未支持的宿主/);
 assert.equal(cordisPin("0.2.0-rc.1"), "4.0.4");
 assert.equal(cordisPin("0.2.0-rc.2"), "4.0.4");
 assert.equal(cordisPin("0.2.1-rc.1"), "4.0.5");
+assert.equal(cordisPin("0.2.1-rc.2"), "4.0.5");
 assert.equal(hostCordisOverrides("0.2.1-rc.1")["@deepseek-ai/schemastery"], "3.18.5");
+assert.equal(hostCordisOverrides("0.2.1-rc.2")["@deepseek-ai/schemastery"], "3.18.5");
 assert.equal(hostCordisOverrides("0.2.1-rc.1")["@deepseek-ai/cordis-plugin-loader"], "1.0.6");
 assert.equal(hostCordisOverrides("0.2.1-rc.1")["@deepseek-ai/cordis-plugin-group"], "1.0.5");
 assert.equal(hostCordisOverrides("0.2.1-rc.1")["@deepseek-ai/cordis-plugin-hmr"], "1.0.20");
@@ -32,7 +34,7 @@ for (const host of supportedHosts) {
   for (const name of requiredPins) assert.ok(overrides[name], `${host} 缺少 ${name}`);
 }
 assert.equal(developmentHost, "0.2.0-rc.2");
-assert.deepEqual(supportedHosts, ["0.2.0-rc.1", "0.2.0-rc.2", "0.2.1-rc.1"]);
+assert.deepEqual(supportedHosts, ["0.2.0-rc.1", "0.2.0-rc.2", "0.2.1-rc.1", "0.2.1-rc.2"]);
 assert.deepEqual(parseOptions(["--keep"]).versions, supportedHosts);
 assert.equal(parseOptions(["--keep", supportedHosts[0]]).keep, true);
 assert.deepEqual(parseOptions([supportedHosts[0], "--keep"]).versions, [supportedHosts[0]]);
