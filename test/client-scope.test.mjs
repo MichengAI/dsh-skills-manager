@@ -69,7 +69,10 @@ try {
   client.apply({ effect() {}, slots: { inject(name, fn) { fn(); }, register(options, fn) { component = fn; } } });
   const t = (key, params = {}) => (client.DICT.zh[key] || key).replace(/\{(\w+)\}/g, (_, name) => String(params[name] ?? "{" + name + "}"));
   let tree;
-  let snapshotFor = (id) => ({ current: id });
+  // 0.2 起只认 retainedBy.mainView；旧 current 字段已不再参与会话识别，夹具不得再模拟它。
+  let snapshotFor = (id) => id
+    ? { ids: [id], byId: { [id]: { retainedBy: { mainView: 1 } } } }
+    : { ids: [], byId: {} };
   function render() {
     state = outerState; cursor = 0;
     const view = component({ t, useSessions: (selector) => selector(snapshotFor(currentSession)) });
@@ -225,9 +228,6 @@ try {
   assert.ok(find((node) => node.props.className === "dssm-source"), "旧会话的慢响应不会让页面崩溃");
   console.log("全局页 Tab、筛选记忆、会话重挂载和创建目标交互回归通过");
 
-  snapshotFor = (id) => id
-    ? { ids: [id], byId: { [id]: { retainedBy: { mainView: 1 } } } }
-    : { ids: [], byId: {} };
   outerState.length = 0;
   innerState = [];
   mountedKey = undefined;

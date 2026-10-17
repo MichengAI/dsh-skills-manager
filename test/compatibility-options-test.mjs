@@ -41,7 +41,6 @@ for (const host of supportedHosts) {
 }
 assert.equal(developmentHost, "0.2.0-rc.2");
 assert.deepEqual(supportedHosts, ["0.2.0-rc.1", "0.2.0-rc.2", "0.2.1-alpha.1", "0.2.1-alpha.2", "0.2.1-alpha.3", "0.2.1-alpha.4", "0.2.1-alpha.5"]);
-assert.equal(supportedHosts.some((version) => version.includes("0.1.6-alpha") || version.includes("0.1.7-alpha")), false);
 assert.deepEqual(parseOptions(["--keep"]).versions, supportedHosts);
 assert.equal(parseOptions(["--keep", supportedHosts[0]]).keep, true);
 assert.deepEqual(parseOptions([supportedHosts[0], "--keep"]).versions, [supportedHosts[0]]);
