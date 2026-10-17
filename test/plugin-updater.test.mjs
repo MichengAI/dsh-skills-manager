@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 import { handlePluginUpdateEscape, manualPluginUpdateCommand } from '../src/plugin-update-model.ts'
-import { isDshCliEntry, isNewerVersion, isTrustedUpdateRequest, PLUGIN_UPDATE_HEADER, resolveUpdateRuntime, shouldNotifyParent } from '../src/plugin-updater.ts'
+import { isDshCliEntry, isNewerVersion, isTrustedUpdateRequest, mergeMinimumReleaseAgeExclude, PLUGIN_UPDATE_HEADER, resolveUpdateRuntime, shouldNotifyParent } from '../src/plugin-updater.ts'
 
 test('技能管理器独立更新只接受同源专用请求', () => {
   assert.equal(isNewerVersion('0.1.40', '0.1.41'), true)
@@ -81,4 +81,29 @@ test('官方 Desktop 在线更新指向 desktop profile，且不通知父进程'
   assert.equal(runtime.canAutoUpdate, true)
   assert.equal(runtime.officialDesktop, true)
   assert.equal(shouldNotifyParent(runtime, () => {}), false)
+})
+
+test('自更新把刚安装的版本并进已有发布年龄白名单，不另起一行', () => {
+  const created = mergeMinimumReleaseAgeExclude('packages:\n  - .\n', '@michengai/dsh-skills-manager@1.2.0')
+  assert.match(created, /minimumReleaseAgeExclude:\n  - '@michengai\/dsh-skills-manager@1\.2\.0'\n/)
+  assert.doesNotMatch(created, /minimumReleaseAgeExclude:\n  - '@michengai\/dsh-skills-manager'\n/)
+
+  const merged = mergeMinimumReleaseAgeExclude(
+    "minimumReleaseAgeExclude:\n  - '@michengai/dsh-skills-manager@1.1.19 || 1.1.21 || 1.1.22'\n  - keep@1.0.0\n",
+    '@michengai/dsh-skills-manager@1.2.0',
+  )
+  assert.match(merged, /'@michengai\/dsh-skills-manager@1\.1\.19 \|\| 1\.1\.21 \|\| 1\.1\.22 \|\| 1\.2\.0'/)
+  assert.match(merged, /keep@1\.0\.0/)
+  assert.equal(merged.split('@michengai/dsh-skills-manager').length - 1, 1)
+})
+
+test('同名白名单多行先并进第一条，读不懂的块则停止更新', () => {
+  const merged = mergeMinimumReleaseAgeExclude(
+    "minimumReleaseAgeExclude:\n  - '@michengai/dsh-skills-manager@1.1.19'\n  - keep@1.0.0\n  - '@michengai/dsh-skills-manager@1.1.22'\n",
+    '@michengai/dsh-skills-manager@1.2.0',
+  )
+  assert.match(merged, /'@michengai\/dsh-skills-manager@1\.1\.19 \|\| 1\.1\.22 \|\| 1\.2\.0'/)
+  assert.equal(merged.split('@michengai/dsh-skills-manager').length - 1, 1)
+  assert.match(merged, /keep@1\.0\.0/)
+  assert.throws(() => mergeMinimumReleaseAgeExclude('minimumReleaseAgeExclude: [keep@1.0.0]\n', '@michengai/dsh-skills-manager@1.2.0'), /无法安全合并/)
 })
