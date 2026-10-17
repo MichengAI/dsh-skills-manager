@@ -244,6 +244,14 @@ ok(
   "client metadata does not reference retired runtime",
 );
 ok(
+  manifest.peerDependencies["@deepseek-ai/dsh-client-ui-primitives"] === manifest.peerDependencies["@deepseek-ai/dsh-client-ui-slots"],
+  "primitives is a required host peer",
+);
+ok(
+  manifest.dsh.client.inject.includes("@deepseek-ai/dsh-client-ui-primitives"),
+  "client metadata injects primitives",
+);
+ok(
   /@media\(max-width:720px\)\{\.dssm-title-row\{flex-wrap:wrap\}/.test(source),
   "feedback title row wraps at the archive plugin breakpoint",
 );

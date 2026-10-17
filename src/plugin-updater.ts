@@ -3,7 +3,7 @@ import type { HostContext, UpdateOptions, UpdateTarget } from "./host-types.js";
 import type { CodedError } from "./types.js";
 import { spawn } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, delimiter, dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -233,8 +233,9 @@ function isReleaseVersion(version: string) {
 function unreadableReleaseAgeExclude() {
   return new Error("发布年龄白名单无法安全合并，已停止更新，避免这个 profile 之后无法安装插件。");
 }
-function excludeEntry(indent: string, name: string, versions: readonly string[]) {
-  return `${indent}- '${name}@${versions.join(" || ")}'`;
+function excludeEntry(indent: string, name: string, versions: readonly string[], comment = "") {
+  const entry = `${indent}- '${name}@${versions.join(" || ")}'`;
+  return comment === "" ? entry : `${entry} ${comment}`;
 }
 function parseExcludeLine(line: string) {
   const dash = line.indexOf("-");
@@ -242,12 +243,14 @@ function parseExcludeLine(line: string) {
   const indent = line.slice(0, dash);
   const raw = line.slice(dash + 1).trim();
   let body = raw;
+  let comment = "";
   if (raw.startsWith("'") || raw.startsWith("\"")) {
     const quote = raw[0] ?? "'";
     const end = raw.lastIndexOf(quote);
     if (end <= 0) return undefined;
     const rest = raw.slice(end + 1).trim();
     if (rest !== "" && !rest.startsWith("#")) return undefined;
+    if (rest.startsWith("#")) comment = rest;
     body = raw.slice(1, end);
   } else if (raw.includes("#")) return undefined;
   if (body.includes("#")) return undefined;
@@ -255,10 +258,10 @@ function parseExcludeLine(line: string) {
   if (versionAt > 0) {
     const name = body.slice(0, versionAt);
     const versions = body.slice(versionAt + 1).split(" || ");
-    if (isPackageName(name) && versions.every(isReleaseVersion)) return { indent, name, versions };
+    if (isPackageName(name) && versions.every(isReleaseVersion)) return { indent, name, versions, comment };
     return undefined;
   }
-  if (isPackageName(body) || /^@[^/\s]+\/\*$/.test(body)) return { indent, name: body, versions: undefined };
+  if (isPackageName(body) || /^@[^/\s]+\/\*$/.test(body)) return { indent, name: body, versions: undefined, comment };
   return undefined;
 }
 /** 把刚安装的精确版本并进 profile 白名单。pnpm 每个包名只认第一条，所以必须并进已有 union，不能另起一行，也不能收成裸包名。 */
@@ -300,14 +303,14 @@ function mergeReleaseAgeText(yaml: string, name: string, version: string) {
     bodyEnd = nextNl + 1;
     if (bodyEnd === yaml.length) break;
   }
-  let ours: { index: number; versions: string[] | undefined; indent: string } | undefined;
+  let ours: { index: number; versions: string[] | undefined; indent: string; comment: string } | undefined;
   const rewritten = lines.map((line, index) => {
     if (line.trim() === "" || /^[ \t]*#/.test(line)) return line;
     const parsed = parseExcludeLine(line);
     if (parsed === undefined) throw unreadableReleaseAgeExclude();
     if (parsed.name !== name) return line;
     if (ours === undefined) {
-      ours = { index, indent: parsed.indent, versions: parsed.versions };
+      ours = { index, indent: parsed.indent, versions: parsed.versions, comment: parsed.comment };
       return line;
     }
     if (ours.versions !== undefined && parsed.versions !== undefined) ours.versions = [...ours.versions, ...parsed.versions.filter((item) => !ours?.versions?.includes(item))];
@@ -316,7 +319,7 @@ function mergeReleaseAgeText(yaml: string, name: string, version: string) {
   if (ours?.versions === undefined && ours !== undefined) return yaml;
   const indent = ours?.indent ?? lines.find((line) => /^[ \t]+-/.test(line))?.match(/^([ \t]+)/)?.[1] ?? "  ";
   const versions = ours?.versions === undefined ? [version] : ours.versions.includes(version) ? ours.versions : [...ours.versions, version];
-  const entry = excludeEntry(indent, name, versions);
+  const entry = excludeEntry(indent, name, versions, ours?.comment ?? "");
   if (ours === undefined) rewritten.push(entry);
   else rewritten[ours.index] = entry;
   const body = rewritten.filter((line) => line !== "").join("\n");
@@ -330,11 +333,36 @@ async function guardReleaseAgeExclude(profileDir: string, packageSpec: string) {
   const current = existsSync(file) ? await readFile(file, "utf8") : "packages:\n  - .\n";
   mergeMinimumReleaseAgeExclude(current, packageSpec);
 }
+async function replaceTextFile(file: string, next: string) {
+  const tmp = `${file}.${process.pid}.tmp`;
+  const backup = `${file}.${process.pid}.bak`;
+  await writeFile(tmp, next, "utf8");
+  try {
+    await rename(tmp, file);
+    return;
+  } catch (error) {
+    const code = error && typeof error === "object" && "code" in error ? String(error.code) : "";
+    if (code !== "EEXIST" && code !== "EPERM" && code !== "EACCES") {
+      await unlink(tmp).catch(() => {});
+      throw error;
+    }
+  }
+  await unlink(backup).catch(() => {});
+  await rename(file, backup);
+  try {
+    await rename(tmp, file);
+  } catch (error) {
+    await rename(backup, file).catch(() => {});
+    await unlink(tmp).catch(() => {});
+    throw error;
+  }
+  await unlink(backup).catch(() => {});
+}
 async function recordReleaseAgeExclude(profileDir: string, packageSpec: string) {
   const file = resolve(profileDir, "pnpm-workspace.yaml");
   const current = existsSync(file) ? await readFile(file, "utf8") : "packages:\n  - .\n";
   const next = mergeMinimumReleaseAgeExclude(current, packageSpec);
-  if (next !== current) await writeFile(file, next, "utf8");
+  if (next !== current) await replaceTextFile(file, next);
 }
 async function runCliInstall(target: UpdateTarget, packageSpec: string) {
   if (target.cliEntry === void 0) throw new Error("\u5F53\u524D\u73AF\u5883\u4E0D\u652F\u6301\u81EA\u52A8\u66F4\u65B0\uFF0C\u8BF7\u4F7F\u7528\u624B\u5DE5\u66F4\u65B0\u547D\u4EE4\u3002");
@@ -394,8 +422,12 @@ async function install(target: UpdateTarget, packageSpec: string) {
     return;
   }
   if (target.pluginManager !== void 0) {
+    await guardReleaseAgeExclude(target.profileDir, packageSpec);
     const result = await target.pluginManager.installBundle(packageSpec);
-    if (result.application === "applied" || result.application === "restart-required" || result.application === "overridden") return;
+    if (result.application === "applied" || result.application === "restart-required" || result.application === "overridden") {
+      await recordReleaseAgeExclude(target.profileDir, packageSpec);
+      return;
+    }
     throw new Error(result.error?.message || result.packageResult?.output || "更新失败，请查看服务端日志。");
   }
   await guardReleaseAgeExclude(target.profileDir, packageSpec);
@@ -472,5 +504,6 @@ export {
   isDshCliEntry,
   isNewerVersion,
   isTrustedUpdateRequest,
+  recordReleaseAgeExclude,
   registerPluginUpdater
 };

@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict'
-import { readFile } from 'node:fs/promises'
+import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import test from 'node:test'
 import { handlePluginUpdateEscape, manualPluginUpdateCommand } from '../src/plugin-update-model.ts'
-import { isDshCliEntry, isNewerVersion, isTrustedUpdateRequest, mergeMinimumReleaseAgeExclude, PLUGIN_UPDATE_HEADER, resolveUpdateRuntime, shouldNotifyParent } from '../src/plugin-updater.ts'
+import { isDshCliEntry, isNewerVersion, isTrustedUpdateRequest, mergeMinimumReleaseAgeExclude, recordReleaseAgeExclude, PLUGIN_UPDATE_HEADER, resolveUpdateRuntime, shouldNotifyParent } from '../src/plugin-updater.ts'
 
 test('技能管理器独立更新只接受同源专用请求', () => {
   assert.equal(isNewerVersion('0.1.40', '0.1.41'), true)
@@ -106,4 +108,37 @@ test('同名白名单多行先并进第一条，读不懂的块则停止更新',
   assert.equal(merged.split('@michengai/dsh-skills-manager').length - 1, 1)
   assert.match(merged, /keep@1\.0\.0/)
   assert.throws(() => mergeMinimumReleaseAgeExclude('minimumReleaseAgeExclude: [keep@1.0.0]\n', '@michengai/dsh-skills-manager@1.2.0'), /无法安全合并/)
+})
+
+test('合并白名单保留行内注释、CRLF 和文件结尾换行', () => {
+  const merged = mergeMinimumReleaseAgeExclude(
+    "minimumReleaseAgeExclude:\r\n  - '@michengai/dsh-skills-manager@1.1.19' # 保留\r\n  - keep@1.0.0\r\n",
+    '@michengai/dsh-skills-manager@1.2.0',
+  )
+  assert.match(merged, /'@michengai\/dsh-skills-manager@1\.1\.19 \|\| 1\.2\.0' # 保留/)
+  assert.ok(merged.includes('\r\n'))
+  assert.equal(merged.at(-1), '\n')
+  const noEol = mergeMinimumReleaseAgeExclude('packages:\n  - .', '@michengai/dsh-skills-manager@1.2.0')
+  assert.equal(noEol.endsWith('\n'), true)
+  assert.match(noEol, /'@michengai\/dsh-skills-manager@1\.2\.0'\n$/)
+})
+
+test('pluginManager 安装前先检查白名单，成功后才写入', async () => {
+  const source = await readFile(new URL('../src/plugin-updater.ts', import.meta.url), 'utf8')
+  const start = source.indexOf('if (target.pluginManager !== void 0)')
+  const branch = source.slice(start, source.indexOf('await runCliInstall', start))
+  assert.match(branch, /await guardReleaseAgeExclude[\s\S]*installBundle[\s\S]*await recordReleaseAgeExclude/)
+})
+
+test('白名单先写临时文件再替换，不留下临时文件', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'dsh-age-'))
+  try {
+    await writeFile(join(dir, 'pnpm-workspace.yaml'), "packages:\n  - .\nminimumReleaseAgeExclude:\n  - '@michengai/dsh-skills-manager@1.1.19' # 保留\n", 'utf8')
+    await recordReleaseAgeExclude(dir, '@michengai/dsh-skills-manager@1.2.0')
+    const text = await readFile(join(dir, 'pnpm-workspace.yaml'), 'utf8')
+    assert.match(text, /1\.1\.19 \|\| 1\.2\.0' # 保留/)
+    assert.deepEqual(await readdir(dir), ['pnpm-workspace.yaml'])
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
 })

@@ -71,6 +71,7 @@ const ignoresLib = ignoreRules.split(/\r?\n/u).some((line) => line === "lib" || 
 await ok(manifest.scripts?.prepare === undefined && !ignoresLib, "GitHub installs do not depend on a blocked build script");
 await ok(manifest.scripts?.prepack === "npm run typecheck && npm run build", "打包前自动检查类型并生成产物");
 await ok(!manifest.scripts?.verify?.includes("check-generated.mjs"), "发布验证不再要求提交生成产物");
+await ok(manifest.scripts?.test?.startsWith("node scripts/check-committed-lib.mjs"), "提交的 lib 必须与源码构建结果一致");
 await ok(manifest.scripts?.verify?.includes("pack-test.mjs"), "发布验证覆盖无产物的干净目录打包");
 const generatedCore = new URL("../lib/core.js", import.meta.url);
 const beforeFailureHash = createHash("sha256").update(await readFile(generatedCore)).digest("hex");
