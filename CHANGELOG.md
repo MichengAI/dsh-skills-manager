@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.2 - 2026-10-17
+
+- Support DeepSeek Harness `0.2.1-rc.1`; supported host versions are `0.2.0-rc.1`, `0.2.0-rc.2`, and `0.2.1-rc.1`.
+- Remove intermediate pre-release support for `0.2.1-alpha.1` through `0.2.1-alpha.5`.
+
 ## 1.2.1 - 2026-10-17
 
 - After this plugin updates itself, installing or removing other plugins no longer fails the one-day supply-chain check just because this package was published recently.

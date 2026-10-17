@@ -156,7 +156,7 @@ const workspace = await resolveTempRoot(join(sandbox, "workspace"));
 // 先验证普通工作区，随后补 Git 标记验证两种根目录规则一致。
 await mkdir(env.USERPROFILE, { recursive: true });
 
-async function run(args, cwd = sandbox, taskEnv = process.env) {
+async function run(args, cwd = sandbox, taskEnv = process.env, timeoutMs = 600000) {
   return new Promise((resolveRun, reject) => {
     const directTool =
       process.platform !== "win32" && [npm, pnpm].includes(args[0]);
@@ -174,8 +174,8 @@ async function run(args, cwd = sandbox, taskEnv = process.env) {
     let output = "";
     const timeout = setTimeout(() => {
       void stopProcess(child).catch((error) => console.error(error));
-      reject(new Error(`命令超过 180 秒：${args.join(" ")}\n${output}`));
-    }, 180000);
+      reject(new Error(`命令超过 ${Math.round(timeoutMs / 1000)} 秒：${args.join(" ")}\n${output}`));
+    }, timeoutMs);
     child.stdout.on("data", (data) => {
       output += data;
     });
@@ -265,6 +265,7 @@ try {
     pnpm,
     "install",
     "--ignore-scripts",
+    "--fetch-timeout=600000",
     "--registry=https://registry.npmjs.org/",
   ]);
   await writeFile(join(sandbox, "install.log"), installLog);
