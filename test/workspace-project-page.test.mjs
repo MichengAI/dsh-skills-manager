@@ -9,6 +9,12 @@ function assertSourceCleanup() {
   assert.match(projectCss, /\.dssm-filter-actions\{[^}]*margin-left:auto/, "搜索旁按钮组对齐到工具栏最右侧");
   assert.match(projectCss, /\.dssm-filter-actions\{[^}]*display:flex[^}]*gap:8px;flex:none/, "搜索右侧图标按钮组间距稳定");
   assert.match(projectCss, /\.dssm-source\{[^}]*background:transparent/, "来源卡片背景透出页面底色");
+  assert.match(projectCss, /\.dssm-source-title\{[^}]*white-space:nowrap[^}]*flex:none/, "来源标题不因长路径折行");
+  assert.doesNotMatch(projectCss, /\.dssm-source-title\{[^}]*overflow-wrap:anywhere/, "来源标题不再任意折行");
+  assert.match(projectCss, /\.dssm-count\{[^}]*white-space:nowrap[^}]*flex:none/, "技能数量不因长路径折行");
+  assert.match(projectCss, /\.dssm-source-path\{[^}]*min-width:0[^}]*max-width:180px[^}]*text-overflow:ellipsis/, "全局和项目来源路径固定缩短并省略");
+  assert.doesNotMatch(projectCss, /\.dssm-source-path\{max-width:320px\}/, "窄容器不再把路径放宽到 320px");
+  assert.match(projectCss, /\.dssm-source-toggle\{[^}]*overflow:hidden/, "来源头裁切溢出的路径，避免盖住加号");
 }
 
 let definition, component, cursor = 0, state = [];

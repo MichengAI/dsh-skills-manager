@@ -700,8 +700,10 @@ eq(
   "Codex",
   "fixed user source labels remain unchanged",
 );
+eq(DICT.zh["root.projectDsh"], DICT.zh["root.dsh"], "项目 DSH 与全局同名");
+eq(DICT.en["root.projectDsh"], DICT.en["root.dsh"], "project DSH uses the same label as global DSH");
 ok(
-  DICT.zh["root.projectDsh"] && DICT.en["root.projectAgents"] && DICT.zh["root.copilot"] && DICT.en["root.copilot"] &&
+  DICT.zh["root.projectAgents"] && DICT.en["root.projectAgents"] && DICT.zh["root.copilot"] && DICT.en["root.copilot"] &&
     DICT.zh["root.windsurf"] && DICT.en["root.windsurfUser"] && DICT.zh["root.traeCn"] && DICT.en["root.openclaw"] &&
     DICT.zh["root.clawdbot"] && DICT.en["root.roo"] && DICT.zh["root.codebuddy"] && DICT.en["root.codebuddy"] &&
     DICT.zh["root.workbuddy"] && DICT.en["root.workbuddy"] &&
@@ -1049,7 +1051,7 @@ ok(
   "warning feedback has a distinct visual state",
 );
 ok(
-  source.includes("@container(max-width:780px)"),
+  source.includes("@container(max-width:520px)") && source.includes(".dssm-skill-row{flex-wrap:wrap}"),
   "skill rows respond to the settings content width rather than only the viewport",
 );
 ok(

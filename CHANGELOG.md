@@ -5,6 +5,8 @@
 - Supported hosts are now DeepSeek Harness `0.2.0-rc.1`, `0.2.0-rc.2`, `0.2.1-alpha.1`, `0.2.1-alpha.2`, `0.2.1-alpha.3`, `0.2.1-alpha.4`, and `0.2.1-alpha.5`. Hosts before `0.2.0` are no longer supported. If you still use a `0.1.x` host, install plugin `1.1.23` instead of `@latest`.
 - Tabs, dialogs, inputs, and icon buttons use the host controls. The screen no longer depends on Ant Design.
 - Search-bar icon buttons use the same outlined buttons as the actions on a skill row.
+- Source paths in Global and Project stay on one line and are capped at 180px. The full path remains in the tooltip.
+- The project DSH source uses the same name as the global DSH source.
 
 ## 1.1.23 - 2026-10-16
 
