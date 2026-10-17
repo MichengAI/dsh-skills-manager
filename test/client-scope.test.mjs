@@ -139,9 +139,9 @@ try {
   const trashDialog = find((node) => node.props.title === t("confirm.trash.title"));
   assert.equal(trashDialog.props.description, t("confirm.trash.desc", { name: "global-one" }), "回收说明走宿主 description");
   assert.equal(nodes(trashDialog).some((node) => node.props.className === "dssm-desc"), false, "确认说明不再塞进正文");
-  const trashConfirm = find((node) => node.children.includes(t("btn.trash")) && node.props.variant === "primary");
-    assert.ok(trashConfirm, "技能回收确认用宿主主按钮");
-    assert.equal(trashConfirm.props.className, undefined, "文字确认不挂危险类");
+  const trashConfirm = find((node) => node.children.includes(t("btn.trash")) && node.props.variant === "outline");
+    assert.ok(trashConfirm, "技能回收确认用 outline 按钮");
+    assert.equal(trashConfirm.props.className, "dssm-btn-danger", "文字确认对齐官方删除警告样式挂红色类");
   assert.equal(find((node) => node.children.includes(t("btn.cancel")) && node.props.variant === "outline").props.className, undefined, "取消不套危险类");
   find((node) => node.children.includes(t("btn.cancel"))).props.onClick(); render();
   assert.ok(JSON.stringify(nodes()).includes("LONG_DESCRIPTION_global-one"), "展开来源后显示技能简介");

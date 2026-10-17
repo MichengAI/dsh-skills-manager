@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.4 - 2026-10-17
+
+- Align confirmation dialog destructive action styling with host warning patterns, using red outlined buttons for deletion and uninstallation.
+
 ## 1.2.3 - 2026-10-17
 
 - Support DeepSeek Harness `0.2.1-rc.2` while retaining all existing supported versions.

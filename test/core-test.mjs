@@ -326,8 +326,10 @@ ok(
   "client sends the mutation request marker",
 );
 ok(
-  clientSource.includes("width: props.wide ? 720 : props.className === \"dssm-modal-import\" ? 480 : 560"),
-  "dialogs use Ant Design modal widths",
+  clientSource.includes("PrimitiveModal") &&
+    clientSource.includes("title: props.title") &&
+    clientSource.includes("onClose: props.onClose"),
+  "dialogs use host Modal primitive",
 );
 ok(
   clientSource.includes(

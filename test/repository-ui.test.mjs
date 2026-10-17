@@ -586,8 +586,8 @@ assert.ok(modalNodes().some(n => n.props.role === "alert" && n.children.includes
 assert.equal(dialog().props.description, "repo.uninstallHint", "卸载说明走宿主 description，不再塞进正文");
 assert.equal(modalNodes().some(n => n.props.className === "dssm-desc"), false, "确认说明不再用页面描述样式撑下去");
 assert.ok(Array.isArray(dialog().props.footer) || dialog().props.footer, "确认按钮放在宿主 footer");
-assert.equal(modalAction("repo.confirmUninstall").props.variant, "primary", "文字确认用宿主主按钮，不再套危险皮");
-assert.equal(modalAction("repo.confirmUninstall").props.className, undefined, "文字按钮不挂自定义危险类");
+assert.equal(modalAction("repo.confirmUninstall").props.variant, "outline", "文字确认对齐官方删除警告样式使用 outline");
+assert.equal(modalAction("repo.confirmUninstall").props.className, "dssm-btn-danger", "文字确认挂红色警告类");
 assert.equal(modalAction("repo.cancel").props.variant, "outline", "取消保持宿主描边");
 assert.equal(modalAction("repo.cancel").props.className, undefined, "取消不挂自定义类");
 await clickModal("repo.cancel");
