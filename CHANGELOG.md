@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.1 - 2026-10-17
+
+- After this plugin updates itself, installing or removing other plugins no longer fails the one-day supply-chain check just because this package was published recently.
+- Installed copies list the global copy first, then project copies. Location labels use a middle dot, and both the label and the path stay within their half of the row.
+- Source paths in Global and Project stay within half the row instead of a fixed 180px. The full path remains in the tooltip.
+- Confirmation text sits in the dialog description, and the buttons stay in the footer, so the text is no longer pushed down against the buttons.
+
 ## 1.2.0 - 2026-10-17
 
 - Supported hosts are now DeepSeek Harness `0.2.0-rc.1`, `0.2.0-rc.2`, `0.2.1-alpha.1`, `0.2.1-alpha.2`, `0.2.1-alpha.3`, `0.2.1-alpha.4`, and `0.2.1-alpha.5`. Hosts before `0.2.0` are no longer supported. If you still use a `0.1.x` host, install plugin `1.1.23` instead of `@latest`.
