@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.6 - 2026-10-18
+
+- Hide native skills when the native DSH source (`~/.dsh/skills`) is turned off in Settings → Skills by publishing a rank-399 overlay with `modelInvocable: false` (#48).
+
 ## 1.2.5 - 2026-10-17
 
 - List top-level directory links in writable DSH skill folders (`~/.dsh/skills` and project `.dsh/skills`) as read-only entries. Details and enable/disable work; delete, overwrite, and import replacement are refused (#45).
