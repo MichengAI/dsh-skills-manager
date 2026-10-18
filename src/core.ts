@@ -3239,12 +3239,14 @@ export async function listProviderCandidates(options: ScopeOptions = {}) {
     const overlayRank = group.length > 1
       ? Math.min(...group.map((item) => Math.min(item.root.rank, item.entry.providerRank ?? item.root.rank))) - 1
       : undefined;
+    // 原生根由宿主自己的 provider 提供；来源停用必须发布覆盖层，否则停用不生效。
     const needsOverlay =
       !policyOnly ||
       group.length > 1 ||
       policy.override !== undefined ||
       !entry.invocationPolicyValid ||
-      policyResult.writable === false;
+      policyResult.writable === false ||
+      !policy.sourceEnabled;
     if (!needsOverlay) continue;
     candidates.push({
       name: canonicalSkillName({ root, entry, policy }),
