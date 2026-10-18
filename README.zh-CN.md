@@ -106,29 +106,29 @@ dsh plugin --profile web add @michengai/dsh-skills-manager@latest --registry=htt
 
 ## 支持的 Agent 目录
 
-`~` 表示用户主目录，`<project>` 表示已登记工作区的项目根。表中为默认路径；设置了对应 DSH 目录变量时，以配置为准。
+`~` 表示用户主目录，`<project>` 表示已登记工作区的项目根。表中为默认路径；设置了对应环境变量时，以配置为准。环境变量覆盖对应 Agent 的主根目录，插件会在其目录下扫描 `skills` 文件夹（即 `<环境变量值>/skills`）。
 
-| 来源 | 全局目录 | 项目目录 |
-| --- | --- | --- |
-| <img src="assets/brands/dsh.png" width="16" height="16" alt="DSH" valign="middle"> DSH | `~/.dsh/skills` | `<project>/.dsh/skills` |
-| <img src="assets/brands/agents.svg" width="16" height="16" alt="Shared Agent" valign="middle"> 公共 Agent | `~/.agents/skills` | `<project>/.agents/skills` |
-| <img src="assets/brands/cc-switch.png" width="16" height="16" alt="CC Switch" valign="middle"> CC Switch | `~/.cc-switch/skills` | — |
-| <img src="assets/brands/codex.svg" width="16" height="16" alt="Codex" valign="middle"> Codex | `~/.codex/skills` | `<project>/.codex/skills` |
-| <img src="assets/brands/claude.svg" width="16" height="16" alt="Claude Code" valign="middle"> Claude Code | `~/.claude/skills` | `<project>/.claude/skills` |
-| <img src="assets/brands/gemini.svg" width="16" height="16" alt="Gemini" valign="middle"> Gemini | `~/.gemini/skills` | `<project>/.gemini/skills` |
-| <img src="assets/brands/opencode.svg" width="16" height="16" alt="OpenCode" valign="middle"> OpenCode | `~/.config/opencode/skills` | `<project>/.opencode/skills` |
-| <img src="assets/brands/cursor.svg" width="16" height="16" alt="Cursor" valign="middle"> Cursor | `~/.cursor/skills` | `<project>/.cursor/skills` |
-| <img src="assets/brands/copilot.svg" width="16" height="16" alt="Copilot" valign="middle"> Copilot | `~/.copilot/skills` | `<project>/.github/skills` |
-| <img src="assets/brands/windsurf.svg" width="16" height="16" alt="Windsurf" valign="middle"> Windsurf | `~/.codeium/windsurf/skills`<br>`~/.windsurf/skills` | `<project>/.windsurf/skills` |
-| <img src="assets/brands/trae.svg" width="16" height="16" alt="Trae" valign="middle"> Trae | `~/.trae/skills` | `<project>/.trae/skills` |
-| <img src="assets/brands/trae.svg" width="16" height="16" alt="Trae CN" valign="middle"> Trae CN | `~/.trae-cn/skills` | `<project>/.trae-cn/skills` |
-| <img src="assets/brands/openclaw.svg" width="16" height="16" alt="OpenClaw" valign="middle"> OpenClaw / Clawdbot | `~/.openclaw/skills`<br>`~/.clawdbot/skills` | — |
-| <img src="assets/brands/roo.svg" width="16" height="16" alt="Roo" valign="middle"> Roo | `~/.roo/skills` | `<project>/.roo/skills` |
-| <img src="assets/brands/codebuddy.svg" width="16" height="16" alt="CodeBuddy" valign="middle"> CodeBuddy | `~/.codebuddy/skills` | `<project>/.codebuddy/skills` |
-| <img src="assets/brands/workbuddy.png" width="16" height="16" alt="WorkBuddy" valign="middle"> WorkBuddy | `~/.workbuddy/skills` | `<project>/.workbuddy/skills` |
-| <img src="assets/brands/qoder.svg" width="16" height="16" alt="Qoder" valign="middle"> Qoder | `~/.qoder/skills` | `<project>/.qoder/skills` |
-| <img src="assets/brands/qoder.svg" width="16" height="16" alt="Qoder CN CLI" valign="middle"> Qoder CN CLI | `~/.qoder-cn/skills` | — |
-| <img src="assets/brands/qoder.svg" width="16" height="16" alt="Qoder CN" valign="middle"> Qoder CN | `~/.lingma/skills` | `<project>/.lingma/skills` |
+| 来源 | 全局目录 | 环境变量 | 项目目录 |
+| --- | --- | --- | --- |
+| <img src="assets/brands/dsh.png" width="16" height="16" alt="DSH" valign="middle"> DSH | `~/.dsh/skills` | `DSH_HOME` | `<project>/.dsh/skills` |
+| <img src="assets/brands/agents.svg" width="16" height="16" alt="Shared Agent" valign="middle"> 公共 Agent | `~/.agents/skills` | `DSH_AGENTS_HOME` | `<project>/.agents/skills` |
+| <img src="assets/brands/cc-switch.png" width="16" height="16" alt="CC Switch" valign="middle"> CC Switch | `~/.cc-switch/skills` | — | — |
+| <img src="assets/brands/codex.svg" width="16" height="16" alt="Codex" valign="middle"> Codex | `~/.codex/skills` | `DSH_CODEX_HOME` | `<project>/.codex/skills` |
+| <img src="assets/brands/claude.svg" width="16" height="16" alt="Claude Code" valign="middle"> Claude Code | `~/.claude/skills` | `DSH_CLAUDE_HOME` | `<project>/.claude/skills` |
+| <img src="assets/brands/gemini.svg" width="16" height="16" alt="Gemini" valign="middle"> Gemini | `~/.gemini/skills` | `DSH_GEMINI_HOME` | `<project>/.gemini/skills` |
+| <img src="assets/brands/opencode.svg" width="16" height="16" alt="OpenCode" valign="middle"> OpenCode | `~/.config/opencode/skills` | `DSH_OPENCODE_HOME` | `<project>/.opencode/skills` |
+| <img src="assets/brands/cursor.svg" width="16" height="16" alt="Cursor" valign="middle"> Cursor | `~/.cursor/skills` | `DSH_CURSOR_HOME` | `<project>/.cursor/skills` |
+| <img src="assets/brands/copilot.svg" width="16" height="16" alt="Copilot" valign="middle"> Copilot | `~/.copilot/skills` | `DSH_COPILOT_HOME` | `<project>/.github/skills` |
+| <img src="assets/brands/windsurf.svg" width="16" height="16" alt="Windsurf" valign="middle"> Windsurf | `~/.codeium/windsurf/skills`<br>`~/.windsurf/skills` | `DSH_WINDSURF_HOME`<br>`DSH_WINDSURF_USER_HOME` | `<project>/.windsurf/skills` |
+| <img src="assets/brands/trae.svg" width="16" height="16" alt="Trae" valign="middle"> Trae | `~/.trae/skills` | `DSH_TRAE_HOME` | `<project>/.trae/skills` |
+| <img src="assets/brands/trae.svg" width="16" height="16" alt="Trae CN" valign="middle"> Trae CN | `~/.trae-cn/skills` | `DSH_TRAE_CN_HOME` | `<project>/.trae-cn/skills` |
+| <img src="assets/brands/openclaw.svg" width="16" height="16" alt="OpenClaw" valign="middle"> OpenClaw / Clawdbot | `~/.openclaw/skills`<br>`~/.clawdbot/skills` | `DSH_OPENCLAW_HOME`<br>`DSH_CLAWDBOT_HOME` | — |
+| <img src="assets/brands/roo.svg" width="16" height="16" alt="Roo" valign="middle"> Roo | `~/.roo/skills` | `DSH_ROO_HOME` | `<project>/.roo/skills` |
+| <img src="assets/brands/codebuddy.svg" width="16" height="16" alt="CodeBuddy" valign="middle"> CodeBuddy | `~/.codebuddy/skills` | `DSH_CODEBUDDY_HOME` | `<project>/.codebuddy/skills` |
+| <img src="assets/brands/workbuddy.png" width="16" height="16" alt="WorkBuddy" valign="middle"> WorkBuddy | `~/.workbuddy/skills` | `DSH_WORKBUDDY_HOME` | `<project>/.workbuddy/skills` |
+| <img src="assets/brands/qoder.svg" width="16" height="16" alt="Qoder" valign="middle"> Qoder | `~/.qoder/skills` | `DSH_QODER_HOME` | `<project>/.qoder/skills` |
+| <img src="assets/brands/qoder.svg" width="16" height="16" alt="Qoder CN CLI" valign="middle"> Qoder CN CLI | `~/.qoder-cn/skills` | `DSH_QODER_CN_HOME` | — |
+| <img src="assets/brands/qoder.svg" width="16" height="16" alt="Qoder CN" valign="middle"> Qoder CN | `~/.lingma/skills` | `DSH_LINGMA_HOME` | `<project>/.lingma/skills` |
 
 不扫描普通项目根目录的 `<project>/skills`，避免把仓库的发布资源当作 Agent 技能。OpenClaw / Clawdbot 仅保留上表中的用户级来源。Qoder CN CLI 的项目技能在 `<project>/.qoder/skills`，显示为 Qoder。Qoder CN IDE 使用 Lingma 目录。不存在的外部来源目录不会显示。
 
