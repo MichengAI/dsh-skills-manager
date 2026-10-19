@@ -52,6 +52,7 @@ export interface ModalProps {
     children?: React.ReactNode;
     wide?: boolean;
     className?: string;
+    contentClassName?: string;
 }
 export interface SourceSelectProps {
     value?: string;

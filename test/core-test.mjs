@@ -338,6 +338,14 @@ ok(
   "dialog actions wrap instead of stretching the dialog",
 );
 ok(
+  clientSource.includes(".dssm-modal{max-height:100%}") &&
+    clientSource.includes(
+      ".dssm-modal-content>div:last-child{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable}",
+    ) &&
+    clientSource.includes('contentClassName: ["dssm-modal-content"'),
+  "long dialogs scroll inside the host content slot while actions stay visible",
+);
+ok(
   clientSource.includes('placeholder: t("search.placeholder")'),
   "settings panel registers a skill search input",
 );
