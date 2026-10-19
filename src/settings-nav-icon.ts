@@ -49,8 +49,8 @@ function ensureNavIconStyle(): void {
  */
 export function applySettingsNavIcon(button: Element, wantedLabel: () => string): boolean {
   if (!isOwnNavRow(button.textContent, wantedLabel())) return false;
-  // 宿主没有图标时保持原样，避免凭空多出一个图标破坏布局
-  if (!button.querySelector("svg")) return false;
+  // 只认宿主直接渲染在按钮里的图标；包裹型图标插入额外节点会打乱布局
+  if (!button.querySelector(":scope > svg")) return false;
   if (button.getAttribute(NAV_ICON_MARKER) === "skills" && button.querySelector(`.${NAV_ICON_CLASS}`)) return false;
 
   const doc = button.ownerDocument;

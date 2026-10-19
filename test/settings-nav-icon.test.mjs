@@ -62,6 +62,9 @@ class FakeElement {
   }
 
   querySelectorAll(selector) {
+    if (selector === ":scope > svg") {
+      return this.children.filter((child) => child.tagName === "SVG");
+    }
     const found = [];
     const visit = (node) => {
       for (const child of node.children) {
@@ -174,6 +177,22 @@ test("宿主没有 svg 时不凭空插入图标", () => {
   const button = doc.createElement("button");
   button.textContent = "技能";
   assert.equal(applySettingsNavIcon(button, () => "技能"), false);
+  assert.equal(button.querySelector(`.${NAV_ICON_CLASS}`), null);
+});
+
+test("图标包在容器里时不注入，避免打乱宿主布局", () => {
+  const { doc } = createDom();
+  const button = doc.createElement("button");
+  button.textContent = "技能";
+  const wrapper = doc.createElement("span");
+  wrapper.appendChild(doc.createElement("svg"));
+  button.appendChild(wrapper);
+  const label = doc.createElement("span");
+  label.textContent = "技能";
+  button.appendChild(label);
+
+  assert.equal(applySettingsNavIcon(button, () => "技能"), false);
+  assert.equal(button.getAttribute(NAV_ICON_MARKER), null);
   assert.equal(button.querySelector(`.${NAV_ICON_CLASS}`), null);
 });
 
