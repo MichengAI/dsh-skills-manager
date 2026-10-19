@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.8 - 2026-10-19
+
+- Let the settings page fill the host content column by removing the 820px cap.
+- Scroll the modal body when content exceeds the viewport while keeping footer actions visible across create, import, detail, and category dialogs.
+- Only decorate settings nav buttons that render the host `svg` as a direct child, so wrapped icons keep the host layout.
+
 ## 1.2.7 - 2026-10-19
 
 - Keep the Skills settings nav icon visible under third-party skins by rendering it as an independent CSS mask instead of rewriting the host SVG (#49).
