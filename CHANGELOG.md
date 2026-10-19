@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.7 - 2026-10-19
+
+- Keep the Skills settings nav icon visible under third-party skins by rendering it as an independent CSS mask instead of rewriting the host SVG (#49).
+- Align the scope tabs indicator with the 2px inset used by the Skills page.
+- Document the environment variables that override each supported agent directory.
+
 ## 1.2.6 - 2026-10-18
 
 - Hide native skills when the native DSH source (`~/.dsh/skills`) is turned off in Settings → Skills by publishing a rank-399 overlay with `modelInvocable: false` (#48).
