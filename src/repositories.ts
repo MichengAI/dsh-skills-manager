@@ -700,7 +700,7 @@ export function createRepositoryManager({ fetchImpl = globalThis.fetch, log, reg
         const result = await importUploadedSkill({ name: skill.name, entries }, log, { conflict: "skip", root });
         if (result.ok === false || !result.imported?.length) throw failure(result.error || "技能安装失败或遇到同名冲突", typeof result.code === "string" ? result.code : "error.repo.conflict", result.params);
         copied = true;
-        // 界面默认显示已启用，但斜杠菜单只会收到显式启用覆盖项。安装完成后走与手动开启相同的策略写入。
+        // 界面默认显示已启用，安装完成后走策略初始化，确保不在禁用列表中。
         const enabled = await setSkillEnabled(root, skill.name, true, log);
         if (enabled && typeof enabled === "object" && "ok" in enabled && enabled.ok === false) throw failure(enabled.error || "技能启用状态无法写入", typeof enabled.code === "string" ? enabled.code : "error.repo.enableState", enabled.params);
       } catch (caught) { const error = caught as CodedError;

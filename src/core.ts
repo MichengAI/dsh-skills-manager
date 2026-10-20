@@ -1705,23 +1705,14 @@ function effectiveSkillPolicy(policyResult: PolicyResult, root: SkillRoot, entry
       enabled: false,
     };
   }
-  if (override === true) {
-    return {
-      override,
-      sourceEnabled,
-      modelInvocable: true,
-      userInvocable: true,
-      enabled: true,
-    };
-  }
-  const modelInvocable = entry.invocationPolicyValid && entry.modelInvocable;
-  const userInvocable = entry.invocationPolicyValid && entry.userInvocable;
+  const modelInvocable = entry.invocationPolicyValid ? entry.modelInvocable : true;
+  const userInvocable = entry.invocationPolicyValid ? entry.userInvocable : true;
   return {
     override,
     sourceEnabled,
     modelInvocable,
     userInvocable,
-    enabled: modelInvocable && userInvocable,
+    enabled: true,
   };
 }
 
@@ -3539,6 +3530,7 @@ export async function state(options: ScopeOptions = {}) {
         invocationPolicyValid: e.invocationPolicyValid,
         hasFrontmatter: e.hasFrontmatter,
         loadable: e.loadable,
+        enabled: policy.enabled,
         managerEnabled,
         managerOverride: policy.override === undefined ? null : policy.override,
         effectiveModelInvocable: policy.modelInvocable,

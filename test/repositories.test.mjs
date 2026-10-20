@@ -53,10 +53,15 @@ try {
   assert.equal(requested.length, requestsBeforeInstall, "安装复用已验证缓存，不重新下载移动中的分支");
   const enabledPolicy = JSON.parse(await readFile(join(process.env.DSH_HOME, "skills-manager/state.json"), "utf8"));
   assert.ok(enabledPolicy.enabledSkills.dsh.includes("pdf"), "仓库安装写入显式启用策略，而不是只在界面上显示为开启");
-  const { listProviderCandidates } = await import("../lib/core.js");
+  const { listProviderCandidates, state: currentManagerState } = await import("../lib/core.js");
   const installedCandidate = (await listProviderCandidates()).find((candidate) => candidate.name === "pdf");
   assert.equal(installedCandidate?.invocation.userInvocable, true, "安装后的技能进入斜杠菜单覆盖项");
   assert.equal(installedCandidate?.invocation.modelInvocable, true, "安装后的技能同时允许模型调用");
+  const dshRootState = (await currentManagerState()).roots.find((r) => r.key === "dsh");
+  const installedSkillView = dshRootState?.skills.find((s) => s.name === "pdf");
+  assert.equal(installedSkillView?.enabled, true, "安装后的常规技能处于开启状态");
+  assert.equal(installedSkillView?.effectiveModelInvocable, true, "安装后的常规技能允许模型调用");
+  assert.equal(installedSkillView?.effectiveUserInvocable, true, "安装后的常规技能允许用户调用");
   archive = originalArchive;
   const restartManager = createRepositoryManager({ fetchImpl: async () => { throw new Error("不应请求网络"); } });
   const cacheFile = join(process.env.DSH_HOME, "skills-manager/repository-cache", `${added.id}-${list.repositories[0].commit}.zip`);
@@ -153,6 +158,22 @@ try {
   assert.equal((await manager.sources())[installationSourceKey(join(process.env.DSH_HOME, "skills"), "pdf")].owner, "example", "移除订阅保留安装来源");
   assert.equal((await manager.list()).repositories.length, 0);
   assert.equal(await readFile(join(process.env.DSH_HOME, "skills/pdf/SKILL.md"), "utf8"), "用户本地修改", "移除仓库不删除已安装技能");
+
+  // 回归测试：通过仓库安装包含 disable-model-invocation: true 的技能，权限不被提权 (#51)
+  const repoWithRestricted = zipSync({
+    "repo-main/skills/restricted/SKILL.md": Buffer.from("---\nname: restricted\ndescription: Only for user.\ndisable-model-invocation: true\n---\nRestricted body"),
+  });
+  const restrictedManager = createRepositoryManager({
+    fetchImpl: async () => new Response(repoWithRestricted),
+  });
+  const restrictedRepo = await restrictedManager.add({ url: "example/restricted", subdirectory: "skills" });
+  await restrictedManager.refresh({ id: restrictedRepo.id });
+  await restrictedManager.install({ id: restrictedRepo.id, path: "skills/restricted" });
+  const dshState = (await (await import("../lib/core.js")).state()).roots.find((r) => r.key === "dsh");
+  const restrictedView = dshState?.skills.find((s) => s.name === "restricted");
+  assert.equal(restrictedView?.enabled, true, "受限技能安装后总闸处于开启状态");
+  assert.equal(restrictedView?.effectiveModelInvocable, false, "受限技能模型不可调用，未被管理器提权 (#51)");
+  assert.equal(restrictedView?.effectiveUserInvocable, true, "受限技能斜杠命令正常允许调用");
   const concurrent = await Promise.allSettled([manager.add({ url: "a/concurrent" }), manager.add({ url: "a/concurrent" })]);
   assert.equal(concurrent.filter((r) => r.status === "fulfilled").length, 1, "并发添加不会丢失状态或创建重复来源");
   assert.ok(requested.every(url => url.startsWith("https://codeload.github.com/")), "不消耗GitHub REST API额度");

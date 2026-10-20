@@ -886,14 +886,69 @@ let dshPolicyCandidate = (await listProviderCandidates()).find(
 ok(
   dshPolicyCandidate &&
     dshPolicyCandidate.rank === 399 &&
-    dshPolicyCandidate.invocation.modelInvocable &&
-    dshPolicyCandidate.invocation.userInvocable,
-  "explicit manager enable overrides a source-disabled user DSH Skill through rank 399 policy",
+    dshPolicyCandidate.invocation.modelInvocable === false &&
+    dshPolicyCandidate.invocation.userInvocable === false,
+  "explicit manager enable does not elevate source-level disabled fields (#43, #51)",
 );
-eq(
-  (await getProviderSkill(dshPolicyCandidate)).content,
-  "Source-disabled body",
-  "user DSH policy candidate loads through the manager without changing its source",
+let managerStateNow = await state();
+let sourceDisabledView = managerStateNow.roots
+  .find((r) => r.key === "dsh")
+  ?.skills.find((s) => s.name === "source-disabled");
+ok(
+  sourceDisabledView &&
+    sourceDisabledView.enabled === true &&
+    sourceDisabledView.effectiveModelInvocable === false &&
+    sourceDisabledView.effectiveUserInvocable === false,
+  "manager enable opens gatekeeper without overriding source-level invocation restrictions (#43, #51)",
+);
+
+// ── 回归测试：Issue #43 & #51 (尊重 disable-model-invocation: true，总闸开启不篡改权限) ──
+const manualOnlyText =
+  "---\nname: manual-only\ndescription: Only invoked by user.\ndisable-model-invocation: true\n---\nManual only body";
+await makeSkill(dshRoot, "manual-only", manualOnlyText);
+let manualState = await state();
+let manualView = manualState.roots
+  .find((r) => r.key === "dsh")
+  ?.skills.find((s) => s.name === "manual-only");
+ok(
+  manualView &&
+    manualView.enabled === true &&
+    manualView.effectiveModelInvocable === false &&
+    manualView.effectiveUserInvocable === true,
+  "installed manual-only skill respects disable-model-invocation: true (#51)",
+);
+// 测试拨动总闸关闭与重新开启（#43）
+await setSkillEnabled(dshRoot, "manual-only", false);
+let manualDisabledCandidate = (await listProviderCandidates()).find(
+  (item) => item.source === "user-dsh" && item.name === "manual-only",
+);
+ok(
+  manualDisabledCandidate &&
+    manualDisabledCandidate.rank === 399 &&
+    manualDisabledCandidate.invocation.modelInvocable === false &&
+    manualDisabledCandidate.invocation.userInvocable === false,
+  "disabling manual-only skill globally blocks all invocation via rank 399",
+);
+await setSkillEnabled(dshRoot, "manual-only", true);
+let manualReenabledState = await state();
+let manualReenabledView = manualReenabledState.roots
+  .find((r) => r.key === "dsh")
+  ?.skills.find((s) => s.name === "manual-only");
+ok(
+  manualReenabledView &&
+    manualReenabledView.enabled === true &&
+    manualReenabledView.effectiveModelInvocable === false &&
+    manualReenabledView.effectiveUserInvocable === true,
+  "reenabling manual-only skill perfectly restores frontmatter inheritance (#43)",
+);
+let manualReenabledCandidate = (await listProviderCandidates()).find(
+  (item) => item.source === "user-dsh" && item.name === "manual-only",
+);
+ok(
+  manualReenabledCandidate &&
+    manualReenabledCandidate.invocation.modelInvocable === false &&
+    manualReenabledCandidate.invocation.userInvocable === true,
+  "reenabled candidate keeps model invocation disabled while permitting slash commands (#43, #51)",
 );
 
 // ── 外部来源 provider 与本地策略 ──

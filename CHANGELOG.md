@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.9 - 2026-10-21
+
+- Align the enable/disable switch with lifecycle gatekeeper semantics: disabling globally blocks both model and slash invocations; enabling respects source frontmatter (`disable-model-invocation` and `user-invocable`) without forcing privileges (#43, #51).
+- Prevent repository and catalog installations from overriding `disable-model-invocation: true`, keeping user-only skills out of the model `skill-catalog` (#51).
+- Restore clean frontmatter policy inheritance when re-enabling a previously toggled skill (#43).
+
 ## 1.2.8 - 2026-10-19
 
 - Let the settings page fill the host content column by removing the 820px cap.
