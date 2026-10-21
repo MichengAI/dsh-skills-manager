@@ -1226,6 +1226,15 @@ function isValidDeclaredName(name: string): boolean {
   return true;
 }
 
+function hostAcceptableSkillName(declaredName: string): string | null {
+  const trimmed = String(declaredName || "").trim();
+  if (trimmed === "" || !isValidDeclaredName(trimmed)) return null;
+  if (KEBAB_RE.test(trimmed)) return trimmed;
+  const kebab = toKebab(trimmed);
+  if (kebab && KEBAB_RE.test(kebab)) return kebab;
+  return null;
+}
+
 function entryOf(name: string, kind: string, docPath: string, doc: Pick<ParsedSkill, "map" | "hasFrontmatter">) {
   const declaredName = doc.map.name !== undefined ? unquote(doc.map.name) : "";
   const description =
@@ -1238,6 +1247,7 @@ function entryOf(name: string, kind: string, docPath: string, doc: Pick<ParsedSk
     (doc.map["disable-model-invocation"] === undefined ||
       modelValue !== undefined) &&
     (doc.map["user-invocable"] === undefined || userValue !== undefined);
+  const acceptableName = hostAcceptableSkillName(declaredName);
   const diagnostics = [];
   if (!doc.hasFrontmatter)
     diagnostics.push({
@@ -1246,7 +1256,7 @@ function entryOf(name: string, kind: string, docPath: string, doc: Pick<ParsedSk
     });
   if (doc.hasFrontmatter && !declaredName)
     diagnostics.push({ level: "error", code: "diagnostic.name.missing" });
-  else if (declaredName && !isValidDeclaredName(declaredName))
+  else if (declaredName && acceptableName === null)
     diagnostics.push({
       level: "error",
       code: "diagnostic.name.invalid",
@@ -1269,9 +1279,9 @@ function entryOf(name: string, kind: string, docPath: string, doc: Pick<ParsedSk
     userInvocable: !userDisabled,
     invocationPolicyValid,
     hasFrontmatter: doc.hasFrontmatter,
-    // 只要有 frontmatter、说明非空且声明名合法即可加载；调用策略异常可由 manager 本地覆盖。
+    // 宿主不接受的格式不允许启用（loadable: false）
     loadable:
-      doc.hasFrontmatter && description !== "" && isValidDeclaredName(declaredName),
+      doc.hasFrontmatter && description !== "" && acceptableName !== null,
     diagnostics,
   };
 }
@@ -3373,9 +3383,8 @@ export async function getProviderSkill(candidate: ProviderCandidate, options: Sc
 
 function canonicalSkillName(item: SkillItem) {
   const declared = item.entry.declaredName || "";
-  if (KEBAB_RE.test(declared)) return declared;
-  const kebab = toKebab(declared);
-  return (kebab && KEBAB_RE.test(kebab)) ? kebab : (declared || item.entry.name);
+  const acceptable = hostAcceptableSkillName(declared);
+  return acceptable || declared || item.entry.name;
 }
 
 /** 真实路径去重后按声明名分组；管理页与当前工作区 provider 共用来源优先级。 */

@@ -915,9 +915,14 @@ const allIssue53Skills = issue53State.roots.flatMap(root => root.skills || []);
 
 const guoziranSkill = allIssue53Skills.find(s => s.name === "国自然申请书自检");
 ok(guoziranSkill, "找到中文技能 国自然申请书自检");
-eq(guoziranSkill.loadable, true, "中文技能必须 loadable === true");
-eq(guoziranSkill.diagnostics.length, 0, "中文技能不报 diagnostic.name.invalid");
-eq(guoziranSkill.canonicalName, "国自然申请书自检", "中文技能 canonicalName 保留真实中文名");
+eq(guoziranSkill.loadable, false, "宿主不接受的格式不允许启用（loadable === false）");
+eq(guoziranSkill.diagnostics.length, 1, "中文技能带有格式诊断提示");
+eq(guoziranSkill.diagnostics[0].code, "diagnostic.name.invalid", "中文技能诊断代码为 diagnostic.name.invalid");
+eq(guoziranSkill.declaredName, "国自然申请书自检", "中文技能 declaredName 保留真实中文名");
+
+const cantEnableChinese = await setSkillEnabled(dshRoot, "国自然申请书自检", true);
+ok(cantEnableChinese.ok === false, "宿主不接受格式的技能禁止开启启用");
+eq(cantEnableChinese.code, "error.skill.notLoadable", "禁止启用时返回 notLoadable 错误码");
 
 const cSkill = allIssue53Skills.find(s => s.name === "C盘清理顾问");
 const dSkill = allIssue53Skills.find(s => s.name === "D盘清理顾问");
@@ -925,14 +930,33 @@ const docxSkill = allIssue53Skills.find(s => s.name === "docx脚注图片字压�
 const pptSkill = allIssue53Skills.find(s => s.name === "归藏网页PPT");
 
 ok(cSkill && dSkill && docxSkill && pptSkill, "所有混排中文技能均正常发现");
-eq(cSkill.loadable, true, "C盘清理顾问 loadable === true");
-eq(cSkill.canonicalName, "C盘清理顾问", "C盘清理顾问 canonicalName 不被截断为 c");
-eq(dSkill.canonicalName, "D盘清理顾问", "D盘清理顾问 canonicalName 不被截断为 d");
-eq(docxSkill.canonicalName, "docx脚注图片字压字修复", "docx脚注图片字压字修复 canonicalName 不被截断为 docx");
-eq(pptSkill.canonicalName, "归藏网页PPT", "归藏网页PPT canonicalName 不被截断为 ppt");
+eq(cSkill.loadable, false, "宿主不接受格式的混排技能不允许启用（loadable === false）");
+eq(cSkill.declaredName, "C盘清理顾问", "C盘清理顾问 declaredName 不被截断为 c");
+eq(dSkill.declaredName, "D盘清理顾问", "D盘清理顾问 declaredName 不被截断为 d");
+eq(docxSkill.declaredName, "docx脚注图片字压字修复", "docx脚注图片字压字修复 declaredName 不被截断为 docx");
+eq(pptSkill.declaredName, "归藏网页PPT", "归藏网页PPT declaredName 不被截断为 ppt");
 
-ok(cSkill.winner && !cSkill.shadowedBy, "C盘清理顾问独立为 winner，不被覆盖");
-ok(dSkill.winner && !dSkill.shadowedBy, "D盘清理顾问独立为 winner，不被 C盘清理顾问 覆盖");
+ok(!cSkill.shadowedBy, "C盘清理顾问不被错误覆盖");
+ok(!dSkill.shadowedBy, "D盘清理顾问不被 C盘清理顾问 覆盖");
+
+// 中文目录但 frontmatter 声明合法英文名：宿主接受，允许启用
+await makeSkill(
+  codexRoot,
+  "中文目录带英文声明",
+  `---
+name: chinese-dir-english-name
+description: 中文目录但带有符合规范的英文调用标识。
+---
+正文
+`,
+);
+const stateWithEnglishName = await state();
+const englishNamedSkill = stateWithEnglishName.roots.flatMap(r => r.skills || []).find(s => s.name === "中文目录带英文声明");
+ok(englishNamedSkill, "发现中文目录带英文声明的技能");
+eq(englishNamedSkill.loadable, true, "带合法英文调用标识时允许启用（loadable === true）");
+eq(englishNamedSkill.diagnostics.length, 0, "带合法英文标识不报 diagnostic.name.invalid");
+eq(englishNamedSkill.canonicalName, "chinese-dir-english-name", "canonicalName 为合法英文标识");
+await rm(join(codexRoot, "中文目录带英文声明"), { recursive: true });
 
 const issue53Candidates = await listProviderCandidates();
 const ghostNames = ["c", "d", "docx", "ppt", "miner-u", "mineru", "dj-vu"];

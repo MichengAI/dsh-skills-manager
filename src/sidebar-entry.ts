@@ -31,13 +31,6 @@ export const sidebarEntryCss = `
 .dssm-bundle-label-box{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1;text-align:left}
 .dssm-bundle-title{font-size:13px;font-weight:500;line-height:20px;color:var(--dsw-alias-label-primary)}
 .dssm-bundle-desc{font-size:12px;line-height:18px;color:var(--dsw-alias-label-secondary)}
-.dssm-enable-switch{box-sizing:border-box!important;position:relative!important;flex:0 0 auto!important;width:36px!important;height:20px!important;min-width:36px!important;min-height:20px!important;padding:2px!important;border:0!important;border-radius:999px!important;background:var(--dsw-alias-border-l3,#888)!important;cursor:pointer!important;transition:background-color 150ms ease!important}
-.dssm-enable-switch[aria-checked="true"],.dssm-enable-switch[aria-checked=true]{background:var(--dsw-alias-brand-primary,#000)!important}
-.dssm-enable-switch:disabled{cursor:default!important;opacity:.5!important}
-.dssm-enable-switch:focus-visible{outline:var(--dsw-focus-ring-width,1px) solid var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary))!important;outline-offset:2px!important}
-.dssm-enable-switch-thumb{display:block!important;width:16px!important;height:16px!important;border-radius:50%!important;background:var(--dsw-alias-label-primary-foreground,#fff)!important;transition:transform 150ms ease!important;pointer-events:none!important}
-.dssm-enable-switch[aria-checked="false"] .dssm-enable-switch-thumb,.dssm-enable-switch[aria-checked=false] .dssm-enable-switch-thumb{background:var(--dsw-alias-switch-thumb,#fff)!important;transform:translateX(0)!important}
-.dssm-enable-switch[aria-checked="true"] .dssm-enable-switch-thumb,.dssm-enable-switch[aria-checked=true] .dssm-enable-switch-thumb{transform:translateX(16px)!important}
 `;
 
 export function ensureSidebarEntryStyle(): void {
@@ -70,45 +63,6 @@ export function SkillBundleConfigCard(props: {
 }) {
   ensureSidebarEntryStyle();
   const { t, enabled, onToggle, disabled } = props;
-  const switchElement = typeof PrimitiveSwitch === "function"
-    ? h(PrimitiveSwitch, {
-        checked: enabled,
-        onChange: onToggle,
-        label: t("sidebar.entry.toggle"),
-        disabled: disabled,
-      })
-    : h("button", {
-        type: "button",
-        role: "switch",
-        "aria-checked": enabled ? "true" : "false",
-        "aria-label": t("sidebar.entry.toggle"),
-        disabled: disabled,
-        className: "dssm-enable-switch",
-        style: {
-          boxSizing: "border-box",
-          position: "relative",
-          flex: "0 0 auto",
-          width: "36px",
-          height: "20px",
-          padding: "2px",
-          border: 0,
-          borderRadius: "999px",
-          background: enabled ? "var(--dsw-alias-brand-primary, #000)" : "var(--dsw-alias-border-l3, #888)",
-          cursor: disabled ? "default" : "pointer",
-        },
-        onClick: () => onToggle(!enabled),
-      }, h("span", {
-        className: "dssm-enable-switch-thumb",
-        style: {
-          display: "block",
-          width: "16px",
-          height: "16px",
-          borderRadius: "50%",
-          background: "var(--dsw-alias-label-primary-foreground, #fff)",
-          transform: enabled ? "translateX(16px)" : "translateX(0)",
-          transition: "transform 150ms ease",
-        },
-      }));
 
   return h("div", {
     className: "dssm-bundle-row",
@@ -151,7 +105,12 @@ export function SkillBundleConfigCard(props: {
         },
       }, t("sidebar.entry.desc"))
     ),
-    switchElement
+    h(PrimitiveSwitch, {
+      checked: enabled,
+      onChange: onToggle,
+      label: t("sidebar.entry.toggle"),
+      disabled: disabled,
+    })
   );
 }
 
