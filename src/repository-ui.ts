@@ -778,20 +778,23 @@ export function createRepositoryUI({ react, Modal, Input, Button, SourceSelect, 
               body = h("div", null, h("div", { className: "dssm-name" }, modal.repo.owner + "/" + modal.repo.name), feedbackNode);
               footer = h(react.Fragment, null, button("repo.cancel", () => setModal({ type: "manage" })), button("repo.removeConfirm", () => perform(async () => { await post("remove", { id: (modal as Extract<RepoModal, {type: "remove"}>).repo.id }); if (source === (modal as Extract<RepoModal, {type: "remove"}>).repo.id) setSource(""); setModal({ type: "manage" }); }), true, false, true));
             }
-      if (modal.type === "catalog-detail" && modal.detail) body = h("div", { className: "dssm-repo-panel" },
-        h("div", { className: "dssm-detail-head" },
-          h("div", { className: "dssm-name" }, modal.detail.name),
-          modal.detail.body ? h(PrimitiveButton, {
-            variant: "outline",
-            size: "sm",
-            onClick: () => copyText(modal.detail.body)
-          }, copyState === "copied" ? t("repo.copied") : copyState === "failed" ? t("repo.copyFailed") : t("repo.copyBody")) : null
-        ),
-        h("p", { className: "dssm-desc" }, modal.detail.description),
-        h("div", { className: "dssm-detail-path" }, modal.detail.origin),
-        h("p", { className: "dssm-note" }, t("repo.installHint")),
-        h(Input.TextArea, { className: "dssm-detail-body", readOnly: true, value: modal.detail.body || "", rows: 16 })
-      );
+      if (modal.type === "catalog-detail" && modal.detail) {
+        const detail = modal.detail;
+        body = h("div", { className: "dssm-repo-panel" },
+          h("div", { className: "dssm-detail-head" },
+            h("div", { className: "dssm-name" }, detail.name),
+            detail.body ? h(PrimitiveButton, {
+              variant: "outline",
+              size: "sm",
+              onClick: () => copyText(detail.body)
+            }, copyState === "copied" ? t("repo.copied") : copyState === "failed" ? t("repo.copyFailed") : t("repo.copyBody")) : null
+          ),
+          h("p", { className: "dssm-desc" }, detail.description),
+          h("div", { className: "dssm-detail-path" }, detail.origin),
+          h("p", { className: "dssm-note" }, t("repo.installHint")),
+          h(Input.TextArea, { className: "dssm-detail-body", readOnly: true, value: detail.body || "", rows: 16 })
+        );
+      }
       if (modal.type === "catalog-detail" && !modal.detail) body = h("div", { role: "status", className: "dssm-repo-panel" }, modal.loading ? t("repo.detailLoading") : null, modal.failed ? feedbackNode : null);
       if (modal.type === "catalog-install") body = h("div", { className: "dssm-repo-panel", "aria-busy": busy },
         h("div", { className: "dssm-name" }, modal.target.name),
@@ -809,21 +812,24 @@ export function createRepositoryUI({ react, Modal, Input, Button, SourceSelect, 
           busy ? h('div', { role: 'status', 'aria-live': 'polite' }, t('repo.uninstallProgress')) : null, feedbackNode);
         footer = h(react.Fragment, null, button('repo.cancel', close), button(busy ? 'repo.uninstalling' : 'repo.confirmUninstall', confirmCatalogUninstall, true, false, true));
       }
-      if (modal.type === "detail" && modal.detail) body = h("div", { className: "dssm-repo-panel" },
-        h("div", { className: "dssm-detail-head" },
-          h("div", { className: "dssm-name" }, modal.detail.name),
-          modal.detail.body ? h(PrimitiveButton, {
-            variant: "outline",
-            size: "sm",
-            onClick: () => copyText(modal.detail.body)
-          }, copyState === "copied" ? t("repo.copied") : copyState === "failed" ? t("repo.copyFailed") : t("repo.copyBody")) : null
-        ),
-        h("p", { className: "dssm-desc" }, modal.detail.description),
-        h("div", { className: "dssm-detail-path" }, modal.repo.owner + "/" + modal.repo.name + " · " + modal.detail.path),
-        h("div", { className: "dssm-repo-metadata" }, t("repo.commit") + " · " + modal.detail.commit),
-        h("p", { className: "dssm-note" }, t("repo.installHint")),
-        h(Input.TextArea, { className: "dssm-detail-body", readOnly: true, value: modal.detail.body || "", rows: 16 })
-      );
+      if (modal.type === "detail" && modal.detail) {
+        const detail = modal.detail;
+        body = h("div", { className: "dssm-repo-panel" },
+          h("div", { className: "dssm-detail-head" },
+            h("div", { className: "dssm-name" }, detail.name),
+            detail.body ? h(PrimitiveButton, {
+              variant: "outline",
+              size: "sm",
+              onClick: () => copyText(detail.body)
+            }, copyState === "copied" ? t("repo.copied") : copyState === "failed" ? t("repo.copyFailed") : t("repo.copyBody")) : null
+          ),
+          h("p", { className: "dssm-desc" }, detail.description),
+          h("div", { className: "dssm-detail-path" }, modal.repo.owner + "/" + modal.repo.name + " · " + detail.path),
+          h("div", { className: "dssm-repo-metadata" }, t("repo.commit") + " · " + detail.commit),
+          h("p", { className: "dssm-note" }, t("repo.installHint")),
+          h(Input.TextArea, { className: "dssm-detail-body", readOnly: true, value: detail.body || "", rows: 16 })
+        );
+      }
       if (modal.type === "detail" && !modal.detail) body = h("div", { role: "status", className: "dssm-repo-panel" }, modal.loading ? t("repo.detailLoading") : null, modal.failed ? feedbackNode : null);
       dialog = h(Modal, { wide: modal.type === "detail" || modal.type === "catalog-detail", title: t("repo." + (modal.type === "catalog-detail" ? "detail" : modal.type === "catalog-install" ? "install" : modal.type === "catalog-uninstall" ? "uninstall" : modal.type === "remove" ? "remove" : modal.type)), description, footer, closeLabel: t("repo.close"), onClose: close }, body);
     }
