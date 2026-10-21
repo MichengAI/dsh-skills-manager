@@ -60,7 +60,7 @@ try {
       return {
         Button: (props) => react.createElement("button", props, props.children),
         Input: (props) => react.createElement("span", { className: props.className }, react.createElement("input", props)),
-        Modal: (props) => props.open ? react.createElement("div", { role: "dialog", title: props.title, description: props.description }, props.description, props.children, props.footer) : null,
+        Modal: (props) => props.open ? react.createElement("div", { role: "dialog", title: props.title, description: props.description, className: props.className, onClose: props.onClose }, props.description, props.children, props.footer) : null,
         Menu: (props) => react.createElement("div", { "data-menu-open": props.open }, props.anchor, props.open ? props.items?.map(it => react.createElement("button", { key: it.id, onClick: () => props.onSelect(it.id) }, it.label)) : null),
       };
     }
@@ -144,6 +144,11 @@ try {
     assert.equal(trashConfirm.props.className, "dssm-btn-danger", "文字确认对齐官方删除警告样式挂红色类");
   assert.equal(find((node) => node.children.includes(t("btn.cancel")) && node.props.variant === "outline").props.className, undefined, "取消不套危险类");
   find((node) => node.children.includes(t("btn.cancel"))).props.onClick(); render();
+  more.props.onChange({ target: { value: "detail" } }); render();
+  const detailDialog = find((node) => node.props.title === t("detail.title"));
+  assert.ok(detailDialog, "详情菜单打开技能详情弹窗");
+  assert.ok(detailDialog.props.className && detailDialog.props.className.includes("dssm-modal-wide"), "技能详情弹窗必须声明 wide 并赋予 dssm-modal-wide 类名");
+  detailDialog.props.onClose(); render();
   assert.ok(JSON.stringify(nodes()).includes("LONG_DESCRIPTION_global-one"), "展开来源后显示技能简介");
   nodes(groups()[0]).find((node) => node.props.className === "dssm-source-toggle").props.onClick(); render();
   assert.deepEqual(rows(), ["global-two"], "来源可独立折叠");

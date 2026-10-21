@@ -947,6 +947,16 @@ await writeFile(managerStateFile, JSON.stringify(rawState2, null, 2), "utf8");
 const canDisableBroken = await setSkillEnabled(dshRoot, "broken-frontmatter-skill", false);
 ok(canDisableBroken.ok !== false && canDisableBroken.enabled === false, "frontmatter 损坏但历史开启的技能允许执行停用清理");
 
+// 磁盘已删除/改名但 enabledSkills 残留旧名的技能：执行停用能够成功清理
+const rawState3 = JSON.parse(await readFile(managerStateFile, "utf8"));
+rawState3.enabledSkills.dsh = [...(rawState3.enabledSkills.dsh || []), "ghost-deleted-skill"];
+await writeFile(managerStateFile, JSON.stringify(rawState3, null, 2), "utf8");
+
+const canDisableGhost = await setSkillEnabled(dshRoot, "ghost-deleted-skill", false);
+ok(canDisableGhost.ok !== false && canDisableGhost.enabled === false, "磁盘已删除但开启残留的技能允许执行停用注销");
+const afterGhostState = JSON.parse(await readFile(managerStateFile, "utf8"));
+ok(!afterGhostState.enabledSkills.dsh.includes("ghost-deleted-skill"), "残留旧名从 enabledSkills 中成功清除");
+
 const cSkill = allIssue53Skills.find(s => s.name === "C盘清理顾问");
 const dSkill = allIssue53Skills.find(s => s.name === "D盘清理顾问");
 const docxSkill = allIssue53Skills.find(s => s.name === "docx脚注图片字压字修复");

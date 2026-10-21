@@ -36,7 +36,7 @@ export const repositoryLocales = {
     "repo.uninstall": "卸载", "repo.confirmUninstall": "移至回收站", "repo.uninstallHint": "仅将此仓库已跟踪的安装副本移至回收站，包括本地修改。之后可在回收站恢复。", "repo.uninstallExternalWarning": "卸载该技能也会影响使用所选目录的其他 Agent。", "repo.uninstalling": "卸载中…", "repo.uninstallProgress": "正在将已安装的技能移至回收站，请稍候…", "repo.uninstallSuccess": "技能已移至回收站，可在回收站恢复。",
     "repo.empty": "还没有技能仓库，添加一个公开 GitHub 仓库开始。", "repo.noSkills": "没有匹配的技能。可刷新仓库或调整筛选。",
     "repo.url": "仓库地址", "repo.ref": "分支或标签（可选）", "repo.directory": "技能子目录（可选）", "repo.defaultBranch": "留空使用默认分支", "repo.defaultBranchLabel": "默认分支", "repo.directoryHint": "例如 skills，留空扫描整个仓库",
-    "repo.remove": "移除仓库", "repo.removeHint": "仅移除仓库订阅，已安装的技能会保留。", "repo.removeConfirm": "确认移除", "repo.cancel": "取消", "repo.close": "关闭", "repo.loading": "处理中…", "repo.success": "操作完成", "repo.installHint": "技能可能包含脚本，请先查看说明并确认信任来源。安装会保留资源文件，不会执行脚本。", "repo.commit": "扫描版本", "repo.notScanned": "尚未扫描", "repo.updated": "上次刷新",
+    "repo.remove": "移除仓库", "repo.removeHint": "仅移除仓库订阅，已安装的技能会保留。", "repo.removeConfirm": "确认移除", "repo.cancel": "取消", "repo.close": "关闭", "repo.loading": "处理中…", "repo.success": "操作完成", "repo.installHint": "技能可能包含脚本，请先查看说明并确认信任来源。安装会保留资源文件，不会执行脚本。", "repo.commit": "扫描版本", "repo.notScanned": "尚未扫描", "repo.updated": "上次刷新", "repo.copyBody": "复制正文", "repo.copied": "已复制", "repo.copyFailed": "复制失败",
     "error.repo.tooLarge": "仓库归档超过 32 MiB，请选择较小的技能仓库；子目录筛选不会缩小下载量。", "error.repo.installState": "技能文件已保留，但来源状态未确认。请恢复磁盘写入后重新打开仓库页，系统会校验文件并恢复记录。", "error.repo.capacity": "安装来源状态超过 16 MiB。请先清理不需要的回收记录或旧身份，仍有效的安装副本会保留。",
     "error.repo.invalid": "仓库地址、路径或内容无效，请检查输入及仓库大小。", "error.repo.network": "仓库访问失败，请检查网络或稍后重试。上次列表已保留。", "error.repo.state": "仓库状态文件损坏或无法读取，请保留文件并修复后重试。", "error.repo.conflict": "同名技能已存在或安装失败，本地文件未被覆盖。", "error.repo.enableState": "技能文件已撤销，但启用状态无法写入。请恢复磁盘写入后重试安装。",
   },
@@ -59,7 +59,7 @@ export const repositoryLocales = {
     "repo.uninstall": "Uninstall", "repo.confirmUninstall": "Move to Trash", "repo.uninstallHint": "Move only this repository’s tracked installed copy, including local edits, to Trash. You can restore it from Trash later.", "repo.uninstallExternalWarning": "Uninstalling this skill also affects other agents that use the selected directory.", "repo.uninstalling": "Uninstalling…", "repo.uninstallProgress": "Moving the installed skill to Trash. Please wait…", "repo.uninstallSuccess": "Skill moved to Trash. You can restore it from Trash.",
     "repo.empty": "No repositories yet. Add a public GitHub repository to get started.", "repo.noSkills": "No matching skills. Refresh the repository or adjust your filters.",
     "repo.url": "Repository URL", "repo.ref": "Branch or tag (optional)", "repo.directory": "Skill subdirectory (optional)", "repo.defaultBranch": "Leave empty for the default branch", "repo.defaultBranchLabel": "default branch", "repo.directoryHint": "For example: skills. Leave empty to scan the repository.",
-    "repo.remove": "Remove repository", "repo.removeHint": "This removes the subscription only. Installed skills are kept.", "repo.removeConfirm": "Confirm removal", "repo.cancel": "Cancel", "repo.close": "Close", "repo.loading": "Working…", "repo.success": "Completed", "repo.installHint": "Skills may include scripts. Read the instructions and trust the source before installing. Resources are copied; scripts are not executed.", "repo.commit": "Snapshot version", "repo.notScanned": "Not scanned yet", "repo.updated": "Last refreshed",
+    "repo.remove": "Remove repository", "repo.removeHint": "This removes the subscription only. Installed skills are kept.", "repo.removeConfirm": "Confirm removal", "repo.cancel": "Cancel", "repo.close": "Close", "repo.loading": "Working…", "repo.success": "Completed", "repo.installHint": "Skills may include scripts. Read the instructions and trust the source before installing. Resources are copied; scripts are not executed.", "repo.commit": "Snapshot version", "repo.notScanned": "Not scanned yet", "repo.updated": "Last refreshed", "repo.copyBody": "Copy body", "repo.copied": "Copied", "repo.copyFailed": "Copy failed",
     "error.repo.tooLarge": "Repository archive exceeds 32 MiB. Choose a smaller repository; a subdirectory filter does not reduce the download size.", "error.repo.installState": "Skill files were preserved but source tracking could not be saved. Restore disk write access and reopen Repositories to verify files and recover the record.", "error.repo.capacity": "Source tracking exceeds 16 MiB. Remove unneeded Trash records or legacy identities first. Active installation copies are kept.",
     "error.repo.invalid": "Invalid repository URL, path or contents. Check the input and repository size.", "error.repo.network": "Repository request failed. Check your connection or retry later. The previous catalog was kept.", "error.repo.state": "Repository state is corrupt or unreadable. Preserve the file and repair it before retrying.", "error.repo.conflict": "A skill with this name exists or installation failed. Local files were not overwritten.", "error.repo.enableState": "The copied skill was removed because its enabled state could not be saved. Restore disk write access and install again.",
   },
@@ -152,6 +152,14 @@ export function createRepositoryUI({ react, Modal, Input, Button, SourceSelect, 
     const [catalogCopies, setCatalogCopies] = react.useState<CatalogCopy[]>([]);
     const [catalogUnknownIds, setCatalogUnknownIds] = react.useState<string[]>([]);
     const [catalogWarnings, setCatalogWarnings] = react.useState<Array<{id: string; code: string; error: string}>>([]);
+    const [copyState, setCopyState] = react.useState<"idle" | "copied" | "failed">("idle");
+    function copyText(text: string) {
+      if (typeof navigator === "undefined" || !navigator.clipboard) { setCopyState("failed"); return; }
+      navigator.clipboard.writeText(text).then(() => {
+        setCopyState("copied");
+        setTimeout(() => setCopyState("idle"), 1500);
+      }).catch(() => setCopyState("failed"));
+    }
     const [catalogHasMore, setCatalogHasMore] = react.useState(true);
     const [catalogLoading, setCatalogLoading] = react.useState(false);
     const [catalogError, setCatalogError] = react.useState(false);
@@ -560,7 +568,7 @@ export function createRepositoryUI({ react, Modal, Input, Button, SourceSelect, 
       return h(PrimitiveButton, { variant: "outline", disabled: busy || !selected.length, "aria-busy": !!pending, onClick: () => refresh(selected) },
         pending ? h("span", { className: "dssm-repo-spinner", "aria-hidden": true }) : null, t(pending ? "repo.refreshing" : "repo.refresh"));
     }
-    function close() { if (!locked.current) setModal(null); }
+    function close() { if (!locked.current) { setCopyState("idle"); setModal(null); } }
     function openInstallation(type: 'install' | 'uninstall', repo: RepoView, skill: RepoSkill, copy?: RepoCopy) {
       if (locked.current || type === 'uninstall' && (!copy || !copy.canUninstall || !copyTarget(copy))) return;
       setFeedback(null); setModal({ type, repo, skill, copy });
@@ -770,7 +778,20 @@ export function createRepositoryUI({ react, Modal, Input, Button, SourceSelect, 
               body = h("div", null, h("div", { className: "dssm-name" }, modal.repo.owner + "/" + modal.repo.name), feedbackNode);
               footer = h(react.Fragment, null, button("repo.cancel", () => setModal({ type: "manage" })), button("repo.removeConfirm", () => perform(async () => { await post("remove", { id: (modal as Extract<RepoModal, {type: "remove"}>).repo.id }); if (source === (modal as Extract<RepoModal, {type: "remove"}>).repo.id) setSource(""); setModal({ type: "manage" }); }), true, false, true));
             }
-      if (modal.type === "catalog-detail" && modal.detail) body = h("div", { className: "dssm-repo-panel" }, h("div", { className: "dssm-name" }, modal.detail.name), h("p", { className: "dssm-desc" }, modal.detail.description), h("div", { className: "dssm-detail-path" }, modal.detail.origin), h("p", { className: "dssm-note" }, t("repo.installHint")), h(Input.TextArea, { readOnly: true, value: modal.detail.body || "", autoSize: { minRows: 6, maxRows: 16 } }));
+      if (modal.type === "catalog-detail" && modal.detail) body = h("div", { className: "dssm-repo-panel" },
+        h("div", { className: "dssm-detail-head" },
+          h("div", { className: "dssm-name" }, modal.detail.name),
+          modal.detail.body ? h(PrimitiveButton, {
+            variant: "outline",
+            size: "sm",
+            onClick: () => copyText(modal.detail.body)
+          }, copyState === "copied" ? t("repo.copied") : copyState === "failed" ? t("repo.copyFailed") : t("repo.copyBody")) : null
+        ),
+        h("p", { className: "dssm-desc" }, modal.detail.description),
+        h("div", { className: "dssm-detail-path" }, modal.detail.origin),
+        h("p", { className: "dssm-note" }, t("repo.installHint")),
+        h(Input.TextArea, { className: "dssm-detail-body", readOnly: true, value: modal.detail.body || "", rows: 16 })
+      );
       if (modal.type === "catalog-detail" && !modal.detail) body = h("div", { role: "status", className: "dssm-repo-panel" }, modal.loading ? t("repo.detailLoading") : null, modal.failed ? feedbackNode : null);
       if (modal.type === "catalog-install") body = h("div", { className: "dssm-repo-panel", "aria-busy": busy },
         h("div", { className: "dssm-name" }, modal.target.name),
@@ -788,9 +809,23 @@ export function createRepositoryUI({ react, Modal, Input, Button, SourceSelect, 
           busy ? h('div', { role: 'status', 'aria-live': 'polite' }, t('repo.uninstallProgress')) : null, feedbackNode);
         footer = h(react.Fragment, null, button('repo.cancel', close), button(busy ? 'repo.uninstalling' : 'repo.confirmUninstall', confirmCatalogUninstall, true, false, true));
       }
-      if (modal.type === "detail" && modal.detail) body = h("div", { className: "dssm-repo-panel" }, h("div", { className: "dssm-name" }, modal.detail.name), h("p", { className: "dssm-desc" }, modal.detail.description), h("div", { className: "dssm-detail-path" }, modal.repo.owner + "/" + modal.repo.name + " · " + modal.detail.path), h("div", { className: "dssm-repo-metadata" }, t("repo.commit") + " · " + modal.detail.commit), h("p", { className: "dssm-note" }, t("repo.installHint")), h(Input.TextArea, { readOnly: true, value: modal.detail.body || "", autoSize: { minRows: 6, maxRows: 16 } }));
+      if (modal.type === "detail" && modal.detail) body = h("div", { className: "dssm-repo-panel" },
+        h("div", { className: "dssm-detail-head" },
+          h("div", { className: "dssm-name" }, modal.detail.name),
+          modal.detail.body ? h(PrimitiveButton, {
+            variant: "outline",
+            size: "sm",
+            onClick: () => copyText(modal.detail.body)
+          }, copyState === "copied" ? t("repo.copied") : copyState === "failed" ? t("repo.copyFailed") : t("repo.copyBody")) : null
+        ),
+        h("p", { className: "dssm-desc" }, modal.detail.description),
+        h("div", { className: "dssm-detail-path" }, modal.repo.owner + "/" + modal.repo.name + " · " + modal.detail.path),
+        h("div", { className: "dssm-repo-metadata" }, t("repo.commit") + " · " + modal.detail.commit),
+        h("p", { className: "dssm-note" }, t("repo.installHint")),
+        h(Input.TextArea, { className: "dssm-detail-body", readOnly: true, value: modal.detail.body || "", rows: 16 })
+      );
       if (modal.type === "detail" && !modal.detail) body = h("div", { role: "status", className: "dssm-repo-panel" }, modal.loading ? t("repo.detailLoading") : null, modal.failed ? feedbackNode : null);
-      dialog = h(Modal, { title: t("repo." + (modal.type === "catalog-detail" ? "detail" : modal.type === "catalog-install" ? "install" : modal.type === "catalog-uninstall" ? "uninstall" : modal.type === "remove" ? "remove" : modal.type)), description, footer, closeLabel: t("repo.close"), onClose: close }, body);
+      dialog = h(Modal, { wide: modal.type === "detail" || modal.type === "catalog-detail", title: t("repo." + (modal.type === "catalog-detail" ? "detail" : modal.type === "catalog-install" ? "install" : modal.type === "catalog-uninstall" ? "uninstall" : modal.type === "remove" ? "remove" : modal.type)), description, footer, closeLabel: t("repo.close"), onClose: close }, body);
     }
 
     function catalogInstalled(id: string) { return catalogInstallIds.includes(id) || catalogCopiesOf(id).length > 0; }

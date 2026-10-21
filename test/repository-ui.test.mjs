@@ -321,6 +321,7 @@ assert.equal(catalogTrash.props["aria-label"], "repo.uninstall", "垃圾桶仍�
 assert.equal(catalogTrash.children.includes("repo.uninstall"), false, "垃圾桶不显示文字");
 await clickNode(rowActions(catalogRow("Skill 001"))[0]);
 assert.deepEqual(calls.at(-1), { path: "/catalog/detail", body: { catalog: "clawhub", owner: "owner-1", slug: "skill-001", name: "Skill 001" } }, "详情按作者和 slug 读取这一条 ClawHub 技能");
+assert.equal(dialog()?.props.wide, true, "目录技能详情弹窗必须声明 wide: true");
 assert.equal(modalNodes().find(n => n.type === Input.TextArea)?.props.value, "# Skill 001", "详情展示 ClawHub 返回的技能说明");
 await clickNode(rowActions(catalogRow("Skill 001"))[1]);
 assert.equal(dialog()?.props.title, "repo.install", "安装沿用现有安装位置选择");
@@ -492,6 +493,7 @@ assert.ok(dialog(), "详情应立即打开加载弹窗");
 assert.equal(ui.content.props["aria-busy"], false, "读取详情不切换背景列表忙碌状态");
 finishDetail(); await settle();
 assert.equal(countCalls("/repositories"), listCalls, "只读详情不刷新背景列表");
+assert.equal(dialog().props.wide, true, "仓库技能详情弹窗必须声明 wide: true");
 assert.ok(modalNodes().some(n => n.type === Input.TextArea && n.props.readOnly && n.props.value === "说明"), "详情使用官方只读说明框");
 dialog().props.onClose(); render();
 holdRefresh = true;

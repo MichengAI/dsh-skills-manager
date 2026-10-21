@@ -1823,13 +1823,20 @@ async function checkedPolicyRootDefinition(root: RootInput): Promise<SkillRoot |
 
 async function applyPolicySkillEnabled(definition: SkillRoot, name: string, enabled: boolean, state: ManagerState) {
   const resolved = await resolveEntry(definition, name);
-  if (resolved === null)
+  if (resolved === null) {
+    const explicitlyEnabled = new Set(state.enabledSkills[definition.key] || []);
+    if (!enabled && explicitlyEnabled.has(name)) {
+      explicitlyEnabled.delete(name);
+      state.enabledSkills[definition.key] = [...explicitlyEnabled].sort();
+      return { root: definition.key, name, enabled: false };
+    }
     return {
       ok: false as const,
       error: `技能不存在: ${name}`,
       code: "error.skill.notFound",
       params: { name },
     };
+  }
   let summary;
   try {
     summary = entryOf(
@@ -1841,6 +1848,12 @@ async function applyPolicySkillEnabled(definition: SkillRoot, name: string, enab
       ),
     );
   } catch {
+    const explicitlyEnabled = new Set(state.enabledSkills[definition.key] || []);
+    if (!enabled && explicitlyEnabled.has(name)) {
+      explicitlyEnabled.delete(name);
+      state.enabledSkills[definition.key] = [...explicitlyEnabled].sort();
+      return { root: definition.key, name, enabled: false };
+    }
     return {
       ok: false as const,
       error: `技能不存在: ${name}`,
@@ -1850,15 +1863,7 @@ async function applyPolicySkillEnabled(definition: SkillRoot, name: string, enab
   }
   const explicitlyEnabled = new Set(state.enabledSkills[definition.key] || []);
   const explicitlyDisabled = new Set(state.disabledSkills[definition.key] || []);
-  const summaryAliases = (summary as { policyAliases?: { rootKey: string; name: string }[] }).policyAliases;
-  const isAlreadyEnabled =
-    explicitlyEnabled.has(name) ||
-    Boolean(
-      summaryAliases &&
-        summaryAliases.some((alias) =>
-          (state.enabledSkills[alias.rootKey] || []).includes(alias.name),
-        ),
-    );
+  const isAlreadyEnabled = explicitlyEnabled.has(name);
   const isAlreadyDisabled = explicitlyDisabled.has(name);
 
   // 幂等保护：不可加载技能若已处于停用状态，再次请求停用直接成功
