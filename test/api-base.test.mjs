@@ -150,9 +150,15 @@ ok(
   !/fetch\(\s*["'`]\/api\//.test(clientSource),
   "client.ts has no raw root-absolute fetch left",
 );
+// 更新检查：解析收在模块唯一入口，模块内部只消费已解析的 URL（而不是靠注释提醒）。
 ok(
-  updateUiSource.includes("resolveApiUrl("),
-  "plugin-update-ui.ts resolves its update endpoint through resolveApiUrl",
+  updateUiSource.includes("const endpoint = resolveApiUrl(options.endpoint)"),
+  "plugin-update-ui.ts resolves the update endpoint once at the module entry",
+);
+ok(
+  !/fetch\(\s*(?:options\.)?endpoint\b/.test(updateUiSource) &&
+    !/requestStatus\(\s*options\.endpoint/.test(updateUiSource),
+  "plugin-update-ui.ts never feeds the raw root-absolute endpoint downstream",
 );
 
 if (failed > 0) {

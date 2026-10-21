@@ -4,7 +4,10 @@ import { Button as PrimitiveButton, Modal } from "@deepseek-ai/dsh-client-ui-pri
 import { createUpdateFlow, handlePluginUpdateEscape, manualPluginUpdateCommand, pluginUpdateCopy, type UpdatePayload } from "./plugin-update-model.js";
 import { resolveApiUrl } from "./api-base.js";
 
-interface UpdateUIOptions { endpoint: string; packageName: string; titleRowSelector: string; linksSelector: string; zhName: string; enName: string; createIcon: (name: "refresh" | "download" | "copy" | "close") => HTMLElement }
+interface UpdateUIOptions {
+  /** 更新接口的根绝对路径（如 "/api/.../update"）；模块入口按页面 base 解析，调用方传原始路径，不要自行拼前缀。 */
+  endpoint: string;
+  packageName: string; titleRowSelector: string; linksSelector: string; zhName: string; enName: string; createIcon: (name: "refresh" | "download" | "copy" | "close") => HTMLElement }
 
 const UPDATE_HEADER = "x-michengai-plugin-update";
 const STYLE_ID = "michengai-plugin-update-ui";
@@ -29,9 +32,10 @@ function validPayload(value: unknown): value is UpdatePayload {
   const item = value as Record<string, unknown>;
   return typeof item.packageName === "string" && typeof item.currentVersion === "string" && typeof item.updateAvailable === "boolean" && typeof item.profileName === "string" && typeof item.canAutoUpdate === "boolean" && typeof item.latestCheckFailed === "boolean" && (item.latestVersion === undefined || typeof item.latestVersion === "string");
 }
-async function requestStatus(endpoint: string, method: "GET" | "POST", signal?: AbortSignal) {
+/** 请求更新接口；调用方传入的 URL 已由 observePluginUpdate 入口按页面 base 解析。 */
+async function requestStatus(url: string, method: "GET" | "POST", signal?: AbortSignal) {
   const signalOption = signal === undefined ? {} : { signal };
-  const response = await fetch(resolveApiUrl(endpoint), method === "GET" ? { cache: "no-store", ...signalOption } : {
+  const response = await fetch(url, method === "GET" ? { cache: "no-store", ...signalOption } : {
     method: "POST", headers: { "content-type": "application/json", [UPDATE_HEADER]: "1" }, body: "{}", ...signalOption,
   });
   const value: unknown = await response.json();
@@ -95,6 +99,8 @@ function UpdateDialog(props: { flow: ReturnType<typeof createUpdateFlow>; packag
 
 function observePluginUpdate(options: UpdateUIOptions) {
   if (typeof document === "undefined" || document.body === null) return () => {};
+  // 唯一入口解析一次：模块内部只处理已解析的 URL，新增消费点也不会丢前缀。
+  const endpoint = resolveApiUrl(options.endpoint);
   ensureStyle();
   const controller = new AbortController();
   let payload: UpdatePayload | undefined;
@@ -123,7 +129,7 @@ function observePluginUpdate(options: UpdateUIOptions) {
     dialogHost = host;
     dialogRoot = createRoot(host);
     dialogRoot.render(React.createElement(UpdateDialog, {
-      flow: createUpdateFlow((method) => requestStatus(options.endpoint, method, controller.signal), payload, (next) => { payload = next; applyControls(); }),
+      flow: createUpdateFlow((method) => requestStatus(endpoint, method, controller.signal), payload, (next) => { payload = next; applyControls(); }),
       packageName: options.packageName, zhName: options.zhName, enName: options.enName, onClose: closeDialog,
     }));
   }
@@ -160,7 +166,7 @@ function observePluginUpdate(options: UpdateUIOptions) {
     renderCheck();
   }
   const load = async () => {
-    payload = await requestStatus(options.endpoint, "GET", controller.signal);
+    payload = await requestStatus(endpoint, "GET", controller.signal);
     applyControls();
     return payload;
   };
