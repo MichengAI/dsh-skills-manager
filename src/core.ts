@@ -1849,8 +1849,24 @@ async function applyPolicySkillEnabled(definition: SkillRoot, name: string, enab
     };
   }
   const explicitlyEnabled = new Set(state.enabledSkills[definition.key] || []);
-  const isAlreadyEnabled = explicitlyEnabled.has(name);
-  if (!summary.hasFrontmatter) {
+  const explicitlyDisabled = new Set(state.disabledSkills[definition.key] || []);
+  const summaryAliases = (summary as { policyAliases?: { rootKey: string; name: string }[] }).policyAliases;
+  const isAlreadyEnabled =
+    explicitlyEnabled.has(name) ||
+    Boolean(
+      summaryAliases &&
+        summaryAliases.some((alias) =>
+          (state.enabledSkills[alias.rootKey] || []).includes(alias.name),
+        ),
+    );
+  const isAlreadyDisabled = explicitlyDisabled.has(name);
+
+  // 幂等保护：不可加载技能若已处于停用状态，再次请求停用直接成功
+  if (!enabled && isAlreadyDisabled) {
+    return { root: definition.key, name, enabled: false };
+  }
+
+  if (!summary.hasFrontmatter && (enabled || !isAlreadyEnabled)) {
     return {
       ok: false as const,
       error: `技能缺少完整 frontmatter，无法${enabled ? "启用" : "停用"}: ${name}`,
@@ -1866,7 +1882,7 @@ async function applyPolicySkillEnabled(definition: SkillRoot, name: string, enab
       params: { name, action: enabled ? "enable" : "disable" },
     };
   }
-  const disabled = new Set(state.disabledSkills[definition.key] || []);
+  const disabled = explicitlyDisabled;
   if (enabled) {
     disabled.delete(name);
     explicitlyEnabled.add(name);

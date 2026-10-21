@@ -934,6 +934,19 @@ await writeFile(managerStateFile, JSON.stringify(rawState, null, 2), "utf8");
 const canDisableChinese = await setSkillEnabled(dshRoot, "国自然申请书自检", false);
 ok(canDisableChinese.ok !== false && canDisableChinese.enabled === false, "历史残留开启的非规范技能允许执行停用，彻底清理开启状态");
 
+// 幂等停用：再次停用已在 disabled 的不可加载技能返回成功
+const idempotentDisable = await setSkillEnabled(dshRoot, "国自然申请书自检", false);
+ok(idempotentDisable.ok !== false && idempotentDisable.enabled === false, "已停用的非规范技能重复停用幂等返回成功");
+
+// frontmatter 改坏但历史残留已启用的技能：允许执行停用以清理状态
+await makeSkill(dshRoot, "broken-frontmatter-skill", "没有 frontmatter 的损坏技能");
+const rawState2 = JSON.parse(await readFile(managerStateFile, "utf8"));
+rawState2.enabledSkills.dsh = [...(rawState2.enabledSkills.dsh || []), "broken-frontmatter-skill"];
+await writeFile(managerStateFile, JSON.stringify(rawState2, null, 2), "utf8");
+
+const canDisableBroken = await setSkillEnabled(dshRoot, "broken-frontmatter-skill", false);
+ok(canDisableBroken.ok !== false && canDisableBroken.enabled === false, "frontmatter 损坏但历史开启的技能允许执行停用清理");
+
 const cSkill = allIssue53Skills.find(s => s.name === "C盘清理顾问");
 const dSkill = allIssue53Skills.find(s => s.name === "D盘清理顾问");
 const docxSkill = allIssue53Skills.find(s => s.name === "docx脚注图片字压字修复");
