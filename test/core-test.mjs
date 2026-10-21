@@ -924,6 +924,16 @@ const cantEnableChinese = await setSkillEnabled(dshRoot, "国自然申请书自�
 ok(cantEnableChinese.ok === false, "宿主不接受格式的技能禁止开启启用");
 eq(cantEnableChinese.code, "error.skill.notLoadable", "禁止启用时返回 notLoadable 错误码");
 
+// 模拟历史残留已开启的技能：能够成功执行停用以清理状态
+const managerStateFile = managerStatePath();
+const rawState = JSON.parse(await readFile(managerStateFile, "utf8"));
+rawState.enabledSkills = rawState.enabledSkills || {};
+rawState.enabledSkills.dsh = [...(rawState.enabledSkills.dsh || []), "国自然申请书自检"];
+await writeFile(managerStateFile, JSON.stringify(rawState, null, 2), "utf8");
+
+const canDisableChinese = await setSkillEnabled(dshRoot, "国自然申请书自检", false);
+ok(canDisableChinese.ok !== false && canDisableChinese.enabled === false, "历史残留开启的非规范技能允许执行停用，彻底清理开启状态");
+
 const cSkill = allIssue53Skills.find(s => s.name === "C盘清理顾问");
 const dSkill = allIssue53Skills.find(s => s.name === "D盘清理顾问");
 const docxSkill = allIssue53Skills.find(s => s.name === "docx脚注图片字压字修复");

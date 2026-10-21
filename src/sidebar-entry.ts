@@ -27,7 +27,7 @@ export const SIDEBAR_ENTRY_STYLE_ID = "dssm-sidebar-entry-style";
 export const sidebarEntryCss = `
 .dssm-main-panel{box-sizing:border-box;height:100%;min-height:0;overflow-y:auto;display:flex;flex-direction:column;align-items:center;padding:28px clamp(24px,4vw,48px) 48px}
 .dssm-main-panel>*{width:100%;max-width:960px}
-.dssm-bundle-row{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:16px!important;padding:12px 0!important;border-bottom:0.5px solid var(--dsw-alias-border-l2)!important}
+.dssm-bundle-row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 0;border-bottom:0.5px solid var(--dsw-alias-border-l2)}
 .dssm-bundle-label-box{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1;text-align:left}
 .dssm-bundle-title{font-size:13px;font-weight:500;line-height:20px;color:var(--dsw-alias-label-primary)}
 .dssm-bundle-desc{font-size:12px;line-height:18px;color:var(--dsw-alias-label-secondary)}
@@ -64,46 +64,10 @@ export function SkillBundleConfigCard(props: {
   ensureSidebarEntryStyle();
   const { t, enabled, onToggle, disabled } = props;
 
-  return h("div", {
-    className: "dssm-bundle-row",
-    style: {
-      boxSizing: "border-box",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "space-between",
-      gap: "16px",
-      padding: "12px 0",
-      borderBottom: "0.5px solid var(--dsw-alias-border-l2)",
-    },
-  },
-    h("div", {
-      className: "dssm-bundle-label-box",
-      style: {
-        display: "flex",
-        flexDirection: "column",
-        gap: "2px",
-        minWidth: 0,
-        flex: 1,
-        textAlign: "left",
-      },
-    },
-      h("span", {
-        className: "dssm-bundle-title",
-        style: {
-          fontSize: "13px",
-          fontWeight: 500,
-          lineHeight: "20px",
-          color: "var(--dsw-alias-label-primary)",
-        },
-      }, t("sidebar.entry.title")),
-      h("span", {
-        className: "dssm-bundle-desc",
-        style: {
-          fontSize: "12px",
-          lineHeight: "18px",
-          color: "var(--dsw-alias-label-secondary)",
-        },
-      }, t("sidebar.entry.desc"))
+  return h("div", { className: "dssm-bundle-row" },
+    h("div", { className: "dssm-bundle-label-box" },
+      h("span", { className: "dssm-bundle-title" }, t("sidebar.entry.title")),
+      h("span", { className: "dssm-bundle-desc" }, t("sidebar.entry.desc"))
     ),
     h(PrimitiveSwitch, {
       checked: enabled,

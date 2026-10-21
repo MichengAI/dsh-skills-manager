@@ -1848,6 +1848,8 @@ async function applyPolicySkillEnabled(definition: SkillRoot, name: string, enab
       params: { name },
     };
   }
+  const explicitlyEnabled = new Set(state.enabledSkills[definition.key] || []);
+  const isAlreadyEnabled = explicitlyEnabled.has(name);
   if (!summary.hasFrontmatter) {
     return {
       ok: false as const,
@@ -1856,7 +1858,7 @@ async function applyPolicySkillEnabled(definition: SkillRoot, name: string, enab
       params: { name, action: enabled ? "enable" : "disable" },
     };
   }
-  if (!summary.loadable) {
+  if (!summary.loadable && (enabled || !isAlreadyEnabled)) {
     return {
       ok: false as const,
       error: `技能结构不完整，无法${enabled ? "启用" : "停用"}: ${name}`,
@@ -1865,7 +1867,6 @@ async function applyPolicySkillEnabled(definition: SkillRoot, name: string, enab
     };
   }
   const disabled = new Set(state.disabledSkills[definition.key] || []);
-  const explicitlyEnabled = new Set(state.enabledSkills[definition.key] || []);
   if (enabled) {
     disabled.delete(name);
     explicitlyEnabled.add(name);
