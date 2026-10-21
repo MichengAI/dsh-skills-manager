@@ -495,6 +495,10 @@ eq(
   "toKebab trim + acronym-ish",
 );
 eq(toKebab("中文名"), "", "toKebab non-ascii strips to empty");
+eq(toKebab("C盘清理顾问"), "", "toKebab non-ascii does not truncate to single ascii letters");
+eq(toKebab("docx脚注图片字压字修复"), "", "toKebab non-ascii does not truncate to docx");
+eq(toKebab("归藏网页PPT"), "", "toKebab non-ascii does not truncate to ppt");
+eq(toKebab("MinerU解析整理"), "", "toKebab non-ascii does not truncate to miner-u");
 
 // ── 前台目录浏览器：只列真实子目录，并返回可导航的绝对路径 ──
 const browseRoot = join(tmp, "browse-root");
@@ -853,6 +857,97 @@ const nestedTitleCandidates = (await listProviderCandidates()).filter(candidate 
 eq(nestedTitleCandidates.length, 1, "provider 将嵌套同名技能合并为单个候选");
 ok(nestedTitleCandidates.every(candidate => candidate.name === "nested-title-scan"), "provider 不返回宿主拒绝的大写名称");
 for (const name of ["nested-title-scan", "team/nested-title-scan"]) await rm(join(codexRoot, name), { recursive: true });
+
+// ── 中文技能与混排技能保真回归（Issue #53）──
+await makeSkill(
+  dshRoot,
+  "国自然申请书自检",
+  `---
+name: 国自然申请书自检
+description: 基金申请书自检规范。
+---
+自检正文
+`,
+);
+await makeSkill(
+  codexRoot,
+  "C盘清理顾问",
+  `---
+name: C盘清理顾问
+description: 清理C盘冗余文件。
+---
+清理正文
+`,
+);
+await makeSkill(
+  codexRoot,
+  "D盘清理顾问",
+  `---
+name: D盘清理顾问
+description: 清理D盘冗余文件。
+---
+清理正文
+`,
+);
+await makeSkill(
+  codexRoot,
+  "docx脚注图片字压字修复",
+  `---
+name: docx脚注图片字压字修复
+description: 修复Word排版压字问题。
+---
+修复正文
+`,
+);
+await makeSkill(
+  codexRoot,
+  "归藏网页PPT",
+  `---
+name: 归藏网页PPT
+description: 网页生成PPT排版。
+---
+PPT正文
+`,
+);
+
+const issue53State = await state();
+const allIssue53Skills = issue53State.roots.flatMap(root => root.skills || []);
+
+const guoziranSkill = allIssue53Skills.find(s => s.name === "国自然申请书自检");
+ok(guoziranSkill, "找到中文技能 国自然申请书自检");
+eq(guoziranSkill.loadable, true, "中文技能必须 loadable === true");
+eq(guoziranSkill.diagnostics.length, 0, "中文技能不报 diagnostic.name.invalid");
+eq(guoziranSkill.canonicalName, "国自然申请书自检", "中文技能 canonicalName 保留真实中文名");
+
+const cSkill = allIssue53Skills.find(s => s.name === "C盘清理顾问");
+const dSkill = allIssue53Skills.find(s => s.name === "D盘清理顾问");
+const docxSkill = allIssue53Skills.find(s => s.name === "docx脚注图片字压字修复");
+const pptSkill = allIssue53Skills.find(s => s.name === "归藏网页PPT");
+
+ok(cSkill && dSkill && docxSkill && pptSkill, "所有混排中文技能均正常发现");
+eq(cSkill.loadable, true, "C盘清理顾问 loadable === true");
+eq(cSkill.canonicalName, "C盘清理顾问", "C盘清理顾问 canonicalName 不被截断为 c");
+eq(dSkill.canonicalName, "D盘清理顾问", "D盘清理顾问 canonicalName 不被截断为 d");
+eq(docxSkill.canonicalName, "docx脚注图片字压字修复", "docx脚注图片字压字修复 canonicalName 不被截断为 docx");
+eq(pptSkill.canonicalName, "归藏网页PPT", "归藏网页PPT canonicalName 不被截断为 ppt");
+
+ok(cSkill.winner && !cSkill.shadowedBy, "C盘清理顾问独立为 winner，不被覆盖");
+ok(dSkill.winner && !dSkill.shadowedBy, "D盘清理顾问独立为 winner，不被 C盘清理顾问 覆盖");
+
+const issue53Candidates = await listProviderCandidates();
+const ghostNames = ["c", "d", "docx", "ppt", "miner-u", "mineru", "dj-vu"];
+for (const ghost of ghostNames) {
+  ok(!issue53Candidates.some(c => c.name === ghost), `provider 候选绝对不包含截断假条目: ${ghost}`);
+}
+ok(
+  issue53Candidates.every(c => /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(c.name)),
+  "provider 上报给宿主的所有候选均必须满足宿主 ASCII kebab 契约，避免宿主崩溃",
+);
+
+await rm(join(dshRoot, "国自然申请书自检"), { recursive: true });
+for (const name of ["C盘清理顾问", "D盘清理顾问", "docx脚注图片字压字修复", "归藏网页PPT"]) {
+  await rm(join(codexRoot, name), { recursive: true });
+}
 await makeSkill(
   agentsRoot,
   "public-skill",

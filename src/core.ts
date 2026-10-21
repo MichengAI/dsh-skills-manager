@@ -882,10 +882,10 @@ function isDshRoot(root: RootInput) {
 
 // ── 命名规整 ────────────────────────────────────────────────────────────────
 
-/** 尽量把任意名称规整为 kebab-case；无法生成合法名称时返回空串。 */
+/** 尽量把英文变体规整为 kebab-case；包含非 ASCII 字符或无法生成合法名称时返回空串。 */
 export function toKebab(s: string) {
   let t = String(s).trim();
-  if (t === "") return "";
+  if (t === "" || /[^\x00-\x7F]/.test(t)) return "";
   t = t.replace(/([a-z0-9])([A-Z])/g, "$1-$2"); // camelCase 边界
   t = t.toLowerCase();
   t = t.replace(/[\s_.]+/g, "-");
@@ -1217,6 +1217,15 @@ export async function resolveEntry(root: RootInput, name: string): Promise<Disco
   }
 }
 
+function isValidDeclaredName(name: string): boolean {
+  if (typeof name !== "string") return false;
+  const trimmed = name.trim();
+  if (trimmed === "" || trimmed === "." || trimmed === ".." || trimmed.startsWith(".")) return false;
+  if (trimmed.length > MAX_ENTRY_NAME_LENGTH) return false;
+  if (/[\\/:*?"<>|\0]/.test(trimmed) || /[. ]$/.test(trimmed)) return false;
+  return true;
+}
+
 function entryOf(name: string, kind: string, docPath: string, doc: Pick<ParsedSkill, "map" | "hasFrontmatter">) {
   const declaredName = doc.map.name !== undefined ? unquote(doc.map.name) : "";
   const description =
@@ -1237,7 +1246,7 @@ function entryOf(name: string, kind: string, docPath: string, doc: Pick<ParsedSk
     });
   if (doc.hasFrontmatter && !declaredName)
     diagnostics.push({ level: "error", code: "diagnostic.name.missing" });
-  else if (declaredName && !KEBAB_RE.test(toKebab(declaredName)))
+  else if (declaredName && !isValidDeclaredName(declaredName))
     diagnostics.push({
       level: "error",
       code: "diagnostic.name.invalid",
@@ -1260,9 +1269,9 @@ function entryOf(name: string, kind: string, docPath: string, doc: Pick<ParsedSk
     userInvocable: !userDisabled,
     invocationPolicyValid,
     hasFrontmatter: doc.hasFrontmatter,
-    // 调用策略值异常可以由 manager 本地策略覆盖；结构本身合法即可加载。
+    // 只要有 frontmatter、说明非空且声明名合法即可加载；调用策略异常可由 manager 本地覆盖。
     loadable:
-      doc.hasFrontmatter && description !== "" && KEBAB_RE.test(KEBAB_RE.test(declaredName) ? declaredName : toKebab(declaredName)),
+      doc.hasFrontmatter && description !== "" && isValidDeclaredName(declaredName),
     diagnostics,
   };
 }
@@ -3261,8 +3270,10 @@ export async function listProviderCandidates(options: ScopeOptions = {}) {
       policyResult.writable === false ||
       !policy.sourceEnabled;
     if (!needsOverlay) continue;
+    const candidateName = canonicalSkillName({ root, entry, policy });
+    if (!KEBAB_RE.test(candidateName)) continue;
     candidates.push({
-      name: canonicalSkillName({ root, entry, policy }),
+      name: candidateName,
       description: entry.description,
       invocation: {
         modelInvocable: policy.modelInvocable,
@@ -3364,7 +3375,7 @@ function canonicalSkillName(item: SkillItem) {
   const declared = item.entry.declaredName || "";
   if (KEBAB_RE.test(declared)) return declared;
   const kebab = toKebab(declared);
-  return kebab || declared || item.entry.name;
+  return (kebab && KEBAB_RE.test(kebab)) ? kebab : (declared || item.entry.name);
 }
 
 /** 真实路径去重后按声明名分组；管理页与当前工作区 provider 共用来源优先级。 */
