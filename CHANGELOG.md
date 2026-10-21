@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.11 - 2026-10-21
+
+- Resolve API endpoints and plugin self-update URLs against the page base (`document.baseURI`) instead of raw site-root paths, fixing "non-JSON response (HTTP 404)" when DeepSeek Harness is deployed behind a prefix-stripping reverse proxy (Issue #56).
+- Handle base URLs lacking trailing slashes and gracefully fall back to literal paths in non-browser and test environments (#56).
+
 ## 1.2.10 - 2026-10-21
 
 - Enlarge skill detail dialogs to 760px wide with a spacious, monospace body reader that can be resized vertically (Issue #54).
