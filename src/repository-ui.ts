@@ -786,6 +786,8 @@ export function createRepositoryUI({ react, Modal, Input, Button, SourceSelect, 
             detail.body ? h(PrimitiveButton, {
               variant: "outline",
               size: "sm",
+              "aria-live": "polite",
+              style: { flex: "none" },
               onClick: () => copyText(detail.body)
             }, copyState === "copied" ? t("repo.copied") : copyState === "failed" ? t("repo.copyFailed") : t("repo.copyBody")) : null
           ),
@@ -820,6 +822,8 @@ export function createRepositoryUI({ react, Modal, Input, Button, SourceSelect, 
             detail.body ? h(PrimitiveButton, {
               variant: "outline",
               size: "sm",
+              "aria-live": "polite",
+              style: { flex: "none" },
               onClick: () => copyText(detail.body)
             }, copyState === "copied" ? t("repo.copied") : copyState === "failed" ? t("repo.copyFailed") : t("repo.copyBody")) : null
           ),
