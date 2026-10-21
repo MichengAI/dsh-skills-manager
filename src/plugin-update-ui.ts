@@ -2,6 +2,7 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import { Button as PrimitiveButton, Modal } from "@deepseek-ai/dsh-client-ui-primitives";
 import { createUpdateFlow, handlePluginUpdateEscape, manualPluginUpdateCommand, pluginUpdateCopy, type UpdatePayload } from "./plugin-update-model.js";
+import { resolveApiUrl } from "./api-base.js";
 
 interface UpdateUIOptions { endpoint: string; packageName: string; titleRowSelector: string; linksSelector: string; zhName: string; enName: string; createIcon: (name: "refresh" | "download" | "copy" | "close") => HTMLElement }
 
@@ -30,7 +31,7 @@ function validPayload(value: unknown): value is UpdatePayload {
 }
 async function requestStatus(endpoint: string, method: "GET" | "POST", signal?: AbortSignal) {
   const signalOption = signal === undefined ? {} : { signal };
-  const response = await fetch(endpoint, method === "GET" ? { cache: "no-store", ...signalOption } : {
+  const response = await fetch(resolveApiUrl(endpoint), method === "GET" ? { cache: "no-store", ...signalOption } : {
     method: "POST", headers: { "content-type": "application/json", [UPDATE_HEADER]: "1" }, body: "{}", ...signalOption,
   });
   const value: unknown = await response.json();
