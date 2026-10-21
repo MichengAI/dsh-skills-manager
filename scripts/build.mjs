@@ -23,7 +23,7 @@ async function exists(path) {
 
 try {
   await build({
-    entryPoints: ["src/core.ts", "src/readonly-discovery.ts", "src/index.ts", "src/plugin-updater.ts", "src/repositories.ts", "src/repository-updates.ts", "src/skills-sh-catalog.ts", "src/catalog-skill.ts", "src/clawhub-catalog.ts", "src/settings-nav-icon.ts", "src/sidebar-entry.ts"],
+    entryPoints: ["src/core.ts", "src/readonly-discovery.ts", "src/index.ts", "src/plugin-updater.ts", "src/repositories.ts", "src/repository-updates.ts", "src/skills-sh-catalog.ts", "src/catalog-skill.ts", "src/clawhub-catalog.ts"],
     outdir: stagingDirectory,
     outbase: "src",
     bundle: false,

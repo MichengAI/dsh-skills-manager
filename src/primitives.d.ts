@@ -67,6 +67,15 @@ declare module '@deepseek-ai/dsh-client-ui-primitives' {
     className?: string
   }): ReactElement
 
+  export function Switch(props: {
+    checked: boolean
+    onChange: (next: boolean) => void
+    label?: string
+    disabled?: boolean
+    title?: string | undefined
+    className?: string | undefined
+  }): ReactElement
+
   export function Modal(props: {
     open?: boolean
     onClose?: () => void

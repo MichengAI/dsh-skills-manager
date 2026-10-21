@@ -423,14 +423,26 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
         if (byId[id] && byId[id].retainedBy && byId[id].retainedBy!.mainView) return id;
       }
     }
-    function SkillManagerSection(props: SectionProps) {
-      var sessionId = props.useSessions ? props.useSessions(currentSessionId) : undefined;
+    function resolveT(rawT?: Translate): Translate {
+      if (typeof rawT === "function") return rawT;
+      if (localeService && typeof localeService.bind === "function") return localeService.bind(NS);
+      return function (key: string, params?: object) {
+        var dict = (DICT.zh || {}) as Record<string, string>;
+        var template = dict[key] || key;
+        if (!params) return template;
+        var p = params as Record<string, unknown>;
+        return template.replace(/\{(\w+)\}/g, function (_, name) { return String(p[name] ?? "{" + name + "}"); });
+      };
+    }
+    function SkillManagerSection(props: Partial<SectionProps>) {
+      var t = resolveT(props && props.t);
+      var sessionId = props && props.useSessions ? props.useSessions(currentSessionId) : undefined;
       var scopes = react.useState("user"), filtersState = react.useState<Record<string, Filters>>({}), expandedState = react.useState<Record<string, boolean>>({});
       // 按会话重挂载请求和表单状态，旧会话的异步响应不能覆盖新会话页面。
-      return h(SkillManagerView, Object.assign({}, props, { key: sessionId || "no-session", sessionId: sessionId, scope: scopes[0], setScope: scopes[1], savedFilters: filtersState[0], setSavedFilters: filtersState[1], expanded: expandedState[0], setExpanded: expandedState[1] }));
+      return h(SkillManagerView, Object.assign({}, props, { t: t, key: sessionId || "no-session", sessionId: sessionId, scope: scopes[0], setScope: scopes[1], savedFilters: filtersState[0], setSavedFilters: filtersState[1], expanded: expandedState[0], setExpanded: expandedState[1] }));
     }
     function SkillManagerView(props: ViewProps) {
-      var t = props.t;
+      var t = resolveT(props && props.t);
       function sessionApi<K extends keyof ApiRoutes>(path: K, options?: RequestInit): Promise<ApiRoutes[K]> {
         var headers: Record<string, string> = Object.fromEntries(new Headers(options?.headers).entries());
         if (props.sessionId) headers["x-dsh-skills-session"] = props.sessionId;
@@ -950,5 +962,5 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
     }
 
     var inject = ["slots", "locale"];
-    function apply(ctx: ClientContext) { localeService = ctx.locale; ctx.effect(function () { return ctx.locale.register(NS, DICT); }); ctx.effect(function () { return observePluginUpdate({ endpoint: "/api/michengai/dsh-skills-manager/update", packageName: "@michengai/dsh-skills-manager", titleRowSelector: ".dssm-title-row", linksSelector: ".dssm-feedback-links", zhName: "技能", enName: "Skills", createIcon: createPluginUpdateIcon }); }, "skills-manager: plugin update ui"); installSettingsNavIcon(ctx, function () { return ctx.locale.bind(NS)("title"); }); ctx.slots.inject("settings.section", function () { return ctx.slots.register({ name: "settings.section", id: "skills-manager", order: 25, label: function () { return ctx.locale.bind(NS)("title"); }, icon: "skill", locale: NS }, SkillManagerSection); }); setupSidebarEntry(ctx, { callApi: callApi, headers: MUTATION_HEADERS, renderPanel: function () { return h(SkillManagerSection, null); }, ns: NS }); }
+    function apply(ctx: ClientContext) { localeService = ctx.locale; ctx.effect(function () { return ctx.locale.register(NS, DICT); }); ctx.effect(function () { return observePluginUpdate({ endpoint: "/api/michengai/dsh-skills-manager/update", packageName: "@michengai/dsh-skills-manager", titleRowSelector: ".dssm-title-row", linksSelector: ".dssm-feedback-links", zhName: "技能", enName: "Skills", createIcon: createPluginUpdateIcon }); }, "skills-manager: plugin update ui"); installSettingsNavIcon(ctx, function () { return ctx.locale.bind(NS)("title"); }); ctx.slots.inject("settings.section", function () { return ctx.slots.register({ name: "settings.section", id: "skills-manager", order: 25, label: function () { return ctx.locale.bind(NS)("title"); }, icon: "skill", locale: NS }, SkillManagerSection); });      setupSidebarEntry(ctx, { callApi: callApi, headers: MUTATION_HEADERS, renderPanel: function (ownerProps?: any) { return h(SkillManagerSection, Object.assign({ t: ctx.locale.bind(NS) }, ownerProps)); }, ns: NS }); }
     module.exports.formatTrashTime = formatTrashTime; module.exports.DICT = DICT; module.exports.translateError = translateError; module.exports.parseApiResponse = parseApiResponse; module.exports.isSkillEnabled = isSkillEnabled; module.exports.countKey = countKey; module.exports.rootDisplayName = rootDisplayName; module.exports.summarizeImportResult = summarizeImportResult; module.exports.normalizeSkillQuery = normalizeSkillQuery; module.exports.matchSkillQuery = matchSkillQuery; module.exports.filterSkills = filterSkills; module.exports.visibleSkillRoots = visibleSkillRoots; module.exports.scopeSkillRoots = scopeSkillRoots; module.exports.skillStatus = skillStatus; module.exports.countSkillStatuses = countSkillStatuses; module.exports.currentSessionId = currentSessionId; module.exports.canToggleSource = canToggleSource; module.exports.recoverModalFocus = recoverModalFocus; module.exports.trapModalFocus = trapModalFocus; module.exports.inspectUploadSelection = inspectUploadSelection; module.exports.setupSidebarEntry = setupSidebarEntry; module.exports.apply = apply; module.exports.inject = inject;

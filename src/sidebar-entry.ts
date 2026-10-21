@@ -1,4 +1,5 @@
 import * as React from "react";
+import { Switch as PrimitiveSwitch } from "@deepseek-ai/dsh-client-ui-primitives";
 import type { ClientContext, Translate } from "./client-types.js";
 import { SKILL_PATHS } from "./settings-nav-icon.js";
 
@@ -21,14 +22,32 @@ export const sidebarLocales = {
   },
 };
 
+export const SIDEBAR_ENTRY_STYLE_ID = "dssm-sidebar-entry-style";
+
 export const sidebarEntryCss = `
-.dssm-main-panel{box-sizing:border-box;height:100%;min-height:0;overflow-y:auto;padding:24px clamp(16px,4vw,48px) 48px}
-.dssm-bundle-config{display:flex;flex-direction:column;gap:12px;padding:12px 14px;border-radius:var(--dsw-radius-md,10px);border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}
-.dssm-bundle-row{display:flex;align-items:center;justify-content:space-between;gap:16px}
-.dssm-bundle-label-box{display:flex;flex-direction:column;gap:4px;min-width:0;flex:1}
+.dssm-main-panel{box-sizing:border-box;height:100%;min-height:0;overflow-y:auto;display:flex;flex-direction:column;align-items:center;padding:28px clamp(24px,4vw,48px) 48px}
+.dssm-main-panel>*{width:100%;max-width:960px}
+.dssm-bundle-row{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:16px!important;padding:12px 0!important;border-bottom:0.5px solid var(--dsw-alias-border-l2)!important}
+.dssm-bundle-label-box{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1;text-align:left}
 .dssm-bundle-title{font-size:13px;font-weight:500;line-height:20px;color:var(--dsw-alias-label-primary)}
 .dssm-bundle-desc{font-size:12px;line-height:18px;color:var(--dsw-alias-label-secondary)}
+.dssm-enable-switch{box-sizing:border-box!important;position:relative!important;flex:0 0 auto!important;width:36px!important;height:20px!important;min-width:36px!important;min-height:20px!important;padding:2px!important;border:0!important;border-radius:999px!important;background:var(--dsw-alias-border-l3,#888)!important;cursor:pointer!important;transition:background-color 150ms ease!important}
+.dssm-enable-switch[aria-checked="true"],.dssm-enable-switch[aria-checked=true]{background:var(--dsw-alias-brand-primary,#000)!important}
+.dssm-enable-switch:disabled{cursor:default!important;opacity:.5!important}
+.dssm-enable-switch:focus-visible{outline:var(--dsw-focus-ring-width,1px) solid var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary))!important;outline-offset:2px!important}
+.dssm-enable-switch-thumb{display:block!important;width:16px!important;height:16px!important;border-radius:50%!important;background:var(--dsw-alias-label-primary-foreground,#fff)!important;transition:transform 150ms ease!important;pointer-events:none!important}
+.dssm-enable-switch[aria-checked="false"] .dssm-enable-switch-thumb,.dssm-enable-switch[aria-checked=false] .dssm-enable-switch-thumb{background:var(--dsw-alias-switch-thumb,#fff)!important;transform:translateX(0)!important}
+.dssm-enable-switch[aria-checked="true"] .dssm-enable-switch-thumb,.dssm-enable-switch[aria-checked=true] .dssm-enable-switch-thumb{transform:translateX(16px)!important}
 `;
+
+export function ensureSidebarEntryStyle(): void {
+  if (typeof document === "undefined") return;
+  if (document.getElementById(SIDEBAR_ENTRY_STYLE_ID) !== null) return;
+  const style = document.createElement("style");
+  style.id = SIDEBAR_ENTRY_STYLE_ID;
+  style.textContent = sidebarEntryCss;
+  (document.head ?? document.documentElement).appendChild(style);
+}
 
 export function SkillSidebarIcon(props?: { size?: number }) {
   const size = props && typeof props.size === "number" ? props.size : 16;
@@ -49,23 +68,90 @@ export function SkillBundleConfigCard(props: {
   onToggle: (enabled: boolean) => void;
   disabled?: boolean;
 }) {
+  ensureSidebarEntryStyle();
   const { t, enabled, onToggle, disabled } = props;
-  return h("div", { className: "dssm-bundle-config" },
-    h("div", { className: "dssm-bundle-row" },
-      h("div", { className: "dssm-bundle-label-box" },
-        h("div", { className: "dssm-bundle-title" }, t("sidebar.entry.title")),
-        h("div", { className: "dssm-bundle-desc" }, t("sidebar.entry.desc"))
-      ),
-      h("button", {
+  const switchElement = typeof PrimitiveSwitch === "function"
+    ? h(PrimitiveSwitch, {
+        checked: enabled,
+        onChange: onToggle,
+        label: t("sidebar.entry.toggle"),
+        disabled: disabled,
+      })
+    : h("button", {
         type: "button",
         role: "switch",
-        "aria-checked": enabled,
+        "aria-checked": enabled ? "true" : "false",
         "aria-label": t("sidebar.entry.toggle"),
         disabled: disabled,
         className: "dssm-enable-switch",
+        style: {
+          boxSizing: "border-box",
+          position: "relative",
+          flex: "0 0 auto",
+          width: "36px",
+          height: "20px",
+          padding: "2px",
+          border: 0,
+          borderRadius: "999px",
+          background: enabled ? "var(--dsw-alias-brand-primary, #000)" : "var(--dsw-alias-border-l3, #888)",
+          cursor: disabled ? "default" : "pointer",
+        },
         onClick: () => onToggle(!enabled),
-      }, h("span", { className: "dssm-enable-switch-thumb" }))
-    )
+      }, h("span", {
+        className: "dssm-enable-switch-thumb",
+        style: {
+          display: "block",
+          width: "16px",
+          height: "16px",
+          borderRadius: "50%",
+          background: "var(--dsw-alias-label-primary-foreground, #fff)",
+          transform: enabled ? "translateX(16px)" : "translateX(0)",
+          transition: "transform 150ms ease",
+        },
+      }));
+
+  return h("div", {
+    className: "dssm-bundle-row",
+    style: {
+      boxSizing: "border-box",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: "16px",
+      padding: "12px 0",
+      borderBottom: "0.5px solid var(--dsw-alias-border-l2)",
+    },
+  },
+    h("div", {
+      className: "dssm-bundle-label-box",
+      style: {
+        display: "flex",
+        flexDirection: "column",
+        gap: "2px",
+        minWidth: 0,
+        flex: 1,
+        textAlign: "left",
+      },
+    },
+      h("span", {
+        className: "dssm-bundle-title",
+        style: {
+          fontSize: "13px",
+          fontWeight: 500,
+          lineHeight: "20px",
+          color: "var(--dsw-alias-label-primary)",
+        },
+      }, t("sidebar.entry.title")),
+      h("span", {
+        className: "dssm-bundle-desc",
+        style: {
+          fontSize: "12px",
+          lineHeight: "18px",
+          color: "var(--dsw-alias-label-secondary)",
+        },
+      }, t("sidebar.entry.desc"))
+    ),
+    switchElement
   );
 }
 
@@ -106,7 +192,7 @@ function SkillBundleConfigCardWrapper(props: {
 export interface SetupSidebarEntryOptions {
   callApi: (path: "/sidebar-entry", options?: RequestInit) => Promise<{ enabled: boolean }>;
   headers: Record<string, string>;
-  renderPanel: () => React.ReactNode;
+  renderPanel: (ownerProps?: any) => React.ReactNode;
   ns: string;
 }
 
@@ -121,6 +207,7 @@ export function setupSidebarEntry(
   ctx: ClientContext,
   options: SetupSidebarEntryOptions
 ): SidebarEntryController {
+  ensureSidebarEntryStyle();
   if (!ctx.locale) {
     return {
       isEnabled: () => false,
@@ -154,7 +241,8 @@ export function setupSidebarEntry(
           name: "main",
           key: SIDEBAR_PANEL_ID,
           locale: ns,
-        }, () => h("div", { className: "dssm-main-panel" }, renderPanel()));
+          inject: () => ({ t: ctx.locale?.bind ? ctx.locale.bind(ns) : undefined }),
+        }, (ownerProps?: any) => h("div", { className: "dssm-main-panel" }, renderPanel(ownerProps)));
         offPanel = typeof res === "function" ? (res as () => void) : () => {};
       }
       if (!offRow) {

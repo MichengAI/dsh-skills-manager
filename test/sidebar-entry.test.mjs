@@ -106,10 +106,31 @@ try {
   }
 
   // 3. 客户端槽位与门控测试
-  const { setupSidebarEntry, BUNDLE_KEY, SIDEBAR_PANEL_ID, SIDEBAR_PANEL_ORDER } = await import("../lib/sidebar-entry.js");
-  assert.equal(BUNDLE_KEY, "@michengai/dsh-skills-manager");
-  assert.equal(SIDEBAR_PANEL_ID, "skills-manager");
-  assert.equal(SIDEBAR_PANEL_ORDER, 2);
+  const { readFile } = await import("node:fs/promises");
+  const react = await import("react");
+
+  let definition;
+  new Function("window", await readFile(new URL("../lib/client.js", import.meta.url), "utf8"))({
+    __ModuleLoader__: { load(value) { definition = value; } },
+  });
+  const client = definition.factory((id) => {
+    if (id === "react") return react;
+    if (id === "react/jsx-runtime") return { jsx: react.createElement, jsxs: react.createElement, Fragment: react.Fragment };
+    if (id.startsWith("react-dom")) return { createPortal: (node) => node };
+    if (id === "@deepseek-ai/dsh-client-ui-primitives") {
+      return {
+        Button: (props) => react.createElement("button", props, props.children),
+        Input: (props) => react.createElement("input", props),
+        Modal: (props) => null,
+        SegmentedTabs: (props) => null,
+        Switch: (props) => react.createElement("input", { type: "checkbox", checked: props.checked, onChange: (e) => props.onChange(e.target.checked) }),
+      };
+    }
+    throw new Error("unexpected require: " + id);
+  });
+
+  const { setupSidebarEntry } = client;
+  assert.equal(typeof setupSidebarEntry, "function", "client 导出 setupSidebarEntry");
 
   const slotRegistrations = new Map();
   const slotInjections = new Map();
