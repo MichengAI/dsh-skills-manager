@@ -81,6 +81,8 @@ export interface ManagerState {
     sources: Record<string, boolean>;
     disabledSkills: Record<string, string[]>;
     enabledSkills: Record<string, string[]>;
+    /** 是否在左侧全局侧边栏显示技能直达入口。默认 false。 */
+    sidebarEntry?: boolean;
     /** 每个来源自己的列表分类。旧状态文件可以没有这两个字段。 */
     categories: Record<string, SkillCategory[]>;
     categoryMembers: Record<string, Record<string, string>>;

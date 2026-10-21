@@ -34,6 +34,8 @@ import {
   listWorkspaces,
   workspaceSkills,
   logPath,
+  getSidebarEntry,
+  setSidebarEntry,
 } from "./core.js";
 import { registerPluginUpdater } from "./plugin-updater.js";
 import { createRepositoryManager } from "./repositories.js";
@@ -474,6 +476,9 @@ function apply(ctx: HostContext) {
         if (req.method === "GET" && path === "/api/dsh-skills-manager/state") {
           return run(res, stateWithSources);
         }
+        if (req.method === "GET" && path === "/api/dsh-skills-manager/sidebar-entry") {
+          return run(res, async () => ({ enabled: await getSidebarEntry() }));
+        }
         if ((req.method === "GET" || req.method === "HEAD") && path === "/api/dsh-skills-manager/workspaces") {
           return run(res, async () => ({ items: await listWorkspaces(registeredWorkspacePaths(ctx) ?? []) }), undefined, req.method === "HEAD");
         }
@@ -501,6 +506,7 @@ function apply(ctx: HostContext) {
         if (req.method === "HEAD") {
           // HEAD 复用 GET/405 的载荷计算 content-length，保持与实体一致的响应头语义。
           if (path === "/api/dsh-skills-manager/state") return run(res, stateWithSources, undefined, true);
+          if (path === "/api/dsh-skills-manager/sidebar-entry") return run(res, async () => ({ enabled: await getSidebarEntry() }), undefined, true);
           json(res, 405, { ok: false, code: "error.proto.method", error: `method not allowed: ${req.method}` }, true);
           return;
         }
@@ -537,6 +543,14 @@ function apply(ctx: HostContext) {
         }
         return enqueueMutation(() => {
           switch (path) {
+            case "/api/dsh-skills-manager/sidebar-entry":
+              return run(res, async () => {
+                if (!body || typeof body.enabled !== "boolean") {
+                  throw Object.assign(new Error("enabled 必须是布尔值"), { statusCode: 400, code: "error.proto.invalidParams" });
+                }
+                const enabled = await setSidebarEntry(body.enabled);
+                return { enabled };
+              });
             case "/api/dsh-skills-manager/repositories/add":
               return run(res, () => repositories.add(body));
             case "/api/dsh-skills-manager/repositories/remove":

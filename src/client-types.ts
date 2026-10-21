@@ -41,6 +41,7 @@ export type ApiRoutes = RepositoryRoutes & Record<SkillsShSearchPath, SkillsShSe
     '/category-move': unknown;
     '/category-enable': unknown;
     '/category-disable': unknown;
+    '/sidebar-entry': { enabled: boolean };
 };
 export type ApiCall = <K extends keyof ApiRoutes>(path: K, options?: RequestInit) => Promise<ApiRoutes[K]>;
 export interface ModalProps {
@@ -104,14 +105,7 @@ export interface ClientContext {
     };
     slots: {
         inject: (name: string, factory: () => unknown) => unknown;
-        register: (options: {
-            name: string;
-            id: string;
-            order: number;
-            label: () => string;
-            icon: string;
-            locale: string;
-        }, component: React.ComponentType<SectionProps>) => unknown;
+        register: (options: Record<string, unknown>, component: (...args: any[]) => any) => unknown;
     };
 }
 interface Require {
