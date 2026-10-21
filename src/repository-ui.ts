@@ -469,6 +469,7 @@ export function createRepositoryUI({ react, Modal, Input, Button, SourceSelect, 
     }
     function openDetail(repo: RepoView, skill: RepoSkill) {
       return perform(async () => {
+        setCopyState("idle");
         setModal({ type: "detail", repo, loading: true });
         try {
           const detail = await post("detail", { id: repo.id, path: skill.path });
@@ -478,6 +479,7 @@ export function createRepositoryUI({ react, Modal, Input, Button, SourceSelect, 
     }
     function openCatalogDetail(target: CatalogTarget) {
       return perform(async () => {
+        setCopyState("idle");
         setModal({ type: "catalog-detail", loading: true });
         try {
           const detail = await api("/catalog/detail", { method: "POST", headers, body: JSON.stringify(target) });
@@ -782,12 +784,11 @@ export function createRepositoryUI({ react, Modal, Input, Button, SourceSelect, 
         const detail = modal.detail;
         body = h("div", { className: "dssm-repo-panel" },
           h("div", { className: "dssm-detail-head" },
-            h("div", { className: "dssm-name" }, detail.name),
+            h("div", { className: "dssm-name", title: detail.name }, detail.name),
             detail.body ? h(PrimitiveButton, {
               variant: "outline",
               size: "sm",
               "aria-live": "polite",
-              style: { flex: "none" },
               onClick: () => copyText(detail.body)
             }, copyState === "copied" ? t("repo.copied") : copyState === "failed" ? t("repo.copyFailed") : t("repo.copyBody")) : null
           ),
@@ -818,12 +819,11 @@ export function createRepositoryUI({ react, Modal, Input, Button, SourceSelect, 
         const detail = modal.detail;
         body = h("div", { className: "dssm-repo-panel" },
           h("div", { className: "dssm-detail-head" },
-            h("div", { className: "dssm-name" }, detail.name),
+            h("div", { className: "dssm-name", title: detail.name }, detail.name),
             detail.body ? h(PrimitiveButton, {
               variant: "outline",
               size: "sm",
               "aria-live": "polite",
-              style: { flex: "none" },
               onClick: () => copyText(detail.body)
             }, copyState === "copied" ? t("repo.copied") : copyState === "failed" ? t("repo.copyFailed") : t("repo.copyBody")) : null
           ),
