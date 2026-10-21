@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.2.10 - 2026-10-21
+
+- Enlarge skill detail dialogs to 760px wide with a spacious, monospace body reader that can be resized vertically (Issue #54).
+- Add a one-click "Copy body" button with transient status feedback and full-title tooltips for truncated skill names (Issue #54).
+- Unify the wide layout and reading experience across local skills, repository skills, and catalog skills (ClawHub and skills.sh) (Issue #54).
+- Preserve Unicode and non-ASCII skill names, preventing Chinese and mixed skill names from being truncated into invalid short candidates (#53).
+- Enforce host naming policies with clear diagnostics while allowing historical non-conforming skills to be safely disabled and cleaned up (#53).
+- Align the sidebar panel width with the 960px host baseline and adopt native switch controls.
+
 ## 1.2.9 - 2026-10-21
 
 - Align the enable/disable switch with lifecycle gatekeeper semantics: disabling globally blocks both model and slash invocations; enabling respects source frontmatter (`disable-model-invocation` and `user-invocable`) without forcing privileges (#43, #51).
