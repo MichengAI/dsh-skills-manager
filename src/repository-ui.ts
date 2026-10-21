@@ -831,7 +831,7 @@ export function createRepositoryUI({ react, Modal, Input, Button, SourceSelect, 
         );
       }
       if (modal.type === "detail" && !modal.detail) body = h("div", { role: "status", className: "dssm-repo-panel" }, modal.loading ? t("repo.detailLoading") : null, modal.failed ? feedbackNode : null);
-      dialog = h(Modal, { wide: modal.type === "detail" || modal.type === "catalog-detail", title: t("repo." + (modal.type === "catalog-detail" ? "detail" : modal.type === "catalog-install" ? "install" : modal.type === "catalog-uninstall" ? "uninstall" : modal.type === "remove" ? "remove" : modal.type)), description, footer, closeLabel: t("repo.close"), onClose: close }, body);
+      dialog = h(Modal, { className: (modal.type === "detail" || modal.type === "catalog-detail") ? "dssm-modal-wide" : undefined, title: t("repo." + (modal.type === "catalog-detail" ? "detail" : modal.type === "catalog-install" ? "install" : modal.type === "catalog-uninstall" ? "uninstall" : modal.type === "remove" ? "remove" : modal.type)), description, footer, closeLabel: t("repo.close"), onClose: close }, body);
     }
 
     function catalogInstalled(id: string) { return catalogInstallIds.includes(id) || catalogCopiesOf(id).length > 0; }

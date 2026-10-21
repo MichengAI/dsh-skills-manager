@@ -78,7 +78,6 @@ declare module '@deepseek-ai/dsh-client-ui-primitives' {
 
   export function Modal(props: {
     open?: boolean
-    wide?: boolean
     onClose?: () => void
     title?: ReactNode
     closeLabel?: string

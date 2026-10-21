@@ -147,7 +147,7 @@ try {
   more.props.onChange({ target: { value: "detail" } }); render();
   const detailDialog = find((node) => node.props.title === t("detail.title"));
   assert.ok(detailDialog, "详情菜单打开技能详情弹窗");
-  assert.ok(detailDialog.props.className && detailDialog.props.className.includes("dssm-modal-wide"), "技能详情弹窗必须声明 wide 并赋予 dssm-modal-wide 类名");
+  assert.ok(detailDialog.props.className && detailDialog.props.className.includes("dssm-modal-wide"), "技能详情弹窗必须赋予 dssm-modal-wide 类名");
   detailDialog.props.onClose(); render();
   assert.ok(JSON.stringify(nodes()).includes("LONG_DESCRIPTION_global-one"), "展开来源后显示技能简介");
   nodes(groups()[0]).find((node) => node.props.className === "dssm-source-toggle").props.onClick(); render();

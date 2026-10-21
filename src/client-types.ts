@@ -51,7 +51,6 @@ export interface ModalProps {
     description?: string;
     footer?: React.ReactNode;
     children?: React.ReactNode;
-    wide?: boolean;
     className?: string;
     contentClassName?: string;
 }
