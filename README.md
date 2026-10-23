@@ -23,17 +23,15 @@ This README describes **1.2.12**. Released changes are in the [changelog](CHANGE
 
 ## Features
 
-
 Bring skills from your computer and projects into DSH without switching between Agent folders.
 
-- **Manage in one place**: browse collapsible source groups, search, read, and toggle skills. Categories group skills inside a source and do not move files.
-- **Global and project skills**: select a registered workspace from the project tab dropdown. Its skills use the same source-group layout as global skills. Project copies take priority over global copies.
-- **Reuse existing skills**: supports Codex, Claude Code, Copilot, and other agents without modifying their source files when toggled.
-- **Create and import**: create a skill or import ZIP archives, folders, and `SKILL.md` files into your user directory (default) or a registered workspace. User-level writes can go to DSH skills or Shared Agent.
-- **Skill repositories**: discover public GitHub skills, install without overwriting local files, review updates and restore backups.
-- **Recover deleted skills**: DSH skills go to Trash first, so accidental deletions can be restored.
-
-- **Source tracking and updates**: distinguish local and repository skills, preview file changes, protect local edits, and confirm backup, update or rollback.
+- **Unified multi-view management**: Browse Global Skills, Project Skills, Discover, and Trash in unified tabs with instant search, status filtering, and collapsible source groups.
+- **Broad ecosystem support**: Full coverage for 19+ tools and CLI environments including DSH, Shared Agent, Codex, Claude Code, Copilot, Cursor, Windsurf, Qoder, and Trae without touching third-party files.
+- **Categorization and drag & drop**: Create category folders inside sources, drag skill rows (`⋮⋮`) to organize and order them, batch assign skills, and toggle entire categories with a single switch. Category metadata is saved without moving files.
+- **Public markets & repositories**: Integrated Discover hub to explore trending skills from ClawHub and skills.sh, or subscribe to public GitHub repositories with incremental diff inspection and backups.
+- **Create and flexible import**: Create skills or import ZIP archives, folders, and `SKILL.md` files directly into your global user root or a registered workspace.
+- **Wide reading experience**: 760px responsive detail modal with monospace syntax styling, vertical resizing, and a one-click "Copy body" action.
+- **Trash & safe rollback**: Soft delete protects skills from accidental loss, allowing complete restoration with provenance and update history preserved.
 
 ## Screenshots
 
@@ -45,11 +43,11 @@ Project skills:
 
 ![Project skills management view](assets/screenshots/project-skills.webp)
 
-Skill repositories:
+Skill repositories & discover:
 
 ![Browse and install repository skills](assets/screenshots/skill-repositories.webp)
 
-*Screenshots show the 1.1.18 release featuring global skills, project skills, and skill repositories. Screenshots show only the core feature panels, with background whitespace and unneeded window chrome cropped out, and use lossless WebP.*
+*Screenshots show core feature views for global skills, project skills, and skill discovery. Lossless WebP.*
 
 ## Installation
 
@@ -77,32 +75,85 @@ Restart DSH, refresh the page, and open **Settings → Skills**. To update, sele
 
 - Plugin `1.2.12` is tested with DeepSeek Harness `0.2.0-rc.1`, `0.2.0-rc.2`, `0.2.1-rc.1`, `0.2.1-rc.2`.
 - Hosts before `0.2.0` are no longer supported. If you still use a `0.1.x` host, install plugin `1.1.23` instead of `@latest`.
+- **Reverse proxy deployment**: Supports hosting DSH behind prefix-stripping reverse proxies (e.g. `/app/dsh/`). API and update endpoints resolve against the page base URI (`document.baseURI`).
 
-## Usage
+## Plugin Configuration & Toggles
 
-| What you want to do | How |
+The plugin follows standard DSH bundle configuration conventions. Options are located at:
+> **Sidebar → Plugins → Click `Skills Manager`** (the host's `plugins.bundle.config` slot).
+
+Two native switches are available:
+
+### 1. Sidebar Entry (`sidebarEntry`)
+- **Default**: Disabled (`false`)
+- **Description**: Displays a persistent **Skills** navigation icon directly under **Plugins** in the host's left primary sidebar.
+- **Effect**:
+  - When enabled, clicking the sidebar icon opens the Skills Manager directly in the primary workspace with a **960px centered container** (matching host plugin manager conventions). This eliminates vertical scrolling constraints in narrow settings dialogs;
+  - When disabled, unregisters the sidebar entry cleanly;
+  - The standard **Settings → Skills** view remains active either way, and state is synchronized live across both entry points.
+
+### 2. Online Updates (`onlineUpdate` / `updater`)
+- **Default**: Enabled (`true`)
+- **Description**: Controls whether the plugin checks for and installs updates from npm.
+- **Effect**:
+  - **Dynamic UI Sync**: Disabling the toggle hides the **Check for updates** button in the header immediately without requiring a full page reload;
+  - **Endpoint Guard**: When disabled, the update API route returns `HTTP 403` for all check and install requests, preventing unreviewed updates;
+  - **Host / Platform Lock**: For curated plugin indexes (such as VibeDev) or restricted enterprise environments, this can be locked directly via Cordis configuration (bundle patch) without needing UI interaction:
+    ```yaml
+    updater: false # or onlineUpdate: false
+    ```
+    Once configured, the built-in updater is disabled at startup and the update action stays hidden.
+
+## Usage Guide
+
+| Action | How to do it |
 | --- | --- |
-| Find a skill | Choose Global or Project, expand a source group, or use search and filters. |
-| Read its contents | Select **View details** for the skill body and source information. |
-| Enable or disable | Toggle the skill switch. This affects DSH without editing source files. |
-| Add a skill | Select **Create skill** or **Import skill**, then use the side-by-side dropdowns: choose **User directory** (default) or **Specific workspace** on the left, and a location or registered workspace on the right. Check the destination path below. A workspace copy is written to that project's `.dsh/skills` and may be committed to its repository. |
-| Install from a repository | Open **Repositories → Add repository**, enter a public GitHub URL, scan, click **Install**, use the same side-by-side dropdowns to choose the scope and location or workspace, check the destination path below, and confirm. |
-| Uninstall a repository skill | Click the red **Uninstall** button and confirm. This includes copies in a registered workspace. The installed folder and local edits move to **Trash**, and **Install** becomes available again. |
-| Update repository skills | Select **Refresh & check updates**, then **Review update** to inspect changes and confirm backup and update. |
-| Roll back an update | Select **Restore previous version** for a skill with a backup, preview and confirm. |
-| Recover a deletion | Open **Trash** and restore. |
+| **Find skills** | Switch between Global Skills and Project Skills tabs, expand/collapse source groups, or use the search bar and status filters. |
+| **Inspect content** | Click **View details** on any skill row to read `SKILL.md` content and diagnostics in a 760px wide resizable dialog, with one-click **Copy body**. |
+| **Toggle invocation** | Toggle the switch on the right side of a skill row to enable or disable it for DSH without editing third-party files. |
+| **Organize categories** | Click **New category** within a source, then drag the grab handle (`⋮⋮`) to reorder or move skills across categories. Toggling a category turns all its member skills on or off. |
+| **Create & import** | Click **Create skill** or **Import skill** in the header. Select destination scope (User directory or a registered workspace project) and path. |
+| **Discover & install** | Open the **Discover** tab to browse trending ClawHub skills or search the skills.sh catalog, or click **Add repository** to subscribe to a public GitHub repo. |
+| **Update repository skills** | Click **Refresh**, inspect file diffs with **Review update**, and confirm to update with an automated backup. |
+| **Roll back updates** | Click **Restore previous version** on skills with backup history, preview changes, and confirm rollback. |
+| **Recover deletions** | Open **Trash** to restore accidentally deleted DSH skills with their original locations preserved. |
 
-- **Registered workspaces**: select a registered workspace from the project tab dropdown. Only that workspace is scanned, displayed and searched. Git repositories use the nearest Git root; other folders use the workspace directory, so no `git init` is required. Empty workspaces remain selectable; unavailable directories are disabled.
-- **Independent copies**: disabling a project copy allows another enabled copy to take over, and the panel identifies the active source. Disable all copies to turn the skill off completely.
-- **File management**: User-level DSH and Shared Agent skills can move to Trash and be restored from the general manager without installation records. A top-level directory link in user or project DSH is listed too: it can be viewed and toggled, and it cannot be deleted or overwritten. Project Shared Agent remains read-only. Shared Agent keeps recursive discovery and link reading; linked entries and unsafe paths are not writable. Repository-installed copies in DSH, Shared Agent, or a registered workspace can also be uninstalled from **Repositories**. Codex, Claude and other external skills remain read-only. Creation, file import and repository install can write to DSH skills or Shared Agent in your user directory, or to a registered workspace's `.dsh/skills`. Creation, import and installation never preselect a workspace, and Shared Agent is not available for workspaces. The project tab viewing selection is not a write destination.
-- **Restore**: retired repository provenance belongs to the specific Trash entry and is reactivated only by an explicit restore, including the destination and update/rollback history. A different same-name skill does not inherit repository management. Uninstalling a Shared Agent copy affects every agent using that directory.
+### Four Main Tabs
 
-### Repository boundaries
+1. **Global Skills**
+   - Manage cross-project skills stored across all detected agent home directories on your machine.
+   - Categorize and toggle skills by source; same-name precedence automatically highlights shadowed copies.
+2. **Project Skills**
+   - Select any registered workspace from the dropdown to manage its project-level skills (`<project>/.dsh/skills`, etc.).
+   - Scans and searches only the selected workspace; project copies take precedence over global counterparts.
+3. **Discover**
+   - **Public Catalogs**: Direct integration with ClawHub and skills.sh to find and install popular community skills;
+   - **GitHub Repositories**: Subscribe to public repositories, scan skill lists, preview diffs, and install copies with local edit protections.
+4. **Trash**
+   - Soft-delete buffer for DSH and Shared Agent skills, preserving provenance and install destinations.
+   - Deleted skills can be restored anytime with a single click.
 
-- The header **Check for updates** updates the plugin itself. Repository **Refresh & check updates** checks skill contents without installing or replacing them; it shows animation, counts and the current repository.
-- Repository installation writes to user-level DSH skills or Shared Agent (`~/.agents/skills`, overridable with `DSH_AGENTS_HOME`), or to a registered workspace's `<project>/.dsh/skills`. The chooser shows the configured path and disables unsafe paths; a missing directory is created only after confirmation. Codex, Claude and other agent directories cannot be selected. Arbitrary paths, unregistered project destinations and plugin-managed caches are not writable. Missing destinations in legacy records default to DSH; updates and rollback follow the recorded destination. Public GitHub repositories are supported; private credentials and automatic updates are not. Removing a subscription keeps installed skills.
-- Archives are limited to 32 MiB, including when filtering by subdirectory. Failed scans preserve the previous catalog; corrupt caches require refresh.
-- Local edits require explicit confirmation before replacement. Historical backups are not automatically cleaned and consume additional disk space.
+### Skill Naming & Frontmatter Requirements
+
+The DeepSeek Harness loader enforces strict identifier policies:
+- **Format constraint**: Host loaders require skill names to strictly match lowercase ASCII alphanumeric characters and hyphens (kebab-case, e.g. `my-tool`).
+- **Non-ASCII & Chinese skill folders**: Your skill directory name can remain in Chinese (e.g. `文案排版/`), provided you specify a valid English `name` in `SKILL.md` frontmatter:
+  ```markdown
+  ---
+  name: copy-formatting-helper
+  description: Helper for multi-platform article formatting
+  ---
+
+  # Skill instructions...
+  ```
+- **Diagnostics**: Skills lacking an English name are flagged with clear in-app diagnostics explaining that the host loader cannot invoke them, with options to safely disable or clean up records.
+
+### Repository & Installation Boundaries
+
+- The header **Check for updates** updates the plugin itself; repository **Refresh** checks subscribed skill contents without replacing local files.
+- Repository installation can target user DSH skills, Shared Agent (`~/.agents/skills`, overridable via `DSH_AGENTS_HOME`), or `<project>/.dsh/skills` for registered workspaces. Unsafe paths and external agent roots (Codex, Claude) are locked against writes.
+- 32 MiB archive limit; downloading subdirectories still fetches the full archive.
+- Local edits are detected and require explicit confirmation before overwriting; backup history is preserved for rollback.
 
 ## Supported Agent directories
 
