@@ -13,6 +13,7 @@ import { createDestinationKit, defaultDestination, destinationPayload, destinati
 import { observePluginUpdate } from "./plugin-update-ui.js";
 import { resolveApiUrl } from "./api-base.js";
 import { createSourceSelect } from "./source-select.js";
+import * as primitives from "@deepseek-ai/dsh-client-ui-primitives";
 import { Button as PrimitiveButton, Modal as PrimitiveModal, SegmentedTabs } from "@deepseek-ai/dsh-client-ui-primitives";
 import { Input, foldChevron } from "./plugin-ui.js";
 import { installSettingsNavIcon } from "./settings-nav-icon.js";
@@ -21,7 +22,15 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
 // dsh-skills-manager client half：按全局与项目作用域切换的多 Agent Skills 管理面板。
     var react = React;
     var h = react.createElement;
-    function FeedbackIcon() { return h("svg", { viewBox: "0 0 16 16", width: 16, height: 16, "aria-hidden": true, focusable: "false" }, h("path", { fill: "none", stroke: "currentColor", strokeWidth: 1.5, strokeLinecap: "round", strokeLinejoin: "round", d: "M9.5 2.5 13.5 6.5 6 14H2v-4z" })); }
+    function FeedbackIcon() {
+      const IconComponent = (primitives as Record<string, any>)["IconEditOutlineRegular"]
+        || (primitives as Record<string, any>)["IconEditOutline16"]
+        || (primitives as Record<string, any>)["IconEditOutline"];
+      if (typeof IconComponent === "function") {
+        return h(IconComponent, { size: 16 });
+      }
+      return h("svg", { viewBox: "0 0 16 16", width: 16, height: 16, "aria-hidden": true, focusable: "false" }, h("path", { fill: "none", stroke: "currentColor", strokeWidth: 1.5, strokeLinecap: "round", strokeLinejoin: "round", d: "M9.5 2.5 13.5 6.5 6 14H2v-4z" }));
+    }
     var UPDATE_ICON_PATHS = {
       refresh: ["M13.5 5.5V2.5m0 0h-3m3 0-2.1 2.1A5.5 5.5 0 1 0 13.2 12"],
       download: ["M8 2v8m0 0 3-3m-3 3-3-3M3 13v2h10v-2"],
