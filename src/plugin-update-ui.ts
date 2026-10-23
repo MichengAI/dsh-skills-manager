@@ -7,7 +7,14 @@ import { resolveApiUrl } from "./api-base.js";
 interface UpdateUIOptions {
   /** 更新接口的根绝对路径（如 "/api/.../update"）；模块入口按页面 base 解析，调用方传原始路径，不要自行拼前缀。 */
   endpoint: string;
-  packageName: string; titleRowSelector: string; linksSelector: string; zhName: string; enName: string; createIcon: (name: "refresh" | "download" | "copy" | "close") => HTMLElement }
+  packageName: string;
+  titleRowSelector: string;
+  linksSelector: string;
+  zhName: string;
+  enName: string;
+  createIcon: (name: "refresh" | "download" | "copy" | "close") => HTMLElement;
+  isEnabled?: () => boolean;
+}
 
 const UPDATE_HEADER = "x-michengai-plugin-update";
 const STYLE_ID = "michengai-plugin-update-ui";
@@ -152,6 +159,14 @@ function observePluginUpdate(options: UpdateUIOptions) {
     const links = row.querySelector(options.linksSelector);
     if (links === null) return;
     const existing = links.querySelector<HTMLElement>(`[data-mpi-check="${options.packageName}"]`);
+    if (options.isEnabled && !options.isEnabled()) {
+      if (dialogHost !== undefined) closeDialog();
+      if (existing !== null) {
+        unmountCheck();
+        existing.remove();
+      }
+      return;
+    }
     if (existing !== null) {
       const label = existing.querySelector("[data-mpi-label]");
       if (label === null || label.textContent !== pluginUpdateCopy(document.documentElement.lang).check) renderCheck();
@@ -177,11 +192,13 @@ function observePluginUpdate(options: UpdateUIOptions) {
   observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ["lang"] });
   applyControls();
   void load().catch(() => {});
-  return () => {
+  const cleanup = () => {
     controller.abort(); observer.disconnect(); closeDialog(); unmountCheck();
     if (frame !== undefined) window.cancelAnimationFrame(frame);
     document.querySelectorAll(`[data-mpi-check="${options.packageName}"],.mpi-version[data-package="${options.packageName}"]`).forEach((node) => node.remove());
   };
+  (cleanup as unknown as { refresh: () => void }).refresh = () => applyControls();
+  return cleanup;
 }
 
 export { handlePluginUpdateEscape, manualPluginUpdateCommand, observePluginUpdate };

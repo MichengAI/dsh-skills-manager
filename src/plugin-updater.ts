@@ -450,6 +450,13 @@ function registerPluginUpdater(ctx: HostContext, options: UpdateOptions) {
     path: options.endpoint,
     handler: async (request, response) => {
       try {
+        if (options.isEnabled) {
+          const allowed = await options.isEnabled();
+          if (!allowed) {
+            json(response, 403, { ok: false, code: "error.update.disabled", error: "在线更新已被禁用。" });
+            return;
+          }
+        }
         const target = runtime(host);
         if (request.method === "GET" || request.method === "HEAD") {
           const payload = await status(options, target);

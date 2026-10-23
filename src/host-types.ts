@@ -111,6 +111,7 @@ export interface UpdateOptions {
     endpoint: string;
     packageName: string;
     manifestUrl: URL;
+    isEnabled?: () => Promise<boolean> | boolean;
 }
 export interface UpdateTarget {
     profileName: string;

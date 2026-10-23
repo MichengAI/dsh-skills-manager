@@ -36,6 +36,8 @@ import {
   logPath,
   getSidebarEntry,
   setSidebarEntry,
+  getOnlineUpdate,
+  setOnlineUpdate,
 } from "./core.js";
 import { registerPluginUpdater } from "./plugin-updater.js";
 import { createRepositoryManager } from "./repositories.js";
@@ -351,11 +353,23 @@ function registerAgentSkillProviders(ctx: HostContext, invalidators: Set<() => v
   };
 }
 
-function apply(ctx: HostContext) {
+export interface PluginConfig {
+  updater?: boolean;
+  onlineUpdate?: boolean;
+}
+
+function apply(ctx: HostContext, config?: PluginConfig) {
+  const hostDisabled = config?.updater === false || config?.onlineUpdate === false;
+  const isUpdateEnabled = async () => {
+    if (hostDisabled) return false;
+    return await getOnlineUpdate();
+  };
+
   ctx.effect(() => registerPluginUpdater(ctx, {
     endpoint: "/api/michengai/dsh-skills-manager/update",
     packageName: "@michengai/dsh-skills-manager",
     manifestUrl: new URL("../package.json", import.meta.url),
+    isEnabled: isUpdateEnabled,
   }), "skills-manager: plugin updater");
   const log = makeLog();
   const repositories = createRepositoryManager({ log, registeredWorkspaces: () => registeredWorkspacePaths(ctx) });
@@ -479,6 +493,9 @@ function apply(ctx: HostContext) {
         if (req.method === "GET" && path === "/api/dsh-skills-manager/sidebar-entry") {
           return run(res, async () => ({ enabled: await getSidebarEntry() }));
         }
+        if (req.method === "GET" && path === "/api/dsh-skills-manager/online-update") {
+          return run(res, async () => ({ enabled: await isUpdateEnabled() }));
+        }
         if ((req.method === "GET" || req.method === "HEAD") && path === "/api/dsh-skills-manager/workspaces") {
           return run(res, async () => ({ items: await listWorkspaces(registeredWorkspacePaths(ctx) ?? []) }), undefined, req.method === "HEAD");
         }
@@ -507,6 +524,7 @@ function apply(ctx: HostContext) {
           // HEAD 复用 GET/405 的载荷计算 content-length，保持与实体一致的响应头语义。
           if (path === "/api/dsh-skills-manager/state") return run(res, stateWithSources, undefined, true);
           if (path === "/api/dsh-skills-manager/sidebar-entry") return run(res, async () => ({ enabled: await getSidebarEntry() }), undefined, true);
+          if (path === "/api/dsh-skills-manager/online-update") return run(res, async () => ({ enabled: await isUpdateEnabled() }), undefined, true);
           json(res, 405, { ok: false, code: "error.proto.method", error: `method not allowed: ${req.method}` }, true);
           return;
         }
@@ -549,6 +567,17 @@ function apply(ctx: HostContext) {
                   throw Object.assign(new Error("enabled 必须是布尔值"), { statusCode: 400, code: "error.proto.invalidParams" });
                 }
                 const enabled = await setSidebarEntry(body.enabled);
+                return { enabled };
+              });
+            case "/api/dsh-skills-manager/online-update":
+              return run(res, async () => {
+                if (!body || typeof body.enabled !== "boolean") {
+                  throw Object.assign(new Error("enabled 必须是布尔值"), { statusCode: 400, code: "error.proto.invalidParams" });
+                }
+                if (hostDisabled) {
+                  throw Object.assign(new Error("在线更新已被宿主配置锁定禁用"), { statusCode: 403, code: "error.update.disabled" });
+                }
+                const enabled = await setOnlineUpdate(body.enabled);
                 return { enabled };
               });
             case "/api/dsh-skills-manager/repositories/add":

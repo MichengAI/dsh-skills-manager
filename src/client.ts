@@ -74,7 +74,7 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
         "error.trash.notFound": "回收站条目不存在: {id}", "error.trash.conflict": "无法恢复，同名技能已存在: {name}", "error.trash.invalid": "回收站条目路径非法: {id}", "error.trash.projectUnavailable": "原项目当前不在活动工作区中，无法恢复：{path}", "error.trash.rollbackFailed": "移入回收站回滚失败，未恢复内容保留在: {path}（{error}）",
         "error.state.invalid": "技能管理器状态文件不可读，已拒绝覆盖：{path}",
         "error.create.descriptionRequired": "技能简介不能为空", "error.create.bodyRequired": "技能正文不能为空", "error.create.tooLarge": "技能内容过长", "error.create.conflict": "同名技能已存在: {name}",
-        "error.proto.forbidden": "禁止的修改请求（缺少客户端标记）", "error.proto.forbiddenHost": "禁止的请求来源（非法 Host）", "error.proto.contentType": "请求体必须是 application/json", "error.proto.method": "不支持的请求方法", "error.proto.unknownAction": "未知操作", "error.proto.invalidParams": "请求参数无效", "error.proto.bodyTooLarge": "请求体过大", "error.proto.invalidJson": "请求体不是合法 JSON", "error.proto.nonJson": "服务端返回非 JSON 响应（HTTP {status}）",
+        "error.proto.forbidden": "禁止的修改请求（缺少客户端标记）", "error.proto.forbiddenHost": "禁止的请求来源（非法 Host）", "error.proto.contentType": "请求体必须是 application/json", "error.proto.method": "不支持的请求方法", "error.proto.unknownAction": "未知操作", "error.proto.invalidParams": "请求参数无效", "error.proto.bodyTooLarge": "请求体过大", "error.proto.invalidJson": "请求体不是合法 JSON", "error.proto.nonJson": "服务端返回非 JSON 响应（HTTP {status}）", "error.update.disabled": "在线更新已被禁用",
         "error.catalog.query": "搜索关键词无效。", "error.catalog.upstream": "目录服务暂时不可用。", "error.catalog.response": "目录返回的数据无效或过大。", "error.catalog.identity": "目录技能标识无效。",
         "diagnostic.frontmatter.missing": "缺少完整 YAML frontmatter", "diagnostic.name.missing": "frontmatter 缺少 name", "diagnostic.name.invalid": "宿主不支持此技能名称格式（仅支持英文小写字母、数字与连字符），无法启用。如需调用，请在 SKILL.md frontmatter 中指定英文 name（目录名可保留中文）：{name}", "diagnostic.description.missing": "frontmatter 缺少 description", "diagnostic.invocation.invalid": "调用策略字段值无效", "diagnostic.shadowed": "被更高优先级来源 {root} 覆盖",
         "action.enable": "启用", "action.disable": "停用", "action.create": "创建", "action.delete": "删除", "action.restore": "恢复", "action.toggle": "启用或停用",
@@ -102,7 +102,7 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
         "error.trash.notFound": "Trash item not found: {id}", "error.trash.conflict": "Cannot restore because a skill with the same name exists: {name}", "error.trash.invalid": "Invalid trash item path: {id}", "error.trash.projectUnavailable": "The original project is not an active workspace, so this skill cannot be restored: {path}", "error.trash.rollbackFailed": "Move-to-trash rollback failed; unrecovered content was kept at: {path} ({error})",
         "error.state.invalid": "The manager state file could not be read, so overwriting it was refused: {path}",
         "error.create.descriptionRequired": "Skill description is required", "error.create.bodyRequired": "Skill body is required", "error.create.tooLarge": "Skill content is too large", "error.create.conflict": "A skill with the same name already exists: {name}",
-        "error.proto.forbidden": "Forbidden mutation request (missing client marker)", "error.proto.forbiddenHost": "Forbidden request origin (invalid host)", "error.proto.contentType": "Content type must be application/json", "error.proto.method": "Method not allowed", "error.proto.unknownAction": "Unknown action", "error.proto.invalidParams": "Invalid request parameters", "error.proto.bodyTooLarge": "Request body too large", "error.proto.invalidJson": "Invalid JSON request body", "error.proto.nonJson": "Server returned a non-JSON response (HTTP {status})",
+        "error.proto.forbidden": "Forbidden mutation request (missing client marker)", "error.proto.forbiddenHost": "Forbidden request origin (invalid host)", "error.proto.contentType": "Content type must be application/json", "error.proto.method": "Method not allowed", "error.proto.unknownAction": "Unknown action", "error.proto.invalidParams": "Invalid request parameters", "error.proto.bodyTooLarge": "Request body too large", "error.proto.invalidJson": "Invalid JSON request body", "error.proto.nonJson": "Server returned a non-JSON response (HTTP {status})", "error.update.disabled": "Online updates are disabled",
         "error.catalog.query": "The search query is invalid.", "error.catalog.upstream": "The catalog service is temporarily unavailable.", "error.catalog.response": "The catalog response is invalid or too large.", "error.catalog.identity": "The catalog skill identifier is invalid.",
         "diagnostic.frontmatter.missing": "Missing complete YAML frontmatter", "diagnostic.name.missing": "Frontmatter is missing name", "diagnostic.name.invalid": "Skill name format is not supported by host (lowercase letters, numbers and hyphens only), cannot be enabled. To invoke it, specify an English name in the SKILL.md frontmatter (directory name can remain unchanged): {name}", "diagnostic.description.missing": "Frontmatter is missing description", "diagnostic.invocation.invalid": "Invocation policy value is invalid", "diagnostic.shadowed": "Shadowed by higher-priority source {root}",
         "action.enable": "enable", "action.disable": "disable", "action.create": "create", "action.delete": "delete", "action.restore": "restore", "action.toggle": "enabling or disabling",
@@ -981,5 +981,41 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
     }
 
     var inject = ["slots", "locale"];
-    function apply(ctx: ClientContext) { localeService = ctx.locale; ctx.effect(function () { return ctx.locale.register(NS, DICT); }); ctx.effect(function () { return observePluginUpdate({ endpoint: "/api/michengai/dsh-skills-manager/update", packageName: "@michengai/dsh-skills-manager", titleRowSelector: ".dssm-title-row", linksSelector: ".dssm-feedback-links", zhName: "技能", enName: "Skills", createIcon: createPluginUpdateIcon }); }, "skills-manager: plugin update ui"); installSettingsNavIcon(ctx, function () { return ctx.locale.bind(NS)("title"); }); ctx.slots.inject("settings.section", function () { return ctx.slots.register({ name: "settings.section", id: "skills-manager", order: 25, label: function () { return ctx.locale.bind(NS)("title"); }, icon: "skill", locale: NS }, SkillManagerSection); });      setupSidebarEntry(ctx, { callApi: callApi, headers: MUTATION_HEADERS, renderPanel: function (ownerProps?: any) { return h(SkillManagerSection, Object.assign({ t: ctx.locale.bind(NS) }, ownerProps)); }, ns: NS }); }
+    function apply(ctx: ClientContext) {
+      localeService = ctx.locale;
+      ctx.effect(function () { return ctx.locale.register(NS, DICT); });
+      var updateCleanup: any;
+      var sidebarController: any;
+      ctx.effect(function () {
+        updateCleanup = observePluginUpdate({
+          endpoint: "/api/michengai/dsh-skills-manager/update",
+          packageName: "@michengai/dsh-skills-manager",
+          titleRowSelector: ".dssm-title-row",
+          linksSelector: ".dssm-feedback-links",
+          zhName: "技能",
+          enName: "Skills",
+          createIcon: createPluginUpdateIcon,
+          isEnabled: function () {
+            return sidebarController ? sidebarController.isOnlineUpdateEnabled() : true;
+          }
+        });
+        return function () {
+          if (typeof updateCleanup === "function") updateCleanup();
+          updateCleanup = undefined;
+        };
+      }, "skills-manager: plugin update ui");
+      installSettingsNavIcon(ctx, function () { return ctx.locale.bind(NS)("title"); });
+      ctx.slots.inject("settings.section", function () { return ctx.slots.register({ name: "settings.section", id: "skills-manager", order: 25, label: function () { return ctx.locale.bind(NS)("title"); }, icon: "skill", locale: NS }, SkillManagerSection); });
+      sidebarController = setupSidebarEntry(ctx, {
+        callApi: callApi,
+        headers: MUTATION_HEADERS,
+        renderPanel: function (ownerProps?: any) { return h(SkillManagerSection, Object.assign({ t: ctx.locale.bind(NS) }, ownerProps)); },
+        ns: NS,
+        onOnlineUpdateChange: function () {
+          if (updateCleanup && typeof updateCleanup.refresh === "function") {
+            updateCleanup.refresh();
+          }
+        }
+      });
+    }
     module.exports.formatTrashTime = formatTrashTime; module.exports.DICT = DICT; module.exports.translateError = translateError; module.exports.parseApiResponse = parseApiResponse; module.exports.resolveApiUrl = resolveApiUrl; module.exports.isSkillEnabled = isSkillEnabled; module.exports.countKey = countKey; module.exports.rootDisplayName = rootDisplayName; module.exports.summarizeImportResult = summarizeImportResult; module.exports.normalizeSkillQuery = normalizeSkillQuery; module.exports.matchSkillQuery = matchSkillQuery; module.exports.filterSkills = filterSkills; module.exports.visibleSkillRoots = visibleSkillRoots; module.exports.scopeSkillRoots = scopeSkillRoots; module.exports.skillStatus = skillStatus; module.exports.countSkillStatuses = countSkillStatuses; module.exports.currentSessionId = currentSessionId; module.exports.canToggleSource = canToggleSource; module.exports.recoverModalFocus = recoverModalFocus; module.exports.trapModalFocus = trapModalFocus; module.exports.inspectUploadSelection = inspectUploadSelection; module.exports.setupSidebarEntry = setupSidebarEntry; module.exports.apply = apply; module.exports.inject = inject;

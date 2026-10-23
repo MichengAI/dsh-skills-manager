@@ -14,11 +14,17 @@ export const sidebarLocales = {
     "sidebar.entry.title": "侧边栏入口",
     "sidebar.entry.desc": "在侧栏「插件」下方显示技能。设置里的入口不变。",
     "sidebar.entry.toggle": "切换侧边栏入口",
+    "update.entry.title": "在线更新",
+    "update.entry.desc": "允许检查并在线安装技能管理器的新版本。关闭后隐藏更新入口。",
+    "update.entry.toggle": "切换在线更新",
   },
   en: {
     "sidebar.entry.title": "Sidebar entry",
     "sidebar.entry.desc": "Show Skills below Plugins in the sidebar. The Settings entry stays either way.",
     "sidebar.entry.toggle": "Toggle sidebar entry",
+    "update.entry.title": "Online updates",
+    "update.entry.desc": "Allow checking and installing new versions online. Hides the update entry when disabled.",
+    "update.entry.toggle": "Toggle online updates",
   },
 };
 
@@ -60,69 +66,129 @@ export function SkillBundleConfigCard(props: {
   enabled: boolean;
   onToggle: (enabled: boolean) => void;
   disabled?: boolean;
+  onlineUpdateEnabled?: boolean;
+  onToggleOnlineUpdate?: (enabled: boolean) => void;
+  onlineUpdateDisabled?: boolean;
 }) {
   ensureSidebarEntryStyle();
-  const { t, enabled, onToggle, disabled } = props;
+  const {
+    t,
+    enabled,
+    onToggle,
+    disabled,
+    onlineUpdateEnabled = true,
+    onToggleOnlineUpdate,
+    onlineUpdateDisabled,
+  } = props;
 
-  return h("div", { className: "dssm-bundle-row" },
-    h("div", { className: "dssm-bundle-label-box" },
-      h("span", { className: "dssm-bundle-title" }, t("sidebar.entry.title")),
-      h("span", { className: "dssm-bundle-desc" }, t("sidebar.entry.desc"))
+  const rows = [
+    h("div", { key: "sidebar-entry", className: "dssm-bundle-row" },
+      h("div", { className: "dssm-bundle-label-box" },
+        h("span", { className: "dssm-bundle-title" }, t("sidebar.entry.title")),
+        h("span", { className: "dssm-bundle-desc" }, t("sidebar.entry.desc"))
+      ),
+      h(PrimitiveSwitch, {
+        checked: enabled,
+        onChange: onToggle,
+        label: t("sidebar.entry.toggle"),
+        disabled: disabled,
+      })
     ),
-    h(PrimitiveSwitch, {
-      checked: enabled,
-      onChange: onToggle,
-      label: t("sidebar.entry.toggle"),
-      disabled: disabled,
-    })
-  );
+  ];
+
+  if (typeof onToggleOnlineUpdate === "function") {
+    rows.push(
+      h("div", { key: "online-update", className: "dssm-bundle-row" },
+        h("div", { className: "dssm-bundle-label-box" },
+          h("span", { className: "dssm-bundle-title" }, t("update.entry.title")),
+          h("span", { className: "dssm-bundle-desc" }, t("update.entry.desc"))
+        ),
+        h(PrimitiveSwitch, {
+          checked: onlineUpdateEnabled,
+          onChange: onToggleOnlineUpdate,
+          label: t("update.entry.toggle"),
+          disabled: onlineUpdateDisabled,
+        })
+      )
+    );
+  }
+
+  return h(React.Fragment, null, rows);
 }
 
 function SkillBundleConfigCardWrapper(props: {
   t: Translate;
   getEnabled: () => boolean;
   setSidebar: (next: boolean) => Promise<unknown>;
+  getOnlineUpdateEnabled?: () => boolean;
+  setOnlineUpdate?: (next: boolean) => Promise<unknown>;
   subscribe: (fn: () => void) => () => void;
 }) {
   const [enabled, setEnabled] = React.useState(props.getEnabled);
-  const [saving, setSaving] = React.useState(false);
+  const [onlineUpdateEnabled, setOnlineUpdateEnabled] = React.useState(props.getOnlineUpdateEnabled ? props.getOnlineUpdateEnabled : () => true);
+  const [savingSidebar, setSavingSidebar] = React.useState(false);
+  const [savingUpdate, setSavingUpdate] = React.useState(false);
 
   React.useEffect(() => {
     setEnabled(props.getEnabled());
+    if (props.getOnlineUpdateEnabled) {
+      setOnlineUpdateEnabled(props.getOnlineUpdateEnabled());
+    }
     return props.subscribe(() => {
       setEnabled(props.getEnabled());
+      if (props.getOnlineUpdateEnabled) {
+        setOnlineUpdateEnabled(props.getOnlineUpdateEnabled());
+      }
     });
   }, [props]);
 
-  const onToggle = (next: boolean) => {
-    setSaving(true);
+  const onToggleSidebar = (next: boolean) => {
+    setSavingSidebar(true);
     setEnabled(next);
     props.setSidebar(next).catch(() => {
       setEnabled(props.getEnabled());
     }).finally(() => {
-      setSaving(false);
+      setSavingSidebar(false);
     });
   };
+
+  const onToggleOnlineUpdate = props.setOnlineUpdate ? (next: boolean) => {
+    setSavingUpdate(true);
+    setOnlineUpdateEnabled(next);
+    props.setOnlineUpdate!(next).catch(() => {
+      if (props.getOnlineUpdateEnabled) {
+        setOnlineUpdateEnabled(props.getOnlineUpdateEnabled());
+      }
+    }).finally(() => {
+      setSavingUpdate(false);
+    });
+  } : undefined;
 
   return h(SkillBundleConfigCard, {
     t: props.t,
     enabled,
-    disabled: saving,
-    onToggle,
+    disabled: savingSidebar,
+    onToggle: onToggleSidebar,
+    onlineUpdateEnabled,
+    onlineUpdateDisabled: savingUpdate,
+    onToggleOnlineUpdate,
   });
 }
 
 export interface SetupSidebarEntryOptions {
-  callApi: (path: "/sidebar-entry", options?: RequestInit) => Promise<{ enabled: boolean }>;
+  callApi: (path: "/sidebar-entry" | "/online-update", options?: RequestInit) => Promise<{ enabled: boolean }>;
   headers: Record<string, string>;
   renderPanel: (ownerProps?: any) => React.ReactNode;
   ns: string;
+  onOnlineUpdateChange?: (enabled: boolean) => void;
 }
 
 export interface SidebarEntryController {
   isEnabled(): boolean;
   isSupported(): boolean;
   setEnabled(enabled: boolean): Promise<boolean>;
+  isOnlineUpdateEnabled(): boolean;
+  setOnlineUpdate(enabled: boolean): Promise<boolean>;
   destroy(): void;
 }
 
@@ -136,6 +202,8 @@ export function setupSidebarEntry(
       isEnabled: () => false,
       isSupported: () => false,
       setEnabled: async () => false,
+      isOnlineUpdateEnabled: () => true,
+      setOnlineUpdate: async () => false,
       destroy: () => {},
     };
   }
@@ -219,6 +287,35 @@ export function setupSidebarEntry(
     }
   };
 
+  let onlineUpdateEnabled = true;
+  let updateEpoch = 0;
+
+  const setOnlineUpdate = async (next: boolean): Promise<boolean> => {
+    const currentEpoch = ++updateEpoch;
+    onlineUpdateEnabled = next;
+    notify();
+    if (typeof options.onOnlineUpdateChange === "function") {
+      try { options.onOnlineUpdateChange(next); } catch {}
+    }
+    try {
+      await callApi("/online-update", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ enabled: next }),
+      });
+      return next;
+    } catch (err) {
+      if (currentEpoch === updateEpoch) {
+        onlineUpdateEnabled = !next;
+        notify();
+        if (typeof options.onOnlineUpdateChange === "function") {
+          try { options.onOnlineUpdateChange(!next); } catch {}
+        }
+      }
+      throw err;
+    }
+  };
+
   // 读取服务端已保存的状态
   const loadEpoch = epoch;
   callApi("/sidebar-entry")
@@ -227,6 +324,19 @@ export function setupSidebarEntry(
         sidebarEntryEnabled = res.enabled;
         sync();
         notify();
+      }
+    })
+    .catch(() => {});
+
+  const loadUpdateEpoch = updateEpoch;
+  callApi("/online-update")
+    .then((res) => {
+      if (updateEpoch === loadUpdateEpoch && res && typeof res.enabled === "boolean") {
+        onlineUpdateEnabled = res.enabled;
+        notify();
+        if (typeof options.onOnlineUpdateChange === "function") {
+          try { options.onOnlineUpdateChange(res.enabled); } catch {}
+        }
       }
     })
     .catch(() => {});
@@ -256,6 +366,8 @@ export function setupSidebarEntry(
         t: ctx.locale.bind(ns),
         getEnabled: () => sidebarEntryEnabled,
         setSidebar: setEnabled,
+        getOnlineUpdateEnabled: () => onlineUpdateEnabled,
+        setOnlineUpdate: setOnlineUpdate,
         subscribe: (fn) => {
           listeners.add(fn);
           return () => { listeners.delete(fn); };
@@ -268,6 +380,8 @@ export function setupSidebarEntry(
     isEnabled: () => sidebarEntryEnabled,
     isSupported: () => sidebarSupported,
     setEnabled,
+    isOnlineUpdateEnabled: () => onlineUpdateEnabled,
+    setOnlineUpdate,
     destroy: () => {
       listeners.clear();
       if (offRow) {
