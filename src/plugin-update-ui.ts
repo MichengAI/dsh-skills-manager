@@ -186,10 +186,17 @@ function observePluginUpdate(options: UpdateUIOptions) {
     buttonRoot = createRoot(host);
     renderCheck();
   }
-  const load = async () => {
-    payload = await requestStatus(endpoint, "GET", controller.signal);
-    applyControls();
-    return payload;
+  let loading: Promise<UpdatePayload> | undefined;
+  const load = () => {
+    if (loading !== undefined) return loading;
+    loading = requestStatus(endpoint, "GET", controller.signal).then((next) => {
+      if (!controller.signal.aborted) {
+        payload = next;
+        applyControls();
+      }
+      return next;
+    }).finally(() => { loading = undefined; });
+    return loading;
   };
   const observer = new MutationObserver(() => {
     if (frame !== undefined) return;
@@ -203,7 +210,12 @@ function observePluginUpdate(options: UpdateUIOptions) {
     if (frame !== undefined) window.cancelAnimationFrame(frame);
     document.querySelectorAll(`[data-mpi-check="${options.packageName}"],.mpi-version[data-package="${options.packageName}"]`).forEach((node) => node.remove());
   };
-  (cleanup as unknown as { refresh: () => void }).refresh = () => applyControls();
+  (cleanup as unknown as { refresh: () => void }).refresh = () => {
+    if (controller.signal.aborted) return;
+    applyControls();
+    // 首次读取可能因关闭更新而被拒绝；重新开启后补取版本状态。
+    if (payload === undefined && (!options.isEnabled || options.isEnabled())) void load().catch(() => {});
+  };
   return cleanup;
 }
 

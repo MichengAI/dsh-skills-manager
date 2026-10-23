@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.13 - 2026-10-23
+
+- Hide the heading version chip when online updates are disabled alongside the update check action.
+- Disable the bundle config toggle with localized diagnostics when online updates are locked by host configuration (`updater: false` or `onlineUpdate: false`), preventing silent 403 bounces.
+- Clean up sidebar controller listeners and slots on plugin teardown, invalidating late initialization and rollback responses.
+
 ## 1.2.12 - 2026-10-23
 
 - Support opt-out toggle for online updates with a native switch under bundle configuration (Issue #50).

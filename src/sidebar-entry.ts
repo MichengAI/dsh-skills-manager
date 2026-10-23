@@ -17,6 +17,7 @@ export const sidebarLocales = {
     "update.entry.title": "在线更新",
     "update.entry.desc": "允许检查并在线安装技能管理器的新版本。关闭后隐藏更新入口。",
     "update.entry.toggle": "切换在线更新",
+    "update.entry.locked": "在线更新已被宿主配置禁用",
   },
   en: {
     "sidebar.entry.title": "Sidebar entry",
@@ -25,6 +26,7 @@ export const sidebarLocales = {
     "update.entry.title": "Online updates",
     "update.entry.desc": "Allow checking and installing new versions online. Hides the update entry when disabled.",
     "update.entry.toggle": "Toggle online updates",
+    "update.entry.locked": "Online updates are disabled by the host configuration.",
   },
 };
 
@@ -69,6 +71,7 @@ export function SkillBundleConfigCard(props: {
   onlineUpdateEnabled?: boolean;
   onToggleOnlineUpdate?: (enabled: boolean) => void;
   onlineUpdateDisabled?: boolean;
+  onlineUpdateLocked?: boolean;
 }) {
   ensureSidebarEntryStyle();
   const {
@@ -79,6 +82,7 @@ export function SkillBundleConfigCard(props: {
     onlineUpdateEnabled = true,
     onToggleOnlineUpdate,
     onlineUpdateDisabled,
+    onlineUpdateLocked,
   } = props;
 
   const rows = [
@@ -101,13 +105,14 @@ export function SkillBundleConfigCard(props: {
       h("div", { key: "online-update", className: "dssm-bundle-row" },
         h("div", { className: "dssm-bundle-label-box" },
           h("span", { className: "dssm-bundle-title" }, t("update.entry.title")),
-          h("span", { className: "dssm-bundle-desc" }, t("update.entry.desc"))
+          h("span", { className: "dssm-bundle-desc" }, t(onlineUpdateLocked ? "update.entry.locked" : "update.entry.desc"))
         ),
         h(PrimitiveSwitch, {
           checked: onlineUpdateEnabled,
           onChange: onToggleOnlineUpdate,
           label: t("update.entry.toggle"),
           disabled: onlineUpdateDisabled,
+          title: onlineUpdateLocked ? t("update.entry.locked") : undefined,
         })
       )
     );
@@ -122,25 +127,27 @@ function SkillBundleConfigCardWrapper(props: {
   setSidebar: (next: boolean) => Promise<unknown>;
   getOnlineUpdateEnabled?: () => boolean;
   setOnlineUpdate?: (next: boolean) => Promise<unknown>;
-  onlineUpdateLocked?: boolean;
+  getOnlineUpdateLocked?: () => boolean;
   subscribe: (fn: () => void) => () => void;
 }) {
   const [enabled, setEnabled] = React.useState(props.getEnabled);
   const [onlineUpdateEnabled, setOnlineUpdateEnabled] = React.useState(props.getOnlineUpdateEnabled ? props.getOnlineUpdateEnabled : () => true);
+  const [onlineUpdateLocked, setOnlineUpdateLocked] = React.useState(props.getOnlineUpdateLocked ? props.getOnlineUpdateLocked : () => false);
   const [savingSidebar, setSavingSidebar] = React.useState(false);
   const [savingUpdate, setSavingUpdate] = React.useState(false);
 
   React.useEffect(() => {
-    setEnabled(props.getEnabled());
-    if (props.getOnlineUpdateEnabled) {
-      setOnlineUpdateEnabled(props.getOnlineUpdateEnabled());
-    }
-    return props.subscribe(() => {
+    const syncState = () => {
       setEnabled(props.getEnabled());
       if (props.getOnlineUpdateEnabled) {
         setOnlineUpdateEnabled(props.getOnlineUpdateEnabled());
       }
-    });
+      if (props.getOnlineUpdateLocked) {
+        setOnlineUpdateLocked(props.getOnlineUpdateLocked());
+      }
+    };
+    syncState();
+    return props.subscribe(syncState);
   }, [props]);
 
   const onToggleSidebar = (next: boolean) => {
@@ -154,6 +161,7 @@ function SkillBundleConfigCardWrapper(props: {
   };
 
   const onToggleOnlineUpdate = props.setOnlineUpdate ? (next: boolean) => {
+    if (props.getOnlineUpdateLocked?.()) return;
     setSavingUpdate(true);
     setOnlineUpdateEnabled(next);
     props.setOnlineUpdate!(next).catch(() => {
@@ -171,8 +179,9 @@ function SkillBundleConfigCardWrapper(props: {
     disabled: savingSidebar,
     onToggle: onToggleSidebar,
     onlineUpdateEnabled,
-    onlineUpdateDisabled: savingUpdate || !!props.onlineUpdateLocked,
-    onToggleOnlineUpdate: props.onlineUpdateLocked ? undefined : onToggleOnlineUpdate,
+    onlineUpdateDisabled: savingUpdate || onlineUpdateLocked,
+    onlineUpdateLocked,
+    onToggleOnlineUpdate,
   });
 }
 
@@ -214,6 +223,7 @@ export function setupSidebarEntry(
   let offPanel: (() => void) | null = null;
   let offRow: (() => void) | null = null;
   let epoch = 0;
+  let destroyed = false;
   let layoutService: {
     selectPanel(id: string | null): void;
     panelInfo?: { getSnapshot(): { activePanelId?: string | null } };
@@ -221,12 +231,14 @@ export function setupSidebarEntry(
   const listeners = new Set<() => void>();
 
   const notify = () => {
+    if (destroyed) return;
     for (const listener of listeners) {
       try { listener(); } catch {}
     }
   };
 
   const sync = () => {
+    if (destroyed) return;
     if (sidebarSupported && sidebarEntryEnabled) {
       if (!offPanel) {
         const res = ctx.slots.register({
@@ -267,6 +279,7 @@ export function setupSidebarEntry(
   };
 
   const setEnabled = async (next: boolean): Promise<boolean> => {
+    if (destroyed) return sidebarEntryEnabled;
     const currentEpoch = ++epoch;
     sidebarEntryEnabled = next;
     sync();
@@ -293,10 +306,12 @@ export function setupSidebarEntry(
   let updateEpoch = 0;
 
   const setOnlineUpdate = async (next: boolean): Promise<boolean> => {
+    if (destroyed || onlineUpdateLocked) return onlineUpdateEnabled;
     const currentEpoch = ++updateEpoch;
     onlineUpdateEnabled = next;
     notify();
-    if (typeof options.onOnlineUpdateChange === "function") {
+    // 关闭立即隐藏；开启需等服务端保存完成，避免状态读取仍被旧配置拒绝。
+    if (!next && typeof options.onOnlineUpdateChange === "function") {
       try { options.onOnlineUpdateChange(next); } catch {}
     }
     try {
@@ -305,13 +320,19 @@ export function setupSidebarEntry(
         headers,
         body: JSON.stringify({ enabled: next }),
       });
+      if (next && !destroyed && currentEpoch === updateEpoch && typeof options.onOnlineUpdateChange === "function") {
+        try { options.onOnlineUpdateChange(next); } catch {}
+      }
       return next;
     } catch (err) {
       if (currentEpoch === updateEpoch) {
-        onlineUpdateEnabled = !next;
+        // 初始化读取失败时，也能从明确的宿主禁用错误恢复有效锁定状态。
+        const hostLocked = err !== null && typeof err === "object" && "code" in err && err.code === "error.update.disabled";
+        if (hostLocked) onlineUpdateLocked = true;
+        onlineUpdateEnabled = hostLocked ? false : !next;
         notify();
         if (typeof options.onOnlineUpdateChange === "function") {
-          try { options.onOnlineUpdateChange(!next); } catch {}
+          try { options.onOnlineUpdateChange(onlineUpdateEnabled); } catch {}
         }
       }
       throw err;
@@ -322,7 +343,7 @@ export function setupSidebarEntry(
   const loadEpoch = epoch;
   callApi("/sidebar-entry")
     .then((res) => {
-      if (epoch === loadEpoch && res && typeof res.enabled === "boolean") {
+      if (!destroyed && epoch === loadEpoch && res && typeof res.enabled === "boolean") {
         sidebarEntryEnabled = res.enabled;
         sync();
         notify();
@@ -333,7 +354,7 @@ export function setupSidebarEntry(
   const loadUpdateEpoch = updateEpoch;
   callApi("/online-update")
     .then((res) => {
-      if (updateEpoch === loadUpdateEpoch && res && typeof res.enabled === "boolean") {
+      if (!destroyed && updateEpoch === loadUpdateEpoch && res && typeof res.enabled === "boolean") {
         onlineUpdateEnabled = res.enabled;
         if (res.locked === true) onlineUpdateLocked = true;
         notify();
@@ -347,18 +368,20 @@ export function setupSidebarEntry(
   // 监听宿主 layout 服务
   if (typeof (ctx as any).inject === "function") {
     (ctx as any).inject(["layout"], (scoped: any) => {
-      layoutService = scoped.layout;
+      if (!destroyed) layoutService = scoped.layout;
     });
   }
 
   // 监听 sidebar.panellist 槽位
   ctx.slots.inject("sidebar.panellist", () => {
+    if (destroyed) return;
     sidebarSupported = true;
     sync();
   });
 
   // 监听宿主插件管理页的 plugins.bundle.config 槽位
   ctx.slots.inject("plugins.bundle.config", () => {
+    if (destroyed) return;
     return ctx.slots.register({
       name: "plugins.bundle.config",
       key: BUNDLE_KEY,
@@ -371,7 +394,7 @@ export function setupSidebarEntry(
         setSidebar: setEnabled,
         getOnlineUpdateEnabled: () => onlineUpdateEnabled,
         setOnlineUpdate: setOnlineUpdate,
-        onlineUpdateLocked,
+        getOnlineUpdateLocked: () => onlineUpdateLocked,
         subscribe: (fn) => {
           listeners.add(fn);
           return () => { listeners.delete(fn); };
@@ -387,6 +410,12 @@ export function setupSidebarEntry(
     isOnlineUpdateEnabled: () => onlineUpdateEnabled,
     setOnlineUpdate,
     destroy: () => {
+      if (destroyed) return;
+      // 让在途初始化请求和保存失败的回滚失效，避免卸载后重新注册或通知。
+      destroyed = true;
+      epoch++;
+      updateEpoch++;
+      layoutService = undefined;
       listeners.clear();
       if (offRow) {
         try { offRow(); } catch {}
