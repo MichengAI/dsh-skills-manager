@@ -22,14 +22,9 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
 // dsh-skills-manager client half：按全局与项目作用域切换的多 Agent Skills 管理面板。
     var react = React;
     var h = react.createElement;
+    const IconEditOutlineRegular = (primitives as any).IconEditOutlineRegular as React.ComponentType<{ size?: number }>;
     function FeedbackIcon() {
-      const IconComponent = (primitives as Record<string, any>)["IconEditOutlineRegular"]
-        || (primitives as Record<string, any>)["IconEditOutline16"]
-        || (primitives as Record<string, any>)["IconEditOutline"];
-      if (typeof IconComponent === "function") {
-        return h(IconComponent, { size: 16 });
-      }
-      return h("svg", { viewBox: "0 0 16 16", width: 16, height: 16, "aria-hidden": true, focusable: "false" }, h("path", { fill: "none", stroke: "currentColor", strokeWidth: 1.5, strokeLinecap: "round", strokeLinejoin: "round", d: "M9.5 2.5 13.5 6.5 6 14H2v-4z" }));
+      return h(IconEditOutlineRegular, { size: 16 });
     }
     var UPDATE_ICON_PATHS = {
       refresh: ["M13.5 5.5V2.5m0 0h-3m3 0-2.1 2.1A5.5 5.5 0 1 0 13.2 12"],
