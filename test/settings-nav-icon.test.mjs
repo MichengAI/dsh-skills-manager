@@ -36,6 +36,10 @@ class FakeElement {
     delete this.attrs[name];
   }
 
+  hasAttribute(name) {
+    return Object.hasOwn(this.attrs, name);
+  }
+
   appendChild(child) {
     child.parent?.remove();
     child.parent = this;
@@ -151,59 +155,32 @@ test("别的对话框里同名 Skills 行不会被当成技能导航", () => {
   assert.equal(button.querySelector(`.${NAV_ICON_CLASS}`), null);
 });
 
-test("用独立 mask span 补图标，不改写宿主 svg (#49)", () => {
+test("对齐 dshmarket：使用纯属性标记与 ::before 伪元素渲染图标，不向 button 插入 DOM 节点", () => {
   const { doc } = createDom();
   const { button, svg, label } = fakeButton(doc, "技能");
-  // 模拟皮肤已完成识别并打上自己的标记
   svg.setAttribute("data-orca-link-icon", "gear");
 
   assert.equal(applySettingsNavIcon(button, () => "技能"), true);
   assert.equal(svg.innerHTML, "<path d=\"gear\"/>", "宿主 svg 内容必须保持原样");
-  assert.equal(svg.getAttribute("data-orca-link-icon"), "gear", "皮肤标记不能被清除");
-  assert.equal(button.getAttribute(NAV_ICON_MARKER), "skills");
-
-  const icon = button.querySelector(`.${NAV_ICON_CLASS}`);
-  assert.ok(icon, "应插入独立的 mask 图标");
-  assert.equal(icon.getAttribute("aria-hidden"), "true");
-  assert.equal(button.children[0], icon, "图标应排在 svg 与标签之前");
-  assert.equal(button.children.at(-1), label, "标签保持在末尾");
+  assert.equal(button.getAttribute(NAV_ICON_MARKER), "");
+  assert.equal(button.children.length, 2, "禁止插入额外的 span 节点");
+  assert.equal(button.children[0], svg, "svg 保持首位");
+  assert.equal(button.children[1], label, "标签保持末位");
 
   assert.equal(applySettingsNavIcon(button, () => "技能"), false, "重复调用应保持幂等");
-  assert.equal(button.querySelectorAll(`.${NAV_ICON_CLASS}`).length, 1);
+
+  assert.equal(applySettingsNavIcon(button, () => "其他"), true, "切换非本插件入口时清除 marker");
+  assert.equal(button.hasAttribute(NAV_ICON_MARKER), false);
+  assert.equal(applySettingsNavIcon(button, () => "其他"), false);
 });
 
-test("宿主没有 svg 时不凭空插入图标", () => {
-  const { doc } = createDom();
-  const button = doc.createElement("button");
-  button.textContent = "技能";
-  assert.equal(applySettingsNavIcon(button, () => "技能"), false);
-  assert.equal(button.querySelector(`.${NAV_ICON_CLASS}`), null);
-});
-
-test("图标包在容器里时不注入，避免打乱宿主布局", () => {
-  const { doc } = createDom();
-  const button = doc.createElement("button");
-  button.textContent = "技能";
-  const wrapper = doc.createElement("span");
-  wrapper.appendChild(doc.createElement("svg"));
-  button.appendChild(wrapper);
-  const label = doc.createElement("span");
-  label.textContent = "技能";
-  button.appendChild(label);
-
-  assert.equal(applySettingsNavIcon(button, () => "技能"), false);
-  assert.equal(button.getAttribute(NAV_ICON_MARKER), null);
-  assert.equal(button.querySelector(`.${NAV_ICON_CLASS}`), null);
-});
-
-test("卸载后只移除本插件图标，宿主齿轮保持不变", () => {
+test("卸载后移除 marker 属性，宿主齿轮与内容保持不变", () => {
   const { doc } = createDom();
   const { button, svg } = fakeButton(doc, "技能");
   svg.setAttribute("data-orca-link-icon", "gear");
   applySettingsNavIcon(button, () => "技能");
 
   assert.equal(restoreSettingsNavIcon(button), true);
-  assert.equal(button.querySelector(`.${NAV_ICON_CLASS}`), null);
   assert.equal(button.getAttribute(NAV_ICON_MARKER), null);
   assert.equal(svg.innerHTML, "<path d=\"gear\"/>");
   assert.equal(svg.getAttribute("data-orca-link-icon"), "gear");
@@ -224,7 +201,7 @@ test("插件卸载时的清理回调会移除图标并保留样式单例", async
 
   let cleanup = () => {};
   installSettingsNavIcon({ effect(run) { cleanup = run(); } }, () => "技能");
-  assert.ok(button.querySelector(`.${NAV_ICON_CLASS}`));
+  assert.equal(button.getAttribute(NAV_ICON_MARKER), "");
   assert.ok(doc.getElementById("dssm-settings-nav-icon-style"));
 
   // 再次安装不应重复注入样式
@@ -232,7 +209,6 @@ test("插件卸载时的清理回调会移除图标并保留样式单例", async
   assert.equal(doc.documentElement.querySelectorAll("style").length, 1);
 
   cleanup();
-  assert.equal(button.querySelector(`.${NAV_ICON_CLASS}`), null);
   assert.equal(button.getAttribute(NAV_ICON_MARKER), null);
   assert.equal(svg.innerHTML, "<path d=\"gear\"/>");
   globalThis.document = previousDocument;
