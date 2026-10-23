@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.12 - 2026-10-23
+
+- Support opt-out toggle for online updates with a native switch under bundle configuration (Issue #50).
+- Support host-level Cordis plugin configuration (`updater: false` or `onlineUpdate: false`) to disable the update endpoint and automatically hide the update action (#50).
+- Intercept update requests with HTTP 403 when online updates are disabled (#50).
+
 ## 1.2.11 - 2026-10-21
 
 - Resolve API endpoints and plugin self-update URLs against the page base (`document.baseURI`) instead of raw site-root paths, fixing "non-JSON response (HTTP 404)" when DeepSeek Harness is deployed behind a prefix-stripping reverse proxy (Issue #56).
