@@ -122,6 +122,7 @@ function SkillBundleConfigCardWrapper(props: {
   setSidebar: (next: boolean) => Promise<unknown>;
   getOnlineUpdateEnabled?: () => boolean;
   setOnlineUpdate?: (next: boolean) => Promise<unknown>;
+  onlineUpdateLocked?: boolean;
   subscribe: (fn: () => void) => () => void;
 }) {
   const [enabled, setEnabled] = React.useState(props.getEnabled);
@@ -170,13 +171,13 @@ function SkillBundleConfigCardWrapper(props: {
     disabled: savingSidebar,
     onToggle: onToggleSidebar,
     onlineUpdateEnabled,
-    onlineUpdateDisabled: savingUpdate,
-    onToggleOnlineUpdate,
+    onlineUpdateDisabled: savingUpdate || !!props.onlineUpdateLocked,
+    onToggleOnlineUpdate: props.onlineUpdateLocked ? undefined : onToggleOnlineUpdate,
   });
 }
 
 export interface SetupSidebarEntryOptions {
-  callApi: (path: "/sidebar-entry" | "/online-update", options?: RequestInit) => Promise<{ enabled: boolean }>;
+  callApi: (path: "/sidebar-entry" | "/online-update", options?: RequestInit) => Promise<{ enabled: boolean; locked?: boolean }>;
   headers: Record<string, string>;
   renderPanel: (ownerProps?: any) => React.ReactNode;
   ns: string;
@@ -288,6 +289,7 @@ export function setupSidebarEntry(
   };
 
   let onlineUpdateEnabled = true;
+  let onlineUpdateLocked = false;
   let updateEpoch = 0;
 
   const setOnlineUpdate = async (next: boolean): Promise<boolean> => {
@@ -333,6 +335,7 @@ export function setupSidebarEntry(
     .then((res) => {
       if (updateEpoch === loadUpdateEpoch && res && typeof res.enabled === "boolean") {
         onlineUpdateEnabled = res.enabled;
+        if (res.locked === true) onlineUpdateLocked = true;
         notify();
         if (typeof options.onOnlineUpdateChange === "function") {
           try { options.onOnlineUpdateChange(res.enabled); } catch {}
@@ -368,6 +371,7 @@ export function setupSidebarEntry(
         setSidebar: setEnabled,
         getOnlineUpdateEnabled: () => onlineUpdateEnabled,
         setOnlineUpdate: setOnlineUpdate,
+        onlineUpdateLocked,
         subscribe: (fn) => {
           listeners.add(fn);
           return () => { listeners.delete(fn); };

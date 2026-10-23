@@ -144,6 +144,24 @@ function observePluginUpdate(options: UpdateUIOptions) {
     const row = document.querySelector(options.titleRowSelector);
     if (row === null) return;
     const heading = row.querySelector("h1,h2");
+    if (buttonHost !== undefined && !buttonHost.isConnected) unmountCheck();
+    const links = row.querySelector(options.linksSelector);
+    if (links === null) return;
+    const existing = links.querySelector<HTMLElement>(`[data-mpi-check="${options.packageName}"]`);
+    // 在线更新被禁用时，同时移除版本 chip 和检查按钮
+    if (options.isEnabled && !options.isEnabled()) {
+      if (dialogHost !== undefined) closeDialog();
+      if (existing !== null) {
+        unmountCheck();
+        existing.remove();
+      }
+      if (heading !== null) {
+        const versionEl = heading.querySelector<HTMLElement>(`.mpi-version[data-package="${options.packageName}"]`);
+        if (versionEl !== null) versionEl.remove();
+      }
+      return;
+    }
+    // 在线更新启用时才显示版本 chip
     if (heading !== null && payload !== undefined) {
       let version = heading.querySelector<HTMLElement>(`.mpi-version[data-package="${options.packageName}"]`);
       if (version === null) {
@@ -154,18 +172,6 @@ function observePluginUpdate(options: UpdateUIOptions) {
       }
       const versionLabel = `v${payload.currentVersion}`;
       if (version.textContent !== versionLabel) version.textContent = versionLabel;
-    }
-    if (buttonHost !== undefined && !buttonHost.isConnected) unmountCheck();
-    const links = row.querySelector(options.linksSelector);
-    if (links === null) return;
-    const existing = links.querySelector<HTMLElement>(`[data-mpi-check="${options.packageName}"]`);
-    if (options.isEnabled && !options.isEnabled()) {
-      if (dialogHost !== undefined) closeDialog();
-      if (existing !== null) {
-        unmountCheck();
-        existing.remove();
-      }
-      return;
     }
     if (existing !== null) {
       const label = existing.querySelector("[data-mpi-label]");

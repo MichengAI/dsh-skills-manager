@@ -1021,5 +1021,13 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
           }
         }
       });
+      ctx.effect(function () {
+        return function () {
+          if (sidebarController && typeof sidebarController.destroy === "function") {
+            sidebarController.destroy();
+            sidebarController = undefined;
+          }
+        };
+      }, "skills-manager: sidebar entry cleanup");
     }
     module.exports.formatTrashTime = formatTrashTime; module.exports.DICT = DICT; module.exports.translateError = translateError; module.exports.parseApiResponse = parseApiResponse; module.exports.resolveApiUrl = resolveApiUrl; module.exports.isSkillEnabled = isSkillEnabled; module.exports.countKey = countKey; module.exports.rootDisplayName = rootDisplayName; module.exports.summarizeImportResult = summarizeImportResult; module.exports.normalizeSkillQuery = normalizeSkillQuery; module.exports.matchSkillQuery = matchSkillQuery; module.exports.filterSkills = filterSkills; module.exports.visibleSkillRoots = visibleSkillRoots; module.exports.scopeSkillRoots = scopeSkillRoots; module.exports.skillStatus = skillStatus; module.exports.countSkillStatuses = countSkillStatuses; module.exports.currentSessionId = currentSessionId; module.exports.canToggleSource = canToggleSource; module.exports.recoverModalFocus = recoverModalFocus; module.exports.trapModalFocus = trapModalFocus; module.exports.inspectUploadSelection = inspectUploadSelection; module.exports.setupSidebarEntry = setupSidebarEntry; module.exports.apply = apply; module.exports.inject = inject;
