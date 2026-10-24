@@ -19,14 +19,14 @@
 
 > DSH Skills Manager 是社区维护的 DeepSeek Harness（DSH）插件，并非 DeepSeek AI 官方产品。
 
-本文描述 **1.2.14**。已发布变更见[更新日志](CHANGELOG.zh-CN.md)。
+本文描述 **1.2.15**。已发布变更见[更新日志](CHANGELOG.zh-CN.md)。
 
 ## 功能概览
 
 把散落在本机和项目中的技能集中到 DSH，无需在多个 Agent 目录间来回查找。
 
 - **多视图集中管理**：提供「全局技能」、「项目技能」、「发现」与「回收站」四大工作区视图，支持搜索、状态筛选与来源折叠。
-- **生态目录全覆盖**：支持 DSH、公共 Agent（Shared Agent）、Codex、Claude Code、Copilot、Cursor、Windsurf、Qoder、Trae 等 19+ 种常见开发工具与 CLI 生态，启停不修改第三方源文件。
+- **广泛的生态兼容**：覆盖 DSH、公共 Agent、Codex、Claude Code、Copilot、Cursor、Google Antigravity、Windsurf、Qoder、Trae 等 20+ 工具与 CLI 环境，统一管理且不侵入第三方文件。
 - **分类整理与拖拽归类**：支持在各来源内创建分类文件夹、拖拽技能卡片归类排序、批量添加技能，并支持分类级一键启停。分类元数据独立保存，不改动物理文件。
 - **公共市场与仓库订阅**：内置「发现」中心，一站式浏览 ClawHub 热门榜单与 skills.sh 技能市场，支持公开 GitHub 仓库订阅、增量更新检测与版本备份回退。
 - **创建与自由导入**：新建技能，或导入 ZIP、文件夹与 `SKILL.md`，可精准写入用户全局目录或指定工作区项目目录。
@@ -73,7 +73,7 @@ dsh plugin --profile web add @michengai/dsh-skills-manager@latest --registry=htt
 
 安装后重启 DSH 并刷新页面，打开「设置 → 技能」即可使用。更新时可点击「检查更新」，或重新执行安装命令。
 
-- `1.2.14` 已验证兼容 DeepSeek Harness `0.2.0-rc.1`、`0.2.0-rc.2`、`0.2.1-rc.1`、`0.2.1-rc.2`、`0.2.1-rc.3`。
+- `1.2.15` 已验证兼容 DeepSeek Harness `0.2.0-rc.1`、`0.2.0-rc.2`、`0.2.1-rc.1`、`0.2.1-rc.2`、`0.2.1-rc.3`。
 - 不再支持 `0.2.0` 之前的宿主。仍在使用 `0.1.x` 的，请安装插件 `1.1.23`，不要装 `@latest`。
 - **反向代理部署**：支持将 DSH 部署在带路径前缀的反向代理后面（如 `/app/dsh/`），插件 API 统一自动按页面基址（`document.baseURI`）相对解析。
 
@@ -180,6 +180,7 @@ DeepSeek Harness 宿主加载机制对技能标识符遵循规范命名约束：
 | <img src="assets/brands/qoder.svg" width="16" height="16" alt="Qoder" valign="middle"> Qoder | `~/.qoder/skills` | `DSH_QODER_HOME` | `<project>/.qoder/skills` |
 | <img src="assets/brands/qoder.svg" width="16" height="16" alt="Qoder CN CLI" valign="middle"> Qoder CN CLI | `~/.qoder-cn/skills` | `DSH_QODER_CN_HOME` | — |
 | <img src="assets/brands/qoder.svg" width="16" height="16" alt="Qoder CN" valign="middle"> Qoder CN | `~/.lingma/skills` | `DSH_LINGMA_HOME` | `<project>/.lingma/skills` |
+| <img src="assets/brands/gemini.svg" width="16" height="16" alt="Google Antigravity" valign="middle"> Google Antigravity | `~/.gemini/config/skills` | `DSH_ANTIGRAVITY_HOME` | `<project>/.agents/skills` |
 
 不扫描普通项目根目录的 `<project>/skills`，避免把仓库的发布资源当作 Agent 技能。OpenClaw / Clawdbot 仅保留上表中的用户级来源。Qoder CN CLI 的项目技能在 `<project>/.qoder/skills`，显示为 Qoder。Qoder CN IDE 使用 Lingma 目录。不存在的外部来源目录不会显示。
 

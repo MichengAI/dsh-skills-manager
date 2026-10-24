@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.15 - 2026-10-24
+
+- Recognize Google Antigravity global skills under `~/.gemini/config/skills` with `DSH_ANTIGRAVITY_HOME` override support (#61).
+
 ## 1.2.14 - 2026-10-24
 
 - Support DeepSeek Harness `0.2.1-rc.3` while retaining all existing supported versions.

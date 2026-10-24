@@ -2,6 +2,10 @@
 
 [English](CHANGELOG.md)
 
+## 1.2.15 - 2026-10-24
+
+- 支持识别 Google Antigravity 全局技能目录（`~/.gemini/config/skills`），并支持通过 `DSH_ANTIGRAVITY_HOME` 环境变量自定义覆盖（#61）。
+
 ## 1.2.14 - 2026-10-24
 
 - 支持 DeepSeek Harness `0.2.1-rc.3`，继续兼容此前已支持的宿主版本。

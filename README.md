@@ -19,14 +19,14 @@
 
 > DSH Skills Manager is a community-maintained DeepSeek Harness (DSH) plugin, not an official DeepSeek AI product.
 
-This README describes **1.2.14**. Released changes are in the [changelog](CHANGELOG.md).
+This README describes **1.2.15**. Released changes are in the [changelog](CHANGELOG.md).
 
 ## Features
 
 Bring skills from your computer and projects into DSH without switching between Agent folders.
 
 - **Unified multi-view management**: Browse Global Skills, Project Skills, Discover, and Trash in unified tabs with instant search, status filtering, and collapsible source groups.
-- **Broad ecosystem support**: Full coverage for 19+ tools and CLI environments including DSH, Shared Agent, Codex, Claude Code, Copilot, Cursor, Windsurf, Qoder, and Trae without touching third-party files.
+- **Broad ecosystem support**: Full coverage for 20+ tools and CLI environments including DSH, Shared Agent, Codex, Claude Code, Copilot, Cursor, Google Antigravity, Windsurf, Qoder, and Trae without touching third-party files.
 - **Categorization and drag & drop**: Create category folders inside sources, drag skill rows (`⋮⋮`) to organize and order them, batch assign skills, and toggle entire categories with a single switch. Category metadata is saved without moving files.
 - **Public markets & repositories**: Integrated Discover hub to explore trending skills from ClawHub and skills.sh, or subscribe to public GitHub repositories with incremental diff inspection and backups.
 - **Create and flexible import**: Create skills or import ZIP archives, folders, and `SKILL.md` files directly into your global user root or a registered workspace.
@@ -73,7 +73,7 @@ dsh plugin --profile web add @michengai/dsh-skills-manager@latest --registry=htt
 
 Restart DSH, refresh the page, and open **Settings → Skills**. To update, select **Check for updates** or run the installation command again.
 
-- Plugin `1.2.14` is tested with DeepSeek Harness `0.2.0-rc.1`, `0.2.0-rc.2`, `0.2.1-rc.1`, `0.2.1-rc.2`, `0.2.1-rc.3`.
+- Plugin `1.2.15` is tested with DeepSeek Harness `0.2.0-rc.1`, `0.2.0-rc.2`, `0.2.1-rc.1`, `0.2.1-rc.2`, `0.2.1-rc.3`.
 - Hosts before `0.2.0` are no longer supported. If you still use a `0.1.x` host, install plugin `1.1.23` instead of `@latest`.
 - **Reverse proxy deployment**: Supports hosting DSH behind prefix-stripping reverse proxies (e.g. `/app/dsh/`). API and update endpoints resolve against the page base URI (`document.baseURI`).
 
@@ -180,6 +180,7 @@ The DeepSeek Harness loader enforces strict identifier policies:
 | <img src="assets/brands/qoder.svg" width="16" height="16" alt="Qoder" valign="middle"> Qoder | `~/.qoder/skills` | `DSH_QODER_HOME` | `<project>/.qoder/skills` |
 | <img src="assets/brands/qoder.svg" width="16" height="16" alt="Qoder CN CLI" valign="middle"> Qoder CN CLI | `~/.qoder-cn/skills` | `DSH_QODER_CN_HOME` | — |
 | <img src="assets/brands/qoder.svg" width="16" height="16" alt="Qoder CN" valign="middle"> Qoder CN | `~/.lingma/skills` | `DSH_LINGMA_HOME` | `<project>/.lingma/skills` |
+| <img src="assets/brands/gemini.svg" width="16" height="16" alt="Google Antigravity" valign="middle"> Google Antigravity | `~/.gemini/config/skills` | `DSH_ANTIGRAVITY_HOME` | `<project>/.agents/skills` |
 
 Ordinary project-root `<project>/skills` directories are not scanned, so repository release resources are not exposed as Agent skills. OpenClaw / Clawdbot support is limited to the user-level sources above. Qoder CN CLI project skills use `<project>/.qoder/skills` and appear as Qoder. Qoder CN IDE uses the Lingma directories. Missing external source directories are not shown.
 
