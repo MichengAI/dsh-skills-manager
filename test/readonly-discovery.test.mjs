@@ -189,6 +189,25 @@ try {
     false,
   );
 
+  const agTarget = await skill(join(temp, "ag-root"), "ag-skill");
+  process.env.DSH_ANTIGRAVITY_HOME = join(temp, "antigravity");
+  const antigravity = core.userRoots().find((r) => r.key === "antigravity");
+  assert.ok(antigravity, "antigravity 来源存在");
+  await link(agTarget, antigravity.path);
+  assert.equal(
+    (await core.skillDetail("antigravity", ".")).body,
+    "ag-skill 正文",
+    "Google Antigravity 全局技能正文可读取",
+  );
+  await core.setSkillEnabled(antigravity.path, ".", false);
+  assert.equal(
+    (await core.listProviderCandidates()).find((e) => e.name === "ag-skill")
+      .invocation.userInvocable,
+    false,
+    "Google Antigravity 全局技能支持软停用",
+  );
+  delete process.env.DSH_ANTIGRAVITY_HOME;
+
   const project = join(temp, "project");
   await mkdir(join(project, ".git"), { recursive: true });
   await link(join(temp, "external"), join(project, ".agents", "skills"));

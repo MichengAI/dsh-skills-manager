@@ -533,7 +533,7 @@ for (const root of configuredRoots.filter(root => allowedDestinationKeys.include
   assert.deepEqual(pathLines(), [root.path], "路径只显示所选位置的实际配置路径：" + root.key);
 }
 chooseRoot("dsh");
-for (const key of ["codex", "claude", "gemini", "windsurf"]) assert.equal(radio(key), undefined, "只读 Agent 目录不可选：" + key);
+for (const key of ["codex", "claude", "gemini", "windsurf", "antigravity"]) assert.equal(radio(key), undefined, "只读 Agent 目录不可选：" + key);
 assert.ok(!modalNodes().some(n => n.type === "code" && n.children.some(c => c === "$DSH_HOME/skills" || c === "~/.agents/skills")), "不展示硬编码默认路径");
 assert.ok(modalNodes().some(n => n.children.includes("repo.installLocationsHint")));
 assert.equal(countCalls("/repositories/install"), 0, "选择位置不会提交安装");

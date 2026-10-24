@@ -173,6 +173,7 @@ const firstTierUserRoots = {
   qoder: join(testUserHome, ".qoder", "skills"),
   "qoder-cn": join(testUserHome, ".qoder-cn", "skills"),
   lingma: join(testUserHome, ".lingma", "skills"),
+  antigravity: join(testUserHome, ".gemini", "config", "skills"),
 };
 for (const [key, expected] of Object.entries(firstTierUserRoots)) {
   const definition = userRoots().find((root) => root.key === key);
@@ -184,6 +185,14 @@ for (const [key, expected] of Object.entries(firstTierUserRoots)) {
     `userRoots exposes the read-only ${key} Skills storage`,
   );
 }
+
+process.env.DSH_ANTIGRAVITY_HOME = join(tmp, "custom-antigravity");
+const customAntigravity = userRoots().find((root) => root.key === "antigravity");
+ok(
+  customAntigravity && customAntigravity.path === join(process.env.DSH_ANTIGRAVITY_HOME, "skills"),
+  "DSH_ANTIGRAVITY_HOME overrides Google Antigravity global skills path",
+);
+delete process.env.DSH_ANTIGRAVITY_HOME;
 
 // Linux 同样必须拒绝 Windows 保留设备名；Windows 无法创建这类来源，故仅在可创建的系统上做端到端断言。
 if (process.platform !== "win32") {
@@ -3802,8 +3811,12 @@ try {
 const snap = await state();
 eq(
   snap.roots.length,
-  21,
+  22,
   "state returns DSH, CC Switch, Copilot, Cursor, first-tier Agents, WorkBuddy, Qoder, and common Agent roots",
+);
+ok(
+  snap.roots.some((root) => root.key === "antigravity"),
+  "state includes Google Antigravity source",
 );
 ok(
   snap.roots.some((root) => root.key === "ccswitch"),

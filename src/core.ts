@@ -37,7 +37,7 @@ const KEBAB_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const EXTERNAL_SOURCE_ORDER = [
   "ccswitch", "codex", "claude", "gemini", "opencode", "cursor", "copilot",
   "windsurf", "windsurf-user", "trae", "trae-cn", "openclaw", "clawdbot",
-  "roo", "codebuddy", "workbuddy", "qoder", "qoder-cn", "lingma",
+  "roo", "codebuddy", "workbuddy", "qoder", "qoder-cn", "lingma", "antigravity",
 ];
 function rankSources<T extends {key: string; native?: boolean; rank?: number; localeKey?: string}>(sources: T[], startRank: number) {
   const order = (root: T) => EXTERNAL_SOURCE_ORDER.indexOf(root.key);
@@ -340,6 +340,18 @@ export function userRoots(): SkillRoot[] {
       localeKey: "lingma",
       path: join(process.env.DSH_LINGMA_HOME || join(homedir(), ".lingma"), "skills"),
       label: "Qoder CN",
+      mutable: false,
+      toggleable: true,
+      native: false,
+    },
+    {
+      key: "antigravity",
+      localeKey: "antigravity",
+      path: join(
+        process.env.DSH_ANTIGRAVITY_HOME || join(homedir(), ".gemini", "config"),
+        "skills",
+      ),
+      label: "Google Antigravity",
       mutable: false,
       toggleable: true,
       native: false,
