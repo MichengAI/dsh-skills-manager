@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 // 已验证的同版本官方宿主组合；发布元数据由契约测试核对。
-export const supportedHosts = Object.freeze(["0.2.0-rc.1", "0.2.0-rc.2", "0.2.1-rc.1", "0.2.1-rc.2"]);
+export const supportedHosts = Object.freeze(["0.2.0-rc.1", "0.2.0-rc.2", "0.2.1-rc.1", "0.2.1-rc.2", "0.2.1-rc.3"]);
 export const peerRange = supportedHosts.join(" || ");
 export const developmentHost = "0.2.0-rc.2";
 

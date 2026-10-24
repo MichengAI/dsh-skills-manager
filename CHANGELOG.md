@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.14 - 2026-10-24
+
+- Support DeepSeek Harness `0.2.1-rc.3` while retaining all existing supported versions.
+
 ## 1.2.13 - 2026-10-23
 
 - Hide the heading version chip when online updates are disabled alongside the update check action.

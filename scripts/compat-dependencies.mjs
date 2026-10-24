@@ -4,6 +4,7 @@ const CORDIS_PINS = Object.freeze({
   "0.2.0-rc.2": "4.0.4",
   "0.2.1-rc.1": "4.0.5",
   "0.2.1-rc.2": "4.0.5",
+  "0.2.1-rc.3": "4.0.5",
 });
 const CORDIS_PLUGIN_PINS = Object.freeze({
   "4.0.4": {
@@ -37,7 +38,7 @@ export function pluginPins(cordis) {
 export function hostCordisOverrides(hostVersion) {
   const cordis = cordisPin(hostVersion);
   const overrides = { "@deepseek-ai/cordis": cordis, ...pluginPins(cordis) };
-  if (hostVersion === "0.2.1-rc.1" || hostVersion === "0.2.1-rc.2") {
+  if (hostVersion === "0.2.1-rc.1" || hostVersion === "0.2.1-rc.2" || hostVersion === "0.2.1-rc.3") {
     overrides["@deepseek-ai/schemastery"] = "3.18.5";
   }
   return overrides;
