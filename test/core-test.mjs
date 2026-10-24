@@ -1672,6 +1672,8 @@ delete legacyManagerState.enabledSkills;
 delete legacyManagerState.disabledSkills.dsh;
 delete legacyManagerState.sources.ccswitch;
 delete legacyManagerState.disabledSkills.ccswitch;
+delete legacyManagerState.sources.antigravity;
+delete legacyManagerState.disabledSkills.antigravity;
 await writeFile(managerStatePath(), JSON.stringify(legacyManagerState), "utf8");
 const migratedLegacyState = await readManagerState();
 ok(
@@ -1683,6 +1685,11 @@ ok(
   migratedLegacyState.state.sources.ccswitch === true &&
     Array.isArray(migratedLegacyState.state.disabledSkills.ccswitch),
   "legacy state gains a default-enabled CC Switch source without failing closed",
+);
+ok(
+  migratedLegacyState.state.sources.antigravity === true &&
+    Array.isArray(migratedLegacyState.state.disabledSkills.antigravity),
+  "legacy state gains a default-enabled Google Antigravity source without failing closed",
 );
 ok(
   migratedLegacyState.state.sources.cursor === true &&

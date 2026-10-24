@@ -1544,6 +1544,15 @@ function validManagerStateDocument(value: ManagerState) {
   return true;
 }
 
+const BASELINE_SOURCES = new Set([
+  "dsh",
+  "agents",
+  "codex",
+  "claude",
+  "gemini",
+  "opencode",
+]);
+
 /** 仅对可识别的 version 1 状态补齐新增只读来源键，其余结构仍交由严格校验失败关闭。 */
 function migrateManagerStateDocument(value: ManagerState) {
   if (
@@ -1553,9 +1562,11 @@ function migrateManagerStateDocument(value: ManagerState) {
     value.version !== 1
   )
     return value;
-  // version 1 没有记录引入来源的版本，只有确曾新增的来源允许补缺。
+  // version 1 没有记录引入来源的版本，只有确曾新增的只读来源允许补缺。
   // 原有 agents/codex/claude/gemini/opencode 字段缺失仍表示损坏配置。
-  const addedSources = ["ccswitch", "cursor", "copilot", "windsurf", "windsurf-user", "trae", "trae-cn", "openclaw", "clawdbot", "roo", "codebuddy", "workbuddy", "qoder", "qoder-cn", "lingma"];
+  const addedSources = userRoots()
+    .map((root) => root.key)
+    .filter((key) => !BASELINE_SOURCES.has(key));
   for (const key of addedSources) {
     for (const field of ["sources", "disabledSkills", "enabledSkills"] as const) {
       if (

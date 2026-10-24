@@ -28,6 +28,7 @@ for (const key of [
   "DSH_QODER_HOME",
   "DSH_QODER_CN_HOME",
   "DSH_LINGMA_HOME",
+  "DSH_ANTIGRAVITY_HOME",
 ])
   process.env[key] = join(temp, key);
 const core = await import("../lib/core.js");
@@ -56,13 +57,14 @@ try {
     "qoder",
     "qoder-cn",
     "lingma",
+    "antigravity",
   ];
   for (const key of firstTierUserKeys)
     assert.ok(core.userRoots().some((root) => root.key === key), `注册全局 ${key} 来源`);
   const copilot = core.userRoots().find((root) => root.key === "copilot");
   await skill(join(copilot.path, "global"), "global-copilot");
   const oldState = (await core.readManagerState()).state;
-  for (const key of ["copilot", "windsurf", "windsurf-user", "trae", "trae-cn", "openclaw", "clawdbot", "roo", "codebuddy", "workbuddy", "qoder", "qoder-cn", "lingma"]) {
+  for (const key of ["copilot", "windsurf", "windsurf-user", "trae", "trae-cn", "openclaw", "clawdbot", "roo", "codebuddy", "workbuddy", "qoder", "qoder-cn", "lingma", "antigravity"]) {
     delete oldState.sources[key];
     delete oldState.disabledSkills[key];
     delete oldState.enabledSkills[key];
@@ -79,6 +81,7 @@ try {
   assert.equal(migrated.state.sources.qoder, true, "迁移补齐 Qoder");
   assert.equal(migrated.state.sources["qoder-cn"], true, "迁移补齐 Qoder CN CLI");
   assert.equal(migrated.state.sources.lingma, true, "迁移补齐 Qoder CN IDE");
+  assert.equal(migrated.state.sources.antigravity, true, "迁移补齐 Google Antigravity");
   for (const field of ["sources", "disabledSkills"]) {
     const broken = structuredClone(migrated.state);
     delete broken[field].agents;
