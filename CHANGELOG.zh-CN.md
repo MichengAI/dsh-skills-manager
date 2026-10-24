@@ -2,7 +2,7 @@
 
 [English](CHANGELOG.md)
 
-## 1.2.17 - 2026-10-24
+## 1.2.18 - 2026-10-24
 
 - 宿主准入机制全面升级：声明 `engines.dsh: ">=0.2.0-rc.1 <0.3.0-0"`，全面开放对 DeepSeek Harness 整个 `0.2.x` 系列的支持（包含已支持的 `0.2.0-rc.1` 起及后续全部 alpha/rc/正式版），非破坏性宿主升级无需再重复发版。
 - 解除 peerDependencies 逐版本锁定：所有 `@deepseek-ai/dsh-*` peer 依赖统一放宽至 `0.2.x` 代际范围。
