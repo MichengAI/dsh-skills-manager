@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.16 - 2026-10-24
+
+- Dynamically migrate non-baseline external sources in `migrateManagerStateDocument()`, resolving state lockup and accidental fail-closed disablement when upgrading from older releases (Issue #63).
+
 ## 1.2.15 - 2026-10-24
 
 - Recognize Google Antigravity global skills under `~/.gemini/config/skills` with `DSH_ANTIGRAVITY_HOME` override support (#61).

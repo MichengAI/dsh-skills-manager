@@ -2,6 +2,10 @@
 
 [English](CHANGELOG.md)
 
+## 1.2.16 - 2026-10-24
+
+- 修复状态文档迁移逻辑：动态识别并补齐所有新增外部来源的缺省字段（含 `antigravity`），解决从旧版本升级后状态文件校验失败、导致所有技能被安全停用且写入锁定的问题（Issue #63）。
+
 ## 1.2.15 - 2026-10-24
 
 - 支持识别 Google Antigravity 全局技能目录（`~/.gemini/config/skills`），并支持通过 `DSH_ANTIGRAVITY_HOME` 环境变量自定义覆盖（#61）。
