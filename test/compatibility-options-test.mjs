@@ -34,7 +34,7 @@ for (const host of supportedHosts) {
   const overrides = hostCordisOverrides(host);
   for (const name of requiredPins) assert.ok(overrides[name], `${host} 缺少 ${name}`);
 }
-assert.equal(developmentHost, "0.2.0-rc.2");
+assert.equal(developmentHost, "0.2.1-rc.3");
 assert.deepEqual(supportedHosts, ["0.2.0-rc.1", "0.2.0-rc.2", "0.2.1-rc.1", "0.2.1-rc.2", "0.2.1-rc.3"]);
 assert.deepEqual(parseOptions(["--keep"]).versions, supportedHosts);
 assert.equal(parseOptions(["--keep", supportedHosts[0]]).keep, true);
@@ -48,11 +48,12 @@ assert.throws(() => parseOptions(["--serve"]), /单一版本/);
 assert.throws(() => parseOptions(["--all", "--serve"]), /单一版本/);
 assert.equal(parseOptions(["--serve", supportedHosts[0]]).serve, true);
 const manifest = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
+assert.equal(manifest.engines?.dsh, ">=0.2.0-rc.1 <0.3.0-0");
 assertHostPeers(manifest.peerDependencies);
 for (const [name, range] of Object.entries(manifest.peerDependencies)) {
   if (name.startsWith("@deepseek-ai/dsh-")) assert.equal(range, peerRange, name);
 }
-assert.equal(manifest.devDependencies["@deepseek-ai/cordis"], "4.0.4");
+assert.equal(manifest.devDependencies["@deepseek-ai/cordis"], "4.0.5");
 for (const [name, version] of Object.entries(manifest.devDependencies)) {
   if (name.startsWith("@deepseek-ai/dsh-")) assert.equal(version, developmentHost, name);
 }

@@ -57,7 +57,7 @@ const harness = ctx.plugin({ name: "regression-harness", inject: ["skills"], app
     return { name: "dsh-skills-manager-external", list: core.listProviderCandidates, get: core.getProviderSkill };
   });
   let tool;
-  toolmod.apply({ skills: host.skills, tools: { register(t) { tool = t; } }, on() {} });
+  toolmod.apply({ skills: host.skills, tools: { register(t) { tool = t; } }, workingDirectory: { ensure: async () => qa }, on() {} });
   runRegression = async () => {
     const selected = async () => {
       invalidate();
