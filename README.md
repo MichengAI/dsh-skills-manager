@@ -112,7 +112,7 @@ Two native switches are available:
 | **Find skills** | Switch between Global Skills and Project Skills tabs, expand/collapse source groups, or use the search bar and status filters. |
 | **Inspect content** | Click **View details** on any skill row to read `SKILL.md` content and diagnostics in a 760px wide resizable dialog, with one-click **Copy body**. |
 | **Toggle invocation** | Toggle the switch on the right side of a skill row to enable or disable it for DSH without editing third-party files. |
-| **Change an external source folder** | Select **Change skills folder** on the source row, type or browse to a folder, and save. **Restore default** returns to the configured default. Only where this plugin reads changes; no files move and external sources stay read-only. |
+| **Change an external source folder** | Click **Source folders…** in the header or select **Change skills folder** on the source row, type or browse to a folder, and save. **Restore default** returns to the configured default. Only where this plugin reads changes; no files move and external sources stay read-only. |
 | **Organize categories** | Click **New category** within a source, then drag the grab handle (`⋮⋮`) to reorder or move skills across categories. Toggling a category turns all its member skills on or off. |
 | **Create & import** | Click **Create skill** or **Import skill** in the header. Select destination scope (User directory or a registered workspace project) and path. |
 | **Discover & install** | Open the **Discover** tab to browse trending ClawHub skills or search the skills.sh catalog, or click **Add repository** to subscribe to a public GitHub repo. |

@@ -578,7 +578,11 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
       function submitImport() { if (!upload || !destinationReady(importDestination, workspaceRows, userDestinations)) return; buildUploadPayload(upload).then(function (payload) { return post("/upload", Object.assign({}, payload, destinationPayload(importDestination)), null); }).then(function (data) { var summary = summarizeImportResult(t, data); setResult({ ok: summary.ok, warning: summary.warning, text: summary.text }); if (summary.imported) { setModal(null); setUpload(null); } }).catch(function () {}); }
       var data = snapshot.data || { roots: [], writeDestinations: [], projects: [], trash: [], warnings: [] }, allRoots = data.roots || [];
       var overridableRoots = allRoots.filter(function (r) { return !r.mutable && r.scope !== "project"; });
-      function openRootPathPicker() { if (overridableRoots.length > 0) openRootPath(overridableRoots[0]); }
+      function openRootPathPicker() {
+        if (!overridableRoots.length) return;
+        var target = (activeSource && overridableRoots.find(function (r) { return r.key === activeSource; })) || overridableRoots[0];
+        openRootPath(target);
+      }
       var filterKey = scope === "project" ? "project" : "user", filters = savedFilters[filterKey] || { query: "", source: "", status: "" }, query = filters.query, source = filters.source;
       function updateFilter(key: string, value: string) { setSavedFilters(function (previous) { return Object.assign({}, previous, { [filterKey]: Object.assign({}, filters, { [key]: value }) }); }); }
       function setQuery(value: string) { updateFilter("query", value); }
