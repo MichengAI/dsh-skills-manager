@@ -14,6 +14,8 @@ export interface SkillRoot {
     projectName?: string;
     workspaceCwds?: string[];
     ok?: true;
+    /** 被 roots.json 改写前的默认目录；只有用户级外部来源会出现。 */
+    defaultPath?: string;
 }
 export type RootInput = SkillRoot | string | null | undefined;
 export interface Diagnostic {
@@ -133,6 +135,8 @@ export interface RootView extends SkillRoot {
     skills: SkillView[];
     categories: SkillCategory[];
     categoryOrder?: Record<string, string[]>;
+    /** 该来源当前使用 roots.json 里的自定义目录。 */
+    overridden?: boolean;
 }
 export interface SkillItem {
     root: SkillRoot;

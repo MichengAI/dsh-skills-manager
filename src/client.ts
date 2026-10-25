@@ -6,7 +6,7 @@ type UploadFile = File & {_dssmPath?: string};
 type UploadSelection = {kind: string; name: string; files: UploadFile[]; count: number; size: number; error?: never};
 type SelectionResult = UploadSelection | {error: Diagnostic};
 type ResultMessage = {ok: boolean; text: string; warning?: boolean; scope?: string};
-type ConfirmModal = {type: 'trash-confirm'; root: string; name: string; workspace?: string} | {type: 'delete-confirm'; id: string; name: string} | {type: 'category-create'; root: string; workspace?: string} | {type: 'category-rename'; root: string; id: string; name: string; workspace?: string} | {type: 'category-delete'; root: string; id: string; name: string; workspace?: string} | {type: 'category-add'; root: string; id: string; name: string; workspace?: string; skills: {name: string; declaredName?: string; description?: string; currentCatName: string}[]};
+type ConfirmModal = {type: 'trash-confirm'; root: string; name: string; workspace?: string} | {type: 'delete-confirm'; id: string; name: string} | {type: 'category-create'; root: string; workspace?: string} | {type: 'category-rename'; root: string; id: string; name: string; workspace?: string} | {type: 'category-delete'; root: string; id: string; name: string; workspace?: string} | {type: 'category-add'; root: string; id: string; name: string; workspace?: string; skills: {name: string; declaredName?: string; description?: string; currentCatName: string}[]} | {type: 'root-path'; root: string; label: string; path: string; defaultPath?: string};
 type ModalState = 'detail' | 'create' | 'import' | ConfirmModal | null;
 import { createRepositoryUI, repositoryLocales } from "./repository-ui.js";
 import { createDestinationKit, defaultDestination, destinationPayload, destinationReady, destinationLocales, destinationCss, type DestinationValue } from "./destination-picker.js";
@@ -114,8 +114,45 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
       }
     };
 
-    Object.assign(DICT.zh, repositoryLocales.zh, destinationLocales.zh, sidebarLocales.zh);
-    Object.assign(DICT.en, repositoryLocales.en, destinationLocales.en, sidebarLocales.en);
+    // 外部来源目录改写的文案单独成块，和仓库/目标选择器一样与主词典合并，减少巨型字典的冲突。
+    var ROOT_PATH_LOCALES = {
+      zh: {
+        "rootPath.edit": "修改技能目录", "rootPath.title": "修改「{name}」的技能目录",
+        "rootPath.desc": "只改本插件读取的位置，不移动任何文件。外部来源仍然只读；要让该 Agent 自己换目录，请改它自己的配置。",
+        "rootPath.label": "技能目录（含 SKILL.md 的上一级）", "rootPath.placeholder": "例如 D:\\skills\\codex",
+        "rootPath.browse": "浏览…", "rootPath.pickUnavailable": "当前环境没有可用的目录选择器，请直接输入路径。",
+        "rootPath.reset": "恢复默认", "rootPath.save": "保存", "rootPath.custom": "自定义",
+        "rootPath.overrideTitle": "自定义目录，默认：{path}", "rootPath.defaultHint": "默认目录：{path}",
+        "rootPath.saved": "已更新「{name}」的技能目录。", "rootPath.resetDone": "已恢复「{name}」的默认目录。",
+        "error.rootPath.unsupported": "该技能来源不支持修改目录：{root}",
+        "error.rootPath.invalid": "技能目录无效：{path}", "error.rootPath.absolute": "技能目录必须是绝对路径：{path}",
+        "error.rootPath.tooLong": "技能目录路径过长：{path}", "error.rootPath.notFound": "技能目录不存在：{path}",
+        "error.rootPath.notDirectory": "技能目录不是文件夹：{path}", "error.rootPath.overlap": "技能目录不能与其它技能来源重叠：{path}",
+        "error.rootPath.reserved": "技能目录不能与技能管理器的状态目录重叠：{path}",
+        "warning.rootPath.invalid": "技能目录配置项无效，已忽略：{path}",
+        "warning.rootPath.corrupt": "技能目录配置不可读，已使用默认目录：{path}", "warning.rootPath.missing": "自定义技能目录不存在：{path}",
+      },
+      en: {
+        "rootPath.edit": "Change skills folder", "rootPath.title": "Change the skills folder for {name}",
+        "rootPath.desc": "Only changes where this plugin reads skills. No files are moved. External sources stay read-only; to change the agent's own folder, update that agent's configuration.",
+        "rootPath.label": "Skills folder (the parent of SKILL.md files)", "rootPath.placeholder": "e.g. D:\\skills\\codex",
+        "rootPath.browse": "Browse…", "rootPath.pickUnavailable": "No directory picker is available here; type the path instead.",
+        "rootPath.reset": "Restore default", "rootPath.save": "Save", "rootPath.custom": "Custom",
+        "rootPath.overrideTitle": "Custom folder; default: {path}", "rootPath.defaultHint": "Default folder: {path}",
+        "rootPath.saved": "Updated the skills folder for {name}.", "rootPath.resetDone": "Restored the default folder for {name}.",
+        "error.rootPath.unsupported": "This skill source does not support changing its folder: {root}",
+        "error.rootPath.invalid": "Invalid skills folder: {path}", "error.rootPath.absolute": "The skills folder must be an absolute path: {path}",
+        "error.rootPath.tooLong": "The skills folder path is too long: {path}", "error.rootPath.notFound": "The skills folder does not exist: {path}",
+        "error.rootPath.notDirectory": "The skills folder is not a directory: {path}", "error.rootPath.overlap": "The skills folder must not overlap another skill source: {path}",
+        "error.rootPath.reserved": "The skills folder must not overlap the manager's state folder: {path}",
+        "warning.rootPath.invalid": "Ignored an invalid skills folder setting: {path}",
+        "warning.rootPath.corrupt": "The skills folder settings could not be read; defaults are in use: {path}", "warning.rootPath.missing": "The custom skills folder does not exist: {path}",
+      }
+    };
+
+
+    Object.assign(DICT.zh, ROOT_PATH_LOCALES.zh, repositoryLocales.zh, destinationLocales.zh, sidebarLocales.zh);
+    Object.assign(DICT.en, ROOT_PATH_LOCALES.en, repositoryLocales.en, destinationLocales.en, sidebarLocales.en);
     var SourceSelect = createSourceSelect(react);
     var destinationKit = createDestinationKit({ react, SourceSelect, translateError });
     var DestinationPicker = destinationKit.DestinationPicker;
@@ -124,6 +161,8 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
 @container(max-width:400px){.dssm-source-path{display:none}}@media(max-width:760px){.dssm-summary{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:720px){.dssm-title-row{flex-wrap:wrap}}@container(max-width:520px){.dssm-trash-item{grid-template-columns:minmax(0,1fr)}.dssm-skill-row{flex-wrap:wrap}.dssm-skill-actions{width:100%;margin-inline-start:0;justify-content:flex-end}.dssm-trash-actions{justify-content:flex-end}.dssm-head{flex-direction:column}.dssm-actions{width:100%;margin-left:0}.dssm-actions button{flex:1}.dssm-summary{grid-template-columns:1fr}}.dssm-row-state{display:flex;align-items:center;justify-content:flex-end;gap:8px}
 .dssm-enable-switch{box-sizing:border-box;position:relative;flex:0 0 auto;width:36px;height:20px;padding:2px;border:0;border-radius:999px;corner-shape:round;background:var(--dsw-alias-border-l3,#555);cursor:pointer}.dssm-enable-switch[aria-checked=true]{background:var(--dsw-alias-brand-primary)}.dssm-enable-switch:disabled{cursor:default;opacity:.5}.dssm-enable-switch:focus-visible{outline:var(--dsw-focus-ring-width,1px) solid var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary));outline-offset:2px}.dssm-enable-switch-thumb{display:block;width:16px;height:16px;border-radius:50%;corner-shape:round;background:var(--dsw-alias-label-primary-foreground,#fff);transition:transform 120ms ease;pointer-events:none}.dssm-enable-switch[aria-checked=false] .dssm-enable-switch-thumb{background:var(--dsw-alias-switch-thumb,#fff)}.dssm-enable-switch[aria-checked=true] .dssm-enable-switch-thumb{transform:translateX(16px)}
 .dssm-icon-action{width:22px;min-width:22px;height:22px;padding:0;border-radius:var(--dsw-radius-sm,8px);background:transparent;color:var(--dsw-alias-label-secondary,#b9b9b9);border-color:var(--dsw-alias-border-l2,#494949)}.dssm-icon-action:not(:disabled):not(.dssm-icon-danger):hover{color:var(--dsw-alias-link,#4176e6)!important;border-color:var(--dsw-alias-link,#4176e6)!important}.dssm-icon-action.dssm-icon-danger{color:var(--dsw-alias-state-error-primary,#ef7272);border-color:var(--dsw-alias-state-error-primary,#ef7272)}.dssm-btn-danger:not(:disabled){color:var(--dsw-alias-state-error-primary,#ef7272)}
+.dssm-root-path-actions{display:flex;flex-wrap:wrap;gap:8px}
+.dssm-source-custom{color:var(--dsw-alias-label-tertiary);font-size:11px;white-space:nowrap}
 .dssm-modal{max-height:100%}
 .dssm-modal.dssm-modal-wide{width:min(760px,100%)!important;max-height:100%!important}
 .dssm-modal-content{flex:1;min-height:0;overflow:hidden}
@@ -176,9 +215,10 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
     function normalizeSkillQuery(query: unknown) { return String(query == null ? "" : query).trim().toLowerCase(); }
     function matchSkillQuery(skill: SearchSkill, query: unknown) { var q = normalizeSkillQuery(query); if (!q) return true; return [skill.name, skill.declaredName, skill.description, skill.kind, skill.kindLabel, skill.statusLabel, skill.rootKey, skill.rootLabel].some(function (value) { return String(value == null ? "" : value).toLowerCase().includes(q); }); }
     function filterSkills<T extends SearchSkill>(list: T[], options?: {rootKey?: string; query?: unknown}) { var rootKey = options && options.rootKey != null ? options.rootKey : ""; return list.filter(function (skill) { return (!rootKey || skill.rootKey === rootKey) && matchSkillQuery(skill, options && options.query); }); }
-    function visibleSkillRoots<T extends {mutable?: boolean; exists?: boolean}>(roots: T[]) {
+    function visibleSkillRoots<T extends {mutable?: boolean; exists?: boolean; overridden?: boolean}>(roots: T[]) {
       return (roots || []).filter(function (root) {
-        return root.mutable || root.exists !== false;
+        // 自定义目录即使已失效也要保留，否则用户没有入口把目录改回去。
+        return root.mutable || root.overridden === true || root.exists !== false;
       });
     }
     function skillStatus(skill: Partial<SkillView>) { return skill.shadowedBy ? "shadowed" : skill.loadable === false ? "invalid" : isSkillEnabled(skill) ? "enabled" : "disabled"; }
@@ -192,7 +232,7 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
     function scopeSkillRoots(roots: RootView[]) {
       return visibleSkillRoots(roots).filter(function (root) {
         if (root.scope === "project") return false;
-        return root.mutable || (root.skills || []).length > 0;
+        return root.mutable || root.overridden === true || (root.skills || []).length > 0;
       });
     }
     var MAX_UPLOAD_ARCHIVE_BYTES = 32 << 20, MAX_UPLOAD_ENTRY_BYTES = 32 << 20, MAX_UPLOAD_TOTAL_BYTES = 64 << 20, MAX_UPLOAD_ENTRIES = 1000;
@@ -479,6 +519,9 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
       var wls = react.useState<{ loading: boolean; error: string | null }>({ loading: false, error: null }), workspaceList = wls[0], setWorkspaceList = wls[1];
       var wds = react.useState<Record<string, { loading: boolean; error: string | null; roots: RootView[] }>>({}), workspaceDetails = wds[0], setWorkspaceDetails = wds[1];
       var us = react.useState<UploadSelection | null>(null), upload = us[0], setUpload = us[1];
+      var rps = react.useState(""), rootPathValue = rps[0], setRootPathValue = rps[1];
+      var rpk = react.useState(false), rootPathPicking = rpk[0], setRootPathPicking = rpk[1];
+      var rpe = react.useState<string | null>(null), rootPathError = rpe[0], setRootPathError = rpe[1];
       var ds = react.useState<Detail | null>(null), detail = ds[0], setDetail = ds[1];
       var copySt = react.useState<"idle" | "copied" | "failed">("idle"), copyState = copySt[0], setCopyState = copySt[1];
       function copyText(text: string) {
@@ -500,6 +543,32 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
       react.useEffect(function () { refresh(false); }, []);
       function post<K extends keyof ApiRoutes>(path: K, body: unknown, successKey?: string | null, successParams?: object): Promise<ApiRoutes[K]> { if (inflightRef.current) return Promise.reject({ error: "operation already in progress" }); inflightRef.current = true; setBusy(true); setResult(null); return sessionApi(path, { method: "POST", headers: MUTATION_HEADERS, body: JSON.stringify(body || {}) }).then(function (data) { setResult({ ok: true, text: successKey ? t(successKey, successParams || data || {}) : t("result.updated") }); var scopedWorkspace = body && typeof (body as { workspace?: unknown }).workspace === "string" ? (body as { workspace: string }).workspace : ""; return Promise.all([refresh(true), scopedWorkspace ? loadWorkspaceDetail(scopedWorkspace) : null]).then(function () { return data; }); }).catch(function (error) { setResult({ ok: false, text: t("error.action", { error: translateError(t, error) }) }); throw error; }).finally(function () { inflightRef.current = false; setBusy(false); }); }
       function openDetail(root: RootView, skill: SkillView, workspacePath?: string) { setBusy(true); setDetail(null); setCopyState("idle"); setModal("detail"); sessionApi("/detail", { method: "POST", headers: MUTATION_HEADERS, body: JSON.stringify(workspacePath ? { root: root.key, name: skill.name, workspace: workspacePath } : { root: root.key, name: skill.name }) }).then(setDetail).catch(function (error) { setResult({ ok: false, text: t("error.action", { error: translateError(t, error) }) }); setModal(null); }).finally(function () { setBusy(false); }); }
+      function openRootPath(root: RootView) {
+        setRootPathValue(root.defaultPath || root.path);
+        setRootPathPicking(false);
+        setRootPathError(null);
+        setModal({ type: "root-path", root: root.key, label: rootDisplayName(t, root), path: root.path, defaultPath: root.defaultPath });
+      }
+      // 浏览走宿主自己的目录选择器（桌面端是系统文件夹对话框），选中的路径只回填输入框。
+      function pickRootPathDirectory() {
+        var picker = availableDirectoryPicker();
+        if (!picker) { setRootPathError(t("rootPath.pickUnavailable")); return; }
+        setRootPathError(null);
+        setRootPathPicking(true);
+        Promise.resolve().then(picker).then(function (picked) {
+          if (typeof picked === "string" && picked.trim()) setRootPathValue(picked.trim());
+        }).catch(function (error) {
+          setRootPathError(translateError(t, error));
+        }).finally(function () { setRootPathPicking(false); });
+      }
+      function saveRootPath(value: string | null) {
+        var target = modal && typeof modal === "object" && modal.type === "root-path" ? modal : null;
+        if (!target) return;
+        setRootPathError(null);
+        post("/root-path", { key: target.root, path: value }, value === null ? "rootPath.resetDone" : "rootPath.saved", { name: target.label })
+          .then(function () { setModal(null); })
+          .catch(function (error) { setRootPathError(translateError(t, error)); });
+      }
       function updateForm(key: string, value: string) { setForm(Object.assign({}, form, { [key]: value })); }
       function submitCreate() { if (!destinationReady(createDestination, workspaceRows, userDestinations)) return; post("/create", Object.assign({}, form, { root: undefined }, destinationPayload(createDestination)), null).then(function (data) { setModal(null); setForm({ root: "dsh", name: "", description: "", body: "" }); setResult({ ok: true, text: t("result.created", { name: data.name }) + (createDestination.scope === "workspace" ? " · " + t("dest.createdInWorkspace") : "") }); }).catch(function () {}); }
       function selectUploadFiles(files: ArrayLike<UploadFile> | null) { pickerOpenRef.current = false; var selected = inspectUploadSelection(files); if (!selected) return; if (selected.error) { setUpload(null); setResult({ ok: false, text: translateError(t, selected.error) }); return; } setUpload(selected); setResult(null); }
@@ -703,6 +772,8 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
         var scoped = workspacePath ? { root: root.key, workspace: workspacePath } : { root: root.key };
         var actions: React.ReactNode[] = [];
         actions.push(iconButton(t("category.create"), strokeIcon("M8 2.5v11M2.5 8h11"), function () { setCategoryName(""); setModal({ type: "category-create", root: root.key, workspace: workspacePath }); }, false, busy));
+        // 外部只读来源可以改读取位置；DSH / 公共 Agent 由宿主配置，不在这里开放。
+        if (!workspacePath && root.mutable !== true) actions.push(iconButton(t("rootPath.edit"), strokeIcon("M2.5 4.5h3l1.3 1.5h6.7v6h-11z"), function () { openRootPath(root); }, false, busy));
         if (canToggleSource(root)) actions.push(h(SkillSwitch, { on: root.enabled, disabled: busy, label: t("source.toggle") + " " + displayName, onClick: function () { post(root.enabled ? "/source-disable" : "/source-enable", scoped); } }));
         return h("span", { className: "dssm-source-actions", onClick: function (event: React.MouseEvent) { event.stopPropagation(); } }, actions);
       }
@@ -826,7 +897,7 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
         var displayName = workspacePath ? rootDisplayName(t, Object.assign({}, root, { projectName: undefined })) : rootDisplayName(t, root);
         return h("section", { key: (keyPrefix || "") + root.key, className: "dssm-source", "data-source-key": root.key },
           h("div", { className: "dssm-source-head" },
-            h("button", { type: "button", className: "dssm-source-toggle", "aria-expanded": open, onClick: function () { setExpanded(function (previous) { var next: Record<string, boolean> = {}; next[expansionKey] = !open; return Object.assign({}, previous, next); }); } }, foldChevron(h, open), h("div", { className: "dssm-source-label" }, renderRootIcon(root.key), h("span", { className: "dssm-source-title" }, displayName), h("span", { className: "dssm-count" }, t(countKey("summary.group", filtered.length), { count: filtered.length })), h("span", { className: "dssm-source-path", title: root.path }, root.path))),
+            h("button", { type: "button", className: "dssm-source-toggle", "aria-expanded": open, onClick: function () { setExpanded(function (previous) { var next: Record<string, boolean> = {}; next[expansionKey] = !open; return Object.assign({}, previous, next); }); } }, foldChevron(h, open), h("div", { className: "dssm-source-label" }, renderRootIcon(root.key), h("span", { className: "dssm-source-title" }, displayName), h("span", { className: "dssm-count" }, t(countKey("summary.group", filtered.length), { count: filtered.length })), h("span", { className: "dssm-source-path", title: root.overridden ? t("rootPath.overrideTitle", { path: root.defaultPath || "" }) : root.path }, root.path, root.overridden ? h("span", { className: "dssm-source-custom" }, " · " + t("rootPath.custom")) : null))),
             sourceExtra(root, workspacePath, displayName)),
           open ? h("div", { className: "dssm-source-body", role: "region" }, renderSourceBody(root, filtered, workspacePath, keyPrefix, scopeRows)) : null);
       }
@@ -902,6 +973,30 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
         h("div", { className: "dssm-upload-requirements" }, h("div", { className: "dssm-label" }, t("upload.requirements")), h("ul", null, h("li", null, t("upload.requirement.skill")), h("li", null, t("upload.requirement.frontmatter")), h("li", null, t("upload.requirement.copy")))),
         h("div", { className: "dssm-modal-actions" }, hostButton(t("btn.cancel"), function () { pickerOpenRef.current = false; setUpload(null); setResult(null); setModal(null); }, "outline"), hostButton(busy ? t("upload.importing") : t("btn.import.now"), submitImport, "primary", busy || !upload || !destinationReady(importDestination, workspaceRows, userDestinations)))
       ));
+
+      if (modal && typeof modal === "object" && modal.type === "root-path") {
+        var rootPathModal = modal as Extract<ConfirmModal, {type: "root-path"}>;
+        content.push(h(Modal, {
+          key: "root-path",
+          title: t("rootPath.title", { name: rootPathModal.label }),
+          closeLabel: t("btn.close"),
+          onClose: function () { setModal(null); setRootPathError(null); }
+        },
+          h("div", { className: "dssm-form" },
+            h("p", { className: "dssm-note" }, t("rootPath.desc")),
+            h("label", { className: "dssm-field" },
+              h("span", { className: "dssm-label" }, t("rootPath.label")),
+              h(Input, { value: rootPathValue, placeholder: t("rootPath.placeholder"), disabled: busy, onChange: function (event: React.ChangeEvent<HTMLInputElement>) { setRootPathValue(event.target.value); setRootPathError(null); } })),
+            h("div", { className: "dssm-root-path-actions" },
+              hostButton(t("rootPath.browse"), pickRootPathDirectory, "outline", busy || rootPathPicking),
+              rootPathModal.defaultPath ? hostButton(t("rootPath.reset"), function () { saveRootPath(null); }, "outline", busy) : null),
+            h("p", { className: "dssm-help" }, t("rootPath.defaultHint", { path: rootPathModal.defaultPath || rootPathModal.path })),
+            rootPathError ? h("div", { className: "dssm-feedback dssm-error", role: "alert" }, rootPathError) : null),
+          h("div", { className: "dssm-modal-actions" },
+            hostButton(t("btn.cancel"), function () { setModal(null); setRootPathError(null); }, "outline"),
+            hostButton(t("rootPath.save"), function () { saveRootPath(rootPathValue.trim()); }, "primary", busy || !rootPathValue.trim()))));
+      }
+
       if (modal === "detail") {
         var currentDetail = detail;
         var detailTitle = currentDetail ? currentDetail.declaredName || currentDetail.name : "";
@@ -984,9 +1079,28 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
       return h("section", { className: "dssm-section" }, content);
     }
 
+    // 目录选择：桌面端由 preload 暴露系统文件夹对话框；Web/远程端退到工作区 UI 的选择器。
+    var workspacePickDirectory: (() => Promise<string | null>) | null = null;
+    function availableDirectoryPicker(): (() => Promise<string | null>) | null {
+      var bridge = (globalThis as unknown as {__DSH_DIRECTORY_PICKER__?: {pick?: () => Promise<string | null>}}).__DSH_DIRECTORY_PICKER__;
+      if (bridge && typeof bridge.pick === "function") { var bridgePick = bridge.pick.bind(bridge); return function () { return bridgePick(); }; }
+      return workspacePickDirectory;
+    }
+
     var inject = ["slots", "locale"];
     function apply(ctx: ClientContext) {
       localeService = ctx.locale;
+      if (typeof ctx.inject === "function") {
+        try {
+          ctx.inject(["uiWorkspace"], function (scoped: ClientContext & {uiWorkspace?: {pickDirectory: () => Promise<string | null>}}) {
+            var workspace = scoped.uiWorkspace;
+            if (workspace && typeof workspace.pickDirectory === "function") {
+              var pickDirectory = workspace.pickDirectory.bind(workspace);
+              workspacePickDirectory = function () { return pickDirectory(); };
+            }
+          });
+        } catch (_error) { /* 可选服务不可用时保留手动输入路径 */ }
+      }
       ctx.effect(function () { return ctx.locale.register(NS, DICT); });
       var updateCleanup: any;
       var sidebarController: any;

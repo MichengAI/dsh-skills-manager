@@ -32,6 +32,7 @@ Bring skills from your computer and projects into DSH without switching between 
 - **Create and flexible import**: Create skills or import ZIP archives, folders, and `SKILL.md` files directly into your global user root or a registered workspace.
 - **Wide reading experience**: 760px responsive detail modal with monospace syntax styling, vertical resizing, and a one-click "Copy body" action.
 - **Trash & safe rollback**: Soft delete protects skills from accidental loss, allowing complete restoration with provenance and update history preserved.
+- **Custom source folders**: Point an external agent source at another folder from the panel without moving any file. DSH and Shared Agent stay configured by the host.
 
 ## Screenshots
 
@@ -111,6 +112,7 @@ Two native switches are available:
 | **Find skills** | Switch between Global Skills and Project Skills tabs, expand/collapse source groups, or use the search bar and status filters. |
 | **Inspect content** | Click **View details** on any skill row to read `SKILL.md` content and diagnostics in a 760px wide resizable dialog, with one-click **Copy body**. |
 | **Toggle invocation** | Toggle the switch on the right side of a skill row to enable or disable it for DSH without editing third-party files. |
+| **Change an external source folder** | Select **Change skills folder** on the source row, type or browse to a folder, and save. **Restore default** returns to the configured default. Only where this plugin reads changes; no files move and external sources stay read-only. |
 | **Organize categories** | Click **New category** within a source, then drag the grab handle (`⋮⋮`) to reorder or move skills across categories. Toggling a category turns all its member skills on or off. |
 | **Create & import** | Click **Create skill** or **Import skill** in the header. Select destination scope (User directory or a registered workspace project) and path. |
 | **Discover & install** | Open the **Discover** tab to browse trending ClawHub skills or search the skills.sh catalog, or click **Add repository** to subscribe to a public GitHub repo. |
@@ -183,6 +185,7 @@ The DeepSeek Harness loader enforces strict identifier policies:
 | <img src="assets/brands/gemini.svg" width="16" height="16" alt="Google Antigravity" valign="middle"> Google Antigravity | `~/.gemini/config/skills` | `DSH_ANTIGRAVITY_HOME` | `<project>/.agents/skills` |
 
 Ordinary project-root `<project>/skills` directories are not scanned, so repository release resources are not exposed as Agent skills. OpenClaw / Clawdbot support is limited to the user-level sources above. Qoder CN CLI project skills use `<project>/.qoder/skills` and appear as Qoder. Qoder CN IDE uses the Lingma directories. Missing external source directories are not shown.
+External agent sources (CC Switch, Codex, Claude Code and others) can be pointed at another folder from the source row; the change takes effect immediately. Overrides are stored in `~/.dsh/skills-manager/roots.json` and take precedence over `DSH_<AGENT>_HOME`; editing that file by hand requires restarting DSH. DSH and Shared Agent are the host's scan paths and are not offered here — use `DSH_HOME` / `DSH_AGENTS_HOME` to relocate them. The folder must already exist and must not overlap another source; when a custom folder disappears, the source stays listed so you can restore the default.
 
 ## DSH product ecosystem
 

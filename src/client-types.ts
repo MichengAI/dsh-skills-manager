@@ -25,6 +25,7 @@ export type ApiRoutes = RepositoryRoutes & Record<SkillsShSearchPath, SkillsShSe
     '/catalog/detail': { name: string; description: string; body: string; origin: string };
     '/catalog/install': { name: string; root: string };
     '/detail': Detail;
+    '/root-path': { ok: true; root: { key: string; path: string; defaultPath?: string } };
     '/create': Success<Awaited<ReturnType<typeof createSkill>>>;
     '/upload': ImportResult;
     '/delete': unknown;
@@ -95,8 +96,14 @@ export interface ViewProps extends SectionProps {
     expanded: Record<string, boolean>;
     setExpanded: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
 }
+export interface WorkspaceDirectoryPicker {
+    pickDirectory: () => Promise<string | null>;
+}
 export interface ClientContext {
     effect: (effect: () => void | (() => void), label?: string) => unknown;
+    /** Cordis 的可选服务注入：工作区 UI 缺席时插件照常加载，只保留手动输入路径。 */
+    inject?: (deps: string[], callback: (ctx: ClientContext & { uiWorkspace?: WorkspaceDirectoryPicker }) => void) => unknown;
+    uiWorkspace?: WorkspaceDirectoryPicker;
     locale: {
         register: (namespace: string, dictionary: Record<string, Record<string, string>>) => () => void;
         bind: (namespace: string) => Translate;

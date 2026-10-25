@@ -257,4 +257,54 @@ try {
   await selectSession(undefined);
   assert.ok(find((node) => node.props.className === "dssm-source"), "alpha.2 没有会话时全局页仍可用");
   console.log("alpha.2 retainedBy.mainView 会话形态通过");
-} finally { globalThis.fetch = originalFetch; }
+
+  // 自定义目录：空/失效来源仍保留，来源行可打开改目录弹窗并用系统选择器回填。
+  data.roots.push({
+    key: "codex", path: "D:/skills/codex", defaultPath: "C:/u/.codex/skills",
+    overridden: true, exists: false, enabled: true, skills: [],
+  });
+  outerState.length = 0;
+  innerState = [];
+  mountedKey = undefined;
+  currentSession = "session-a";
+  let pickedPath = "E:/picked/codex";
+  let browseRequests = 0;
+  globalThis.__DSH_DIRECTORY_PICKER__ = { pick: async () => pickedPath };
+  globalThis.fetch = async (url, options) => {
+    const body = options?.body ? JSON.parse(options.body) : {};
+    if (options?.method === "POST" && String(url).endsWith("/browse")) browseRequests++;
+    if (options?.method === "POST" && String(url).endsWith("/root-path")) toggleRequest = { url, body };
+    return { ok: true, json: async () => ({ data: sessionData(options) }) };
+  };
+  render(); effects.splice(0).forEach((effect) => effect());
+  await new Promise((resolve) => setImmediate(resolve)); render();
+  const customGroup = groups().find((node) => node.props["data-source-key"] === "codex");
+  assert.ok(customGroup, "自定义目录即使不存在也保留来源行");
+  assert.ok(JSON.stringify(nodes(customGroup)).includes(t("rootPath.custom")), "来源行显示自定义标记");
+  const editPath = nodes(customGroup).find((node) => String(node.props["aria-label"] || "").startsWith(t("rootPath.edit")));
+  assert.ok(editPath, "外部来源提供改目录按钮");
+  editPath.props.onClick(); render();
+  assert.ok(find((node) => node.props.title === t("rootPath.title", { name: t("root.codex") })), "改目录弹窗打开");
+  assert.equal(find((node) => node.props.placeholder === t("rootPath.placeholder")).props.value, "C:/u/.codex/skills", "弹窗预填默认目录");
+  assert.ok(nodes().some((node) => node.children.includes(t("rootPath.reset"))), "已自定义时提供恢复默认");
+  find((node) => node.children.includes(t("rootPath.browse"))).props.onClick();
+  await new Promise((resolve) => setImmediate(resolve)); render();
+  assert.equal(find((node) => node.props.placeholder === t("rootPath.placeholder")).props.value, "E:/picked/codex", "浏览使用系统目录选择器回填路径");
+  assert.equal(browseRequests, 0, "浏览不再请求插件内的目录接口");
+  pickedPath = null;
+  find((node) => node.children.includes(t("rootPath.browse"))).props.onClick();
+  await new Promise((resolve) => setImmediate(resolve)); render();
+  assert.equal(find((node) => node.props.placeholder === t("rootPath.placeholder")).props.value, "E:/picked/codex", "取消系统选择不改变路径");
+  pickedPath = "F:/another/codex";
+  find((node) => node.children.includes(t("rootPath.browse"))).props.onClick();
+  await new Promise((resolve) => setImmediate(resolve)); render();
+  nodes().filter((node) => node.children.includes(t("rootPath.save"))).at(-1).props.onClick();
+  await new Promise((resolve) => setImmediate(resolve)); render();
+  assert.ok(toggleRequest && toggleRequest.url.endsWith("/root-path"), "保存提交 root-path");
+  assert.deepEqual(toggleRequest.body, { key: "codex", path: "F:/another/codex" }, "保存提交系统选择器返回的路径");
+  assert.equal(find((node) => node.props.title === t("rootPath.title", { name: t("root.codex") })), undefined, "保存成功后关闭弹窗");
+  console.log("自定义技能目录弹窗通过");
+} finally {
+  delete globalThis.__DSH_DIRECTORY_PICKER__;
+  globalThis.fetch = originalFetch;
+}

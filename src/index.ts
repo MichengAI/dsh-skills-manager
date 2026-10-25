@@ -29,6 +29,7 @@ import {
   listProviderCandidates,
   getProviderSkill,
   userRoots,
+  setRootPath,
   projectRoots,
   resolveWorkspaceTarget,
   listWorkspaces,
@@ -388,8 +389,8 @@ function apply(ctx: HostContext, config?: PluginConfig) {
     }
     return [];
   };
-  const roots = userRoots();
-  const rootByKey = Object.fromEntries(roots.map((r) => [r.key, r]));
+  // 目录可被 roots.json 改写，来源定义必须在每次请求时重新读取，不能缓存在启动时。
+  const findUserRoot = (key: string) => userRoots().find((root) => root.key === key);
 
   const providerInvalidators = new Set<() => void>();
   const invalidateSkills = () => {
@@ -463,7 +464,7 @@ function apply(ctx: HostContext, config?: PluginConfig) {
         return { projectCwds: (target as { root: SkillRoot }).root.workspaceCwds ?? [] };
       };
       const scopedOptions = (scope: { projectCwds: string[] } | null) => scope ?? projectOptions();
-      const requestRoot = async (key: string, cwds?: string[]) => cwds ? (await projectRoots(cwds)).find((root) => root.key === key) : rootByKey[key] || (await projectRoots(projectOptions().projectCwds)).find((root) => root.key === key);
+      const requestRoot = async (key: string, cwds?: string[]) => cwds ? (await projectRoots(cwds)).find((root) => root.key === key) : findUserRoot(key) || (await projectRoots(projectOptions().projectCwds)).find((root) => root.key === key);
       /** 单项操作的统一入口：有 workspace 就在其作用域内解析根，无则沿用当前会话。 */
       const withScope = async <T>(body: RequestBody, action: (scope: { projectCwds: string[] } | null) => Promise<T>) => {
         const scope = await workspaceScope(body);
@@ -609,6 +610,9 @@ function apply(ctx: HostContext, config?: PluginConfig) {
               return run(res, () => withScope(body, (scope) => setSourceEnabled(String(body.root || ""), true, log, scopedOptions(scope))), afterWrite);
             case "/api/dsh-skills-manager/source-disable":
               return run(res, () => withScope(body, (scope) => setSourceEnabled(String(body.root || ""), false, log, scopedOptions(scope))), afterWrite);
+            case "/api/dsh-skills-manager/root-path":
+              // path: null / "" 表示恢复默认目录；只改读取位置，不移动任何文件。
+              return run(res, () => setRootPath(String(body.key || ""), body.path === undefined ? null : body.path), afterWrite);
             case "/api/dsh-skills-manager/category-create":
               return run(res, () => withScope(body, (scope) => createCategory(String(body.root || ""), String(body.name || ""), log, scopedOptions(scope))));
             case "/api/dsh-skills-manager/category-rename":
@@ -684,4 +688,4 @@ function apply(ctx: HostContext, config?: PluginConfig) {
 export { activeSessionCwds, apply, inject, name, notifyChatCatalog, registerAgentSkillProviders };
 
 /** 请求体由各业务入口现有校验解析，此类型只声明路由转交的字段。 */
-type RequestBody = CreateInput & UploadInput & SkillRequest & RepositoryInput & {root?: string; source?: string; conflict?: string; dryRun?: boolean; workspace?: unknown; enabled?: boolean; category?: string; targetName?: string; position?: "before" | "after"; catalog?: string; skillId?: string; owner?: string; slug?: string};
+type RequestBody = CreateInput & UploadInput & SkillRequest & RepositoryInput & {root?: string; source?: string; conflict?: string; dryRun?: boolean; workspace?: unknown; enabled?: boolean; category?: string; targetName?: string; position?: "before" | "after"; catalog?: string; skillId?: string; owner?: string; slug?: string; path?: unknown; key?: string};
