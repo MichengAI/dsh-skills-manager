@@ -23,7 +23,7 @@ import {
   isAbsolute,
   sep,
 } from "node:path";
-import { promises as fs } from "node:fs";
+import { promises as fs, readFileSync } from "node:fs";
 import { createHash, randomUUID } from "node:crypto";
 import { unzipSync } from "fflate";
 import {
@@ -128,7 +128,8 @@ export function resolveAgentsHome() {
  * manager provider 以 450 接管公共 Agents（仍低于 DSH），其余来源依次排在其后。
  */
 export function userRoots(): SkillRoot[] {
-  return rankSources([
+  // rank 由 rankSources 统一分配，定义里只声明可写字段，避免每新增来源都要手写优先级。
+  const roots: (Omit<SkillRoot, "rank"> & { rank?: number })[] = [
     {
       key: "dsh",
       path: join(resolveDshHome(), "skills"),
@@ -356,7 +357,15 @@ export function userRoots(): SkillRoot[] {
       toggleable: true,
       native: false,
     },
-  ], 500);
+  ];
+  const overrides = loadRootPathConfig().paths;
+  for (const root of roots) {
+    const override = overrides[root.key];
+    if (!override) continue;
+    root.defaultPath = root.path;
+    root.path = override;
+  }
+  return rankSources(roots, 500);
 }
 
 function projectIdentity(path: string) {
@@ -580,6 +589,220 @@ export function trashRootPath() {
 
 export function logPath() {
   return join(resolveDshHome(), "dsh-skills-manager.log");
+}
+
+// ── 外部来源目录覆盖 ────────────────────────────────────────────────────────
+
+const ROOTS_CONFIG_VERSION = 1;
+const MAX_ROOT_PATH_LENGTH = 1024;
+/**
+ * 只有外部只读来源允许改写目录。DSH / 公共 Agent 是宿主的扫描路径，
+ * 单独改这里会出现「写进去却读不到」，要搬迁请用 DSH_HOME / DSH_AGENTS_HOME。
+ */
+const OVERRIDABLE_ROOT_KEYS = new Set(EXTERNAL_SOURCE_ORDER);
+
+interface RootPathConfig {
+  paths: Record<string, string>;
+  warnings: Diagnostic[];
+}
+
+/** roots.json 读取一次后常驻内存；写入时同步替换，手工改文件需重启 DSH。 */
+let rootPathConfig: RootPathConfig | null = null;
+
+/** 覆盖配置的位置，与 state.json、trash 同级。 */
+export function rootPathConfigPath() {
+  return join(managerHomePath(), "roots.json");
+}
+
+function rootPathError(
+  code: string,
+  message: string,
+  params: Record<string, unknown> = {},
+): OperationError {
+  return { ok: false, code, params, error: message };
+}
+
+function corruptRootPathConfig(file: string, reason: string): RootPathConfig {
+  return {
+    paths: {},
+    warnings: [
+      {
+        code: "warning.rootPath.corrupt",
+        params: { path: file },
+        error: `${reason}，已使用默认目录: ${file}`,
+      },
+    ],
+  };
+}
+
+/** 逐条忽略损坏或非法的配置项，不影响其它来源，也不触发 state.json 的 fail-closed。 */
+function readRootPathConfigFile(): RootPathConfig {
+  const file = rootPathConfigPath();
+  let raw: string;
+  try {
+    raw = readFileSync(file, "utf8");
+  } catch (caught) {
+    const error = caught as CodedError;
+    if (error && error.code === "ENOENT") return { paths: {}, warnings: [] };
+    return corruptRootPathConfig(file, "技能目录配置不可读");
+  }
+  let document: unknown;
+  try {
+    document = JSON.parse(raw);
+  } catch {
+    return corruptRootPathConfig(file, "技能目录配置不是合法 JSON");
+  }
+  const paths =
+    document && typeof document === "object" && !Array.isArray(document)
+      ? (document as { paths?: unknown }).paths
+      : undefined;
+  if (!paths || typeof paths !== "object" || Array.isArray(paths))
+    return corruptRootPathConfig(file, "技能目录配置缺少 paths 对象");
+  const accepted: Record<string, string> = {};
+  const warnings: Diagnostic[] = [];
+  for (const [key, value] of Object.entries(paths as Record<string, unknown>)) {
+    const requested = typeof value === "string" ? value.trim() : "";
+    // 未登记来源和非绝对路径都只跳过这一条，其它来源的覆盖照常生效。
+    if (!OVERRIDABLE_ROOT_KEYS.has(key) || !requested || !isAbsolute(requested)) {
+      warnings.push({
+        code: "warning.rootPath.invalid",
+        params: { path: key },
+        error: `技能目录配置项无效，已忽略: ${key}`,
+      });
+      continue;
+    }
+    accepted[key] = resolve(requested);
+  }
+  return { paths: accepted, warnings };
+}
+
+function loadRootPathConfig(): RootPathConfig {
+  if (!rootPathConfig) rootPathConfig = readRootPathConfigFile();
+  return rootPathConfig;
+}
+
+/** 重新读取 roots.json；供测试与「手工改文件后重启」的等价入口使用。 */
+export function reloadRootPathOverrides() {
+  rootPathConfig = null;
+  return loadRootPathConfig();
+}
+
+async function writeRootPathOverrides(
+  config: RootPathConfig,
+  key: string,
+  value: string | null,
+) {
+  const paths = { ...config.paths };
+  if (value === null) delete paths[key];
+  else paths[key] = value;
+  config.paths = Object.fromEntries(
+    Object.entries(paths).sort(([left], [right]) => left.localeCompare(right)),
+  );
+  await fs.mkdir(managerHomePath(), { recursive: true });
+  await writeFileAtomically(
+    rootPathConfigPath(),
+    `${JSON.stringify({ version: ROOTS_CONFIG_VERSION, paths: config.paths }, null, 2)}\n`,
+  );
+  config.warnings = [];
+}
+
+/**
+ * 改写或恢复某个外部来源的技能目录。
+ * 只校验「读哪里」，不移动、不创建任何目录；保存后由调用方触发目录缓存失效。
+ */
+export async function setRootPath(
+  key: unknown,
+  value: unknown,
+): Promise<
+  | { ok: true; root: { key: string; path: string; defaultPath?: string } }
+  | OperationError
+> {
+  const rootKey = typeof key === "string" ? key.trim() : "";
+  const current = userRoots().find((root) => root.key === rootKey);
+  // OVERRIDABLE_ROOT_KEYS 只含外部只读来源，DSH / 公共 Agent / 项目来源都天然被排除。
+  if (!rootKey || !current || !OVERRIDABLE_ROOT_KEYS.has(rootKey))
+    return rootPathError(
+      "error.rootPath.unsupported",
+      `该技能来源不支持修改目录: ${rootKey || "(空)"}`,
+      { root: rootKey || "(empty)" },
+    );
+  const config = loadRootPathConfig();
+  const defaultPath = current.defaultPath || current.path;
+  // null / 空字符串 / 与默认值相同都表示恢复默认，避免把默认值写成一条显式覆盖。
+  if (
+    value === null ||
+    value === undefined ||
+    (typeof value === "string" && value.trim() === "")
+  ) {
+    await writeRootPathOverrides(config, rootKey, null);
+    return { ok: true, root: { key: rootKey, path: defaultPath } };
+  }
+  if (typeof value !== "string")
+    return rootPathError(
+      "error.rootPath.invalid",
+      `技能目录必须是文本路径: ${String(value)}`,
+      { path: String(value) },
+    );
+  const requested = value.trim();
+  if (!isAbsolute(requested))
+    return rootPathError(
+      "error.rootPath.absolute",
+      `技能目录必须是绝对路径: ${requested}`,
+      { path: requested },
+    );
+  if (requested.length > MAX_ROOT_PATH_LENGTH)
+    return rootPathError(
+      "error.rootPath.tooLong",
+      `技能目录路径超过 ${MAX_ROOT_PATH_LENGTH} 个字符: ${requested}`,
+      { path: requested },
+    );
+  if (pathIdentity(requested) === pathIdentity(defaultPath)) {
+    await writeRootPathOverrides(config, rootKey, null);
+    return { ok: true, root: { key: rootKey, path: defaultPath } };
+  }
+  let info;
+  try {
+    info = await fs.stat(requested);
+  } catch {
+    return rootPathError(
+      "error.rootPath.notFound",
+      `技能目录不存在: ${requested}`,
+      { path: requested },
+    );
+  }
+  if (!info.isDirectory())
+    return rootPathError(
+      "error.rootPath.notDirectory",
+      `技能目录不是文件夹: ${requested}`,
+      { path: requested },
+    );
+  const candidate = await comparisonPath(requested);
+  const managerHome = await comparisonPath(managerHomePath());
+  if (
+    isSameOrDescendant(managerHome, candidate) ||
+    isSameOrDescendant(candidate, managerHome)
+  )
+    return rootPathError(
+      "error.rootPath.reserved",
+      `技能目录不能与技能管理器的状态目录重叠: ${requested}`,
+      { path: requested },
+    );
+  // 覆盖后的路径也要参与重叠判断，否则两个来源可以指向同一棵树而绕过去重与停用策略。
+  for (const other of userRoots()) {
+    if (other.key === rootKey) continue;
+    const otherPath = await comparisonPath(other.path);
+    if (
+      isSameOrDescendant(candidate, otherPath) ||
+      isSameOrDescendant(otherPath, candidate)
+    )
+      return rootPathError(
+        "error.rootPath.overlap",
+        `技能目录不能与其它技能来源重叠: ${other.path}`,
+        { path: requested },
+      );
+  }
+  await writeRootPathOverrides(config, rootKey, resolve(requested));
+  return { ok: true, root: { key: rootKey, path: resolve(requested), defaultPath } };
 }
 
 /**
@@ -3605,6 +3828,7 @@ export async function state(options: ScopeOptions = {}) {
     warnings: [
       ...(policyResult.warning ? [policyResult.warning] : []),
       ...projectWarnings,
+      ...loadRootPathConfig().warnings,
     ],
   };
   const all: ViewItem[] = [];
@@ -3621,6 +3845,13 @@ export async function state(options: ScopeOptions = {}) {
         code: "warning.scan.truncated",
         params: { path: root.path },
         error: `技能扫描达到遍历上限，部分技能未显示: ${root.path}`,
+      });
+    // 自定义目录被删掉或改名时，来源仍保留在列表里，用户才有机会在这里改回去。
+    if (root.defaultPath && !exists)
+      result.warnings.push({
+        code: "warning.rootPath.missing",
+        params: { path: root.path },
+        error: `自定义技能目录不存在: ${root.path}`,
       });
     const skills: SkillView[] = [];
     for (const e of entries) {
@@ -3662,6 +3893,9 @@ export async function state(options: ScopeOptions = {}) {
       ...(root.kind ? { kind: root.kind } : {}),
       ...(root.localeKey ? { localeKey: root.localeKey } : {}),
       path: root.path,
+      ...(root.defaultPath
+        ? { defaultPath: root.defaultPath, overridden: true }
+        : {}),
       label: root.label,
       mutable: root.mutable,
       toggleable: root.toggleable,
