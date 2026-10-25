@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.19 - 2026-10-25
+
+- Configurable external skill source folders: External read-only agent sources (Codex, Claude Code, Cursor, CC Switch, Google Antigravity, etc.) can now be pointed at custom folders directly from the UI, persisted to `~/.dsh/skills-manager/roots.json` taking precedence over environment variables with immediate effect (PR #66).
+- New header "Source folders…" management action with in-dialog source switching, enabling first-time configuration for sources that are empty or have missing default directories.
+- Fix custom folder dialog pre-fill: Retain the currently active directory instead of falling back to default, preventing accidental resets when saving without edits.
+- Atomic configuration persistence: Commit in-memory root path configuration only after successful disk writes, preventing memory contamination on filesystem errors.
+- Responsive custom badge layout: Move the "Custom" badge into the header label to ensure visibility even when paths are hidden in narrow container widths.
+
 ## 1.2.18 - 2026-10-24
 
 - Upgrade host admission policy: Declare `engines.dsh: ">=0.2.0-rc.1 <0.3.0-0"` to support the entire DeepSeek Harness `0.2.x` line (including `0.2.0-rc.1` onwards, future alphas, RCs, and stable releases) without requiring routine plugin version bumps.
