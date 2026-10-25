@@ -32,6 +32,7 @@
 - **创建与自由导入**：新建技能，或导入 ZIP、文件夹与 `SKILL.md`，可精准写入用户全局目录或指定工作区项目目录。
 - **宽屏阅读与正文复制**：760px 宽屏自适应详情弹窗，等宽字体代码高亮排版，支持垂直自由拉伸与一键复制 Markdown 正文。
 - **回收站与防误删保障**：DSH 技能删除后优先移入回收站，支持完整保留安装身份与更新历史的安全恢复。
+- **自定义来源目录**：外部 Agent 来源可以在面板里改读取位置，不移动任何文件；DSH 与公共 Agent 仍由宿主配置。
 
 ## 界面预览
 
@@ -111,6 +112,7 @@ dsh plugin --profile web add @michengai/dsh-skills-manager@latest --registry=htt
 | **检索技能** | 切换「全局技能」或「项目技能」页签，按来源分组折叠/展开，或使用顶部搜索框与状态筛选器。 |
 | **阅读技能** | 点击技能行右侧「查看详情」，在 760px 宽屏弹窗中阅读 `SKILL.md` 正文及诊断信息，支持一键「复制正文」。 |
 | **控制启停** | 点击技能行右侧开关，切换其在 DSH 中的调用状态；仅影响 DSH 智能体执行，绝不改动第三方源文件。 |
+| **更换外部来源目录** | 在来源行点「修改技能目录」，输入或浏览目录后保存；「恢复默认」回到默认位置。只改本插件读哪里，不移动文件，外部来源仍只读。 |
 | **分类与拖拽** | 在来源内点击「新建分类」，拖拽左侧把手（`⋮⋮`）直接跨分类移动或同组排序；支持分类一键批量启停与多选添加。 |
 | **创建与导入** | 点击顶栏「创建技能」或「导入技能」，并排选择写入目标（用户目录或已登记工作区项目目录），系统自动核对安全路径。 |
 | **发现与安装** | 切换到「发现」页签，浏览 ClawHub 热榜或搜索 skills.sh 目录，或点击「添加仓库」订阅公开 GitHub 仓库。 |
@@ -183,6 +185,7 @@ DeepSeek Harness 宿主加载机制对技能标识符遵循规范命名约束：
 | <img src="assets/brands/gemini.svg" width="16" height="16" alt="Google Antigravity" valign="middle"> Google Antigravity | `~/.gemini/config/skills` | `DSH_ANTIGRAVITY_HOME` | `<project>/.agents/skills` |
 
 不扫描普通项目根目录的 `<project>/skills`，避免把仓库的发布资源当作 Agent 技能。OpenClaw / Clawdbot 仅保留上表中的用户级来源。Qoder CN CLI 的项目技能在 `<project>/.qoder/skills`，显示为 Qoder。Qoder CN IDE 使用 Lingma 目录。不存在的外部来源目录不会显示。
+外部 Agent 来源（CC Switch、Codex、Claude Code 等）可以在来源行直接改读哪个目录，保存后立即生效。覆盖保存在 `~/.dsh/skills-manager/roots.json`，优先级高于 `DSH_<AGENT>_HOME`；手工编辑该文件需重启 DSH。DSH 与公共 Agent 是宿主的扫描路径，不在此处开放，需要整体搬迁时请改 `DSH_HOME` / `DSH_AGENTS_HOME`。目录必须已存在，且不能与其它来源重叠；自定义目录失效时来源会保留在列表里，方便改回默认。
 
 ## DSH 产品生态
 
