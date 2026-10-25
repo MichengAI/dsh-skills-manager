@@ -695,14 +695,15 @@ async function writeRootPathOverrides(
   const paths = { ...config.paths };
   if (value === null) delete paths[key];
   else paths[key] = value;
-  config.paths = Object.fromEntries(
+  const nextPaths = Object.fromEntries(
     Object.entries(paths).sort(([left], [right]) => left.localeCompare(right)),
   );
   await fs.mkdir(managerHomePath(), { recursive: true });
   await writeFileAtomically(
     rootPathConfigPath(),
-    `${JSON.stringify({ version: ROOTS_CONFIG_VERSION, paths: config.paths }, null, 2)}\n`,
+    `${JSON.stringify({ version: ROOTS_CONFIG_VERSION, paths: nextPaths }, null, 2)}\n`,
   );
+  config.paths = nextPaths;
   config.warnings = [];
 }
 

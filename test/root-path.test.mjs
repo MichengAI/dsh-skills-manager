@@ -137,6 +137,32 @@ try {
       ok(false, message + " 应当被拒绝");
     }
   }
+
+  // ── 持久化失败时内存配置不应被修改 ──
+  const { promises: nodeFs } = await import("node:fs");
+  const origRename = nodeFs.rename;
+  try {
+    nodeFs.rename = async (from, to) => {
+      if (String(to).endsWith("roots.json")) {
+        const err = new Error("EACCES: permission denied, rename");
+        err.code = "EACCES";
+        throw err;
+      }
+      return origRename(from, to);
+    };
+    let threw = false;
+    try {
+      await setRootPath("codex", customCodex);
+    } catch (e) {
+      threw = true;
+      eq(e.code, "EACCES", "写入抛出 EACCES");
+    }
+    ok(threw, "持久化异常向外抛出");
+    eq(userRoots().find((r) => r.key === "codex").path, codexDefault, "持久化失败后内存路径保持默认，不被提前污染");
+    eq(userRoots().find((r) => r.key === "codex").defaultPath, undefined, "持久化失败后不带 defaultPath");
+  } finally {
+    nodeFs.rename = origRename;
+  }
   const plainFile = join(tmp, "plain.txt");
   await writeFile(plainFile, "not a directory", "utf8");
   await mkdir(managerHomePath(), { recursive: true });

@@ -259,10 +259,16 @@ try {
   console.log("alpha.2 retainedBy.mainView 会话形态通过");
 
   // 自定义目录：空/失效来源仍保留，来源行可打开改目录弹窗并用系统选择器回填。
-  data.roots.push({
-    key: "codex", path: "D:/skills/codex", defaultPath: "C:/u/.codex/skills",
-    overridden: true, exists: false, enabled: true, skills: [],
-  });
+  data.roots.push(
+    {
+      key: "codex", path: "D:/skills/codex", defaultPath: "C:/u/.codex/skills",
+      overridden: true, exists: false, enabled: true, skills: [],
+    },
+    {
+      key: "claude", path: "C:/u/.claude/skills",
+      overridden: false, exists: false, enabled: true, skills: [],
+    },
+  );
   outerState.length = 0;
   innerState = [];
   mountedKey = undefined;
@@ -281,12 +287,33 @@ try {
   const customGroup = groups().find((node) => node.props["data-source-key"] === "codex");
   assert.ok(customGroup, "自定义目录即使不存在也保留来源行");
   assert.ok(JSON.stringify(nodes(customGroup)).includes(t("rootPath.custom")), "来源行显示自定义标记");
+  assert.equal(groups().some((node) => node.props["data-source-key"] === "claude"), false, "默认缺失且无技能的外部来源在列表中隐藏");
+
+  // 顶栏提供来源目录管理按钮，供首次配置尚未在列表中出现的外部来源
+  const manageBtn = find((node) => node.props["aria-label"] === t("rootPath.manage"));
+  assert.ok(manageBtn, "顶栏提供来源目录配置入口");
+
   const editPath = nodes(customGroup).find((node) => String(node.props["aria-label"] || "").startsWith(t("rootPath.edit")));
   assert.ok(editPath, "外部来源提供改目录按钮");
   editPath.props.onClick(); render();
   assert.ok(find((node) => node.props.title === t("rootPath.title", { name: t("root.codex") })), "改目录弹窗打开");
-  assert.equal(find((node) => node.props.placeholder === t("rootPath.placeholder")).props.value, "C:/u/.codex/skills", "弹窗预填默认目录");
+  assert.equal(find((node) => node.props.placeholder === t("rootPath.placeholder")).props.value, "D:/skills/codex", "弹窗预填当前生效目录，避免未修改直接保存误恢复默认");
   assert.ok(nodes().some((node) => node.children.includes(t("rootPath.reset"))), "已自定义时提供恢复默认");
+
+  // 不修改直接点击保存，提交的是当前自定义路径，而不是被清空为默认值
+  nodes().filter((node) => node.children.includes(t("rootPath.save"))).at(-1).props.onClick();
+  await new Promise((resolve) => setImmediate(resolve)); render();
+  assert.deepEqual(toggleRequest.body, { key: "codex", path: "D:/skills/codex" }, "未修改直接保存提交当前自定义路径");
+
+  // 重新打开弹窗，测试来源切换下拉
+  manageBtn.props.onClick(); render();
+  assert.ok(find((node) => node.props["aria-label"] === t("rootPath.source")), "弹窗提供来源选择器");
+  const sourceSelect = find((node) => node.props["aria-label"] === t("rootPath.source"));
+  sourceSelect.props.onChange("claude"); render();
+  assert.equal(find((node) => node.props.placeholder === t("rootPath.placeholder")).props.value, "C:/u/.claude/skills", "切换来源后预填该来源当前路径");
+
+  // 切换回 codex 并测试浏览回填
+  sourceSelect.props.onChange("codex"); render();
   find((node) => node.children.includes(t("rootPath.browse"))).props.onClick();
   await new Promise((resolve) => setImmediate(resolve)); render();
   assert.equal(find((node) => node.props.placeholder === t("rootPath.placeholder")).props.value, "E:/picked/codex", "浏览使用系统目录选择器回填路径");

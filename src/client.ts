@@ -118,6 +118,7 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
     var ROOT_PATH_LOCALES = {
       zh: {
         "rootPath.edit": "修改技能目录", "rootPath.title": "修改「{name}」的技能目录",
+        "rootPath.manage": "来源目录", "rootPath.source": "技能来源",
         "rootPath.desc": "只改本插件读取的位置，不移动任何文件。外部来源仍然只读；要让该 Agent 自己换目录，请改它自己的配置。",
         "rootPath.label": "技能目录（含 SKILL.md 的上一级）", "rootPath.placeholder": "例如 D:\\skills\\codex",
         "rootPath.browse": "浏览…", "rootPath.pickUnavailable": "当前环境没有可用的目录选择器，请直接输入路径。",
@@ -134,6 +135,7 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
       },
       en: {
         "rootPath.edit": "Change skills folder", "rootPath.title": "Change the skills folder for {name}",
+        "rootPath.manage": "Source folders", "rootPath.source": "Skill source",
         "rootPath.desc": "Only changes where this plugin reads skills. No files are moved. External sources stay read-only; to change the agent's own folder, update that agent's configuration.",
         "rootPath.label": "Skills folder (the parent of SKILL.md files)", "rootPath.placeholder": "e.g. D:\\skills\\codex",
         "rootPath.browse": "Browse…", "rootPath.pickUnavailable": "No directory picker is available here; type the path instead.",
@@ -544,10 +546,10 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
       function post<K extends keyof ApiRoutes>(path: K, body: unknown, successKey?: string | null, successParams?: object): Promise<ApiRoutes[K]> { if (inflightRef.current) return Promise.reject({ error: "operation already in progress" }); inflightRef.current = true; setBusy(true); setResult(null); return sessionApi(path, { method: "POST", headers: MUTATION_HEADERS, body: JSON.stringify(body || {}) }).then(function (data) { setResult({ ok: true, text: successKey ? t(successKey, successParams || data || {}) : t("result.updated") }); var scopedWorkspace = body && typeof (body as { workspace?: unknown }).workspace === "string" ? (body as { workspace: string }).workspace : ""; return Promise.all([refresh(true), scopedWorkspace ? loadWorkspaceDetail(scopedWorkspace) : null]).then(function () { return data; }); }).catch(function (error) { setResult({ ok: false, text: t("error.action", { error: translateError(t, error) }) }); throw error; }).finally(function () { inflightRef.current = false; setBusy(false); }); }
       function openDetail(root: RootView, skill: SkillView, workspacePath?: string) { setBusy(true); setDetail(null); setCopyState("idle"); setModal("detail"); sessionApi("/detail", { method: "POST", headers: MUTATION_HEADERS, body: JSON.stringify(workspacePath ? { root: root.key, name: skill.name, workspace: workspacePath } : { root: root.key, name: skill.name }) }).then(setDetail).catch(function (error) { setResult({ ok: false, text: t("error.action", { error: translateError(t, error) }) }); setModal(null); }).finally(function () { setBusy(false); }); }
       function openRootPath(root: RootView) {
-        setRootPathValue(root.defaultPath || root.path);
+        setRootPathValue(root.path || "");
         setRootPathPicking(false);
         setRootPathError(null);
-        setModal({ type: "root-path", root: root.key, label: rootDisplayName(t, root), path: root.path, defaultPath: root.defaultPath });
+        setModal({ type: "root-path", root: root.key, label: rootDisplayName(t, root), path: root.path || "", defaultPath: root.defaultPath });
       }
       // 浏览走宿主自己的目录选择器（桌面端是系统文件夹对话框），选中的路径只回填输入框。
       function pickRootPathDirectory() {
@@ -575,6 +577,8 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
       function openNativePicker(ref: React.RefObject<HTMLInputElement>) { if (busy || pickerOpenRef.current || !ref.current) return; pickerOpenRef.current = true; ref.current.value = ""; function release() { setTimeout(function () { pickerOpenRef.current = false; }, 0); } window.addEventListener("focus", release, { once: true }); ref.current.click(); setTimeout(function () { pickerOpenRef.current = false; }, 30000); }
       function submitImport() { if (!upload || !destinationReady(importDestination, workspaceRows, userDestinations)) return; buildUploadPayload(upload).then(function (payload) { return post("/upload", Object.assign({}, payload, destinationPayload(importDestination)), null); }).then(function (data) { var summary = summarizeImportResult(t, data); setResult({ ok: summary.ok, warning: summary.warning, text: summary.text }); if (summary.imported) { setModal(null); setUpload(null); } }).catch(function () {}); }
       var data = snapshot.data || { roots: [], writeDestinations: [], projects: [], trash: [], warnings: [] }, allRoots = data.roots || [];
+      var overridableRoots = allRoots.filter(function (r) { return !r.mutable && r.scope !== "project"; });
+      function openRootPathPicker() { if (overridableRoots.length > 0) openRootPath(overridableRoots[0]); }
       var filterKey = scope === "project" ? "project" : "user", filters = savedFilters[filterKey] || { query: "", source: "", status: "" }, query = filters.query, source = filters.source;
       function updateFilter(key: string, value: string) { setSavedFilters(function (previous) { return Object.assign({}, previous, { [filterKey]: Object.assign({}, filters, { [key]: value }) }); }); }
       function setQuery(value: string) { updateFilter("query", value); }
@@ -897,7 +901,7 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
         var displayName = workspacePath ? rootDisplayName(t, Object.assign({}, root, { projectName: undefined })) : rootDisplayName(t, root);
         return h("section", { key: (keyPrefix || "") + root.key, className: "dssm-source", "data-source-key": root.key },
           h("div", { className: "dssm-source-head" },
-            h("button", { type: "button", className: "dssm-source-toggle", "aria-expanded": open, onClick: function () { setExpanded(function (previous) { var next: Record<string, boolean> = {}; next[expansionKey] = !open; return Object.assign({}, previous, next); }); } }, foldChevron(h, open), h("div", { className: "dssm-source-label" }, renderRootIcon(root.key), h("span", { className: "dssm-source-title" }, displayName), h("span", { className: "dssm-count" }, t(countKey("summary.group", filtered.length), { count: filtered.length })), h("span", { className: "dssm-source-path", title: root.overridden ? t("rootPath.overrideTitle", { path: root.defaultPath || "" }) : root.path }, root.path, root.overridden ? h("span", { className: "dssm-source-custom" }, " · " + t("rootPath.custom")) : null))),
+            h("button", { type: "button", className: "dssm-source-toggle", "aria-expanded": open, onClick: function () { setExpanded(function (previous) { var next: Record<string, boolean> = {}; next[expansionKey] = !open; return Object.assign({}, previous, next); }); } }, foldChevron(h, open), h("div", { className: "dssm-source-label" }, renderRootIcon(root.key), h("span", { className: "dssm-source-title" }, displayName), h("span", { className: "dssm-count" }, t(countKey("summary.group", filtered.length), { count: filtered.length })), root.overridden ? h("span", { className: "dssm-source-custom" }, t("rootPath.custom")) : null, h("span", { className: "dssm-source-path", title: root.overridden ? t("rootPath.overrideTitle", { path: root.defaultPath || "" }) : root.path }, root.path))),
             sourceExtra(root, workspacePath, displayName)),
           open ? h("div", { className: "dssm-source-body", role: "region" }, renderSourceBody(root, filtered, workspacePath, keyPrefix, scopeRows)) : null);
       }
@@ -954,7 +958,8 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
         scope !== "trash" ? h("div", { className: "dssm-filter-actions" },
           filterActionButton(t("btn.refresh"), strokeIcon("M13.5 8A5.5 5.5 0 118 2.5c2.3 0 4.3 1.4 5.1 3.5m.4-3.5v3.5H10"), function () { refresh(false); if (scope === "project") refreshWorkspaceDetails(); }, busy || snapshot.loading),
           filterActionButton(t("btn.create"), strokeIcon("M8 2.5v11M2.5 8h11"), openCreate, busy, t("btn.create") + "…"),
-          filterActionButton(t("import.global"), strokeIcon("M2.5 10.5v2a1 1 0 001 1h9a1 1 0 001-1v-2M8 2.5v7M5 5.5l3-3 3 3"), openImport, busy)
+          filterActionButton(t("import.global"), strokeIcon("M2.5 10.5v2a1 1 0 001 1h9a1 1 0 001-1v-2M8 2.5v7M5 5.5l3-3 3 3"), openImport, busy),
+          scope === "user" ? filterActionButton(t("rootPath.manage"), strokeIcon("M2.5 4.5h3l1.3 1.5h6.7v6h-11z"), openRootPathPicker, busy, t("rootPath.manage") + "…") : null
         ) : null)];
       var content: React.ReactNode[] = ([h("style", { key: "css" }, CSS), h("div", { key: "head", className: "dssm-head" }, h("div", { className: "dssm-title-block" }, h("div", { className: "dssm-title-row" }, h("h2", { className: "dssm-title" }, t("title")), h("div", { className: "dssm-feedback-links" }, h(PrimitiveButton, { variant: "outline", size: "sm", "aria-label": t("link.project"), icon: h(GithubMark16), onClick: function () { window.open("https://github.com/MichengAI/dsh-skills-manager", "_blank", "noreferrer"); } }, t("link.project")), h(PrimitiveButton, { variant: "outline", size: "sm", "aria-label": t("link.feedback"), icon: h(FeedbackIcon), onClick: function () { window.open("https://github.com/MichengAI/dsh-skills-manager/issues", "_blank", "noreferrer"); } }, t("link.feedback")))), h("p", { className: "dssm-desc" }, t("desc")))), tabs] as React.ReactNode[]).concat(scope === "trash" || scope === "repositories" ? [] : skillControls, [result && modal !== "import" ? h("div", { key: "result", className: "dssm-feedback" + (result.warning ? " dssm-warning" : result.ok ? "" : " dssm-error") }, result.text) : null], (data.warnings || []).map(function (warning, index) { return h("div", { key: "warning-" + index, className: "dssm-feedback dssm-warning", role: "alert" }, translateError(t, warning)); }), [snapshot.error ? h("div", { key: "error", className: "dssm-feedback dssm-error" }, snapshot.error) : null, snapshot.loading && !snapshot.data ? h("div", { key: "loading", className: "dssm-empty" }, t("loading")) : scope === "repositories" ? repositoryUI.content : scope === "trash" ? renderTrash() : renderList()]);
 
@@ -984,6 +989,21 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
         },
           h("div", { className: "dssm-form" },
             h("p", { className: "dssm-note" }, t("rootPath.desc")),
+            overridableRoots.length > 0 ? h("label", { className: "dssm-field" },
+              h("span", { className: "dssm-label" }, t("rootPath.source")),
+              h(SourceSelect, {
+                value: rootPathModal.root,
+                label: t("rootPath.source"),
+                disabled: busy,
+                options: overridableRoots.map(function (r) {
+                  return { value: r.key, label: rootDisplayName(t, r) };
+                }),
+                onChange: function (key: string) {
+                  var next = overridableRoots.find(function (r) { return r.key === key; });
+                  if (next) openRootPath(next);
+                }
+              })
+            ) : null,
             h("label", { className: "dssm-field" },
               h("span", { className: "dssm-label" }, t("rootPath.label")),
               h(Input, { value: rootPathValue, placeholder: t("rootPath.placeholder"), disabled: busy, onChange: function (event: React.ChangeEvent<HTMLInputElement>) { setRootPathValue(event.target.value); setRootPathError(null); } })),
@@ -994,7 +1014,7 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
             rootPathError ? h("div", { className: "dssm-feedback dssm-error", role: "alert" }, rootPathError) : null),
           h("div", { className: "dssm-modal-actions" },
             hostButton(t("btn.cancel"), function () { setModal(null); setRootPathError(null); }, "outline"),
-            hostButton(t("rootPath.save"), function () { saveRootPath(rootPathValue.trim()); }, "primary", busy || !rootPathValue.trim()))));
+            hostButton(t("rootPath.save"), function () { saveRootPath((rootPathValue || "").trim()); }, "primary", busy || !(rootPathValue || "").trim()))));
       }
 
       if (modal === "detail") {
