@@ -103,5 +103,5 @@
   "dependencies": {
     "fflate": "0.8.3"
   },
-  "icon": "assets/icon.webp"
+  "icon": "assets/icon.svg"
 }

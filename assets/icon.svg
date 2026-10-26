@@ -1,0 +1,22 @@
+<svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="dsh_svg_skill_g" x1="6" y1="6" x2="30" y2="28" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#7C3AED"/>
+      <stop offset="1" stop-color="#A855F7"/>
+    </linearGradient>
+  </defs>
+  <!-- Modular Skill Card Shell -->
+  <path d="M8 7H28C29.1 7 30 7.9 30 9V24L26 28H10L6 24V9C6 7.9 6.9 7 8 7Z" fill="url(#dsh_svg_skill_g)"/>
+  <!-- Bottom Gold Connector Pins -->
+  <line x1="12" y1="28" x2="12" y2="30" stroke="#F59E0B" stroke-width="2" stroke-linecap="round"/>
+  <line x1="16" y1="28" x2="16" y2="30" stroke="#F59E0B" stroke-width="2" stroke-linecap="round"/>
+  <line x1="20" y1="28" x2="20" y2="30" stroke="#F59E0B" stroke-width="2" stroke-linecap="round"/>
+  <line x1="24" y1="28" x2="24" y2="30" stroke="#F59E0B" stroke-width="2" stroke-linecap="round"/>
+  <!-- 3D Isometric Skill Cube in Center -->
+  <!-- Top Face -->
+  <polygon points="18,10.5 22.5,13 18,15.5 13.5,13" fill="#FFFFFF"/>
+  <!-- Left Face -->
+  <polygon points="13.5,13 18,15.5 18,21 13.5,18.5" fill="#38BDF8"/>
+  <!-- Right Face -->
+  <polygon points="22.5,13 18,15.5 18,21 22.5,18.5" fill="#C084FC"/>
+</svg>
