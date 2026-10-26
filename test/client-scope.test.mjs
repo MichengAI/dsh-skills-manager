@@ -268,6 +268,10 @@ try {
       key: "claude", path: "C:/u/.claude/skills",
       overridden: false, exists: false, enabled: true, skills: [],
     },
+    {
+      key: "custom:xhs", path: "C:/u/Downloads", label: "XHS",
+      overridden: false, exists: true, enabled: true, skills: [], custom: true,
+    },
   );
   outerState.length = 0;
   innerState = [];
@@ -275,11 +279,17 @@ try {
   currentSession = "session-a";
   let pickedPath = "E:/picked/codex";
   let browseRequests = 0;
+  let removeRequest;
   globalThis.__DSH_DIRECTORY_PICKER__ = { pick: async () => pickedPath };
   globalThis.fetch = async (url, options) => {
     const body = options?.body ? JSON.parse(options.body) : {};
     if (options?.method === "POST" && String(url).endsWith("/browse")) browseRequests++;
     if (options?.method === "POST" && String(url).endsWith("/root-path")) toggleRequest = { url, body };
+    if (options?.method === "POST" && String(url).endsWith("/custom-source-remove")) {
+      removeRequest = { url, body };
+      data.roots = data.roots.filter((r) => r.key !== body.id);
+      return { ok: true, json: async () => ({ ok: true, data: { removed: body.id } }) };
+    }
     return { ok: true, json: async () => ({ data: sessionData(options) }) };
   };
   render(); effects.splice(0).forEach((effect) => effect());
@@ -329,7 +339,37 @@ try {
   await new Promise((resolve) => setImmediate(resolve)); render();
   assert.ok(toggleRequest && toggleRequest.url.endsWith("/root-path"), "保存提交 root-path");
   assert.deepEqual(toggleRequest.body, { key: "codex", path: "F:/another/codex" }, "保存提交系统选择器返回的路径");
-  assert.equal(find((node) => node.props.title === t("rootPath.title", { name: t("root.codex") })), undefined, "保存成功后关闭弹窗");
+  await new Promise((resolve) => setImmediate(resolve));
+  await new Promise((resolve) => setImmediate(resolve));
+  render();
+
+  // 重新打开弹窗测试自定义来源表单顺序与移除登记保留弹窗
+  const currentManageBtn = find((node) => node.props["aria-label"] === t("rootPath.manage"));
+  currentManageBtn.props.onClick(); render();
+  assert.ok(find((node) => node.props["aria-label"] === t("rootPath.source")), "重新打开改目录弹窗");
+
+  // 表单顺序：先显示名，后技能目录
+  find((node) => node.children?.includes(t("customSource.add"))).props.onClick(); render();
+  const formInputs = nodes().filter((node) =>
+    node.props?.placeholder === t("customSource.label.placeholder") || node.props?.placeholder === t("customSource.path.placeholder")
+  );
+  assert.equal(formInputs.length, 2, "展开自定义来源表单包含名称与路径输入框");
+  assert.equal(formInputs[0].props.placeholder, t("customSource.label.placeholder"), "第一个输入框是显示名");
+  assert.equal(formInputs[1].props.placeholder, t("customSource.path.placeholder"), "第二个输入框是技能目录");
+
+  // 切换至 custom:xhs 并移除登记：弹窗不关闭，切到剩余来源
+  const currentSelect = find((node) => node.props["aria-label"] === t("rootPath.source"));
+  currentSelect.props.onChange("custom:xhs"); render();
+  assert.equal(find((node) => node.props.placeholder === t("rootPath.placeholder")).props.value, "C:/u/Downloads", "切到自定义来源预填其路径");
+  const removeBtn = nodes().find((node) => node.children.includes(t("customSource.remove")));
+  assert.ok(removeBtn, "自定义来源提供移除登记按钮");
+  removeBtn.props.onClick();
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  render();
+  assert.ok(removeRequest && removeRequest.body.id === "custom:xhs", "发起移除自定义来源请求");
+  assert.ok(find((node) => node.props["aria-label"] === t("rootPath.source")), "移除登记后不关闭弹窗");
+  assert.ok(find((node) => typeof node.props.title === "string" && node.props.title.includes("技能目录")), "移除后弹窗切换到剩余有效来源");
+
   console.log("自定义技能目录弹窗通过");
 } finally {
   delete globalThis.__DSH_DIRECTORY_PICKER__;

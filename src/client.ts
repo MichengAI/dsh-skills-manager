@@ -655,8 +655,31 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
       }
       function removeCustomSourceEntry(root: string) {
         if (busy) return;
+        var removedPath = rootPathValue;
         post("/custom-source-remove", { id: root }, "customSource.removed")
-          .then(function () { setModal(null); })
+          .then(function () {
+            return sessionApi("/state").then(function (freshData) {
+              setSnapshot({ loading: false, error: null, data: freshData });
+              var remaining = (freshData && Array.isArray(freshData.roots) ? freshData.roots : [])
+                .filter(function (r: RootView) { return !r.mutable && r.scope !== "project" && r.key !== root; });
+              var fallback = remaining.find(function (r: RootView) { return r.custom; }) || remaining[0];
+              if (fallback) {
+                openRootPath(fallback);
+              } else {
+                setModal(null);
+              }
+              if (removedPath) {
+                setCustomSourceScan(function (prev) {
+                  if (!prev) return null;
+                  return Object.assign({}, prev, {
+                    candidates: prev.candidates.map(function (c) {
+                      return c.path === removedPath ? Object.assign({}, c, { registered: false }) : c;
+                    })
+                  });
+                });
+              }
+            });
+          })
           .catch(function (error) { setRootPathError(translateError(t, error)); });
       }
       function updateForm(key: string, value: string) { setForm(Object.assign({}, form, { [key]: value })); }
@@ -1116,11 +1139,11 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
               h("p", { className: "dssm-help" }, t("customSource.desc")),
               customSourceOpen ? h("div", { className: "dssm-form" },
                 h("label", { className: "dssm-field" },
-                  h("span", { className: "dssm-label" }, t("customSource.path")),
-                  h(Input, { value: customSourcePath, placeholder: t("customSource.path.placeholder"), disabled: busy || customSourceBusy, onChange: function (event: React.ChangeEvent<HTMLInputElement>) { setCustomSourcePath(event.target.value); setCustomSourceError(null); } })),
-                h("label", { className: "dssm-field" },
                   h("span", { className: "dssm-label" }, t("customSource.label")),
                   h(Input, { value: customSourceLabel, maxLength: 48, placeholder: t("customSource.label.placeholder"), disabled: busy || customSourceBusy, onChange: function (event: React.ChangeEvent<HTMLInputElement>) { setCustomSourceLabel(event.target.value); } })),
+                h("label", { className: "dssm-field" },
+                  h("span", { className: "dssm-label" }, t("customSource.path")),
+                  h(Input, { value: customSourcePath, placeholder: t("customSource.path.placeholder"), disabled: busy || customSourceBusy, onChange: function (event: React.ChangeEvent<HTMLInputElement>) { setCustomSourcePath(event.target.value); setCustomSourceError(null); } })),
                 h("div", { className: "dssm-root-path-actions" },
                   hostButton(t("rootPath.browse"), pickCustomSourceDirectory, "outline", busy || customSourceBusy),
                   hostButton(customSourceBusy ? t("customSource.scanning") : t("customSource.scan"), scanCustomSourceDirectory, "outline", busy || customSourceBusy || !(customSourcePath || "").trim()),
