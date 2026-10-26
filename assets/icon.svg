@@ -1,22 +1,29 @@
 <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <linearGradient id="dsh_svg_skill_g" x1="6" y1="6" x2="30" y2="28" gradientUnits="userSpaceOnUse">
+    <linearGradient id="dsh_svg_skill_book" x1="4" y1="10" x2="32" y2="30" gradientUnits="userSpaceOnUse">
       <stop stop-color="#7C3AED"/>
       <stop offset="1" stop-color="#A855F7"/>
     </linearGradient>
+    <linearGradient id="dsh_svg_skill_star" x1="14" y1="4" x2="22" y2="16" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FBBF24"/>
+      <stop offset="1" stop-color="#F59E0B"/>
+    </linearGradient>
   </defs>
-  <!-- Modular Skill Card Shell -->
-  <path d="M8 7H28C29.1 7 30 7.9 30 9V24L26 28H10L6 24V9C6 7.9 6.9 7 8 7Z" fill="url(#dsh_svg_skill_g)"/>
-  <!-- Bottom Gold Connector Pins -->
-  <line x1="12" y1="28" x2="12" y2="30" stroke="#F59E0B" stroke-width="2" stroke-linecap="round"/>
-  <line x1="16" y1="28" x2="16" y2="30" stroke="#F59E0B" stroke-width="2" stroke-linecap="round"/>
-  <line x1="20" y1="28" x2="20" y2="30" stroke="#F59E0B" stroke-width="2" stroke-linecap="round"/>
-  <line x1="24" y1="28" x2="24" y2="30" stroke="#F59E0B" stroke-width="2" stroke-linecap="round"/>
-  <!-- 3D Isometric Skill Cube in Center -->
-  <!-- Top Face -->
-  <polygon points="18,10.5 22.5,13 18,15.5 13.5,13" fill="#FFFFFF"/>
-  <!-- Left Face -->
-  <polygon points="13.5,13 18,15.5 18,21 13.5,18.5" fill="#38BDF8"/>
-  <!-- Right Face -->
-  <polygon points="22.5,13 18,15.5 18,21 22.5,18.5" fill="#C084FC"/>
+  <!-- Open Skill Book (Left & Right Pages) -->
+  <!-- Left Page -->
+  <path d="M18 20C13 18.5 8 19 5 21V28.5C8 26.5 13 26 18 27.5V20Z" fill="url(#dsh_svg_skill_book)" stroke="#6D28D9" stroke-width="1.4" stroke-linejoin="round"/>
+  <!-- Right Page -->
+  <path d="M18 20C23 18.5 28 19 31 21V28.5C28 26.5 23 26 18 27.5V20Z" fill="url(#dsh_svg_skill_book)" stroke="#6D28D9" stroke-width="1.4" stroke-linejoin="round"/>
+  <!-- Book Spine / Middle Fold -->
+  <line x1="18" y1="20" x2="18" y2="28" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round"/>
+
+  <!-- Code / Skill Glyphs on Book Pages -->
+  <line x1="8" y1="23.5" x2="14" y2="22.5" stroke="#DDD6FE" stroke-width="1.4" stroke-linecap="round"/>
+  <line x1="22" y1="22.5" x2="28" y2="23.5" stroke="#DDD6FE" stroke-width="1.4" stroke-linecap="round"/>
+
+  <!-- Ascending Radiant Skill Star (Talent / Power Mastery) -->
+  <path d="M18 5L19.8 10L25 11.8L19.8 13.6L18 19L16.2 13.6L11 11.8L16.2 10L18 5Z" fill="url(#dsh_svg_skill_star)" stroke="#FFFFFF" stroke-width="1.2"/>
+  <!-- Power Sparkles on Sides -->
+  <circle cx="8" cy="12" r="1.4" fill="#FBBF24"/>
+  <circle cx="28" cy="12" r="1.4" fill="#FBBF24"/>
 </svg>
