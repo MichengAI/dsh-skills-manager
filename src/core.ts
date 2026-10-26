@@ -39,15 +39,32 @@ const EXTERNAL_SOURCE_ORDER = [
   "windsurf", "windsurf-user", "trae", "trae-cn", "openclaw", "clawdbot",
   "roo", "codebuddy", "workbuddy", "qoder", "qoder-cn", "lingma", "antigravity",
 ];
+// 自定义来源由用户在界面登记（roots.json 的 customSources）。key 统一带前缀，
+// 与预设来源区分开，排序排到预设外部来源之后，避免插进既有顺序里改变界面分组。
+export const CUSTOM_SOURCE_PREFIX = "custom:";
+const CUSTOM_SOURCE_ID_RE = /^custom:[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const MAX_CUSTOM_SOURCES = 32;
+const MAX_CUSTOM_LABEL_LENGTH = 48;
+/** 扫描产品总目录时向下探索的层数（0 = 只看总目录自身的 skills）。 */
+const MAX_SOURCE_SCAN_DEPTH = 2;
+const MAX_SOURCE_SCAN_CANDIDATES = 40;
+export function isCustomSourceKey(key: string) {
+  return typeof key === "string" && key.startsWith(CUSTOM_SOURCE_PREFIX);
+}
 function rankSources<T extends {key: string; native?: boolean; rank?: number; localeKey?: string}>(sources: T[], startRank: number) {
   const order = (root: T) => EXTERNAL_SOURCE_ORDER.indexOf(root.key);
   const external = sources.filter((root) => !root.native);
+  const custom = external.filter((root) => isCustomSourceKey(root.key));
+  const preset = external.filter((root) => !isCustomSourceKey(root.key));
   // 先逐项校验；单元素数组不会调用 sort 比较器，也不能漏过未登记来源。
-  for (const root of external) {
+  for (const root of preset) {
     if (order(root) < 0) throw new Error(`技能来源未登记到 EXTERNAL_SOURCE_ORDER: ${root.key}`);
   }
-  external.sort((a, b) => order(a) - order(b));
-  const ranks = new Map(external.map((root, index) => [root.key, startRank + index * 10]));
+  preset.sort((a, b) => order(a) - order(b));
+  const ranks = new Map<string, number>(preset.map((root, index) => [root.key, startRank + index * 10]));
+  // 自定义来源不参与白名单校验，按登记顺序稳定排在预设来源之后。
+  const customBase = startRank + preset.length * 10;
+  custom.forEach((root, index) => ranks.set(root.key, customBase + index * 10));
   return sources.map((root) => ({ ...root, rank: root.native ? root.rank! : ranks.get(root.key)! }))
     .sort((a, b) => a.rank - b.rank);
 }
@@ -365,6 +382,19 @@ export function userRoots(): SkillRoot[] {
     root.defaultPath = root.path;
     root.path = override;
   }
+  // 用户登记的自定义来源：只读扫描，和预设外部来源同构，但目录与显示名由用户自己给。
+  for (const custom of loadRootPathConfig().customSources) {
+    roots.push({
+      key: custom.id,
+      path: custom.path,
+      label: custom.label,
+      ...(custom.group ? { group: custom.group } : {}),
+      mutable: false,
+      toggleable: true,
+      native: false,
+      custom: true,
+    });
+  }
   return rankSources(roots, 500);
 }
 
@@ -601,8 +631,15 @@ const MAX_ROOT_PATH_LENGTH = 1024;
  */
 const OVERRIDABLE_ROOT_KEYS = new Set(EXTERNAL_SOURCE_ORDER);
 
+interface CustomSourceConfig {
+  id: string;
+  label: string;
+  path: string;
+  group?: string;
+}
 interface RootPathConfig {
   paths: Record<string, string>;
+  customSources: CustomSourceConfig[];
   warnings: Diagnostic[];
 }
 
@@ -625,6 +662,7 @@ function rootPathError(
 function corruptRootPathConfig(file: string, reason: string): RootPathConfig {
   return {
     paths: {},
+    customSources: [],
     warnings: [
       {
         code: "warning.rootPath.corrupt",
@@ -635,6 +673,62 @@ function corruptRootPathConfig(file: string, reason: string): RootPathConfig {
   };
 }
 
+/** 显示名 → 稳定的 ASCII slug；中文等非 ASCII 名称退化为 source，靠后缀去重。 */
+function customSourceSlug(label: string) {
+  const slug = label
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 24);
+  return slug || "source";
+}
+
+function normalizeCustomLabel(value: unknown) {
+  const label = typeof value === "string" ? value.trim() : "";
+  return label && label.length <= MAX_CUSTOM_LABEL_LENGTH ? label : "";
+}
+
+/** 逐条解析 customSources：非法条目只跳过自己，不影响路径覆盖与其它自定义来源。 */
+function parseCustomSources(value: unknown, warnings: Diagnostic[]): CustomSourceConfig[] {
+  if (value === undefined) return [];
+  if (!Array.isArray(value)) {
+    warnings.push({
+      code: "warning.rootPath.invalid",
+      params: { path: "customSources" },
+      error: "自定义来源配置必须是数组，已忽略: customSources",
+    });
+    return [];
+  }
+  const accepted: CustomSourceConfig[] = [];
+  const ids = new Set<string>();
+  const paths = new Set<string>();
+  for (const entry of value.slice(0, MAX_CUSTOM_SOURCES)) {
+    const record = entry && typeof entry === "object" && !Array.isArray(entry) ? (entry as Record<string, unknown>) : null;
+    const id = record && typeof record.id === "string" ? record.id.trim() : "";
+    const label = record ? normalizeCustomLabel(record.label) : "";
+    const requested = record && typeof record.path === "string" ? record.path.trim() : "";
+    const group = record && typeof record.group === "string" ? normalizeCustomLabel(record.group) : "";
+    const identity = requested && isAbsolute(requested) ? pathIdentity(requested) : "";
+    if (
+      !record || !CUSTOM_SOURCE_ID_RE.test(id) || !label || !requested ||
+      !isAbsolute(requested) || requested.length > MAX_ROOT_PATH_LENGTH ||
+      ids.has(id) || paths.has(identity)
+    ) {
+      const key = id || (record && typeof record.id === "string" ? record.id : "customSources");
+      warnings.push({
+        code: "warning.rootPath.invalid",
+        params: { path: key },
+        error: `自定义来源配置项无效，已忽略: ${key}`,
+      });
+      continue;
+    }
+    ids.add(id);
+    paths.add(identity);
+    accepted.push({ id, label, path: resolve(requested), ...(group ? { group } : {}) });
+  }
+  return accepted;
+}
+
 /** 逐条忽略损坏或非法的配置项，不影响其它来源，也不触发 state.json 的 fail-closed。 */
 function readRootPathConfigFile(): RootPathConfig {
   const file = rootPathConfigPath();
@@ -643,7 +737,7 @@ function readRootPathConfigFile(): RootPathConfig {
     raw = readFileSync(file, "utf8");
   } catch (caught) {
     const error = caught as CodedError;
-    if (error && error.code === "ENOENT") return { paths: {}, warnings: [] };
+    if (error && error.code === "ENOENT") return { paths: {}, customSources: [], warnings: [] };
     return corruptRootPathConfig(file, "技能目录配置不可读");
   }
   let document: unknown;
@@ -673,7 +767,13 @@ function readRootPathConfigFile(): RootPathConfig {
     }
     accepted[key] = resolve(requested);
   }
-  return { paths: accepted, warnings };
+  const customSources = parseCustomSources(
+    document && typeof document === "object" && !Array.isArray(document)
+      ? (document as { customSources?: unknown }).customSources
+      : undefined,
+    warnings,
+  );
+  return { paths: accepted, customSources, warnings };
 }
 
 function loadRootPathConfig(): RootPathConfig {
@@ -687,6 +787,30 @@ export function reloadRootPathOverrides() {
   return loadRootPathConfig();
 }
 
+/**
+ * 原子写入 roots.json。路径覆盖与自定义来源共用同一个文件，写一次同步两个段落，
+ * 避免两次写入之间留下半套配置；写入失败时不改动内存里的旧配置。
+ */
+async function writeRootPathConfig(
+  config: RootPathConfig,
+  next: { paths?: Record<string, string>; customSources?: CustomSourceConfig[] },
+) {
+  const paths = Object.fromEntries(
+    Object.entries(next.paths ?? config.paths).sort(([left], [right]) =>
+      left.localeCompare(right),
+    ),
+  );
+  const customSources = next.customSources ?? config.customSources;
+  await fs.mkdir(managerHomePath(), { recursive: true });
+  await writeFileAtomically(
+    rootPathConfigPath(),
+    `${JSON.stringify({ version: ROOTS_CONFIG_VERSION, paths, customSources }, null, 2)}\n`,
+  );
+  config.paths = paths;
+  config.customSources = customSources;
+  config.warnings = [];
+}
+
 async function writeRootPathOverrides(
   config: RootPathConfig,
   key: string,
@@ -695,56 +819,14 @@ async function writeRootPathOverrides(
   const paths = { ...config.paths };
   if (value === null) delete paths[key];
   else paths[key] = value;
-  const nextPaths = Object.fromEntries(
-    Object.entries(paths).sort(([left], [right]) => left.localeCompare(right)),
-  );
-  await fs.mkdir(managerHomePath(), { recursive: true });
-  await writeFileAtomically(
-    rootPathConfigPath(),
-    `${JSON.stringify({ version: ROOTS_CONFIG_VERSION, paths: nextPaths }, null, 2)}\n`,
-  );
-  config.paths = nextPaths;
-  config.warnings = [];
+  await writeRootPathConfig(config, { paths });
 }
 
-/**
- * 改写或恢复某个外部来源的技能目录。
- * 只校验「读哪里」，不移动、不创建任何目录；保存后由调用方触发目录缓存失效。
- */
-export async function setRootPath(
-  key: unknown,
-  value: unknown,
-): Promise<
-  | { ok: true; root: { key: string; path: string; defaultPath?: string } }
-  | OperationError
-> {
-  const rootKey = typeof key === "string" ? key.trim() : "";
-  const current = userRoots().find((root) => root.key === rootKey);
-  // OVERRIDABLE_ROOT_KEYS 只含外部只读来源，DSH / 公共 Agent / 项目来源都天然被排除。
-  if (!rootKey || !current || !OVERRIDABLE_ROOT_KEYS.has(rootKey))
-    return rootPathError(
-      "error.rootPath.unsupported",
-      `该技能来源不支持修改目录: ${rootKey || "(空)"}`,
-      { root: rootKey || "(empty)" },
-    );
-  const config = loadRootPathConfig();
-  const defaultPath = current.defaultPath || current.path;
-  // null / 空字符串 / 与默认值相同都表示恢复默认，避免把默认值写成一条显式覆盖。
-  if (
-    value === null ||
-    value === undefined ||
-    (typeof value === "string" && value.trim() === "")
-  ) {
-    await writeRootPathOverrides(config, rootKey, null);
-    return { ok: true, root: { key: rootKey, path: defaultPath } };
-  }
-  if (typeof value !== "string")
-    return rootPathError(
-      "error.rootPath.invalid",
-      `技能目录必须是文本路径: ${String(value)}`,
-      { path: String(value) },
-    );
-  const requested = value.trim();
+/** 只读来源目录的共用校验：绝对路径、长度、存在、是目录、不与状态目录或其它来源重叠。 */
+async function validateSourceRootPath(
+  requested: string,
+  options: { excludeKey?: string } = {},
+): Promise<{ ok: true; path: string } | OperationError> {
   if (!isAbsolute(requested))
     return rootPathError(
       "error.rootPath.absolute",
@@ -757,10 +839,6 @@ export async function setRootPath(
       `技能目录路径超过 ${MAX_ROOT_PATH_LENGTH} 个字符: ${requested}`,
       { path: requested },
     );
-  if (pathIdentity(requested) === pathIdentity(defaultPath)) {
-    await writeRootPathOverrides(config, rootKey, null);
-    return { ok: true, root: { key: rootKey, path: defaultPath } };
-  }
   let info;
   try {
     info = await fs.stat(requested);
@@ -790,7 +868,7 @@ export async function setRootPath(
     );
   // 覆盖后的路径也要参与重叠判断，否则两个来源可以指向同一棵树而绕过去重与停用策略。
   for (const other of userRoots()) {
-    if (other.key === rootKey) continue;
+    if (other.key === options.excludeKey) continue;
     const otherPath = await comparisonPath(other.path);
     if (
       isSameOrDescendant(candidate, otherPath) ||
@@ -802,8 +880,284 @@ export async function setRootPath(
         { path: requested },
       );
   }
-  await writeRootPathOverrides(config, rootKey, resolve(requested));
-  return { ok: true, root: { key: rootKey, path: resolve(requested), defaultPath } };
+  return { ok: true, path: resolve(requested) };
+}
+
+/**
+ * 改写或恢复某个外部来源的技能目录。
+ * 只校验「读哪里」，不移动、不创建任何目录；保存后由调用方触发目录缓存失效。
+ */
+export async function setRootPath(
+  key: unknown,
+  value: unknown,
+): Promise<
+  | { ok: true; root: { key: string; path: string; defaultPath?: string } }
+  | OperationError
+> {
+  const rootKey = typeof key === "string" ? key.trim() : "";
+  const current = userRoots().find((root) => root.key === rootKey);
+  // 自定义来源的目录存在 customSources 段：恢复默认等价于移除登记，避免留下空目录来源。
+  if (rootKey && isCustomSourceKey(rootKey)) {
+    if (!current)
+      return rootPathError(
+        "error.rootPath.unsupported",
+        `该技能来源不支持修改目录: ${rootKey}`,
+        { root: rootKey },
+      );
+    if (
+      value === null ||
+      value === undefined ||
+      (typeof value === "string" && value.trim() === "")
+    ) {
+      const removed = await removeCustomSource(rootKey);
+      if (removed.ok === false) return removed;
+      return { ok: true, root: { key: rootKey, path: current.path } };
+    }
+    const updated = await updateCustomSource(rootKey, { path: value });
+    if (updated.ok === false) return updated;
+    return { ok: true, root: { key: rootKey, path: updated.source.path } };
+  }
+  // OVERRIDABLE_ROOT_KEYS 只含外部只读来源，DSH / 公共 Agent / 项目来源都天然被排除。
+  if (!rootKey || !current || !OVERRIDABLE_ROOT_KEYS.has(rootKey))
+    return rootPathError(
+      "error.rootPath.unsupported",
+      `该技能来源不支持修改目录: ${rootKey || "(空)"}`,
+      { root: rootKey || "(empty)" },
+    );
+  const config = loadRootPathConfig();
+  const defaultPath = current.defaultPath || current.path;
+  // null / 空字符串 / 与默认值相同都表示恢复默认，避免把默认值写成一条显式覆盖。
+  if (
+    value === null ||
+    value === undefined ||
+    (typeof value === "string" && value.trim() === "")
+  ) {
+    await writeRootPathOverrides(config, rootKey, null);
+    return { ok: true, root: { key: rootKey, path: defaultPath } };
+  }
+  if (typeof value !== "string")
+    return rootPathError(
+      "error.rootPath.invalid",
+      `技能目录必须是文本路径: ${String(value)}`,
+      { path: String(value) },
+    );
+  const requested = value.trim();
+  if (pathIdentity(requested) === pathIdentity(defaultPath)) {
+    await writeRootPathOverrides(config, rootKey, null);
+    return { ok: true, root: { key: rootKey, path: defaultPath } };
+  }
+  const checked = await validateSourceRootPath(requested, { excludeKey: rootKey });
+  if (checked.ok === false) return checked;
+  await writeRootPathOverrides(config, rootKey, checked.path);
+  return { ok: true, root: { key: rootKey, path: checked.path, defaultPath } };
+}
+
+// ── 自定义来源登记 ──────────────────────────────────────────────────────────
+
+function nextCustomSourceId(label: string, taken: Set<string>) {
+  const base = CUSTOM_SOURCE_PREFIX + customSourceSlug(label);
+  if (!taken.has(base)) return base;
+  for (let index = 2; index <= MAX_CUSTOM_SOURCES + 1; index++) {
+    const candidate = `${base}-${index}`;
+    if (!taken.has(candidate)) return candidate;
+  }
+  return "";
+}
+
+/**
+ * 登记一个或多个自定义来源（单目录或扫描结果）。
+ * 目录必须已存在且不与现有来源重叠；重复目录是幂等的，不会加出第二份。
+ */
+export async function addCustomSources(input: unknown) {
+  const config = loadRootPathConfig();
+  const list = Array.isArray(input) ? input : [input];
+  if (!list.length)
+    return rootPathError("error.customSource.empty", "没有要添加的技能来源", {});
+  const taken = new Set(userRoots().map((root) => root.key));
+  const next = [...config.customSources];
+  const added: CustomSourceConfig[] = [];
+  for (const entry of list) {
+    if (next.length >= MAX_CUSTOM_SOURCES)
+      return rootPathError(
+        "error.customSource.limit",
+        `自定义来源数量已达上限 ${MAX_CUSTOM_SOURCES} 个`,
+        { limit: MAX_CUSTOM_SOURCES },
+      );
+    const record = entry && typeof entry === "object" ? (entry as Record<string, unknown>) : null;
+    const requested = record && typeof record.path === "string" ? record.path.trim() : "";
+    // 同一个目录重复登记是幂等的：先按 identity 跳过，否则会被自己的来源判成重叠。
+    if (
+      requested &&
+      isAbsolute(requested) &&
+      next.some((item) => pathIdentity(item.path) === pathIdentity(requested))
+    )
+      continue;
+    const checked = await validateSourceRootPath(requested);
+    if (checked.ok === false) return checked;
+    const label = (record && normalizeCustomLabel(record.label)) || basename(checked.path);
+    if (!label)
+      return rootPathError(
+        "error.customSource.label",
+        `自定义来源必须有显示名: ${checked.path}`,
+        { path: checked.path },
+      );
+    if (next.some((item) => pathIdentity(item.path) === pathIdentity(checked.path)))
+      continue;
+    const id = nextCustomSourceId(label, taken);
+    if (!id)
+      return rootPathError(
+        "error.customSource.limit",
+        `自定义来源数量已达上限 ${MAX_CUSTOM_SOURCES} 个`,
+        { limit: MAX_CUSTOM_SOURCES },
+      );
+    taken.add(id);
+    const group = record ? normalizeCustomLabel(record.group) : "";
+    const source: CustomSourceConfig = {
+      id,
+      label,
+      path: checked.path,
+      ...(group ? { group } : {}),
+    };
+    next.push(source);
+    added.push(source);
+  }
+  if (added.length) await writeRootPathConfig(config, { customSources: next });
+  return { ok: true as const, added };
+}
+
+/** 改写自定义来源的显示名或目录；只动登记信息，不碰任何文件。 */
+export async function updateCustomSource(key: unknown, patch: unknown) {
+  const id = typeof key === "string" ? key.trim() : "";
+  const config = loadRootPathConfig();
+  const index = config.customSources.findIndex((item) => item.id === id);
+  if (!CUSTOM_SOURCE_ID_RE.test(id) || index < 0)
+    return rootPathError(
+      "error.customSource.unknown",
+      `未登记的自定义来源: ${id || "(空)"}`,
+      { root: id },
+    );
+  const record = patch && typeof patch === "object" ? (patch as Record<string, unknown>) : {};
+  const current = config.customSources[index];
+  const label = record.label === undefined ? current.label : normalizeCustomLabel(record.label);
+  if (!label)
+    return rootPathError(
+      "error.customSource.label",
+      `自定义来源必须有显示名: ${String(record.label)}`,
+      { path: String(record.label) },
+    );
+  let path = current.path;
+  if (record.path !== undefined) {
+    const requested = typeof record.path === "string" ? record.path.trim() : "";
+    const checked = await validateSourceRootPath(requested, { excludeKey: id });
+    if (checked.ok === false) return checked;
+    path = checked.path;
+  }
+  const group =
+    record.group === undefined ? current.group : normalizeCustomLabel(record.group) || undefined;
+  const source: CustomSourceConfig = { id, label, path, ...(group ? { group } : {}) };
+  const next = config.customSources.map((item, position) =>
+    position === index ? source : item,
+  );
+  await writeRootPathConfig(config, { customSources: next });
+  return { ok: true as const, source };
+}
+
+/** 移除登记；技能文件保持原样，面板只是不再扫描这个目录。 */
+export async function removeCustomSource(key: unknown) {
+  const id = typeof key === "string" ? key.trim() : "";
+  const config = loadRootPathConfig();
+  if (!config.customSources.some((item) => item.id === id))
+    return rootPathError(
+      "error.customSource.unknown",
+      `未登记的自定义来源: ${id || "(空)"}`,
+      { root: id },
+    );
+  await writeRootPathConfig(config, {
+    customSources: config.customSources.filter((item) => item.id !== id),
+  });
+  return { ok: true as const, removed: id };
+}
+
+/**
+ * 在一个总目录下找「技能汇总目录」，只向下探索 MAX_SOURCE_SCAN_DEPTH 层。
+ * 返回的候选只描述现状，登记动作仍由用户确认后调用 addCustomSources。
+ */
+async function collectSkillDirectories(root: string) {
+  const found: { path: string; depth: number; segments: string[] }[] = [];
+  async function walk(directory: string, depth: number, segments: string[]) {
+    if (found.length >= MAX_SOURCE_SCAN_CANDIDATES) return;
+    const skillsDir = join(directory, "skills");
+    if ((await lstatOrNull(skillsDir))?.isDirectory())
+      found.push({ path: skillsDir, depth, segments });
+    if (depth >= MAX_SOURCE_SCAN_DEPTH) return;
+    let entries;
+    try {
+      entries = await fs.readdir(directory, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      if (found.length >= MAX_SOURCE_SCAN_CANDIDATES) return;
+      if (!entry.isDirectory()) continue;
+      // 跳过隐藏目录、依赖目录与 skills 自身，避免把普通资源目录当成来源。
+      if (entry.name.startsWith(".") || entry.name === "skills" || entry.name === "node_modules")
+        continue;
+      await walk(join(directory, entry.name), depth + 1, segments.concat(entry.name));
+    }
+  }
+  await walk(root, 0, []);
+  return found;
+}
+
+/** 扫描候选来源：显示名默认取目录名，总目录名作为分组，界面上就能看到产品名而不是「非标」。 */
+export async function scanCustomSourceCandidates(inputPath: unknown) {
+  const requested = typeof inputPath === "string" ? inputPath.trim() : "";
+  if (!requested || !isAbsolute(requested))
+    return rootPathError(
+      "error.rootPath.absolute",
+      `技能目录必须是绝对路径: ${requested || "(空)"}`,
+      { path: requested },
+    );
+  if (requested.length > MAX_ROOT_PATH_LENGTH)
+    return rootPathError(
+      "error.rootPath.tooLong",
+      `技能目录路径超过 ${MAX_ROOT_PATH_LENGTH} 个字符: ${requested}`,
+      { path: requested },
+    );
+  let info;
+  try {
+    info = await fs.stat(requested);
+  } catch {
+    return rootPathError(
+      "error.rootPath.notFound",
+      `技能目录不存在: ${requested}`,
+      { path: requested },
+    );
+  }
+  if (!info.isDirectory())
+    return rootPathError(
+      "error.rootPath.notDirectory",
+      `技能目录不是文件夹: ${requested}`,
+      { path: requested },
+    );
+  const root = resolve(requested);
+  const product = basename(root) || root;
+  const registered = new Set(userRoots().map((item) => pathIdentity(item.path)));
+  const candidates = [];
+  for (const item of await collectSkillDirectories(root)) {
+    const skills = await discoverReadonlyEntries(item.path);
+    candidates.push({
+      path: item.path,
+      label: item.depth === 0 ? product : [product].concat(item.segments).join(" / "),
+      group: product,
+      depth: item.depth,
+      skillCount: skills.entries.length,
+      // 与已有来源重叠的候选仍然列出来，但界面要禁止登记，否则会绕过停用策略。
+      conflict: await overlapsUserSkillRoot(item.path),
+      registered: registered.has(pathIdentity(item.path)),
+    });
+  }
+  return { ok: true as const, root, candidates };
 }
 
 /**
@@ -3848,7 +4202,7 @@ export async function state(options: ScopeOptions = {}) {
         error: `技能扫描达到遍历上限，部分技能未显示: ${root.path}`,
       });
     // 自定义目录被删掉或改名时，来源仍保留在列表里，用户才有机会在这里改回去。
-    if (root.defaultPath && !exists)
+    if ((root.defaultPath || root.custom) && !exists)
       result.warnings.push({
         code: "warning.rootPath.missing",
         params: { path: root.path },
@@ -3903,6 +4257,8 @@ export async function state(options: ScopeOptions = {}) {
       native: root.native,
       rank: root.rank,
       scope: root.scope || "user",
+      ...(root.custom ? { custom: true } : {}),
+      ...(root.group ? { group: root.group } : {}),
       ...(root.projectRoot
         ? {
             projectRoot: root.projectRoot,

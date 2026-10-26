@@ -5,6 +5,8 @@ type SearchSkill = Partial<SkillView> & {kindLabel?: string; statusLabel?: strin
 type UploadFile = File & {_dssmPath?: string};
 type UploadSelection = {kind: string; name: string; files: UploadFile[]; count: number; size: number; error?: never};
 type SelectionResult = UploadSelection | {error: Diagnostic};
+type ScannedCustomSource = {path: string; label: string; group: string; depth: number; skillCount: number; conflict: boolean; registered: boolean};
+type CustomSourceScanResult = {ok: true; root: string; candidates: ScannedCustomSource[]};
 type ResultMessage = {ok: boolean; text: string; warning?: boolean; scope?: string};
 type ConfirmModal = {type: 'trash-confirm'; root: string; name: string; workspace?: string} | {type: 'delete-confirm'; id: string; name: string} | {type: 'category-create'; root: string; workspace?: string} | {type: 'category-rename'; root: string; id: string; name: string; workspace?: string} | {type: 'category-delete'; root: string; id: string; name: string; workspace?: string} | {type: 'category-add'; root: string; id: string; name: string; workspace?: string; skills: {name: string; declaredName?: string; description?: string; currentCatName: string}[]} | {type: 'root-path'; root: string; label: string; path: string; defaultPath?: string};
 type ModalState = 'detail' | 'create' | 'import' | ConfirmModal | null;
@@ -132,6 +134,17 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
         "error.rootPath.reserved": "技能目录不能与技能管理器的状态目录重叠：{path}",
         "warning.rootPath.invalid": "技能目录配置项无效，已忽略：{path}",
         "warning.rootPath.corrupt": "技能目录配置不可读，已使用默认目录：{path}", "warning.rootPath.missing": "自定义技能目录不存在：{path}",
+        "customSource.title": "自定义来源", "customSource.add": "添加来源",
+        "customSource.desc": "登记清单外的 Agent 技能目录：只读取，不移动也不改动第三方文件。也可以填产品总目录点「扫描子目录」，自动找出各子目录下的 skills。",
+        "customSource.path": "技能目录（含 SKILL.md 的上一级）", "customSource.path.placeholder": "例如 D:\\tools\\my-agent\\skills",
+        "customSource.label": "显示名（留空则用目录名）", "customSource.label.placeholder": "例如 My Agent",
+        "customSource.scan": "扫描子目录", "customSource.scanning": "扫描中…",
+        "customSource.scanResult": "在 {path} 下找到 {count} 个技能目录", "customSource.skillCount.one": "{count} 个技能", "customSource.skillCount.other": "{count} 个技能",
+        "customSource.addOne": "添加", "customSource.addAll": "全部添加",
+        "customSource.added": "已添加 {count} 个自定义来源。", "customSource.removed": "已移除该自定义来源的登记。", "customSource.remove": "移除登记",
+        "customSource.registered": "已登记", "customSource.conflict": "与已有来源重叠",
+        "error.customSource.unknown": "未登记的自定义来源：{root}", "error.customSource.limit": "自定义来源数量已达上限：{limit}",
+        "error.customSource.label": "自定义来源必须有显示名：{path}", "error.customSource.empty": "没有要添加的技能来源",
       },
       en: {
         "rootPath.edit": "Change skills folder", "rootPath.title": "Change the skills folder for {name}",
@@ -149,6 +162,17 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
         "error.rootPath.reserved": "The skills folder must not overlap the manager's state folder: {path}",
         "warning.rootPath.invalid": "Ignored an invalid skills folder setting: {path}",
         "warning.rootPath.corrupt": "The skills folder settings could not be read; defaults are in use: {path}", "warning.rootPath.missing": "The custom skills folder does not exist: {path}",
+        "customSource.title": "Custom sources", "customSource.add": "Add source",
+        "customSource.desc": "Register skill folders for agents that are not in the built-in list. Read-only: nothing is moved or modified. You can also point at a product folder and scan for the skills folders inside it.",
+        "customSource.path": "Skills folder (the parent of SKILL.md files)", "customSource.path.placeholder": "e.g. D:\\tools\\my-agent\\skills",
+        "customSource.label": "Display name (empty uses the folder name)", "customSource.label.placeholder": "e.g. My Agent",
+        "customSource.scan": "Scan subfolders", "customSource.scanning": "Scanning…",
+        "customSource.scanResult": "Found {count} skills folders under {path}", "customSource.skillCount.one": "{count} skill", "customSource.skillCount.other": "{count} skills",
+        "customSource.addOne": "Add", "customSource.addAll": "Add all",
+        "customSource.added": "Added {count} custom sources.", "customSource.removed": "Removed the custom source registration.", "customSource.remove": "Remove",
+        "customSource.registered": "Registered", "customSource.conflict": "Overlaps an existing source",
+        "error.customSource.unknown": "Unknown custom source: {root}", "error.customSource.limit": "Custom sources reached the limit: {limit}",
+        "error.customSource.label": "A custom source needs a display name: {path}", "error.customSource.empty": "No skill sources to add",
       }
     };
 
@@ -164,6 +188,14 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
 .dssm-enable-switch{box-sizing:border-box;position:relative;flex:0 0 auto;width:36px;height:20px;padding:2px;border:0;border-radius:999px;corner-shape:round;background:var(--dsw-alias-border-l3,#555);cursor:pointer}.dssm-enable-switch[aria-checked=true]{background:var(--dsw-alias-brand-primary)}.dssm-enable-switch:disabled{cursor:default;opacity:.5}.dssm-enable-switch:focus-visible{outline:var(--dsw-focus-ring-width,1px) solid var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary));outline-offset:2px}.dssm-enable-switch-thumb{display:block;width:16px;height:16px;border-radius:50%;corner-shape:round;background:var(--dsw-alias-label-primary-foreground,#fff);transition:transform 120ms ease;pointer-events:none}.dssm-enable-switch[aria-checked=false] .dssm-enable-switch-thumb{background:var(--dsw-alias-switch-thumb,#fff)}.dssm-enable-switch[aria-checked=true] .dssm-enable-switch-thumb{transform:translateX(16px)}
 .dssm-icon-action{width:22px;min-width:22px;height:22px;padding:0;border-radius:var(--dsw-radius-sm,8px);background:transparent;color:var(--dsw-alias-label-secondary,#b9b9b9);border-color:var(--dsw-alias-border-l2,#494949)}.dssm-icon-action:not(:disabled):not(.dssm-icon-danger):hover{color:var(--dsw-alias-link,#4176e6)!important;border-color:var(--dsw-alias-link,#4176e6)!important}.dssm-icon-action.dssm-icon-danger{color:var(--dsw-alias-state-error-primary,#ef7272);border-color:var(--dsw-alias-state-error-primary,#ef7272)}.dssm-btn-danger:not(:disabled){color:var(--dsw-alias-state-error-primary,#ef7272)}
 .dssm-root-path-actions{display:flex;flex-wrap:wrap;gap:8px}
+.dssm-custom-sources{display:flex;flex-direction:column;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--dsw-alias-border-l2)}
+.dssm-custom-source-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.dssm-custom-scan{display:flex;flex-direction:column;gap:6px}
+.dssm-custom-candidate{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 8px;border-radius:6px;background:var(--dsw-alias-bg-layer-1)}
+.dssm-custom-candidate-text{display:flex;flex-direction:column;min-width:0}
+.dssm-custom-candidate-name{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dssm-custom-candidate-meta,.dssm-custom-candidate-state{font-size:12px;color:var(--dsw-alias-label-tertiary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dssm-custom-candidate-state{white-space:nowrap}
 .dssm-source-custom{color:var(--dsw-alias-label-tertiary);font-size:11px;white-space:nowrap}
 .dssm-modal{max-height:100%}
 .dssm-modal.dssm-modal-wide{width:min(760px,100%)!important;max-height:100%!important}
@@ -524,6 +556,13 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
       var rps = react.useState(""), rootPathValue = rps[0], setRootPathValue = rps[1];
       var rpk = react.useState(false), rootPathPicking = rpk[0], setRootPathPicking = rpk[1];
       var rpe = react.useState<string | null>(null), rootPathError = rpe[0], setRootPathError = rpe[1];
+      // 自定义来源登记：总目录扫描结果只作候选，用户点「添加」才真正写入 roots.json。
+      var cso = react.useState(false), customSourceOpen = cso[0], setCustomSourceOpen = cso[1];
+      var csp = react.useState(""), customSourcePath = csp[0], setCustomSourcePath = csp[1];
+      var csl = react.useState(""), customSourceLabel = csl[0], setCustomSourceLabel = csl[1];
+      var csr = react.useState<CustomSourceScanResult | null>(null), customSourceScan = csr[0], setCustomSourceScan = csr[1];
+      var csb = react.useState(false), customSourceBusy = csb[0], setCustomSourceBusy = csb[1];
+      var cse = react.useState<string | null>(null), customSourceError = cse[0], setCustomSourceError = cse[1];
       var ds = react.useState<Detail | null>(null), detail = ds[0], setDetail = ds[1];
       var copySt = react.useState<"idle" | "copied" | "failed">("idle"), copyState = copySt[0], setCopyState = copySt[1];
       function copyText(text: string) {
@@ -568,6 +607,55 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
         if (!target) return;
         setRootPathError(null);
         post("/root-path", { key: target.root, path: value }, value === null ? "rootPath.resetDone" : "rootPath.saved", { name: target.label })
+          .then(function () { setModal(null); })
+          .catch(function (error) { setRootPathError(translateError(t, error)); });
+      }
+      function openCustomSourceForm() { setCustomSourceOpen(true); setCustomSourceError(null); setCustomSourceScan(null); }
+      // 浏览同样走宿主的目录选择器；这里选的是「产品总目录」，扫描会自己往下找 skills。
+      function pickCustomSourceDirectory() {
+        var picker = availableDirectoryPicker();
+        if (!picker) { setCustomSourceError(t("rootPath.pickUnavailable")); return; }
+        setCustomSourceError(null);
+        setCustomSourceBusy(true);
+        Promise.resolve().then(picker).then(function (picked) {
+          if (typeof picked === "string" && picked.trim()) setCustomSourcePath(picked.trim());
+        }).catch(function (error) {
+          setCustomSourceError(translateError(t, error));
+        }).finally(function () { setCustomSourceBusy(false); });
+      }
+      function scanCustomSourceDirectory() {
+        var target = (customSourcePath || "").trim();
+        if (!target) return;
+        setCustomSourceBusy(true);
+        setCustomSourceError(null);
+        sessionApi("/custom-source-scan", { method: "POST", headers: MUTATION_HEADERS, body: JSON.stringify({ path: target }) })
+          .then(function (data) { setCustomSourceScan(data); })
+          .catch(function (error) { setCustomSourceScan(null); setCustomSourceError(translateError(t, error)); })
+          .finally(function () { setCustomSourceBusy(false); });
+      }
+      function submitCustomSources(list: {label: string; path: string; group?: string}[]) {
+        var sources = list.filter(function (item) { return item && item.path; });
+        if (!sources.length || customSourceBusy) return;
+        setCustomSourceBusy(true);
+        setCustomSourceError(null);
+        setResult(null);
+        sessionApi("/custom-source-add", { method: "POST", headers: MUTATION_HEADERS, body: JSON.stringify({ sources: sources }) })
+          .then(function (data) {
+            var count = data && Array.isArray(data.added) ? data.added.length : sources.length;
+            return refresh(true).then(function () {
+              setResult({ ok: true, text: t("customSource.added", { count: count }) });
+              setCustomSourceScan(null);
+              setCustomSourcePath("");
+              setCustomSourceLabel("");
+              setCustomSourceOpen(false);
+            });
+          })
+          .catch(function (error) { setCustomSourceError(translateError(t, error)); })
+          .finally(function () { setCustomSourceBusy(false); });
+      }
+      function removeCustomSourceEntry(root: string) {
+        if (busy) return;
+        post("/custom-source-remove", { id: root }, "customSource.removed")
           .then(function () { setModal(null); })
           .catch(function (error) { setRootPathError(translateError(t, error)); });
       }
@@ -985,6 +1073,7 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
 
       if (modal && typeof modal === "object" && modal.type === "root-path") {
         var rootPathModal = modal as Extract<ConfirmModal, {type: "root-path"}>;
+        var scanResult = customSourceScan;
         content.push(h(Modal, {
           key: "root-path",
           title: t("rootPath.title", { name: rootPathModal.label }),
@@ -1013,9 +1102,45 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
               h(Input, { value: rootPathValue, placeholder: t("rootPath.placeholder"), disabled: busy, onChange: function (event: React.ChangeEvent<HTMLInputElement>) { setRootPathValue(event.target.value); setRootPathError(null); } })),
             h("div", { className: "dssm-root-path-actions" },
               hostButton(t("rootPath.browse"), pickRootPathDirectory, "outline", busy || rootPathPicking),
-              rootPathModal.defaultPath ? hostButton(t("rootPath.reset"), function () { saveRootPath(null); }, "outline", busy) : null),
+              rootPathModal.defaultPath ? hostButton(t("rootPath.reset"), function () { saveRootPath(null); }, "outline", busy) : null,
+              rootPathModal.root.indexOf("custom:") === 0 ? hostButton(t("customSource.remove"), function () { removeCustomSourceEntry(rootPathModal.root); }, "outline", busy) : null),
             h("p", { className: "dssm-help" }, t("rootPath.defaultHint", { path: rootPathModal.defaultPath || rootPathModal.path })),
-            rootPathError ? h("div", { className: "dssm-feedback dssm-error", role: "alert" }, rootPathError) : null),
+            rootPathError ? h("div", { className: "dssm-feedback dssm-error", role: "alert" }, rootPathError) : null,
+            h("div", { className: "dssm-custom-sources" },
+              h("div", { className: "dssm-custom-source-head" },
+                h("span", { className: "dssm-label" }, t("customSource.title")),
+                hostButton(customSourceOpen ? t("btn.cancel") : t("customSource.add"), function () {
+                  if (customSourceOpen) { setCustomSourceOpen(false); setCustomSourceScan(null); setCustomSourceError(null); }
+                  else openCustomSourceForm();
+                }, "outline", busy || customSourceBusy)),
+              h("p", { className: "dssm-help" }, t("customSource.desc")),
+              customSourceOpen ? h("div", { className: "dssm-form" },
+                h("label", { className: "dssm-field" },
+                  h("span", { className: "dssm-label" }, t("customSource.path")),
+                  h(Input, { value: customSourcePath, placeholder: t("customSource.path.placeholder"), disabled: busy || customSourceBusy, onChange: function (event: React.ChangeEvent<HTMLInputElement>) { setCustomSourcePath(event.target.value); setCustomSourceError(null); } })),
+                h("label", { className: "dssm-field" },
+                  h("span", { className: "dssm-label" }, t("customSource.label")),
+                  h(Input, { value: customSourceLabel, maxLength: 48, placeholder: t("customSource.label.placeholder"), disabled: busy || customSourceBusy, onChange: function (event: React.ChangeEvent<HTMLInputElement>) { setCustomSourceLabel(event.target.value); } })),
+                h("div", { className: "dssm-root-path-actions" },
+                  hostButton(t("rootPath.browse"), pickCustomSourceDirectory, "outline", busy || customSourceBusy),
+                  hostButton(customSourceBusy ? t("customSource.scanning") : t("customSource.scan"), scanCustomSourceDirectory, "outline", busy || customSourceBusy || !(customSourcePath || "").trim()),
+                  hostButton(t("customSource.addOne"), function () { submitCustomSources([{ label: (customSourceLabel || "").trim(), path: (customSourcePath || "").trim() }]); }, "primary", busy || customSourceBusy || !(customSourcePath || "").trim())),
+                customSourceError ? h("div", { className: "dssm-feedback dssm-error", role: "alert" }, customSourceError) : null,
+                scanResult ? h("div", { className: "dssm-custom-scan" },
+                  h("p", { className: "dssm-help" }, t("customSource.scanResult", { count: scanResult.candidates.length, path: scanResult.root })),
+                  scanResult.candidates.length ? h("div", { className: "dssm-root-path-actions" }, hostButton(t("customSource.addAll"), function () { submitCustomSources(scanResult!.candidates.filter(function (item) { return !item.registered && !item.conflict; }).map(function (item) { return { label: item.label, path: item.path, group: item.group }; })); }, "primary", busy || customSourceBusy || !scanResult.candidates.some(function (item) { return !item.registered && !item.conflict; }))) : null,
+                  scanResult.candidates.map(function (item, index) {
+                    return h("div", { key: "candidate-" + index, className: "dssm-custom-candidate" },
+                      h("div", { className: "dssm-custom-candidate-text" },
+                        h("span", { className: "dssm-custom-candidate-name" }, item.label),
+                        h("span", { className: "dssm-custom-candidate-meta" }, item.path + " · " + t(countKey("customSource.skillCount", item.skillCount), { count: item.skillCount }))),
+                      item.registered ? h("span", { className: "dssm-custom-candidate-state" }, t("customSource.registered"))
+                        : item.conflict ? h("span", { className: "dssm-custom-candidate-state" }, t("customSource.conflict"))
+                        : hostButton(t("customSource.addOne"), function () { submitCustomSources([{ label: item.label, path: item.path, group: item.group }]); }, "outline", busy || customSourceBusy));
+                  })
+                ) : null
+              ) : null
+            )),
           h("div", { className: "dssm-modal-actions" },
             hostButton(t("btn.cancel"), function () { setModal(null); setRootPathError(null); }, "outline"),
             hostButton(t("rootPath.save"), function () { saveRootPath((rootPathValue || "").trim()); }, "primary", busy || !(rootPathValue || "").trim()))));

@@ -1,7 +1,7 @@
 import type { ClawHubPage, ClawHubSearchResponse } from './clawhub-catalog.js';
 import type * as React from 'react';
 import type { createRepositoryManager } from './repositories.js';
-import type { state, skillDetail, createSkill, listTrash, listWorkspaces, workspaceSkills } from './core.js';
+import type { state, skillDetail, createSkill, listTrash, listWorkspaces, workspaceSkills, addCustomSources, updateCustomSource, removeCustomSource, scanCustomSourceCandidates } from './core.js';
 import type { ImportResult } from './types.js';
 export type Translate = (key: string, params?: object) => string;
 type Success<T> = T extends {
@@ -26,6 +26,10 @@ export type ApiRoutes = RepositoryRoutes & Record<SkillsShSearchPath, SkillsShSe
     '/catalog/install': { name: string; root: string };
     '/detail': Detail;
     '/root-path': { ok: true; root: { key: string; path: string; defaultPath?: string } };
+    '/custom-source-add': Success<Awaited<ReturnType<typeof addCustomSources>>>;
+    '/custom-source-update': Success<Awaited<ReturnType<typeof updateCustomSource>>>;
+    '/custom-source-remove': Success<Awaited<ReturnType<typeof removeCustomSource>>>;
+    '/custom-source-scan': Success<Awaited<ReturnType<typeof scanCustomSourceCandidates>>>;
     '/create': Success<Awaited<ReturnType<typeof createSkill>>>;
     '/upload': ImportResult;
     '/delete': unknown;
