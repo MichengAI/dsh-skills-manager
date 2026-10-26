@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.20 - 2026-10-26
+
+- Support registering custom skill sources: Allow adding skill folders for third-party agents outside the built-in list as read-only external sources, persisted to the `customSources` section in `roots.json` with full support for grouping, categories, and toggles (Issue #67, PR #68).
+- Scan product directories for skill candidates: Add automatic detection of sub-profile skill folders up to two levels down, reporting skill counts, conflicts, and registration states for one-click batch registration (PR #68).
+- Refine custom source form UX: Place the display name field before the folder path field; retain the settings modal and smoothly fallback to remaining sources when unregistering a custom source, keeping scan candidates up to date.
+- Modal action layout polish: Add visual separation and ample margin between form actions and the global footer buttons, preventing misclicks and visual grouping ambiguity.
+
 ## 1.2.19 - 2026-10-25
 
 - Configurable external skill source folders: External read-only agent sources (Codex, Claude Code, Cursor, CC Switch, Google Antigravity, etc.) can now be pointed at custom folders directly from the UI, persisted to `~/.dsh/skills-manager/roots.json` taking precedence over environment variables with immediate effect (PR #66).
