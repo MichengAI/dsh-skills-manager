@@ -30,6 +30,10 @@ import {
   getProviderSkill,
   userRoots,
   setRootPath,
+  addCustomSources,
+  updateCustomSource,
+  removeCustomSource,
+  scanCustomSourceCandidates,
   projectRoots,
   resolveWorkspaceTarget,
   listWorkspaces,
@@ -613,6 +617,16 @@ function apply(ctx: HostContext, config?: PluginConfig) {
             case "/api/dsh-skills-manager/root-path":
               // path: null / "" 表示恢复默认目录；只改读取位置，不移动任何文件。
               return run(res, () => setRootPath(String(body.key || ""), body.path === undefined ? null : body.path), afterWrite);
+            case "/api/dsh-skills-manager/custom-source-add":
+              // sources 支持批量：扫描结果可以一次登记多个来源；单条时直接读 label/path。
+              return run(res, () => addCustomSources(Array.isArray(body.sources) ? body.sources : body), afterWrite);
+            case "/api/dsh-skills-manager/custom-source-update":
+              return run(res, () => updateCustomSource(String(body.id || ""), body), afterWrite);
+            case "/api/dsh-skills-manager/custom-source-remove":
+              return run(res, () => removeCustomSource(String(body.id || "")), afterWrite);
+            case "/api/dsh-skills-manager/custom-source-scan":
+              // 只读扫描，不改动任何文件，也不登记；登记由用户确认后走 add。
+              return run(res, () => scanCustomSourceCandidates(body.path));
             case "/api/dsh-skills-manager/category-create":
               return run(res, () => withScope(body, (scope) => createCategory(String(body.root || ""), String(body.name || ""), log, scopedOptions(scope))));
             case "/api/dsh-skills-manager/category-rename":
@@ -688,4 +702,4 @@ function apply(ctx: HostContext, config?: PluginConfig) {
 export { activeSessionCwds, apply, inject, name, notifyChatCatalog, registerAgentSkillProviders };
 
 /** 请求体由各业务入口现有校验解析，此类型只声明路由转交的字段。 */
-type RequestBody = CreateInput & UploadInput & SkillRequest & RepositoryInput & {root?: string; source?: string; conflict?: string; dryRun?: boolean; workspace?: unknown; enabled?: boolean; category?: string; targetName?: string; position?: "before" | "after"; catalog?: string; skillId?: string; owner?: string; slug?: string; path?: unknown; key?: string};
+type RequestBody = CreateInput & UploadInput & SkillRequest & RepositoryInput & {root?: string; source?: string; conflict?: string; dryRun?: boolean; workspace?: unknown; enabled?: boolean; category?: string; targetName?: string; position?: "before" | "after"; catalog?: string; skillId?: string; owner?: string; slug?: string; path?: unknown; key?: string; id?: string; label?: unknown; group?: unknown; sources?: unknown[]};

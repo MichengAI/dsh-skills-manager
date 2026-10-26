@@ -16,6 +16,10 @@ export interface SkillRoot {
     ok?: true;
     /** 被 roots.json 改写前的默认目录；只有用户级外部来源会出现。 */
     defaultPath?: string;
+    /** 用户在界面登记的自定义来源；只读扫描，不写入、不创建目录。 */
+    custom?: boolean;
+    /** 自定义来源的归属分组，通常是扫描到的产品总目录名，用于同源来源归拢显示。 */
+    group?: string;
 }
 export type RootInput = SkillRoot | string | null | undefined;
 export interface Diagnostic {

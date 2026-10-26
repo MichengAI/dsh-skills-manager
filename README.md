@@ -187,6 +187,14 @@ The DeepSeek Harness loader enforces strict identifier policies:
 Ordinary project-root `<project>/skills` directories are not scanned, so repository release resources are not exposed as Agent skills. OpenClaw / Clawdbot support is limited to the user-level sources above. Qoder CN CLI project skills use `<project>/.qoder/skills` and appear as Qoder. Qoder CN IDE uses the Lingma directories. Missing external source directories are not shown.
 External agent sources (CC Switch, Codex, Claude Code and others) can be pointed at another folder from the source row; the change takes effect immediately. Overrides are stored in `~/.dsh/skills-manager/roots.json` and take precedence over `DSH_<AGENT>_HOME`; editing that file by hand requires restarting DSH. DSH and Shared Agent are the host's scan paths and are not offered here — use `DSH_HOME` / `DSH_AGENTS_HOME` to relocate them. The folder must already exist and must not overlap another source; when a custom folder disappears, the source stays listed so you can restore the default.
 
+### Custom sources (agents outside the list)
+
+An agent that is not in the table above does not need to wait for a release: open **Source folders**, choose **Add source** and point it at the agent's skills folder. Custom sources behave like built-in external sources — read-only, nothing moved or modified — and support grouping, drag-and-drop organisation, and source-level plus category-level toggles. The display name defaults to the folder name and can be overridden.
+
+When an agent keeps a separate skills folder per sub-profile (multiple accounts or workspaces), point at the **product folder** and choose **Scan subfolders**: the plugin looks two levels down for every `skills` folder containing `SKILL.md` and lists them as candidates named `product / subfolder`, each with its skill count, so you can register them in one go. Scanning only produces candidates and never registers anything by itself; candidates overlapping an existing source are flagged and cannot be added.
+
+Registrations live in the `customSources` section of `roots.json`, alongside the folder overrides. Removing a registration only deletes that record — the skill files on disk are left untouched. Up to 32 custom sources are supported.
+
 ## DSH product ecosystem
 
 For a desktop workbench, download [DSH Codex Desktop](https://github.com/MichengAI/dsh-codex-desktop/releases). Existing [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) installations can add plugins as needed by following each project's README. Below are 11 first-party plugins; consult the corresponding desktop release notes and bundled catalog for what that version includes.

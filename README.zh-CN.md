@@ -187,6 +187,14 @@ DeepSeek Harness 宿主加载机制对技能标识符遵循规范命名约束：
 不扫描普通项目根目录的 `<project>/skills`，避免把仓库的发布资源当作 Agent 技能。OpenClaw / Clawdbot 仅保留上表中的用户级来源。Qoder CN CLI 的项目技能在 `<project>/.qoder/skills`，显示为 Qoder。Qoder CN IDE 使用 Lingma 目录。不存在的外部来源目录不会显示。
 外部 Agent 来源（CC Switch、Codex、Claude Code 等）可以在来源行直接改读哪个目录，保存后立即生效。覆盖保存在 `~/.dsh/skills-manager/roots.json`，优先级高于 `DSH_<AGENT>_HOME`；手工编辑该文件需重启 DSH。DSH 与公共 Agent 是宿主的扫描路径，不在此处开放，需要整体搬迁时请改 `DSH_HOME` / `DSH_AGENTS_HOME`。目录必须已存在，且不能与其它来源重叠；自定义目录失效时来源会保留在列表里，方便改回默认。
 
+### 自定义来源（清单外的 Agent）
+
+表里没有的 Agent 不必等插件发版：打开「来源目录…」，点「添加来源」，填它的技能目录即可。自定义来源与外部只读来源同构——只扫描不写入、不改动第三方文件，支持分组、拖拽归类、来源级与分类级启停；显示名默认取目录名，也可以自己填。
+
+如果一个 Agent 用多个子 profile（多账号、多工作区）各自维护一套技能，**填产品总目录再点「扫描子目录」**：插件会向下找两层内所有含 `SKILL.md` 的 `skills` 目录，列成候选，每条显示为「产品名 / 子目录名」并标注技能数量，确认后一次登记。扫描只产生候选，不会自动登记；与已有来源重叠的候选会被标出并禁止登记。
+
+登记信息写在 `roots.json` 的 `customSources` 段，与目录覆盖共用同一个文件。移除登记只删除这条记录，磁盘上的技能文件保持原样。上限 32 个自定义来源。
+
 ## DSH 产品生态
 
 想使用桌面工作台，可下载 [DSH Codex Desktop](https://github.com/MichengAI/dsh-codex-desktop/releases)；已有 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 环境，可按各项目 README 按需安装。以下列出 11 个自研插件；桌面端实际随附范围以对应版本的发行说明和内置清单为准。
