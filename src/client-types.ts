@@ -90,6 +90,8 @@ export interface Filters {
     query: string;
     source: string;
     status: string;
+    /** "" = 按来源目录（默认）；"repo" = 按来源仓库分组。旧存档没有该字段时按默认处理。 */
+    group?: string;
 }
 export interface ViewProps extends SectionProps {
     sessionId?: string;

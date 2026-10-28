@@ -109,6 +109,21 @@ export interface Policy {
     userInvocable: boolean;
     enabled: boolean;
 }
+/**
+ * 技能来源。`kind` 说明证据种类（顺序即优先级），`repo` 才是可用于分组的仓库或渠道名。
+ * `root` 表示没有仓库证据、只能按目录落点归类，界面上必须与真实仓库区分开。
+ */
+export interface SkillProvenance {
+    kind: 'install' | 'lock' | 'meta' | 'suffix' | 'root';
+    /** 仓库全名（owner/name）或渠道名；目录落点时为 null。 */
+    repo: string | null;
+    /** 仓库内类别目录（skillPath 的第一段，如 engineering）。 */
+    category: string | null;
+    /** 仓库内技能路径，如 skills/engineering/code-review。 */
+    path: string | null;
+    /** 安装记录里的 ref/tag；锁文件与元数据没有。 */
+    ref: string | null;
+}
 export interface SkillView extends Omit<SkillEntry, 'docPath' | 'entryPath' | 'realDocPath' | 'realEntryPath' | 'linked'> {
     path: string;
     managerEnabled: boolean;
@@ -128,6 +143,8 @@ export interface SkillView extends Omit<SkillEntry, 'docPath' | 'entryPath' | 'r
         scope: string;
     };
     installSource?: InstallSource | null;
+    /** 来源证据；`/state` 与 `/workspace-skills` 都会返回，缺失表示尚未挂载。 */
+    provenance?: SkillProvenance | null;
     categoryId?: string | null;
     /** 可写根里的顶层目录链接。详情和启停可用，删除与覆盖不可用。 */
     linked?: boolean;

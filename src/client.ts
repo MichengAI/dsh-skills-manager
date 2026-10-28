@@ -1,6 +1,6 @@
 import * as React from "react";
 import type { Translate, ApiRoutes, ModalProps, SessionSnapshot, SectionProps, ViewProps, Filters, ClientContext, ManagerSnapshot, Detail, TrashItem } from './client-types.js';
-import type { SkillView, RootView, SkillRoot, CodedError, ImportResult, Diagnostic } from './types.js';
+import type { SkillView, RootView, SkillRoot, CodedError, ImportResult, Diagnostic, SkillProvenance } from './types.js';
 type SearchSkill = Partial<SkillView> & {kindLabel?: string; statusLabel?: string; rootKey?: string; rootLabel?: string};
 type UploadFile = File & {_dssmPath?: string};
 type UploadSelection = {kind: string; name: string; files: UploadFile[]; count: number; size: number; error?: never};
@@ -84,7 +84,12 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
         "error.catalog.query": "搜索关键词无效。", "error.catalog.upstream": "目录服务暂时不可用。", "error.catalog.response": "目录返回的数据无效或过大。", "error.catalog.identity": "目录技能标识无效。",
         "diagnostic.frontmatter.missing": "缺少完整 YAML frontmatter", "diagnostic.name.missing": "frontmatter 缺少 name", "diagnostic.name.invalid": "宿主不支持此技能名称格式（仅支持英文小写字母、数字与连字符），无法启用。如需调用，请在 SKILL.md frontmatter 中指定英文 name（目录名可保留中文）：{name}", "diagnostic.description.missing": "frontmatter 缺少 description", "diagnostic.invocation.invalid": "调用策略字段值无效", "diagnostic.shadowed": "被更高优先级来源 {root} 覆盖",
         "action.enable": "启用", "action.disable": "停用", "action.create": "创建", "action.delete": "删除", "action.restore": "恢复", "action.toggle": "启用或停用",
-        "scope.user": "全局技能", "scope.project": "项目技能", "scope.trash": "回收站", "scope.label": "技能管理视图", "scope.userHint": "跨项目可用。启停仅影响 DSH 中的调用。", "scope.projectHint": "按工作区查看项目技能。启停不修改其他 Agent 的源文件。", "project.empty": "还没有已登记的工作区。请先在侧栏添加工作区。", "project.noSkills": "已登记的工作区里还没有技能。", "workspace.unavailable": "目录不可用", "workspace.noSkills": "这个工作区还没有技能。", "workspace.loading": "正在读取…", "workspace.loadFailed": "读取失败：{error}", "workspace.listFailed": "无法读取工作区列表：{error}", "filter.status": "调用状态", "filter.statusAll": "全部状态", "status.shadowedBy": "被 {source} 中的同名技能覆盖", "status.fallback.user": "当前使用全局 {source} 副本。", "status.fallback.project": "当前使用项目 {source} 副本。", "root.copilot": "GitHub Copilot", "source.selectHint": "先选择一个来源，才能查看目录或关闭整个来源。关闭来源只影响 DSH 调用，不改文件。", "import.global": "导入技能", "category.batchAssigned": "已将 {count} 个技能添加到“{category}”。文件未移动。", "category.selectSkills": "添加技能到“{name}”", "category.noAvailableSkills": "没有可添加的技能", "category.addSkills": "添加技能", "root.dsh": "DSH", "root.agents": "公共 Agent", "root.ccswitch": "CC Switch", "root.projectDsh": "DSH", "root.projectAgents": "项目 Agent", "root.codex": "Codex", "root.claude": "Claude Code", "root.gemini": "Gemini", "root.opencode": "OpenCode", "root.cursor": "Cursor", "root.windsurf": "Windsurf", "root.windsurfUser": "Windsurf (用户目录)", "root.trae": "Trae", "root.traeCn": "Trae (国内版)", "root.openclaw": "OpenClaw", "root.clawdbot": "OpenClaw (旧目录)", "root.roo": "Roo", "root.codebuddy": "CodeBuddy", "root.workbuddy": "WorkBuddy", "root.qoder": "Qoder", "root.qoderCn": "Qoder CN CLI", "root.lingma": "Qoder CN", "root.antigravity": "Google Antigravity"
+        "scope.user": "全局技能", "scope.project": "项目技能", "scope.trash": "回收站", "scope.label": "技能管理视图", "scope.userHint": "跨项目可用。启停仅影响 DSH 中的调用。", "scope.projectHint": "按工作区查看项目技能。启停不修改其他 Agent 的源文件。", "project.empty": "还没有已登记的工作区。请先在侧栏添加工作区。", "project.noSkills": "已登记的工作区里还没有技能。", "workspace.unavailable": "目录不可用", "workspace.noSkills": "这个工作区还没有技能。", "workspace.loading": "正在读取…", "workspace.loadFailed": "读取失败：{error}", "workspace.listFailed": "无法读取工作区列表：{error}", "filter.status": "调用状态", "filter.statusAll": "全部状态", "status.shadowedBy": "被 {source} 中的同名技能覆盖", "status.fallback.user": "当前使用全局 {source} 副本。", "status.fallback.project": "当前使用项目 {source} 副本。", "root.copilot": "GitHub Copilot", "source.selectHint": "先选择一个来源，才能查看目录或关闭整个来源。关闭来源只影响 DSH 调用，不改文件。", "import.global": "导入技能", "category.batchAssigned": "已将 {count} 个技能添加到“{category}”。文件未移动。", "category.selectSkills": "添加技能到“{name}”", "category.noAvailableSkills": "没有可添加的技能", "category.addSkills": "添加技能", "root.dsh": "DSH", "root.agents": "公共 Agent", "root.ccswitch": "CC Switch", "root.projectDsh": "DSH", "root.projectAgents": "项目 Agent", "root.codex": "Codex", "root.claude": "Claude Code", "root.gemini": "Gemini", "root.opencode": "OpenCode", "root.cursor": "Cursor", "root.windsurf": "Windsurf", "root.windsurfUser": "Windsurf (用户目录)", "root.trae": "Trae", "root.traeCn": "Trae (国内版)", "root.openclaw": "OpenClaw", "root.clawdbot": "OpenClaw (旧目录)", "root.roo": "Roo", "root.codebuddy": "CodeBuddy", "root.workbuddy": "WorkBuddy", "root.qoder": "Qoder", "root.qoderCn": "Qoder CN CLI", "root.lingma": "Qoder CN", "root.antigravity": "Google Antigravity",
+        "group.label": "分组方式", "group.bySource": "按来源目录", "group.byRepo": "按来源仓库",
+        "group.hint": "在来源目录下按可核查的记录再分「仓库 → 类别目录」：安装记录 → 目录锁文件 → 技能元数据 → 目录名后缀；没有记录的归入「未归类」，不按名称前缀猜测。",
+        "group.provenanceCount": "{repos} 个来源仓库 · {dirs} 个目录只有落点", "group.repo": "来源仓库", "group.directory": "目录落点", "group.uncategorized": "未归类", "group.repoRoot": "仓库根目录（未分目录）", "group.category": "类别",
+        "group.evidence.install": "安装记录", "group.evidence.lock": "目录锁文件", "group.evidence.meta": "技能元数据", "group.evidence.suffix": "目录名后缀", "group.evidence.root": "目录落点",
+        "group.repoPath": "仓库内路径：{path}", "group.openRepo": "在 GitHub 打开 {repo}", "group.summary": "{count} 个技能 · {categories} 个类别", "group.noRepo": "没有可核查的仓库记录，按来源目录归类。"
       },
       en: {
         "summary.group.one": "{count} skill", "summary.group.other": "{count} skills", "format.locale": "en-US", "format.warningSeparator": "; ",
@@ -112,7 +117,12 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
         "error.catalog.query": "The search query is invalid.", "error.catalog.upstream": "The catalog service is temporarily unavailable.", "error.catalog.response": "The catalog response is invalid or too large.", "error.catalog.identity": "The catalog skill identifier is invalid.",
         "diagnostic.frontmatter.missing": "Missing complete YAML frontmatter", "diagnostic.name.missing": "Frontmatter is missing name", "diagnostic.name.invalid": "Skill name format is not supported by host (lowercase letters, numbers and hyphens only), cannot be enabled. To invoke it, specify an English name in the SKILL.md frontmatter (directory name can remain unchanged): {name}", "diagnostic.description.missing": "Frontmatter is missing description", "diagnostic.invocation.invalid": "Invocation policy value is invalid", "diagnostic.shadowed": "Shadowed by higher-priority source {root}",
         "action.enable": "enable", "action.disable": "disable", "action.create": "create", "action.delete": "delete", "action.restore": "restore", "action.toggle": "enabling or disabling",
-        "scope.user": "Global skills", "scope.project": "Project skills", "scope.trash": "Trash", "scope.label": "Skill manager views", "scope.userHint": "Available across projects. Toggles only affect invocation in DSH.", "scope.projectHint": "View project skills by workspace. Toggles do not modify other agents’ source files.", "project.empty": "No registered workspaces yet. Add one in the sidebar first.", "project.noSkills": "Registered workspaces do not have skills yet.", "workspace.unavailable": "Directory unavailable", "workspace.noSkills": "No skills in this workspace yet.", "workspace.loading": "Loading…", "workspace.loadFailed": "Failed to load: {error}", "workspace.listFailed": "Cannot read the workspace list: {error}", "filter.status": "Invocation status", "filter.statusAll": "All statuses", "status.shadowedBy": "Overridden by the same skill in {source}", "status.fallback.user": "Currently using the global {source} copy.", "status.fallback.project": "Currently using the project {source} copy.", "source.selectHint": "Select a source to view its directory or turn the whole source off. Turning a source off only affects invocation in DSH and does not change files.", "import.global": "Import skill", "category.batchAssigned": "Added {count} skills to “{category}”. Files were not moved.", "category.selectSkills": "Add skills to “{name}”", "category.noAvailableSkills": "No skills available to add", "category.addSkills": "Add skills", "root.dsh": "DSH skills", "root.agents": "Shared Agent", "root.ccswitch": "CC Switch", "root.projectDsh": "DSH skills", "root.projectAgents": "Project Agent", "root.codex": "Codex", "root.claude": "Claude Code", "root.gemini": "Gemini", "root.opencode": "OpenCode", "root.cursor": "Cursor", "root.copilot": "GitHub Copilot", "root.windsurf": "Windsurf", "root.windsurfUser": "Windsurf (User Home)", "root.trae": "Trae", "root.traeCn": "Trae CN", "root.openclaw": "OpenClaw", "root.clawdbot": "OpenClaw (Legacy)", "root.roo": "Roo", "root.codebuddy": "CodeBuddy", "root.workbuddy": "WorkBuddy", "root.qoder": "Qoder", "root.qoderCn": "Qoder CN CLI", "root.lingma": "Qoder CN", "root.antigravity": "Google Antigravity"
+        "scope.user": "Global skills", "scope.project": "Project skills", "scope.trash": "Trash", "scope.label": "Skill manager views", "scope.userHint": "Available across projects. Toggles only affect invocation in DSH.", "scope.projectHint": "View project skills by workspace. Toggles do not modify other agents’ source files.", "project.empty": "No registered workspaces yet. Add one in the sidebar first.", "project.noSkills": "Registered workspaces do not have skills yet.", "workspace.unavailable": "Directory unavailable", "workspace.noSkills": "No skills in this workspace yet.", "workspace.loading": "Loading…", "workspace.loadFailed": "Failed to load: {error}", "workspace.listFailed": "Cannot read the workspace list: {error}", "filter.status": "Invocation status", "filter.statusAll": "All statuses", "status.shadowedBy": "Overridden by the same skill in {source}", "status.fallback.user": "Currently using the global {source} copy.", "status.fallback.project": "Currently using the project {source} copy.", "source.selectHint": "Select a source to view its directory or turn the whole source off. Turning a source off only affects invocation in DSH and does not change files.", "import.global": "Import skill", "category.batchAssigned": "Added {count} skills to “{category}”. Files were not moved.", "category.selectSkills": "Add skills to “{name}”", "category.noAvailableSkills": "No skills available to add", "category.addSkills": "Add skills", "root.dsh": "DSH skills", "root.agents": "Shared Agent", "root.ccswitch": "CC Switch", "root.projectDsh": "DSH skills", "root.projectAgents": "Project Agent", "root.codex": "Codex", "root.claude": "Claude Code", "root.gemini": "Gemini", "root.opencode": "OpenCode", "root.cursor": "Cursor", "root.copilot": "GitHub Copilot", "root.windsurf": "Windsurf", "root.windsurfUser": "Windsurf (User Home)", "root.trae": "Trae", "root.traeCn": "Trae CN", "root.openclaw": "OpenClaw", "root.clawdbot": "OpenClaw (Legacy)", "root.roo": "Roo", "root.codebuddy": "CodeBuddy", "root.workbuddy": "WorkBuddy", "root.qoder": "Qoder", "root.qoderCn": "Qoder CN CLI", "root.lingma": "Qoder CN", "root.antigravity": "Google Antigravity",
+        "group.label": "Group by", "group.bySource": "Source directory", "group.byRepo": "Source repository",
+        "group.hint": "Inside each source directory, verifiable records add a repository → category hierarchy: install record → directory lock file → skill metadata → directory suffix; anything else is grouped as Unclassified. Name prefixes are never guessed.",
+        "group.provenanceCount": "{repos} repositories · {dirs} directories with fallback only", "group.repo": "Repository", "group.directory": "Directory fallback", "group.uncategorized": "Unclassified", "group.repoRoot": "Repository root (no category)", "group.category": "Category",
+        "group.evidence.install": "Install record", "group.evidence.lock": "Directory lock file", "group.evidence.meta": "Skill metadata", "group.evidence.suffix": "Directory suffix", "group.evidence.root": "Directory fallback",
+        "group.repoPath": "Path in repository: {path}", "group.openRepo": "Open {repo} on GitHub", "group.summary": "{count} skills · {categories} categories", "group.noRepo": "No verifiable repository record; grouped by source directory."
       }
     };
 
@@ -205,6 +215,20 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
 .dssm-detail-head .dssm-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .dssm-detail-head button{flex:none}
 .dssm-detail-body{box-sizing:border-box;width:100%;font-family:ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",Menlo,monospace!important;font-size:13px!important;line-height:20px!important;resize:vertical!important}
+.dssm-prov-note{display:block;margin:0 0 6px 0}
+.dssm-prov-badge{flex:none;border:1px solid var(--dsw-alias-border-secondary,#e2e2e2);border-radius:999px;padding:0 6px;font-size:11px;line-height:16px;color:var(--dsw-alias-label-secondary,#666);white-space:nowrap}
+.dssm-prov-path{font-size:11px;color:var(--dsw-alias-label-tertiary,#999);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:320px}
+.dssm-prov-repo-link{color:inherit;text-decoration:none;border-bottom:1px dashed var(--dsw-alias-border-secondary,#d0d0d0)}
+.dssm-prov-repo-link:hover{text-decoration:none;border-bottom-color:currentColor}
+.dssm-prov-repo{margin:2px 0 8px 10px}
+.dssm-prov-repo-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:2px 4px;border-radius:6px}
+.dssm-prov-repo-head:hover{background:var(--dsw-alias-fill-secondary,#f5f5f5)}
+.dssm-prov-repo-title{font-size:12px;font-weight:600;color:var(--dsw-alias-label-primary,#222)}
+.dssm-prov-cat{margin:2px 0 6px 12px;border-left:2px solid var(--dsw-alias-border-secondary,#eee);padding-left:8px}
+.dssm-prov-cat-head{display:flex;align-items:center;gap:8px;padding:2px 4px}
+.dssm-prov-cat-toggle{display:inline-flex;align-items:center;gap:6px;border:0;background:transparent;padding:2px 4px;font:inherit;color:inherit;cursor:pointer;border-radius:6px}
+.dssm-prov-cat-toggle:hover{background:var(--dsw-alias-fill-secondary,#f5f5f5)}
+.dssm-prov-cat-title{font-size:12px;font-weight:600;color:var(--dsw-alias-label-secondary,#555)}
 
 `;
 
@@ -1020,10 +1044,175 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
             sourceExtra(root, workspacePath, displayName)),
           open ? h("div", { className: "dssm-source-body", role: "region" }, renderSourceBody(root, filtered, workspacePath, keyPrefix, scopeRows)) : null);
       }
+      /**
+       * 来源分组（仓库 → 类别目录 → 技能）。
+       * 只读 `/state` 已经算好的 provenance，不在前端猜来源；没有证据的技能按来源目录归入「未归类」。
+       */
+      type ProvenanceRow = {root: RootView; skill: SkillView};
+      interface ProvenanceRepoGroup {
+        key: string;
+        kind: string;
+        repo: string | null;
+        fallback: boolean;
+        rows: ProvenanceRow[];
+        categories: string[];
+        repoPath: string | null;
+      }
+      interface ProvenanceRootGroup {
+        key: string;
+        root: RootView;
+        rows: ProvenanceRow[];
+        repos: ProvenanceRepoGroup[];
+        hasEvidence: boolean;
+      }
+      function provenanceOfRow(row: ProvenanceRow): SkillProvenance | null {
+        return row.skill.provenance || null;
+      }
+      /** 第一层永远是来源目录（DSH / 公共 Agent / Claude Code…），仓库与类别是它下面的两级子分类。 */
+      function collectProvenanceRoots(): ProvenanceRootGroup[] {
+        var groups: Record<string, ProvenanceRootGroup> = Object.create(null);
+        var order: string[] = [];
+        filteredRows.forEach(function (row) {
+          var rootGroup = groups[row.root.key];
+          if (!rootGroup) {
+            rootGroup = { key: row.root.key, root: row.root, rows: [], repos: [], hasEvidence: false };
+            groups[row.root.key] = rootGroup;
+            order.push(row.root.key);
+          }
+          rootGroup.rows.push(row);
+          var provenance = provenanceOfRow(row);
+          var repo = provenance && provenance.repo ? provenance.repo : null;
+          var repoKey = repo ? "repo:" + repo : "none";
+          var repoGroup: ProvenanceRepoGroup | null = null;
+          for (var index = 0; index < rootGroup.repos.length; index++) {
+            if (rootGroup.repos[index].key === repoKey) {
+              repoGroup = rootGroup.repos[index];
+              break;
+            }
+          }
+          if (!repoGroup) {
+            repoGroup = { key: repoKey, kind: repo && provenance ? provenance.kind : "root", repo: repo, fallback: !repo, rows: [], categories: [], repoPath: null };
+            rootGroup.repos.push(repoGroup);
+          }
+          repoGroup.rows.push(row);
+          if (repo && provenance) {
+            var category = provenance.category || "";
+            if (repoGroup.categories.indexOf(category) < 0) repoGroup.categories.push(category);
+            if (!repoGroup.repoPath && provenance.path) repoGroup.repoPath = provenance.path;
+            rootGroup.hasEvidence = true;
+          }
+        });
+        return order.map(function (key) {
+          var group = groups[key];
+          // 有仓库证据的仓库组在前（按名称），「未归类」垫底。
+          group.repos.sort(function (a, b) {
+            if (a.fallback !== b.fallback) return a.fallback ? 1 : -1;
+            return String(a.repo || "").localeCompare(String(b.repo || ""));
+          });
+          return group;
+        });
+      }
+      function categoryLabel(category: string) {
+        return category || t("group.repoRoot");
+      }
+      function renderProvenanceSkills(rows: ProvenanceRow[], workspacePath?: string) {
+        return h("div", { className: "dssm-skill-list" }, rows.map(function (row) { return renderSkill(row.root, row.skill, workspacePath); }));
+      }
+      /** 分组默认收起：只在搜索/状态筛选/选定来源时自动展开，避免一次铺满几百行技能。 */
+      function provenanceAutoOpen(): boolean {
+        return !!(query || activeSource || filters.status);
+      }
+      function renderProvenanceCategory(rootGroup: ProvenanceRootGroup, repoGroup: ProvenanceRepoGroup, category: string, rows: ProvenanceRow[], workspacePath?: string) {
+        var catKey = JSON.stringify(["provcat", filterKey, rootGroup.key, repoGroup.key, category, query, activeSource, filters.status]);
+        var open = expanded[catKey] === undefined ? provenanceAutoOpen() : expanded[catKey];
+        return h("div", { className: "dssm-prov-cat", key: catKey },
+          h("div", { className: "dssm-prov-cat-head" },
+            h("button", { type: "button", className: "dssm-prov-cat-toggle", "aria-expanded": open, onClick: function () { setExpanded(function (previous) { var next: Record<string, boolean> = {}; next[catKey] = !open; return Object.assign({}, previous, next); }); } },
+              foldChevron(h, open), h("span", { className: "dssm-prov-cat-title" }, categoryLabel(category))),
+            h("span", { className: "dssm-count" }, t(countKey("summary.group", rows.length), { count: rows.length }))),
+          open ? renderProvenanceSkills(rows, workspacePath) : null);
+      }
+      /** 第二层：来源目录里的仓库（或「未归类」）。 */
+      function renderProvenanceRepo(rootGroup: ProvenanceRootGroup, repoGroup: ProvenanceRepoGroup, workspacePath?: string) {
+        var expansionKey = JSON.stringify(["provrepo", filterKey, rootGroup.key, repoGroup.key, query, activeSource, filters.status]);
+        var open = expanded[expansionKey] === undefined ? provenanceAutoOpen() : expanded[expansionKey];
+        // 只有 owner/name 形态才当 GitHub 仓库给链接；市场渠道名（如 marketplace）不伪造地址。
+        var githubRepo = !repoGroup.fallback && repoGroup.repo && repoGroup.repo.indexOf("/") > 0 ? repoGroup.repo : null;
+        var label: React.ReactNode = repoGroup.repo
+          ? githubRepo
+            ? h("a", { className: "dssm-prov-repo-link", href: "https://github.com/" + githubRepo, target: "_blank", rel: "noreferrer", title: t("group.openRepo", { repo: githubRepo }), onClick: function (event: React.MouseEvent) { event.stopPropagation(); } }, repoGroup.repo)
+            : repoGroup.repo
+          : t("group.uncategorized");
+        var categories = repoGroup.categories.slice().sort(function (a, b) {
+          if (!a) return 1;
+          if (!b) return -1;
+          return a.localeCompare(b);
+        });
+        var body: React.ReactNode = null;
+        if (open) {
+          // 只有一个「仓库根目录」时不再多套一层文件夹，避免渠道组出现无意义的二级标题。
+          if (!categories.length || categories.length === 1 && !categories[0]) body = renderProvenanceSkills(repoGroup.rows, workspacePath);
+          else body = categories.map(function (category) {
+            var rows = repoGroup.rows.filter(function (row) { var provenance = provenanceOfRow(row); return (provenance && provenance.category || "") === category; });
+            return rows.length ? renderProvenanceCategory(rootGroup, repoGroup, category, rows, workspacePath) : null;
+          });
+        }
+        return h("div", { className: "dssm-prov-repo", key: repoGroup.key },
+          h("div", { className: "dssm-prov-repo-head" },
+            h("button", { type: "button", className: "dssm-prov-cat-toggle dssm-prov-repo-toggle", "aria-expanded": open, onClick: function () { setExpanded(function (previous) { var next: Record<string, boolean> = {}; next[expansionKey] = !open; return Object.assign({}, previous, next); }); } },
+              foldChevron(h, open),
+              repoGroup.repo ? h("span", { className: "dssm-brand-icon", "aria-hidden": true }, h(GithubMark16)) : null,
+              h("span", { className: "dssm-prov-repo-title" }, label),
+              h("span", { className: "dssm-count" }, t(countKey("summary.group", repoGroup.rows.length), { count: repoGroup.rows.length })),
+              h("span", { className: "dssm-prov-badge", title: t("group.hint") }, t("group.evidence." + repoGroup.kind))),
+            h("span", { className: "dssm-source-actions" }, repoGroup.repoPath ? h("span", { className: "dssm-prov-path", title: repoGroup.repoPath }, t("group.repoPath", { path: repoGroup.repoPath })) : null)),
+          body);
+      }
+      /** 第一层：来源目录本身，与默认视图保持同一套头部控件（新建分类 / 启停来源）。 */
+      function renderProvenanceRoot(rootGroup: ProvenanceRootGroup, workspacePath?: string) {
+        var expansionKey = JSON.stringify(["provroot", filterKey, rootGroup.key, query, activeSource, filters.status]);
+        // 与默认视图一致：全局视图默认收起；项目视图选中工作区后展开该目录（仓库层仍收起）。
+        var open = expanded[expansionKey] === undefined ? !!(workspacePath || provenanceAutoOpen()) : expanded[expansionKey];
+        var displayName = workspacePath ? rootDisplayName(t, Object.assign({}, rootGroup.root, { projectName: undefined })) : rootDisplayName(t, rootGroup.root);
+        var body: React.ReactNode = null;
+        if (open) {
+          body = h("div", { className: "dssm-source-body", role: "region" },
+            rootGroup.hasEvidence ? rootGroup.repos.map(function (repoGroup) { return renderProvenanceRepo(rootGroup, repoGroup, workspacePath); }) : renderProvenanceSkills(rootGroup.rows, workspacePath));
+        }
+        return h("section", { key: rootGroup.key, className: "dssm-source", "data-source-key": rootGroup.key },
+          h("div", { className: "dssm-source-head" },
+            h("button", { type: "button", className: "dssm-source-toggle", "aria-expanded": open, onClick: function () { setExpanded(function (previous) { var next: Record<string, boolean> = {}; next[expansionKey] = !open; return Object.assign({}, previous, next); }); } },
+              foldChevron(h, open),
+              h("div", { className: "dssm-source-label" }, renderRootIcon(rootGroup.root.key),
+                h("span", { className: "dssm-source-title" }, displayName),
+                h("span", { className: "dssm-count" }, t(countKey("summary.group", rootGroup.rows.length), { count: rootGroup.rows.length })),
+                rootGroup.hasEvidence ? null : h("span", { className: "dssm-prov-badge", title: t("group.noRepo") }, t("group.evidence.root")),
+                h("span", { className: "dssm-source-path", title: rootGroup.root.path }, rootGroup.root.path))),
+            sourceExtra(rootGroup.root, workspacePath, displayName)),
+          body);
+      }
+      function renderProvenanceList(workspacePath?: string) {
+        var rootGroups = collectProvenanceRoots();
+        if (!rootGroups.length) return h("div", { className: "dssm-empty" }, query || filters.status ? t("empty.search") : t("empty.source"));
+        var reposSeen: Record<string, boolean> = Object.create(null);
+        var dirCount = 0;
+        rootGroups.forEach(function (group) {
+          if (!group.hasEvidence) dirCount++;
+          group.repos.forEach(function (repoGroup) { if (repoGroup.repo) reposSeen[repoGroup.repo] = true; });
+        });
+        var repoCount = Object.keys(reposSeen).length;
+        return h("div", { className: "dssm-provenance" },
+          h("p", { className: "dssm-note dssm-prov-note" }, h("strong", null, t("group.provenanceCount", { repos: repoCount, dirs: dirCount })), " ", t("group.hint")),
+          rootGroups.map(function (group) { return renderProvenanceRoot(group, workspacePath); }));
+      }
       function renderList() {
         var project = scope === "project", path = project ? selectedWorkspace : undefined;
-        var groups = roots.map(function (root) { return renderRoot(root, path, undefined, path ? path + "|" : undefined); }).filter(Boolean);
-        var body: React.ReactNode = groups.length ? groups : h("div", { className: "dssm-empty" }, query || filters.status ? t("empty.search") : t("empty.source"));
+        var body: React.ReactNode;
+        if (filters.group === "repo") body = renderProvenanceList(path);
+        else {
+          var groups = roots.map(function (root) { return renderRoot(root, path, undefined, path ? path + "|" : undefined); }).filter(Boolean);
+          body = groups.length ? groups : h("div", { className: "dssm-empty" }, query || filters.status ? t("empty.search") : t("empty.source"));
+        }
         if (project) {
           if (workspaceList.error) body = h("div", { className: "dssm-feedback dssm-error", role: "alert" }, t("workspace.listFailed", { error: workspaceList.error }));
           else if (workspaceList.loading || selectedWorkspace && (!selectedDetail || selectedDetail.loading)) body = h("div", { className: "dssm-empty" }, t("workspace.loading"));
@@ -1069,7 +1258,7 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
         };
       });
       var tabs = h(SegmentedTabs, { key: "tabs", className: "dssm-scope-tabs", label: t("scope.label"), value: scope, onChange: function (next: string) { setScope(next); if (next === "project" || next === "trash") loadWorkspaces(next === "project"); if (next === "trash") refresh(true); }, items: tabItems });
-      var skillControls = [ scope === "project" ? null : h("div", { key: "summary", className: "dssm-summary" }, [["total", "summary.total"], ["enabled", "summary.enabled"], ["disabled", "summary.disabled"], ["invalid", "summary.invalid"]].map(function (item) { return h("div", { key: item[1], className: "dssm-stat" }, h("strong", null, summary[item[0]]), t(countKey(item[1], summary[item[0]]), { count: summary[item[0]] }).replace(String(summary[item[0]]), "")); })), h("div", { key: "filters", className: "dssm-filters" }, scope === "project" ? null : h("div", { className: "dssm-source-filter" }, h(SourceSelect, { value: activeSource, label: t("filter.source"), options: options, onChange: setSource })), h("div", { className: "dssm-status-filter" }, h(SourceSelect, { value: filters.status, label: t("filter.status"), options: [{ value: "", label: t("filter.statusAll") }].concat(["enabled", "disabled", "shadowed", "invalid"].map(function (value) { return { value: value, label: t("status." + value) }; })), onChange: function (value) { updateFilter("status", value); } })), scope === "project" ? h("div", { className: "dssm-project-filter" }, h(SourceSelect, { value: selectedWorkspace, label: t("filter.workspace"), disabled: workspaceList.loading || !workspaceRows.length, options: workspaceRows.map(function (row) { return { value: workspacePath(row), label: row.name + (!row.available ? " · " + t("workspace.unavailable") : "") + (workspaceRows.filter(function (other) { return other.name === row.name; }).length > 1 ? " · " + workspacePath(row) : ""), disabled: !row.available || !workspacePath(row) }; }), onChange: selectWorkspace })) : null, h(Input, { className: "dssm-search", allowClear: true, value: query, "aria-label": t("search"), placeholder: t("search.placeholder"), onChange: function (e) { setQuery(e.target.value); } }),
+      var skillControls = [ scope === "project" ? null : h("div", { key: "summary", className: "dssm-summary" }, [["total", "summary.total"], ["enabled", "summary.enabled"], ["disabled", "summary.disabled"], ["invalid", "summary.invalid"]].map(function (item) { return h("div", { key: item[1], className: "dssm-stat" }, h("strong", null, summary[item[0]]), t(countKey(item[1], summary[item[0]]), { count: summary[item[0]] }).replace(String(summary[item[0]]), "")); })), h("div", { key: "filters", className: "dssm-filters" }, scope === "project" ? null : h("div", { className: "dssm-source-filter" }, h(SourceSelect, { value: activeSource, label: t("filter.source"), options: options, onChange: setSource })), h("div", { className: "dssm-group-filter" }, h(SourceSelect, { value: filters.group || "", label: t("group.label"), options: [{ value: "", label: t("group.bySource") }, { value: "repo", label: t("group.byRepo") }], onChange: function (value) { updateFilter("group", value); } })), h("div", { className: "dssm-status-filter" }, h(SourceSelect, { value: filters.status, label: t("filter.status"), options: [{ value: "", label: t("filter.statusAll") }].concat(["enabled", "disabled", "shadowed", "invalid"].map(function (value) { return { value: value, label: t("status." + value) }; })), onChange: function (value) { updateFilter("status", value); } })), scope === "project" ? h("div", { className: "dssm-project-filter" }, h(SourceSelect, { value: selectedWorkspace, label: t("filter.workspace"), disabled: workspaceList.loading || !workspaceRows.length, options: workspaceRows.map(function (row) { return { value: workspacePath(row), label: row.name + (!row.available ? " · " + t("workspace.unavailable") : "") + (workspaceRows.filter(function (other) { return other.name === row.name; }).length > 1 ? " · " + workspacePath(row) : ""), disabled: !row.available || !workspacePath(row) }; }), onChange: selectWorkspace })) : null, h(Input, { className: "dssm-search", allowClear: true, value: query, "aria-label": t("search"), placeholder: t("search.placeholder"), onChange: function (e) { setQuery(e.target.value); } }),
         scope !== "trash" ? h("div", { className: "dssm-filter-actions" },
           filterActionButton(t("btn.refresh"), strokeIcon("M13.5 8A5.5 5.5 0 118 2.5c2.3 0 4.3 1.4 5.1 3.5m.4-3.5v3.5H10"), function () { refresh(false); if (scope === "project") refreshWorkspaceDetails(); }, busy || snapshot.loading),
           filterActionButton(t("btn.create"), strokeIcon("M8 2.5v11M2.5 8h11"), openCreate, busy, t("btn.create") + "…"),
