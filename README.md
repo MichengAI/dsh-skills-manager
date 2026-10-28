@@ -19,7 +19,7 @@
 
 > DSH Skills Manager is a community-maintained DeepSeek Harness (DSH) plugin, not an official DeepSeek AI product.
 
-This README describes **1.2.20**. Released changes are in the [changelog](CHANGELOG.md).
+This README describes **1.2.21**. Released changes are in the [changelog](CHANGELOG.md).
 
 ## Features
 
@@ -74,7 +74,7 @@ dsh plugin --profile web add @michengai/dsh-skills-manager@latest --registry=htt
 
 Restart DSH, refresh the page, and open **Settings → Skills**. To update, select **Check for updates** or run the installation command again.
 
-- Plugin `1.2.20` is tested with DeepSeek Harness `0.2.0-rc.1`, `0.2.0-rc.2`, `0.2.1-rc.1`, `0.2.1-rc.2`, `0.2.1-rc.3`.
+- Plugin `1.2.21` is tested with DeepSeek Harness `0.2.0-rc.1`, `0.2.0-rc.2`, `0.2.1-rc.1`, `0.2.1-rc.2`, `0.2.1-rc.3`.
 - Host compatibility: Full DeepSeek Harness `0.2.x` line (`>=0.2.0-rc.1 <0.3.0-0`), forwards-compatible with subsequent `0.2.x` releases, alphas, and RCs without requiring routine plugin version bumps. Legacy versions and breaking changes in the `0.3.0` generation are rejected by the version gate. If you still use a `0.1.x` host, install plugin `1.1.23` instead of `@latest`.
 - **Reverse proxy deployment**: Supports hosting DSH behind prefix-stripping reverse proxies (e.g. `/app/dsh/`). API and update endpoints resolve against the page base URI (`document.baseURI`).
 

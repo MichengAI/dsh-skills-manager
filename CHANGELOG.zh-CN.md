@@ -2,6 +2,10 @@
 
 [English](CHANGELOG.md)
 
+## 1.2.21 - 2026-10-28
+
+- 修复 Windows 下技能导入与更新的瞬时文件锁冲突：在原子复制替换、解压暂存包装、新建技能及仓库更新回滚等路径中全面复用 `renameWithRetry` 重试机制，有效规避 Windows Defender 与系统索引器在瞬时扫描时导致的 `EPERM`/`EBUSY` 抛错，彻底消除界面偶发或高发的「导入失败」报错。
+
 ## 1.2.20 - 2026-10-26
 
 - 支持登记非标 Agent 技能目录（自定义来源）：清单外的第三方 Agent 可直接登记为只读外部来源，配置持久化至 `~/.dsh/skills-manager/roots.json` 的 `customSources` 段，支持与内置来源同等的分组、分类与启停能力（Issue #67、PR #68）。

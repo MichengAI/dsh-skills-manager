@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.21 - 2026-10-28
+
+- Fix Windows transient directory rename locks: Reuse `renameWithRetry` across atomic skill copy, upload staging, skill creation, and repository updates to automatically retry on transient `EPERM`/`EBUSY` locks caused by background filesystem indexers or antivirus scanners, preventing spurious "Import failed" errors.
+
 ## 1.2.20 - 2026-10-26
 
 - Support registering custom skill sources: Allow adding skill folders for third-party agents outside the built-in list as read-only external sources, persisted to the `customSources` section in `roots.json` with full support for grouping, categories, and toggles (Issue #67, PR #68).
