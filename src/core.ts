@@ -3278,16 +3278,16 @@ async function replaceWithCopy(source: string, dest: string, isDir: boolean, exi
   try {
     for (const path of existing) {
       const backup = temporaryPath(path, "backup");
-      await fs.rename(path, backup);
+      await renameWithRetry(path, backup);
       backups.push({ path, backup });
     }
-    await fs.rename(stage, dest);
+    await renameWithRetry(stage, dest);
   } catch (caught) { const error = caught as CodedError;
     await fs.rm(stage, { recursive: true, force: true }).catch(() => undefined);
     const rollbackFailures = [];
     for (const item of backups.reverse()) {
       try {
-        await fs.rename(item.backup, item.path);
+        await renameWithRetry(item.backup, item.path);
       } catch (caught) { const rollbackError = caught as CodedError;
         rollbackFailures.push(item.backup);
       }
@@ -3747,7 +3747,7 @@ async function prepareUploadedSource(sessionRoot: string, input: UploadInput) {
   const batchRoot = join(sessionRoot, "batch");
   const wrappedRoot = join(batchRoot, skillName);
   await fs.mkdir(batchRoot, { recursive: true });
-  await fs.rename(contentRoot, wrappedRoot);
+  await renameWithRetry(contentRoot, wrappedRoot);
   return batchRoot;
 }
 
@@ -3826,7 +3826,7 @@ export async function createSkill(input: CreateInput, log?: Log, options: Mutati
     await fs.mkdir(stage);
     const content = `---\nname: ${name}\ndescription: ${yamlString(description)}\n---\n\n${body}\n`;
     await fs.writeFile(join(stage, "SKILL.md"), content, "utf8");
-    await fs.rename(stage, target);
+    await renameWithRetry(stage, target);
   } catch (caught) { const error = caught as CodedError;
     await fs.rm(stage, { recursive: true, force: true }).catch(() => undefined);
     throw error;

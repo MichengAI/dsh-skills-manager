@@ -4,7 +4,7 @@ import type { Archive, FileDigest, RepositoryDependencies, SkillRequest, Install
 import { promises as fs } from "node:fs";
 import { join, dirname, resolve } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
-import { managerHomePath, userRoots, checkedRepositoryRootDefinition, projectRootForRecord, resolveWorkspaceTarget, createWorkspaceIndex, type indexRegisteredWorkspaces } from "./core.js";
+import { managerHomePath, userRoots, checkedRepositoryRootDefinition, projectRootForRecord, resolveWorkspaceTarget, createWorkspaceIndex, renameWithRetry, type indexRegisteredWorkspaces } from "./core.js";
 
 const hash = (bytes: string | Uint8Array) => createHash("sha256").update(bytes).digest("hex");
 const repositoryInstallKeys = new Set(["dsh", "agents"]);
@@ -134,15 +134,15 @@ export function createRepositoryUpdater({ read, write, repository, download, ser
       const nextRecord = rollback ? { ...record.backup!.record } : { ...previous, commit: plan.commit, files: plan.next };
       nextRecord.backup = { key, fingerprint: signature(plan.current), record: previous };
       // 跨卷或文件锁导致重命名失败时直接终止，不降级为覆盖复制。
-      await fs.rename(target, backup); moved = true;
-      await fs.rename(stage, target); replaced = true;
+      await renameWithRetry(target, backup); moved = true;
+      await renameWithRetry(stage, target); replaced = true;
       data.installs[data.installs.indexOf(record)] = nextRecord;
       await write(data);
     } catch (caught) { const error = caught as CodedError;
       if (moved) {
         try {
-          if (replaced) await fs.rename(target, stage);
-          await fs.rename(backup, target);
+          if (replaced) await renameWithRetry(target, stage);
+          await renameWithRetry(backup, target);
         } catch { recoveryFailed = true; throw failure("自动恢复失败，原文件保留在备份目录，请勿重复操作", "error.repo.state"); }
       }
       throw error;
