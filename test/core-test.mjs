@@ -2928,7 +2928,7 @@ await new Promise((resolve, reject) => {
   });
 });
 const address = server.address();
-const api = `http://127.0.0.1:${address.port}/api/dsh-skills-manager`;
+const api = `http://127.0.0.1:${address.port}/api/michengai/dsh-skills-manager`;
 const secureHeaders = {
   "x-dsh-skills-session": "sess-live",
   "content-type": "application/json",

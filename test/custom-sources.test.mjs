@@ -363,7 +363,7 @@ try {
       resolve();
     });
   });
-  const api = `http://127.0.0.1:${server.address().port}/api/dsh-skills-manager`;
+  const api = `http://127.0.0.1:${server.address().port}/api/michengai/dsh-skills-manager`;
   const headers = { "content-type": "application/json", "x-dsh-skills-manager": "1" };
   try {
     const scanResponse = await fetch(api + "/custom-source-scan", {

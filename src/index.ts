@@ -449,7 +449,7 @@ function apply(ctx: HostContext, config?: PluginConfig) {
   // is not collected. Own the route explicitly for restart and startup failure.
   ctx.effect(() => ctx.webServer.register({
     kind: "prefix",
-    path: "/api/dsh-skills-manager",
+    path: "/api/michengai/dsh-skills-manager",
     handler: async (req, res) => {
       const u = new URL(req.url!, "http://localhost");
       const path = u.pathname.replace(/\/+$/, "");
@@ -492,22 +492,22 @@ function apply(ctx: HostContext, config?: PluginConfig) {
           json(res, hostError.statusCode, { ok: false, code: hostError.code, error: hostError.error });
           return;
         }
-        if (req.method === "GET" && path === "/api/dsh-skills-manager/state") {
+        if (req.method === "GET" && path === "/api/michengai/dsh-skills-manager/state") {
           return run(res, stateWithSources);
         }
-        if (req.method === "GET" && path === "/api/dsh-skills-manager/sidebar-entry") {
+        if (req.method === "GET" && path === "/api/michengai/dsh-skills-manager/sidebar-entry") {
           return run(res, async () => ({ enabled: await getSidebarEntry() }));
         }
-        if (req.method === "GET" && path === "/api/dsh-skills-manager/online-update") {
+        if (req.method === "GET" && path === "/api/michengai/dsh-skills-manager/online-update") {
           return run(res, async () => ({ enabled: await isUpdateEnabled(), locked: hostDisabled }));
         }
-        if ((req.method === "GET" || req.method === "HEAD") && path === "/api/dsh-skills-manager/workspaces") {
+        if ((req.method === "GET" || req.method === "HEAD") && path === "/api/michengai/dsh-skills-manager/workspaces") {
           return run(res, async () => ({ items: await listWorkspaces(registeredWorkspacePaths(ctx) ?? []) }), undefined, req.method === "HEAD");
         }
-        if ((req.method === "GET" || req.method === "HEAD") && path === "/api/dsh-skills-manager/repositories") {
+        if ((req.method === "GET" || req.method === "HEAD") && path === "/api/michengai/dsh-skills-manager/repositories") {
           return run(res, () => enqueueMutation(() => repositories.list()), undefined, req.method === "HEAD");
         }
-        if (req.method === "GET" && (path === "/api/dsh-skills-manager/clawhub/list" || path === "/api/dsh-skills-manager/clawhub/search")) {
+        if (req.method === "GET" && (path === "/api/michengai/dsh-skills-manager/clawhub/list" || path === "/api/michengai/dsh-skills-manager/clawhub/search")) {
           const searching = path.endsWith("/search");
           const allowed = searching ? ["q", "limit"] : ["limit", "cursor", "sort"];
           if ([...u.searchParams.keys()].some(key => !allowed.includes(key) || u.searchParams.getAll(key).length !== 1) || searching && !u.searchParams.has("q")) {
@@ -517,7 +517,7 @@ function apply(ctx: HostContext, config?: PluginConfig) {
           const parameter = (key: string) => u.searchParams.get(key) ?? undefined;
           return run(res, () => searching ? searchClawHub(parameter("q")!, { limit: parameter("limit") }) : listClawHub({ limit: parameter("limit"), sort: parameter("sort"), cursor: parameter("cursor") }));
         }
-        if (req.method === "GET" && path === "/api/dsh-skills-manager/skills-sh/search") {
+        if (req.method === "GET" && path === "/api/michengai/dsh-skills-manager/skills-sh/search") {
           const queries = u.searchParams.getAll("q");
           if (queries.length !== 1) {
             json(res, 400, { ok: false, code: "error.catalog.query", error: "搜索词不能为空且不能超过 100 个字符" });
@@ -527,9 +527,9 @@ function apply(ctx: HostContext, config?: PluginConfig) {
         }
         if (req.method === "HEAD") {
           // HEAD 复用 GET/405 的载荷计算 content-length，保持与实体一致的响应头语义。
-          if (path === "/api/dsh-skills-manager/state") return run(res, stateWithSources, undefined, true);
-          if (path === "/api/dsh-skills-manager/sidebar-entry") return run(res, async () => ({ enabled: await getSidebarEntry() }), undefined, true);
-          if (path === "/api/dsh-skills-manager/online-update") return run(res, async () => ({ enabled: await isUpdateEnabled(), locked: hostDisabled }), undefined, true);
+          if (path === "/api/michengai/dsh-skills-manager/state") return run(res, stateWithSources, undefined, true);
+          if (path === "/api/michengai/dsh-skills-manager/sidebar-entry") return run(res, async () => ({ enabled: await getSidebarEntry() }), undefined, true);
+          if (path === "/api/michengai/dsh-skills-manager/online-update") return run(res, async () => ({ enabled: await isUpdateEnabled(), locked: hostDisabled }), undefined, true);
           json(res, 405, { ok: false, code: "error.proto.method", error: `method not allowed: ${req.method}` }, true);
           return;
         }
@@ -542,18 +542,18 @@ function apply(ctx: HostContext, config?: PluginConfig) {
           json(res, requestError.statusCode, { ok: false, code: requestError.code, error: requestError.error });
           return;
         }
-        const body = await readBody(req, path === "/api/dsh-skills-manager/upload" ? MAX_UPLOAD_BODY_BYTES : undefined);
-        if (path.startsWith("/api/dsh-skills-manager/repositories/") && (!body || typeof body !== "object" || Array.isArray(body))) {
+        const body = await readBody(req, path === "/api/michengai/dsh-skills-manager/upload" ? MAX_UPLOAD_BODY_BYTES : undefined);
+        if (path.startsWith("/api/michengai/dsh-skills-manager/repositories/") && (!body || typeof body !== "object" || Array.isArray(body))) {
           json(res, 400, { ok: false, code: "error.repo.invalid", error: "仓库参数必须是对象" });
           return;
         }
-        if (path === "/api/dsh-skills-manager/browse") {
+        if (path === "/api/michengai/dsh-skills-manager/browse") {
           return run(res, () => browseDirectories(body.path));
         }
         // 网络只读阶段不占本地写入队列；最终文件和状态提交仍串行。
-        if (path === "/api/dsh-skills-manager/repositories/refresh") return run(res, () => repositories.refresh(body));
-        if (path === "/api/dsh-skills-manager/catalog/detail") return run(res, () => readCatalogSkill(body));
-        if (path === "/api/dsh-skills-manager/catalog/install") {
+        if (path === "/api/michengai/dsh-skills-manager/repositories/refresh") return run(res, () => repositories.refresh(body));
+        if (path === "/api/michengai/dsh-skills-manager/catalog/detail") return run(res, () => readCatalogSkill(body));
+        if (path === "/api/michengai/dsh-skills-manager/catalog/install") {
           return run(res, async () => {
             if (body.root !== undefined && body.root !== "dsh" && body.root !== "agents") throw Object.assign(new Error("技能安装位置无效"), { statusCode: 400, code: "error.repo.invalid" });
             if (body.workspace !== undefined && body.root !== undefined && body.root !== "dsh") throw Object.assign(new Error("工作区只能安装到项目 DSH skills"), { statusCode: 400, code: "error.repo.invalid" });
@@ -566,7 +566,7 @@ function apply(ctx: HostContext, config?: PluginConfig) {
         }
         return enqueueMutation(() => {
           switch (path) {
-            case "/api/dsh-skills-manager/sidebar-entry":
+            case "/api/michengai/dsh-skills-manager/sidebar-entry":
               return run(res, async () => {
                 if (!body || typeof body.enabled !== "boolean") {
                   throw Object.assign(new Error("enabled 必须是布尔值"), { statusCode: 400, code: "error.proto.invalidParams" });
@@ -574,7 +574,7 @@ function apply(ctx: HostContext, config?: PluginConfig) {
                 const enabled = await setSidebarEntry(body.enabled);
                 return { enabled };
               });
-            case "/api/dsh-skills-manager/online-update":
+            case "/api/michengai/dsh-skills-manager/online-update":
               return run(res, async () => {
                 if (!body || typeof body.enabled !== "boolean") {
                   throw Object.assign(new Error("enabled 必须是布尔值"), { statusCode: 400, code: "error.proto.invalidParams" });
@@ -585,76 +585,76 @@ function apply(ctx: HostContext, config?: PluginConfig) {
                 const enabled = await setOnlineUpdate(body.enabled);
                 return { enabled };
               });
-            case "/api/dsh-skills-manager/repositories/add":
+            case "/api/michengai/dsh-skills-manager/repositories/add":
               return run(res, () => repositories.add(body));
-            case "/api/dsh-skills-manager/repositories/remove":
+            case "/api/michengai/dsh-skills-manager/repositories/remove":
               return run(res, () => repositories.remove(body));
-            case "/api/dsh-skills-manager/repositories/detail":
+            case "/api/michengai/dsh-skills-manager/repositories/detail":
               return run(res, () => repositories.detail(body));
-            case "/api/dsh-skills-manager/repositories/install":
+            case "/api/michengai/dsh-skills-manager/repositories/install":
               return run(res, () => repositories.install(body, registeredWorkspacePaths(ctx)), afterWrite);
-            case "/api/dsh-skills-manager/repositories/uninstall":
+            case "/api/michengai/dsh-skills-manager/repositories/uninstall":
               return run(res, () => repositories.uninstall(body), afterWrite);
-            case "/api/dsh-skills-manager/repositories/preview":
+            case "/api/michengai/dsh-skills-manager/repositories/preview":
               return run(res, () => repositories.preview(body));
-            case "/api/dsh-skills-manager/repositories/update":
+            case "/api/michengai/dsh-skills-manager/repositories/update":
               return run(res, () => repositories.update(body), afterWrite);
-            case "/api/dsh-skills-manager/repositories/rollback":
+            case "/api/michengai/dsh-skills-manager/repositories/rollback":
               return run(res, () => repositories.rollback(body), afterWrite);
-            case "/api/dsh-skills-manager/workspace-skills":
+            case "/api/michengai/dsh-skills-manager/workspace-skills":
               return run(res, async () => {
                 const snapshot = await workspaceSkills(body.workspace, registeredWorkspacePaths(ctx));
                 return "roots" in snapshot ? attachSources(snapshot) : snapshot;
               });
-            case "/api/dsh-skills-manager/enable":
+            case "/api/michengai/dsh-skills-manager/enable":
               return run(res, () => withScope(body, async (scope) => setSkillEnabled(await requestRoot(String(body.root || "dsh"), scope?.projectCwds), String(body.name || ""), true, log)), afterWrite);
-            case "/api/dsh-skills-manager/disable":
+            case "/api/michengai/dsh-skills-manager/disable":
               return run(res, () => withScope(body, async (scope) => setSkillEnabled(await requestRoot(String(body.root || "dsh"), scope?.projectCwds), String(body.name || ""), false, log)), afterWrite);
-            case "/api/dsh-skills-manager/source-enable":
+            case "/api/michengai/dsh-skills-manager/source-enable":
               return run(res, () => withScope(body, (scope) => setSourceEnabled(String(body.root || ""), true, log, scopedOptions(scope))), afterWrite);
-            case "/api/dsh-skills-manager/source-disable":
+            case "/api/michengai/dsh-skills-manager/source-disable":
               return run(res, () => withScope(body, (scope) => setSourceEnabled(String(body.root || ""), false, log, scopedOptions(scope))), afterWrite);
-            case "/api/dsh-skills-manager/root-path":
+            case "/api/michengai/dsh-skills-manager/root-path":
               // path: null / "" 表示恢复默认目录；只改读取位置，不移动任何文件。
               return run(res, () => setRootPath(String(body.key || ""), body.path === undefined ? null : body.path), afterWrite);
-            case "/api/dsh-skills-manager/custom-source-add":
+            case "/api/michengai/dsh-skills-manager/custom-source-add":
               // sources 支持批量：扫描结果可以一次登记多个来源；单条时直接读 label/path。
               return run(res, () => addCustomSources(Array.isArray(body.sources) ? body.sources : body), afterWrite);
-            case "/api/dsh-skills-manager/custom-source-update":
+            case "/api/michengai/dsh-skills-manager/custom-source-update":
               return run(res, () => updateCustomSource(String(body.id || ""), body), afterWrite);
-            case "/api/dsh-skills-manager/custom-source-remove":
+            case "/api/michengai/dsh-skills-manager/custom-source-remove":
               return run(res, () => removeCustomSource(String(body.id || "")), afterWrite);
-            case "/api/dsh-skills-manager/custom-source-scan":
+            case "/api/michengai/dsh-skills-manager/custom-source-scan":
               // 只读扫描，不改动任何文件，也不登记；登记由用户确认后走 add。
               return run(res, () => scanCustomSourceCandidates(body.path));
-            case "/api/dsh-skills-manager/category-create":
+            case "/api/michengai/dsh-skills-manager/category-create":
               return run(res, () => withScope(body, (scope) => createCategory(String(body.root || ""), String(body.name || ""), log, scopedOptions(scope))));
-            case "/api/dsh-skills-manager/category-rename":
+            case "/api/michengai/dsh-skills-manager/category-rename":
               return run(res, () => withScope(body, (scope) => renameCategory(String(body.root || ""), String(body.id || ""), String(body.name || ""), log, scopedOptions(scope))));
-            case "/api/dsh-skills-manager/category-delete":
+            case "/api/michengai/dsh-skills-manager/category-delete":
               return run(res, () => withScope(body, (scope) => deleteCategory(String(body.root || ""), String(body.id || ""), log, scopedOptions(scope))));
-            case "/api/dsh-skills-manager/category-assign":
+            case "/api/michengai/dsh-skills-manager/category-assign":
               return run(res, () => withScope(body, (scope) => assignSkillCategory(String(body.root || ""), String(body.name || ""), String(body.category || ""), log, scopedOptions(scope))));
-            case "/api/dsh-skills-manager/category-move":
+            case "/api/michengai/dsh-skills-manager/category-move":
               return run(res, () => withScope(body, (scope) => moveSkillInCategory(String(body.root || ""), String(body.name || ""), String(body.category || ""), body.targetName ? String(body.targetName) : undefined, body.position === undefined ? "before" : String(body.position), log, scopedOptions(scope))));
-            case "/api/dsh-skills-manager/category-enable":
+            case "/api/michengai/dsh-skills-manager/category-enable":
               return run(res, () => withScope(body, (scope) => setCategoryEnabled(String(body.root || ""), String(body.category || ""), true, log, scopedOptions(scope))), afterWrite);
-            case "/api/dsh-skills-manager/category-disable":
+            case "/api/michengai/dsh-skills-manager/category-disable":
               return run(res, () => withScope(body, (scope) => setCategoryEnabled(String(body.root || ""), String(body.category || ""), false, log, scopedOptions(scope))), afterWrite);
-            case "/api/dsh-skills-manager/delete":
+            case "/api/michengai/dsh-skills-manager/delete":
                           return run(res, () => withScope(body, async (scope) => {
                             const target = await workspaceTarget(body);
                             if (target && "ok" in target && target.ok === false) return target;
                             const root = target ? (target as { root: SkillRoot }).root : await requestRoot(String(body.root || "dsh"), scope?.projectCwds);
                             return repositories.trashSkill(root, String(body.name || ""));
                           }), afterWrite);
-            case "/api/dsh-skills-manager/trash-restore":
+            case "/api/michengai/dsh-skills-manager/trash-restore":
               return run(res, () => withScope(body, (scope) => repositories.restoreTrash(String(body.id || ""), { ...(scope ?? {}), registeredWorkspaces: registeredWorkspacePaths(ctx) })), afterWrite);
-            case "/api/dsh-skills-manager/trash-delete":
+            case "/api/michengai/dsh-skills-manager/trash-delete":
               return run(res, () => repositories.permanentlyDeleteTrash(String(body.id || "")));
-            case "/api/dsh-skills-manager/detail":
+            case "/api/michengai/dsh-skills-manager/detail":
               return run(res, () => withScope(body, (scope) => skillDetail(String(body.root || "dsh"), String(body.name || ""), scope ? { ...scope, workspaceBound: true } : projectOptions())));
-            case "/api/dsh-skills-manager/create":
+            case "/api/michengai/dsh-skills-manager/create":
               return run(res, async () => {
                 const target = await workspaceTarget(body);
                 if (target && "ok" in target && target.ok === false) return target;
@@ -664,7 +664,7 @@ function apply(ctx: HostContext, config?: PluginConfig) {
                   { root: target ? (target as { root: SkillRoot }).root : await requestRoot(String(body.root || "dsh")) },
                 );
               }, afterWrite);
-            case "/api/dsh-skills-manager/import":
+            case "/api/michengai/dsh-skills-manager/import":
               return run(res, async () => {
                 const target = await workspaceTarget(body);
                 if (target && "ok" in target && target.ok === false) return target;
@@ -674,7 +674,7 @@ function apply(ctx: HostContext, config?: PluginConfig) {
                   ...(target ? { root: (target as { root: SkillRoot }).root } : body.root === "agents" ? { root: await requestRoot("agents") } : {}),
                 });
               }, body.dryRun === true ? undefined : afterWrite);
-            case "/api/dsh-skills-manager/upload":
+            case "/api/michengai/dsh-skills-manager/upload":
               return run(res, async () => {
                 const target = await workspaceTarget(body);
                 if (target && "ok" in target && target.ok === false) return target;

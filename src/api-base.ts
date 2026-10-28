@@ -28,7 +28,7 @@ function pageBaseHref(): string | undefined {
 /**
  * 解析插件端点 URL。
  *
- * @param path 端点路径，通常是 "/api/dsh-skills-manager/xxx" 这类根绝对路径。
+ * @param path 端点路径，通常是 "/api/michengai/dsh-skills-manager/xxx" 这类根绝对路径。
  * @returns 基于页面 base 的绝对 URL；相对路径、完整 URL、协议相对 URL、无 document
  *          或 base 非法时原样返回，保证非浏览器环境与测试夹具行为不变。
  */

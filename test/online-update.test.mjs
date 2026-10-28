@@ -59,7 +59,7 @@ try {
     return prefixRoute.handler(req, res);
   });
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
-  const baseUrl = `http://127.0.0.1:${server.address().port}/api/dsh-skills-manager/online-update`;
+  const baseUrl = `http://127.0.0.1:${server.address().port}/api/michengai/dsh-skills-manager/online-update`;
   const updateUrl = `http://127.0.0.1:${server.address().port}/api/michengai/dsh-skills-manager/update`;
   const headers = { "content-type": "application/json", "x-dsh-skills-manager": "1" };
 
@@ -151,7 +151,7 @@ try {
     return vibePrefixRoute.handler(req, res);
   });
   await new Promise((resolve) => vibeServer.listen(0, "127.0.0.1", resolve));
-  const vibeBaseUrl = `http://127.0.0.1:${vibeServer.address().port}/api/dsh-skills-manager/online-update`;
+  const vibeBaseUrl = `http://127.0.0.1:${vibeServer.address().port}/api/michengai/dsh-skills-manager/online-update`;
   const vibeUpdateUrl = `http://127.0.0.1:${vibeServer.address().port}/api/michengai/dsh-skills-manager/update`;
 
   try {

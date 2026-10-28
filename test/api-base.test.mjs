@@ -78,8 +78,8 @@ if (typeof resolveApiUrl === "function") {
   // 1. 直连部署：站点根，解析结果与旧的根绝对路径完全一致（无行为变化）。
   withBase("http://127.0.0.1:28000/", () => {
     eq(
-      resolveApiUrl("/api/dsh-skills-manager/state"),
-      "http://127.0.0.1:28000/api/dsh-skills-manager/state",
+      resolveApiUrl("/api/michengai/dsh-skills-manager/state"),
+      "http://127.0.0.1:28000/api/michengai/dsh-skills-manager/state",
       "root deployment keeps the original absolute URL",
     );
   });
@@ -87,8 +87,8 @@ if (typeof resolveApiUrl === "function") {
   // 2. 带前缀的反向代理：必须保留 /app/dsh 前缀。
   withBase("https://nas.example.com/app/dsh/", () => {
     eq(
-      resolveApiUrl("/api/dsh-skills-manager/state"),
-      "https://nas.example.com/app/dsh/api/dsh-skills-manager/state",
+      resolveApiUrl("/api/michengai/dsh-skills-manager/state"),
+      "https://nas.example.com/app/dsh/api/michengai/dsh-skills-manager/state",
       "prefix proxy keeps the path prefix",
     );
   });
@@ -96,8 +96,8 @@ if (typeof resolveApiUrl === "function") {
   // 3. 页面地址不带结尾斜杠时也要保留完整前缀（否则会退到上一级目录）。
   withBase("https://nas.example.com/app/dsh", () => {
     eq(
-      resolveApiUrl("/api/dsh-skills-manager/state"),
-      "https://nas.example.com/app/dsh/api/dsh-skills-manager/state",
+      resolveApiUrl("/api/michengai/dsh-skills-manager/state"),
+      "https://nas.example.com/app/dsh/api/michengai/dsh-skills-manager/state",
       "prefix without trailing slash keeps the full prefix",
     );
   });
@@ -125,8 +125,8 @@ if (typeof resolveApiUrl === "function") {
   // 6. 无 document（Node/测试环境）时保持旧行为，避免把端点解析成非法值。
   withBase(undefined, () => {
     eq(
-      resolveApiUrl("/api/dsh-skills-manager/state"),
-      "/api/dsh-skills-manager/state",
+      resolveApiUrl("/api/michengai/dsh-skills-manager/state"),
+      "/api/michengai/dsh-skills-manager/state",
       "no document falls back to the literal path",
     );
   });
@@ -134,8 +134,8 @@ if (typeof resolveApiUrl === "function") {
   // 7. base 非法时也回退原路径，不抛异常。
   withBase("not a url", () => {
     eq(
-      resolveApiUrl("/api/dsh-skills-manager/state"),
-      "/api/dsh-skills-manager/state",
+      resolveApiUrl("/api/michengai/dsh-skills-manager/state"),
+      "/api/michengai/dsh-skills-manager/state",
       "invalid base falls back to the literal path",
     );
   });

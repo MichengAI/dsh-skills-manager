@@ -5,7 +5,7 @@ import { Context } from "@deepseek-ai/cordis";
 import { WebServer } from "@deepseek-ai/dsh-host-webserver";
 import * as plugin from "../lib/index.js";
 
-const prefix = "/api/dsh-skills-manager";
+const prefix = "/api/michengai/dsh-skills-manager";
 const updater = "/api/michengai/dsh-skills-manager/update";
 const ctx = new Context();
 const server = {

@@ -219,7 +219,7 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
       return String(payload == null ? "" : payload);
     }
     function parseApiResponse<T = unknown>(response: Response): Promise<T> { return response.json().catch(function () { var error: CodedError = new Error("non-json response"); error.code = "error.proto.nonJson"; error.params = { status: response.status }; throw error; }).then(function (value: unknown) { const payload = value as {ok?: boolean; data: T}; if (!response.ok || payload.ok === false) throw payload; return payload.data; }); }
-    function callApi<K extends keyof ApiRoutes>(path: K, options?: RequestInit): Promise<ApiRoutes[K]> { return fetch(resolveApiUrl("/api/dsh-skills-manager" + path), options).then(parseApiResponse<ApiRoutes[K]>); }
+    function callApi<K extends keyof ApiRoutes>(path: K, options?: RequestInit): Promise<ApiRoutes[K]> { return fetch(resolveApiUrl("/api/michengai/dsh-skills-manager" + path), options).then(parseApiResponse<ApiRoutes[K]>); }
     function isSkillEnabled(skill: Partial<SkillView>): boolean { if (skill.enabled !== undefined) return skill.enabled === true; return !!(skill.invocationPolicyValid && skill.modelInvocable && skill.userInvocable && skill.managerEnabled !== false); }
     function countKey(key: string, count: number) { return key + (Number(count) === 1 ? ".one" : ".other"); }
     var localeService: ClientContext["locale"] | undefined;

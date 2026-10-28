@@ -33,11 +33,11 @@ apply({
 });
 const server = createServer((req, res) => route.handler(req, res));
 await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
-const api = `http://127.0.0.1:${server.address().port}/api/dsh-skills-manager/repositories`;
+const api = `http://127.0.0.1:${server.address().port}/api/michengai/dsh-skills-manager/repositories`;
 const headers = { "content-type": "application/json", "x-dsh-skills-manager": "1" };
 try {
   const brokenRequest = new EventEmitter();
-  Object.assign(brokenRequest, { url: "/api/dsh-skills-manager/create", method: "POST", headers: { ...headers, host: "localhost" } });
+  Object.assign(brokenRequest, { url: "/api/michengai/dsh-skills-manager/create", method: "POST", headers: { ...headers, host: "localhost" } });
   let outerStatus, outerPayload;
   const brokenResponse = new EventEmitter();
   Object.assign(brokenResponse, { writeHead(status) { outerStatus = status; }, end(body) { outerPayload = JSON.parse(body); } });

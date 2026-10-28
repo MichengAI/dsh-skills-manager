@@ -421,7 +421,7 @@ try {
     assert.equal(response.status, 200, text);
     return JSON.parse(text);
   }
-  const state = await request("/api/dsh-skills-manager/state");
+  const state = await request("/api/michengai/dsh-skills-manager/state");
   assert(state.ok);
   for (const name of ["compat-external", "compat-local"]) {
     assert(
@@ -439,7 +439,7 @@ try {
   assert(snapshot.skill.content.includes("COMPAT_EXTERNAL_BODY"));
   assert(snapshot.skill.invocation.modelInvocable);
   report.checks.push("发布包加载、状态接口、真实 Agent 作用域列表与正文读取");
-  await request("/api/dsh-skills-manager/disable", {
+  await request("/api/michengai/dsh-skills-manager/disable", {
     root: "agents",
     name: "compat-external",
   });
@@ -450,7 +450,7 @@ try {
   );
   assert.equal(snapshot.skill.invocation.modelInvocable, false);
   assert.equal(snapshot.skill.invocation.userInvocable, false);
-  await request("/api/dsh-skills-manager/enable", {
+  await request("/api/michengai/dsh-skills-manager/enable", {
     root: "agents",
     name: "compat-external",
   });
@@ -461,7 +461,7 @@ try {
   report.checks.push(
     "活动 Agent 停用后模型与用户调用策略刷新、恢复启用、源文件不变",
   );
-  const scopedState = await request("/api/dsh-skills-manager/state");
+  const scopedState = await request("/api/michengai/dsh-skills-manager/state");
   const expectedProjectPath = join(workspace, ".dsh", "skills");
   const projectRoots = scopedState.data.roots.filter((item) => item.kind === "project-dsh");
   let projectRoot;
@@ -474,13 +474,13 @@ try {
   assert(projectRoot, "真实 Agent 的项目来源可管理");
   assert.equal(snapshot.scoped.content, "PROJECT_BODY");
   async function toggleScoped(root, enabled) {
-    await request(`/api/dsh-skills-manager/${enabled ? "enable" : "disable"}`, { root, name: "compat-scoped" });
+    await request(`/api/michengai/dsh-skills-manager/${enabled ? "enable" : "disable"}`, { root, name: "compat-scoped" });
     return probe();
   }
   snapshot = await toggleScoped(projectRoot.key, false);
   assert.equal(snapshot.scoped.content, "GLOBAL_BODY", "项目停用后宿主采用全局正文");
   assert.equal(snapshot.scoped.invocation.modelInvocable, true);
-  const fallbackState = await request("/api/dsh-skills-manager/state");
+  const fallbackState = await request("/api/michengai/dsh-skills-manager/state");
   const disabledProject = fallbackState.data.roots.find((r) => r.key === projectRoot.key).skills.find((s) => s.name === "compat-scoped");
   assert.equal(disabledProject.enabled, false);
   assert.equal(disabledProject.shadowedBy, undefined);
@@ -496,12 +496,12 @@ try {
   report.checks.push("项目优先、项目停用后全局回退、全部停用阻断、分别恢复及 UI 状态一致");
   report.checks.push("非 Git 工作区的真实宿主发现、读取、启停及全局回退");
   await mkdir(join(workspace, ".git"));
-  const gitState = await request("/api/dsh-skills-manager/state");
+  const gitState = await request("/api/michengai/dsh-skills-manager/state");
   assert.equal(gitState.data.roots.find((r) => r.kind === "project-dsh").key, projectRoot.key);
   assert.equal((await probe()).scoped.content, "PROJECT_BODY");
   await rm(join(workspace, ".git"), { recursive: true });
   report.checks.push("添加 Git 标记后项目身份和正文保持一致，移除后恢复非 Git 验收环境");
-  await request("/api/dsh-skills-manager/repositories/install", repositoryInstall);
+  await request("/api/michengai/dsh-skills-manager/repositories/install", repositoryInstall);
   snapshot = await probe();
   const installedSkill = snapshot.list.find((skill) => skill.name === "repo-slash");
   assert(installedSkill, "仓库安装后无需手动开关即可进入斜杠目录");

@@ -33,7 +33,7 @@ apply({ effect: fn => fn(), skills: { registerProvider() { return () => {}; } },
 });
 const server = createServer((req, res) => route.handler(req, res));
 await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
-const base = `http://127.0.0.1:${server.address().port}/api/dsh-skills-manager`;
+const base = `http://127.0.0.1:${server.address().port}/api/michengai/dsh-skills-manager`;
 const post = async (path, body) => {
   const response = await nativeFetch(base + path, { method: "POST", headers: { "content-type": "application/json", "x-dsh-skills-manager": "1" }, body: JSON.stringify(body), signal: AbortSignal.timeout(5000) });
   return { status: response.status, ...await response.json() };

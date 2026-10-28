@@ -58,7 +58,7 @@ const originalFetch = globalThis.fetch;
 globalThis.fetch = async (url, options = {}) => {
   const body = options.body ? JSON.parse(options.body) : undefined;
   calls.push({ url: String(url), method: options.method || "GET", body, headers: options.headers });
-  const path = String(url).replace("/api/dsh-skills-manager", "");
+  const path = String(url).replace("/api/michengai/dsh-skills-manager", "");
   let data;
   if (path === "/state") data = globalData;
   else if (path === "/workspaces") {

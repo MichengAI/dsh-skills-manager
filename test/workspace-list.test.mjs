@@ -51,7 +51,7 @@ apply({
 });
 const server = createServer((req, res) => route.handler(req, res));
 await new Promise((done) => server.listen(0, "127.0.0.1", done));
-const base = `http://127.0.0.1:${server.address().port}/api/dsh-skills-manager`;
+const base = `http://127.0.0.1:${server.address().port}/api/michengai/dsh-skills-manager`;
 const headers = { "content-type": "application/json", "x-dsh-skills-manager": "1" };
 const get = async (path) => (await (await fetch(base + path)).json()).data;
 const post = (path, body) => fetch(base + path, { method: "POST", headers, body: JSON.stringify(body) });

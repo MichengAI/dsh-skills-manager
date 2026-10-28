@@ -44,7 +44,7 @@ const originalFetch = globalThis.fetch;
 globalThis.fetch = async (url, options = {}) => {
   const body = options.body ? JSON.parse(options.body) : undefined;
   calls.push({ url: String(url), method: options.method || "GET", body });
-  const path = String(url).replace("/api/dsh-skills-manager", "");
+  const path = String(url).replace("/api/michengai/dsh-skills-manager", "");
   const data = path === "/state" ? globalData : path === "/workspaces" ? { items: workspaces } : path === "/workspace-skills" ? details[body.workspace] : { name: body?.name || "ok" };
   return { ok: true, json: async () => ({ ok: true, data }) };
 };
