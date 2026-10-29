@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.2.22 - 2026-10-29
+
+- Fix 403 Forbidden Host on DSH 0.2.x with LAN IP and remote access (Issue #71):
+  - Completely remove legacy DSH 0.1.x `webRuntime` access, preventing Cordis Context Proxy errors from short-circuiting service fallback;
+  - Fully align with DSH 0.2.x `webStartup` service to properly inherit `--trusted-host` entries;
+  - Admit `--host` listener bind address authorities across arbitrary ports matching host fence semantics, resolving 403 errors when accessing via LAN IP;
+  - Extract authority host from `--public-url` when specified;
+  - Add `DSH_SKILLS_MANAGER_TRUSTED_HOSTS` environment variable fallback (comma-separated list of accepted authorities) for reverse proxy and custom domain deployments.
+
 ## 1.2.21 - 2026-10-28
 
 - Fix Windows transient directory rename locks: Reuse `renameWithRetry` across atomic skill copy, upload staging, skill creation, and repository updates to automatically retry on transient `EPERM`/`EBUSY` locks caused by background filesystem indexers or antivirus scanners, preventing spurious "Import failed" errors.
