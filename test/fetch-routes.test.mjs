@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import * as plugin from "../lib/index.js";
 
 test("方案 A 契约检查：inject 必须包含 connection 服务", () => {
@@ -127,7 +130,7 @@ test("方案 A import 路由：dryRun 试跑绝不触发 afterWrite 刷新通知
       return fn();
     },
     emit(event) {
-      if (event === "chat/refresh" || event === "catalog/reload") broadcastCalled++;
+      if (event === "commands/change" || event === "agent-preset/selected") broadcastCalled++;
     },
   };
 
@@ -135,14 +138,38 @@ test("方案 A import 路由：dryRun 试跑绝不触发 afterWrite 刷新通知
   const importRoute = registeredRoutes.get("/api/michengai/dsh-skills-manager/import");
   assert.ok(importRoute);
 
-  // 发送 dryRun: true 请求
-  const dryReq = new Request("http://localhost/api/michengai/dsh-skills-manager/import", {
-    method: "POST",
-    headers: { "content-type": "application/json", "x-dsh-skills-manager": "1" },
-    body: JSON.stringify({ source: "https://example.com/missing.git", dryRun: true }),
-  });
+  // 构造真实合法的本地 skill 目录
+  const tmp = await mkdtemp(join(tmpdir(), "fetch-dryrun-"));
+  const skillDir = join(tmp, "valid-skill");
+  await mkdir(skillDir, { recursive: true });
+  await writeFile(join(skillDir, "SKILL.md"), "---\nname: valid-skill\ndescription: valid skill\n---\nbody\n");
 
-  const res = await importRoute.fetch(dryReq);
-  // 无论业务返回 400 还是通过，dryRun 均绝不触发写后广播
-  assert.equal(broadcastCalled, 0, "dryRun 试跑绝不能触发广播");
+  try {
+    // 1. 发送 dryRun: true 请求，必须成功（200），但绝对不触发 commands/change 广播
+    const dryReq = new Request("http://localhost/api/michengai/dsh-skills-manager/import", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-dsh-skills-manager": "1" },
+      body: JSON.stringify({ source: skillDir, dryRun: true }),
+    });
+
+    const res = await importRoute.fetch(dryReq);
+    assert.equal(res.status, 200, "dryRun 校验通过必须返回 200");
+    const body = await res.json();
+    assert.equal(body.ok, true, "dryRun 业务必须执行成功");
+    assert.equal(broadcastCalled, 0, "dryRun 试跑成功也绝不能触发广播");
+
+    // 2. 发送真实的写入请求（dryRun: false），必须成功且必须触发广播
+    const writeReq = new Request("http://localhost/api/michengai/dsh-skills-manager/import", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-dsh-skills-manager": "1" },
+      body: JSON.stringify({ source: skillDir, dryRun: false }),
+    });
+    const writeRes = await importRoute.fetch(writeReq);
+    assert.equal(writeRes.status, 200);
+    const writeBody = await writeRes.json();
+    assert.equal(writeBody.ok, true);
+    assert.ok(broadcastCalled > 0, "真正写入时必须触发刷新广播");
+  } finally {
+    await rm(tmp, { recursive: true, force: true });
+  }
 });

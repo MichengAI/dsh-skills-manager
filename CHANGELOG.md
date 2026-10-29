@@ -1,12 +1,24 @@
 # Changelog
 
-## 1.2.22 - 2026-10-29
+## 1.2.23 - 2026-10-29
 
-- Fix 403 Forbidden Host on DSH 0.2.x with LAN IP and remote access (Issue #71):
+- Refactor API routes to host `connection.fetch.register`:
   - Delegate API routes to host `connection.fetch.register`, unifying network admission and cookie authentication with official host semantics;
   - Remove bespoke host fence and `webStartup` inspection, preventing Cordis Context Proxy errors from un-injected property access;
   - Rely on host `connection.admit` for loopback, listener bind addresses, and `--trusted-host` entries;
   - Notice for reverse proxy and custom domain deployments: configured trusted domains should be passed via host `--trusted-host` option.
+- Distinguish workspace path error reasons and preserve errno in diagnostics (Issue #72):
+  - Differentiate `ENOENT`/`ENOTDIR` as `warning.project.missing` and `EACCES`/`EPERM` as `warning.project.unreadable` with errno;
+  - Display granular error reasons in workspace dropdown when paths are unavailable.
+
+## 1.2.22 - 2026-10-29
+
+- Fix 403 Forbidden Host on DSH 0.2.x with LAN IP and remote access (Issue #71):
+  - Completely remove legacy DSH 0.1.x `webRuntime` access, preventing Cordis Context Proxy errors from short-circuiting service fallback;
+  - Fully align with DSH 0.2.x `webStartup` service to properly inherit `--trusted-host` entries;
+  - Admit `--host` listener bind address authorities across arbitrary ports matching host fence semantics, resolving 403 errors when accessing via LAN IP;
+  - Extract authority host from `--public-url` when specified;
+  - Add `DSH_SKILLS_MANAGER_TRUSTED_HOSTS` environment variable fallback (comma-separated list of accepted authorities) for reverse proxy and custom domain deployments.
 
 ## 1.2.21 - 2026-10-28
 

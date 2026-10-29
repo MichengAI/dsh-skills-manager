@@ -555,7 +555,7 @@ export async function indexRegisteredWorkspaces(registered?: string[]): Promise<
  */
 export async function projectRootForRecord(projectRoot: unknown, registered?: string[], indexed?: Array<{ root: SkillRoot } | OperationError>): Promise<{ root: SkillRoot } | OperationError> {
   if (typeof projectRoot !== "string" || !isAbsolute(projectRoot))
-    return { ok: false, error: "安装记录中的工作区路径无效", code: "error.workspace.unavailable" };
+    return { ok: false, error: "安装记录中的工作区路径无效", code: "error.workspace.unavailable", params: { path: typeof projectRoot === "string" ? projectRoot : "" } };
   const saved = await nearestProjectRoot(projectRoot);
   if (!saved?.root || !sameWorkspace(saved.root, projectRoot))
     return { ok: false, error: `工作区目录不可用: ${projectRoot}`, code: "error.workspace.unavailable", params: { path: projectRoot, ...(saved?.code ? { code: saved.code } : {}) } };
