@@ -70,6 +70,7 @@ try {
   assert.equal(plainRow.skillCount, 2);
   const ghostRow = list.items.find((item) => item.available === false);
   assert.equal(resolve(ghostRow.path), resolve(ghost), "目录不存在时标不可用并保留路径");
+  assert.equal(ghostRow.errorCode, "ENOENT", "不可用工作区保留具体错误码");
   assert.equal(ghostRow.skillCount, 0);
 
   const subRow = list.items.find((item) => item.projectRoot === resolve(subOnlyRoot));
@@ -107,7 +108,9 @@ try {
   }
   response = await post("/workspace-skills", { workspace: ghost });
   assert.equal(response.status, 400);
-  assert.equal((await response.json()).code, "error.workspace.unavailable");
+  const ghostErr = await response.json();
+  assert.equal(ghostErr.code, "error.workspace.unavailable");
+  assert.equal(ghostErr.params?.code, "ENOENT", "工作区不可用错误保留具体错误码");
 
   // 5. 在项目页启停只改该项目的副本策略，不影响全局同名技能。
   const root = detail.roots.find((item) => item.kind === "project-dsh");

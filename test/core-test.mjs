@@ -4221,15 +4221,22 @@ try {
   process.env.DSH_HOME = originalDshHome;
   process.env.DSH_AGENTS_HOME = originalAgentsHome;
 }
-const unavailableProjectSnap = await state({
+const missingProjectSnap = await state({
   projectCwds: [join(tmp, "missing-workspace")],
 });
+const missingWarning = missingProjectSnap.warnings.find(
+  (warning) => warning.code === "warning.project.missing",
+);
+ok(missingWarning, "missing active workspaces produce warning.project.missing");
 eq(
-  unavailableProjectSnap.warnings.find(
-    (warning) => warning.code === "warning.project.unavailable",
-  ).params.path,
+  missingWarning.params.path,
   join(tmp, "missing-workspace"),
-  "unreadable active workspaces produce an observable project-discovery warning",
+  "missing active workspace warning preserves path parameter",
+);
+eq(
+  missingWarning.params.code,
+  "ENOENT",
+  "missing active workspace warning preserves ENOENT error code",
 );
 ok(
   registeredTool && registeredTool.name === "create_skill",

@@ -408,9 +408,9 @@ async function nearestProjectRoot(cwd: string) {
   let start;
   try {
     start = await fs.realpath(resolve(cwd));
-    if (!(await fs.stat(start)).isDirectory()) return null;
-  } catch {
-    return { unavailable: true, cwd };
+    if (!(await fs.stat(start)).isDirectory()) return { unavailable: true, cwd, code: "ENOTDIR" };
+  } catch (error: any) {
+    return { unavailable: true, cwd, code: (error && typeof error === "object" && typeof error.code === "string" ? error.code : undefined) || "UNAVAILABLE" };
   }
   let current = start;
   for (;;) {
@@ -460,10 +460,20 @@ export async function projectRoots(projectCwds: string[] = [], diagnostics?: Dia
         typeof cwd === "string" &&
         isAbsolute(cwd)
       ) {
+        const warningCode = found.code === "ENOENT" || found.code === "ENOTDIR"
+          ? "warning.project.missing"
+          : found.code === "EACCES" || found.code === "EPERM"
+            ? "warning.project.unreadable"
+            : "warning.project.unavailable";
+        const warningError = warningCode === "warning.project.missing"
+          ? `工作区目录不存在，可能已被移动或删除: ${cwd}`
+          : warningCode === "warning.project.unreadable"
+            ? `无权限读取工作区目录: ${cwd} (${found.code})`
+            : `无法从宿主读取活动工作区，项目技能未显示: ${cwd}`;
         diagnostics.push({
-          code: "warning.project.unavailable",
-          params: { path: cwd },
-          error: `无法从宿主读取活动工作区，项目技能未显示: ${cwd}`,
+          code: warningCode,
+          params: { path: cwd, ...(found.code ? { code: found.code } : {}) },
+          error: warningError,
         });
       }
       continue;
@@ -547,7 +557,7 @@ export async function projectRootForRecord(projectRoot: unknown, registered?: st
     return { ok: false, error: "安装记录中的工作区路径无效", code: "error.workspace.unavailable" };
   const saved = await nearestProjectRoot(projectRoot);
   if (!saved?.root || !sameWorkspace(saved.root, projectRoot))
-    return { ok: false, error: `工作区目录不可用: ${projectRoot}`, code: "error.workspace.unavailable", params: { path: projectRoot } };
+    return { ok: false, error: `工作区目录不可用: ${projectRoot}`, code: "error.workspace.unavailable", params: { path: projectRoot, ...(saved?.code ? { code: saved.code } : {}) } };
   for (const target of indexed ?? await indexRegisteredWorkspaces(registered)) {
     if ("root" in target && sameWorkspace(target.root.projectRoot!, projectRoot)) return target;
   }
@@ -581,7 +591,7 @@ export async function resolveWorkspaceTarget(
       ok: false,
       error: `工作区目录不可用: ${requested}`,
       code: "error.workspace.unavailable",
-      params: { path: requested },
+      params: { path: requested, ...(found?.code ? { code: found.code } : {}) },
     };
   const source = PROJECT_SOURCES.find((item) => item.key === "dsh")!;
   const root: SkillRoot = {
@@ -4093,6 +4103,7 @@ export interface WorkspaceRow {
   projectRoot?: string;
   registeredPaths: string[];
   available: boolean;
+  errorCode?: string;
   skillCount: number;
 }
 
@@ -4110,7 +4121,7 @@ export async function listWorkspaces(registered: unknown): Promise<WorkspaceRow[
     if (!found || !found.root) {
       const key = `missing:${pathIdentity(path)}`;
       if (!rows.has(key))
-        rows.set(key, { name: basename(path) || path, path, registeredPaths: [path], available: false, skillCount: 0, roots: [] });
+        rows.set(key, { name: basename(path) || path, path, registeredPaths: [path], available: false, errorCode: found?.code, skillCount: 0, roots: [] });
       continue;
     }
     const key = pathIdentity(found.root);
@@ -4155,7 +4166,7 @@ export async function workspaceSkills(workspace: unknown, registered: unknown) {
   if (!list.some((item) => sameWorkspace(item, requested))) return unregistered;
   const found = await nearestProjectRoot(requested);
   if (!found || !found.root)
-    return { ok: false, error: `工作区目录不可用: ${requested}`, code: "error.workspace.unavailable", params: { path: requested } } as OperationError;
+    return { ok: false, error: `工作区目录不可用: ${requested}`, code: "error.workspace.unavailable", params: { path: requested, ...(found?.code ? { code: found.code } : {}) } } as OperationError;
   const snapshot = await state({ projectCwds: [found.cwd] });
   const identity = pathIdentity(found.root);
   const roots = snapshot.roots.filter((root) => root.scope === "project" && root.projectRoot && pathIdentity(root.projectRoot) === identity);

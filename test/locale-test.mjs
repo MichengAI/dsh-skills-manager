@@ -950,6 +950,24 @@ eq(
 );
 eq(
   translateError(mockT, {
+    code: "warning.project.missing",
+    params: { path: "I:/DSH工作区", code: "ENOENT" },
+    error: "工作区目录不存在，可能已被移动或删除: I:/DSH工作区",
+  }),
+  "The workspace directory does not exist and may have been moved or deleted: I:/DSH工作区",
+  "translateError translates missing workspace warning",
+);
+eq(
+  translateError(mockT, {
+    code: "warning.project.unreadable",
+    params: { path: "I:/DSH工作区", code: "EACCES" },
+    error: "无权限读取工作区目录: I:/DSH工作区 (EACCES)",
+  }),
+  "No permission to read the workspace directory: I:/DSH工作区 (EACCES)",
+  "translateError translates unreadable workspace warning",
+);
+eq(
+  translateError(mockT, {
     code: "warning.backupUncleaned",
     params: { path: "C:\\bak", error: "EPERM" },
     error: "旧版本备份未清理",

@@ -174,7 +174,7 @@ try {
   assert.equal(response.status, 400);
   const missingError = await response.json();
   assert.equal(missingError.code, "error.workspace.unavailable");
-  assert.deepEqual(missingError.params, { path: missingWorkspace }, "安装包装和 HTTP run 均保留完整翻译参数");
+  assert.deepEqual(missingError.params, { path: missingWorkspace, code: "ENOENT" }, "安装包装和 HTTP run 均保留完整翻译参数");
   response = await post("repositories/install", { id, path: "demo", root: "agents", workspace: registered });
   assert.equal(response.status, 400, "工作区不能装进 Shared Agent");
   assert.equal(await exists(join(registered, ".agents")), false);
