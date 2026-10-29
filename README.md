@@ -26,6 +26,7 @@ This README describes **1.2.22**. Released changes are in the [changelog](CHANGE
 Bring skills from your computer and projects into DSH without switching between Agent folders.
 
 - **Unified multi-view management**: Browse Global Skills, Project Skills, Discover, and Trash in unified tabs with instant search, status filtering, and collapsible source groups.
+- **Group by source repository**: Switch between grouping by source directory (default) and by source repository. Repository groups come from verifiable records only (install record, directory lock file, skill metadata) and render as **source directory → repository → category directory** (for example `engineering`); skills without evidence fall back to Unclassified instead of guessing from name prefixes.
 - **Broad ecosystem support**: Full coverage for 20+ tools and CLI environments including DSH, Shared Agent, Codex, Claude Code, Copilot, Cursor, Google Antigravity, Windsurf, Qoder, and Trae without touching third-party files.
 - **Categorization and drag & drop**: Create category folders inside sources, drag skill rows (`⋮⋮`) to organize and order them, batch assign skills, and toggle entire categories with a single switch. Category metadata is saved without moving files.
 - **Public markets & repositories**: Integrated Discover hub to explore trending skills from ClawHub and skills.sh, or subscribe to public GitHub repositories with incremental diff inspection and backups.
@@ -119,6 +120,24 @@ Two native switches are available:
 | **Update repository skills** | Click **Refresh**, inspect file diffs with **Review update**, and confirm to update with an automated backup. |
 | **Roll back updates** | Click **Restore previous version** on skills with backup history, preview changes, and confirm rollback. |
 | **Recover deletions** | Open **Trash** to restore accidentally deleted DSH skills with their original locations preserved. |
+
+### Group by source repository
+
+The filter row adds a **Group by** selector: **Source directory** (default, unchanged behaviour) and **Source repository**.
+
+With **Source repository** selected, the first level is still the source directory (DSH, Shared Agent, Claude Code, WorkBuddy, …), and repository plus category become two sub-levels beneath it: **source directory → repository → repository category directory → skills**. For example, `WorkBuddy` expands into `vinvcn/mattpocock-skills-zh-CN`, which expands into `engineering`, `productivity`, `in-progress`, and `misc`. A source directory with no repository evidence gets no empty repository level; its skills are listed directly and the header is marked as a directory fallback.
+
+All three levels start collapsed and open one level per click. They auto-expand only while the search box has content, a status filter is set, or a source is selected, so the panel never opens with hundreds of rows. In the Project view, selecting a workspace opens that directory while its repository level stays collapsed.
+
+Groups use verifiable file facts only, in this order (each level falls back to the next):
+
+1. **Install record**: repository skills installed by this plugin (`repositories.json` installs, with `owner/name` and the in-repository `skillPath`).
+2. **Directory lock file**: `.skills-lock.json` in the source directory (`source` and `skillPath`).
+3. **Skill metadata**: `source` in the skill directory's `_skillhub_meta.json` / `_meta.json`.
+4. **Directory suffix**: a `__<channel>` suffix in the skill directory name (for example `find-skills__skillhub`).
+5. **Directory fallback**: everything else is grouped as Unclassified inside its source directory, and the header marks the evidence as a directory fallback.
+
+Name prefixes are never guessed (`code-review` and `codebase-design` are not merged just because they share a prefix). Grouping is a read-only presentation layer: it moves no files and writes no state, and enable/disable, drag-and-drop categories, and details keep working as before.
 
 ### Four Main Tabs
 

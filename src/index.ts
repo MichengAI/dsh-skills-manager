@@ -47,6 +47,7 @@ import {
 import { registerPluginUpdater } from "./plugin-updater.js";
 import { createRepositoryManager } from "./repositories.js";
 import { installationSourceKey } from "./repository-updates.js";
+import { attachProvenance } from "./provenance.js";
 import { listClawHub, searchClawHub } from "./clawhub-catalog.js";
 import { searchSkillsSh } from "./skills-sh-catalog.js";
 import { loadCatalogPackage, readCatalogSkill } from "./catalog-skill.js";
@@ -512,6 +513,8 @@ function apply(ctx: HostContext, config?: PluginConfig) {
             const realRoot = await realpath(root.path).catch(() => root.path);
             for (const skill of root.skills || []) skill.installSource = sources[installationSourceKey(realRoot, skill.name)] ?? null;
           }
+          // 来源分组：安装记录之外，还要读来源目录里的锁文件、技能目录元数据；全部只读，不改任何文件。
+          await attachProvenance(snapshot);
         } catch (caught) { const error = caught as CodedError; snapshot.warnings.push({ code: "error.repo.state", error: error.message }); }
         return snapshot;
       };
