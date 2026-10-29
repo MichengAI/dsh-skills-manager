@@ -409,7 +409,8 @@ async function nearestProjectRoot(cwd: string) {
   try {
     start = await fs.realpath(resolve(cwd));
     if (!(await fs.stat(start)).isDirectory()) return { unavailable: true, cwd, code: "ENOTDIR" };
-  } catch (error: any) {
+  } catch (caught) {
+    const error = caught as CodedError;
     return { unavailable: true, cwd, code: (error && typeof error === "object" && typeof error.code === "string" ? error.code : undefined) || "UNAVAILABLE" };
   }
   let current = start;
@@ -466,10 +467,10 @@ export async function projectRoots(projectCwds: string[] = [], diagnostics?: Dia
             ? "warning.project.unreadable"
             : "warning.project.unavailable";
         const warningError = warningCode === "warning.project.missing"
-          ? `工作区目录不存在，可能已被移动或删除: ${cwd}`
+          ? `工作区目录不存在，可能已被移动或删除：${cwd}`
           : warningCode === "warning.project.unreadable"
-            ? `无权限读取工作区目录: ${cwd} (${found.code})`
-            : `无法从宿主读取活动工作区，项目技能未显示: ${cwd}`;
+            ? `无权限读取工作区目录：${cwd}（${found.code}）`
+            : `无法从宿主读取活动工作区，项目技能未显示：${cwd}`;
         diagnostics.push({
           code: warningCode,
           params: { path: cwd, ...(found.code ? { code: found.code } : {}) },

@@ -5,11 +5,10 @@
 ## 1.2.22 - 2026-10-29
 
 - 修复 DSH 0.2.x 远程访问与局域网 IP 报 403 错误（Issue #71）：
-  - 彻底清理已废弃的 0.1.x `webRuntime` 残留服务访问，消除 Cordis Context Proxy 在属性未声明 inject 时抛错中断回退链的问题；
-  - 全面适配 DSH 0.2.x 的 `webStartup` 启动服务，支持正常读取 `--trusted-host` 声明的 Host 名单；
-  - 适配 `--host` 绑定网卡地址（直连 IP 放行，任意端口匹配，对齐宿主行为），解决局域网直连形态下插件 API 报「禁止的请求来源（非法 Host）」的缺陷；
-  - 支持提取 `--public-url` 声明的 host authority；
-  - 新增 `DSH_SKILLS_MANAGER_TRUSTED_HOSTS` 环境变量，支持逗号分隔的 authority 白名单，为反向代理等复杂部署场景提供免发版放行通道。
+  - 将管理路由全面委托至宿主标准 `connection.fetch.register` 体系，来源准入与 Cookie 登录鉴权统一由宿主负责；
+  - 彻底删除插件自建 Host 栅栏代码及 `webStartup` 访问，消除 Cordis Context Proxy 在属性未声明 inject 时的抛错隐患；
+  - 依赖宿主 `connection.admit` 统一放行 loopback、`--host` 监听网卡地址与 `--trusted-host` 声明的 Host 名单；
+  - 针对反向代理与自定义域名部署场景：请统一通过宿主启动参数 `--trusted-host` 或配置指定受信域名。
 
 ## 1.2.21 - 2026-10-28
 

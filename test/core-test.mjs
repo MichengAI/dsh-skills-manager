@@ -12,6 +12,7 @@ import {
   symlink,
   rename,
 } from "node:fs/promises";
+import fs from "node:fs/promises";
 import { createServer, request } from "node:http";
 import { basename, dirname, join, sep } from "node:path";
 import { tmpdir } from "node:os";
@@ -4238,6 +4239,29 @@ eq(
   "ENOENT",
   "missing active workspace warning preserves ENOENT error code",
 );
+
+// 验证 EACCES 权限错误端到端派发 warning.project.unreadable
+const originRealpath = fs.realpath;
+fs.realpath = async (p) => {
+  if (String(p).includes("eacces-workspace")) {
+    const err = new Error("permission denied");
+    err.code = "EACCES";
+    throw err;
+  }
+  return originRealpath(p);
+};
+try {
+  const unreadableSnap = await state({
+    projectCwds: [join(tmp, "eacces-workspace")],
+  });
+  const unreadableWarning = unreadableSnap.warnings.find(
+    (w) => w.code === "warning.project.unreadable",
+  );
+  ok(unreadableWarning, "EACCES active workspace produces warning.project.unreadable");
+  eq(unreadableWarning.params.code, "EACCES", "unreadable warning preserves EACCES error code");
+} finally {
+  fs.realpath = originRealpath;
+}
 ok(
   registeredTool && registeredTool.name === "create_skill",
   "host registers the conversational create_skill tool",

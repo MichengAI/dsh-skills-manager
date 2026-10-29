@@ -79,8 +79,70 @@ test("方案 A 契约检查：管理 API 必须全面通过 ctx.connection.fetch
   const badBody = await badRes.json();
   assert.equal(badBody.code, "error.proto.forbidden");
 
+  // 测试 POST 非法 JSON：捕获并返回 400 与 error.proto.invalidJson
+  const invalidJsonReq = new Request("http://localhost/api/michengai/dsh-skills-manager/create", {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-dsh-skills-manager": "1" },
+    body: "not a json string {",
+  });
+  const invalidJsonRes = await createRoute.fetch(invalidJsonReq);
+  assert.equal(invalidJsonRes.status, 400);
+  const invalidJsonBody = await invalidJsonRes.json();
+  assert.equal(invalidJsonBody.code, "error.proto.invalidJson");
+
+  // 测试 POST 超限 Payload：捕获并返回 413 与 error.proto.bodyTooLarge
+  const tooLargeReq = new Request("http://localhost/api/michengai/dsh-skills-manager/create", {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-dsh-skills-manager": "1" },
+    body: JSON.stringify({ name: "a".repeat(1 << 20) }),
+  });
+  const tooLargeRes = await createRoute.fetch(tooLargeReq);
+  assert.equal(tooLargeRes.status, 413);
+  const tooLargeBody = await tooLargeRes.json();
+  assert.equal(tooLargeBody.code, "error.proto.bodyTooLarge");
+
   // 测试清理函数释放所有路由
   for (const cleanup of effects) cleanup();
   assert.equal(registeredRoutes.size, 0, "disposer 必须清空所有 Fetch 路由");
   assert.ok(disposersCalled.length > 0, "所有注册路由注销回调均已被触发");
+});
+
+test("方案 A import 路由：dryRun 试跑绝不触发 afterWrite 刷新通知", async () => {
+  let broadcastCalled = 0;
+  const registeredRoutes = new Map();
+
+  const mockCtx = {
+    connection: {
+      fetch: {
+        register(route) {
+          registeredRoutes.set(route.path, route);
+          return () => {};
+        },
+      },
+    },
+    skills: { registerProvider() { return () => {}; } },
+    tools: { register() { return () => {}; } },
+    sessions: {},
+    effect(fn) {
+      return fn();
+    },
+    emit(event) {
+      if (event === "chat/refresh" || event === "catalog/reload") broadcastCalled++;
+    },
+  };
+
+  plugin.apply(mockCtx);
+  const importRoute = registeredRoutes.get("/api/michengai/dsh-skills-manager/import");
+  assert.ok(importRoute);
+
+  // 发送 dryRun: true 请求
+  const dryReq = new Request("http://localhost/api/michengai/dsh-skills-manager/import", {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-dsh-skills-manager": "1" },
+    body: JSON.stringify({ source: "https://example.com/missing.git", dryRun: true }),
+  });
+
+  const res = await importRoute.fetch(dryReq);
+  // 无论业务返回 400 还是通过，dryRun 均绝不触发写后广播
+  assert.equal(broadcastCalled, 0, "dryRun 试跑绝不能触发广播");
 });

@@ -73,11 +73,6 @@ export interface HostContext {
         };
         requestRejection?: (request: unknown) => number | undefined;
     };
-    webStartup?: {
-        trustedHosts?: string[];
-        host?: string;
-        publicUrl?: string;
-    };
     webServer?: {
         register: (route: {
             kind: string;

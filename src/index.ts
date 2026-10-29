@@ -3,10 +3,10 @@ import type { HostContext, ProviderControl, Agent } from "./host-types.js";
 import type { Log, Serialize, CreateInput, UploadInput, SkillRequest, RepositoryInput, ScopeOptions, SkillRoot, OperationError, RootView, Diagnostic } from "./types.js";
 import type { ProviderCandidate } from "./core.js";
 import type { CodedError } from "./types.js";
-// dsh-skills-manager host half：设置面板的 HTTP 后端（webServer prefix 路由）
-// - host 路由仅依赖 node: 内置与本地 core.js；ZIP 解压封装在 core
+// dsh-skills-manager host half：设置面板的 HTTP 后端（connection.fetch 路由）
+// - host 路由基于 Web Fetch 标准并由宿主 connection.admit / owner 门禁统一准入
 // - 路由：状态、启停、详情、创建、导入、回收站
-// - 全部接口先校验 DSH Web 信任的 Host；写接口再校验请求标记与 JSON
+// - 写接口执行防 CSRF 标记头与同源 Origin 校验；参数与操作保护由业务层负责
 // - 所有来源的启停只写 manager 状态，不改原始 Skill 文件
 // - $DSH_HOME\skills 与活动项目 .dsh/skills 可创建、回收与恢复；Agent 来源文件保持只读
 
@@ -388,13 +388,23 @@ function apply(ctx: HostContext, config?: PluginConfig) {
   const handlePost = async (
     req: Request,
     action: (body: RequestBody, scope: { projectCwds: string[] } | null) => Promise<unknown>,
-    options?: { maxBytes?: number; afterSuccess?: () => void; isRepo?: boolean; queued?: boolean }
+    options?: { maxBytes?: number; afterSuccess?: (body: RequestBody) => void; isRepo?: boolean; queued?: boolean }
   ) => {
     const mutationError = validateMutationRequest(req);
     if (mutationError) {
       return jsonResponse(mutationError.statusCode, { ok: false, code: mutationError.code, error: mutationError.error });
     }
-    const body = await readJsonBody(req, options?.maxBytes);
+    let body: RequestBody;
+    try {
+      body = await readJsonBody(req, options?.maxBytes);
+    } catch (caught) {
+      const e = caught as CodedError;
+      return jsonResponse(Number.isInteger(e && e.statusCode) ? e.statusCode! : 400, {
+        ok: false,
+        code: (e && typeof e.code === "string") ? e.code : "error.proto.invalidJson",
+        error: String(e && e.message ? e.message : e),
+      });
+    }
     if (options?.isRepo && (!body || typeof body !== "object" || Array.isArray(body))) {
       return jsonResponse(400, { ok: false, code: "error.repo.invalid", error: "仓库参数必须是对象" });
     }
@@ -403,7 +413,8 @@ function apply(ctx: HostContext, config?: PluginConfig) {
       if (scope && "ok" in scope && scope.ok === false) return scope;
       return action(body, scope as { projectCwds: string[] } | null);
     };
-    return runFetch(() => (options?.queued !== false ? enqueueMutation(execute) : execute()), options?.afterSuccess);
+    const afterSuccess = options?.afterSuccess ? () => options.afterSuccess!(body) : undefined;
+    return runFetch(() => (options?.queued !== false ? enqueueMutation(execute) : execute()), afterSuccess);
   };
 
   interface ApiFetchRoute {
@@ -707,7 +718,7 @@ function apply(ctx: HostContext, config?: PluginConfig) {
           dryRun: b.dryRun === true,
           ...(target ? { root: (target as { root: SkillRoot }).root } : b.root === "agents" ? { root: await requestRoot("agents", undefined, req.headers.get("x-dsh-skills-session")) } : {}),
         });
-      }, { afterSuccess: afterWrite }),
+      }, { afterSuccess: (b) => { if (b.dryRun !== true) afterWrite(); } }),
     },
     {
       path: `${API_PREFIX}/upload`,
@@ -745,10 +756,16 @@ function apply(ctx: HostContext, config?: PluginConfig) {
       };
     }
     // 兜底：无 connection 时自动通过 webServer 桥接 Fetch 路由（兼顾老测试和纯 webServer 环境）
-    if (ctx.webServer?.register) {
+    let webServer: HostContext["webServer"] | undefined;
+    try {
+      webServer = ctx.webServer;
+    } catch {
+      // 真实 Cordis Context Proxy 在未 inject 且无该服务时抛错，安全捕获忽略
+    }
+    if (webServer?.register) {
       const routeMap = new Map<string, ApiFetchRoute>();
       for (const r of routes) routeMap.set(r.path, r);
-      return ctx.webServer.register({
+      return webServer.register({
         kind: "prefix",
         path: API_PREFIX,
         handler: async (req, res) => {
