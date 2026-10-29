@@ -138,8 +138,11 @@ test("方案 A import 路由：dryRun 试跑绝不触发 afterWrite 刷新通知
   const importRoute = registeredRoutes.get("/api/michengai/dsh-skills-manager/import");
   assert.ok(importRoute);
 
-  // 构造真实合法的本地 skill 目录
+  // 构造真实合法的本地 skill 目录与隔离的 DSH_HOME，绝不污染真实用户目录
   const tmp = await mkdtemp(join(tmpdir(), "fetch-dryrun-"));
+  const originalDshHome = process.env.DSH_HOME;
+  process.env.DSH_HOME = join(tmp, "dsh-home");
+  await mkdir(join(tmp, "dsh-home", "skills"), { recursive: true });
   const skillDir = join(tmp, "valid-skill");
   await mkdir(skillDir, { recursive: true });
   await writeFile(join(skillDir, "SKILL.md"), "---\nname: valid-skill\ndescription: valid skill\n---\nbody\n");
@@ -170,6 +173,8 @@ test("方案 A import 路由：dryRun 试跑绝不触发 afterWrite 刷新通知
     assert.equal(writeBody.ok, true);
     assert.ok(broadcastCalled > 0, "真正写入时必须触发刷新广播");
   } finally {
+    if (originalDshHome !== undefined) process.env.DSH_HOME = originalDshHome;
+    else delete process.env.DSH_HOME;
     await rm(tmp, { recursive: true, force: true });
   }
 });
