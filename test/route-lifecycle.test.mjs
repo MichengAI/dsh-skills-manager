@@ -8,14 +8,20 @@ import * as plugin from "../lib/index.js";
 const prefix = "/api/michengai/dsh-skills-manager";
 const updater = "/api/michengai/dsh-skills-manager/update";
 const ctx = new Context();
-const server = {
-  exact: new Map(),
-  prefixes: new Map(),
-  register: WebServer.prototype.register,
+const fetchRoutes = new Map();
+const connection = {
+  fetch: {
+    register(route) {
+      if (fetchRoutes.has(route.path)) throw new Error(`duplicate fetch route: ${route.path}`);
+      fetchRoutes.set(route.path, route);
+      return () => {
+        fetchRoutes.delete(route.path);
+      };
+    },
+  },
 };
 for (const [name, value] of Object.entries({
-  webServer: server,
-  webStartup: { trustedHosts: [] },
+  connection,
   skills: { registerProvider() { return () => {}; } },
   tools: {},
   sessions: {},
@@ -24,19 +30,19 @@ for (const [name, value] of Object.entries({
 try {
   const fiber = ctx.plugin(plugin);
   await fiber.await();
-  let previous = server.prefixes.get(prefix);
+  assert.ok(fetchRoutes.size > 0, "启动后成功注册所有 Fetch 路由");
+  const initialSize = fetchRoutes.size;
+  let previous = fetchRoutes.get(`${prefix}/state`);
   assert.ok(previous);
   for (let cycle = 0; cycle < 3; cycle++) {
     await fiber.restart();
-    assert.equal(server.prefixes.size, 1);
-    assert.equal(server.exact.size, 1);
-    assert.notEqual(server.prefixes.get(prefix), previous, "restart installs a fresh handler");
-    previous = server.prefixes.get(prefix);
+    assert.equal(fetchRoutes.size, initialSize);
+    assert.notEqual(fetchRoutes.get(`${prefix}/state`), previous, "restart installs a fresh handler");
+    previous = fetchRoutes.get(`${prefix}/state`);
   }
   await fiber.dispose();
   await fiber.await();
-  assert.equal(server.prefixes.size, 0, "unload releases the main API route");
-  assert.equal(server.exact.size, 0, "unload releases the update route");
+  assert.equal(fetchRoutes.size, 0, "unload releases all Fetch routes");
 
   // A later startup error must also release an already registered main route.
   const failing = ctx.plugin({
@@ -47,28 +53,24 @@ try {
     },
   });
   await assert.rejects(failing.await(), /failure after route registration/);
-  assert.equal(server.prefixes.size, 0);
-  assert.equal(server.exact.size, 0);
+  assert.equal(fetchRoutes.size, 0);
   await failing.dispose();
 
   // A real collision must not silently reuse or replace another owner's route.
-  const foreign = { kind: "prefix", path: prefix, handler() {} };
-  const releaseForeign = server.register(foreign);
+  const foreign = { path: `${prefix}/state`, methods: ["GET"], fetch: async () => new Response("ok") };
+  const releaseForeign = connection.fetch.register(foreign);
   const conflict = ctx.plugin(plugin);
-  await assert.rejects(conflict.await(), /duplicate prefix route/);
-  assert.equal(server.prefixes.get(prefix), foreign);
-  assert.equal(server.exact.has(updater), false);
+  await assert.rejects(conflict.await(), /duplicate fetch route/);
+  assert.equal(fetchRoutes.get(`${prefix}/state`), foreign);
   await conflict.dispose();
   releaseForeign();
 
   const reactivated = ctx.plugin(plugin);
   await reactivated.await();
-  assert.equal(server.prefixes.size, 1);
-  assert.equal(server.exact.size, 1);
+  assert.equal(fetchRoutes.size, initialSize);
   await reactivated.dispose();
   await reactivated.await();
-  assert.equal(server.prefixes.size, 0);
-  assert.equal(server.exact.size, 0);
+  assert.equal(fetchRoutes.size, 0);
 } finally {
   await ctx.fiber.dispose();
 }

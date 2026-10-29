@@ -445,6 +445,65 @@ function publicError(error: unknown) {
 function registerPluginUpdater(ctx: HostContext, options: UpdateOptions) {
   const host = ctx;
   let installing = false;
+  if (host.connection?.fetch?.register) {
+    return host.connection.fetch.register({
+      path: options.endpoint,
+      methods: ["GET", "HEAD", "POST"],
+      requestBody: "buffered",
+      fetch: async (request: Request) => {
+        try {
+          if (options.isEnabled) {
+            const allowed = await options.isEnabled();
+            if (!allowed) {
+              return Response.json({ ok: false, code: "error.update.disabled", error: "在线更新已被禁用。" }, { status: 403, headers: { "cache-control": "no-store" } });
+            }
+          }
+          const target = runtime(host);
+          if (request.method === "GET" || request.method === "HEAD") {
+            const payload = await status(options, target);
+            return new Response(request.method === "HEAD" ? null : JSON.stringify(payload), {
+              status: 200,
+              headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
+            });
+          }
+          if (request.method !== "POST") {
+            return new Response(null, { status: 405, headers: { allow: "GET, HEAD, POST" } });
+          }
+          if (request.headers.get(PLUGIN_UPDATE_HEADER) !== "1") {
+            return Response.json({ error: "已拒绝非同源专用更新请求。" }, { status: 403 });
+          }
+          if (installing) {
+            return Response.json({ error: "当前插件正在更新，请稍候。" }, { status: 409 });
+          }
+          const before = await status(options, target);
+          if (before.latestVersion === void 0) {
+            return Response.json({ error: "暂时无法获取最新版本。" }, { status: 503 });
+          }
+          if (!before.updateAvailable) {
+            return Response.json(before, { status: 200 });
+          }
+          installing = true;
+          try {
+            await install(target, `${options.packageName}@${before.latestVersion}`);
+          } finally {
+            installing = false;
+          }
+          const notifyParent = shouldNotifyParent(target);
+          const autoReload = target.desktopPnpm !== void 0 || notifyParent;
+          const body = { ...before, updatedVersion: before.latestVersion, restartRequired: true, autoReload, ...target.officialDesktop ? { restartDesktop: true } : {} };
+          if (notifyParent) setTimeout(() => {
+            process.send?.(PLUGIN_UPDATE_IPC);
+          }, 150).unref?.();
+          return Response.json(body, { status: 200 });
+        } catch (caught) {
+          const error = caught as CodedError;
+          ctx.logger?.warn?.(`plugin updater failed: ${String(error)}`);
+          return Response.json({ error: publicError(error) }, { status: 503 });
+        }
+      },
+    });
+  }
+  if (!host.webServer?.register) return () => {};
   return host.webServer.register({
     kind: "exact",
     path: options.endpoint,

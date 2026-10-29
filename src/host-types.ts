@@ -62,12 +62,23 @@ export interface HostContext {
     get?: <K extends keyof Services>(key: K) => Services[K] | undefined;
     sessions?: Sessions;
     skills: Skills;
+    connection?: {
+        fetch: {
+            register: (route: {
+                path: string;
+                methods: string[];
+                requestBody?: "buffered" | "streaming";
+                fetch: (request: Request) => Promise<Response>;
+            }) => () => void;
+        };
+        requestRejection?: (request: unknown) => number | undefined;
+    };
     webStartup?: {
         trustedHosts?: string[];
         host?: string;
         publicUrl?: string;
     };
-    webServer: {
+    webServer?: {
         register: (route: {
             kind: string;
             path: string;

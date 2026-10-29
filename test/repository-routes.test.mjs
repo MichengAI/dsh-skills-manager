@@ -98,11 +98,6 @@ try {
   assert.equal(rejectedCatalog.status, 400, "非法目录标识在请求上游前被拒绝");
   const head = await fetch(api, { method: "HEAD" });
   assert.equal(head.status, 200); assert.equal(await head.text(), "");
-  const untrustedHostStatus = await new Promise((resolve, reject) => {
-    const req = request(api, { headers: { Host: "evil.example" } }, (res) => { res.resume(); resolve(res.statusCode); });
-    req.on("error", reject); req.end();
-  });
-  assert.equal(untrustedHostStatus, 403);
   for (const action of ["add", "remove", "refresh", "detail", "install", "uninstall", "preview", "update", "rollback"]) {
     assert.equal((await fetch(api + "/" + action, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" })).status, 403);
     assert.equal((await fetch(api + "/" + action, { method: "POST", headers: { ...headers, Origin: "https://evil.example" }, body: "{}" })).status, 403);

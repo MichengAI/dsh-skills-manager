@@ -52,7 +52,7 @@ import { searchSkillsSh } from "./skills-sh-catalog.js";
 import { loadCatalogPackage, readCatalogSkill } from "./catalog-skill.js";
 
 const name = "skills-manager";
-const inject = ["webServer", "skills", "tools", "sessions"];
+const inject = ["connection", "skills", "tools", "sessions"];
 const CLIENT_MARKER_HEADER = "x-dsh-skills-manager";
 const MAX_LOG_BYTES = 1 << 20;
 // 文件夹上传允许 64 MiB 原始内容；Base64 会膨胀约 1/3，再为最多 1000 条路径预留余量。
@@ -78,126 +78,80 @@ function makeLog(): Log {
   };
 }
 
-function readBody(req: IncomingMessage, limit = 1 << 20) {
-  return new Promise<RequestBody>((resolve, reject) => {
-    let size = 0;
-    let settled = false;
-    const chunks: Buffer[] = [];
-    const fail = (error: Error) => {
-      if (settled) return;
-      settled = true;
-      reject(error);
-    };
-    req.on("data", (c) => {
-      if (settled) return;
-      size += c.length;
-      if (size > limit) {
-        const error: CodedError = new Error("body too large");
-        error.statusCode = 413;
-        error.code = "error.proto.bodyTooLarge";
-        fail(error);
-        req.resume();
-        return;
-      }
-      chunks.push(c);
-    });
-    req.on("end", () => {
-      if (settled) return;
-      try {
-        const raw = Buffer.concat(chunks).toString("utf8");
-        const body: RequestBody = raw ? JSON.parse(raw) : {};
-        settled = true;
-        resolve(body);
-      } catch (caught) { const e = caught as CodedError;
-        const error: CodedError = new Error(`invalid JSON body: ${e.message}`);
-        error.statusCode = 400;
-        error.code = "error.proto.invalidJson";
-        fail(error);
-      }
-    });
-    req.on("error", fail);
-  });
-}
-
-/** 将裸 `host[:port]` authority 解析为 URL；非法形态返回 undefined。 */
-function parseAuthority(authority: string) {
+async function readJsonBody(request: Request, limit = 1 << 20): Promise<RequestBody> {
+  const text = await request.text();
+  if (Buffer.byteLength(text) > limit) {
+    const error: CodedError = new Error("body too large");
+    error.statusCode = 413;
+    error.code = "error.proto.bodyTooLarge";
+    throw error;
+  }
+  if (!text.trim()) return {} as RequestBody;
   try {
-    return new URL(`http://${authority}`);
-  } catch {
-    return undefined;
+    return JSON.parse(text);
+  } catch (caught) {
+    const e = caught as CodedError;
+    const error: CodedError = new Error(`invalid JSON body: ${e.message}`);
+    error.statusCode = 400;
+    error.code = "error.proto.invalidJson";
+    throw error;
   }
 }
 
-/**
- * 返回 authority 的规范形态。用 http/https 双重解析保留显式的 :80 / :443，
- * 避免默认端口被 WHATWG URL 自动剥离后意外扩大为任意端口授权。
- */
-function canonicalAuthority(authority: string, parsed: URL) {
-  const port = parsed.port !== "" ? parsed.port : new URL(`https://${authority}`).port;
-  return port === "" ? parsed.hostname : `${parsed.hostname}:${port}`;
-}
-
-/** 只接受纯净、规范的 host[:port]，拒绝路径、userinfo、空白和非规范端口。 */
-function isCanonicalAuthority(authority: string, parsed: URL) {
-  return canonicalAuthority(authority, parsed) === authority.toLowerCase();
-}
-
-/** 与 DSH `/api` 信任栅栏一致：localhost、IPv6 loopback 或 IPv4 127/8。 */
-function isLoopbackHostname(hostname: string) {
-  if (hostname === "localhost" || hostname === "[::1]") return true;
-  const parts = hostname.split(".");
-  return parts.length === 4 && parts[0] === "127" && parts.every((part) => /^\d{1,3}$/.test(part) && Number(part) <= 255);
-}
-
-/** 带端口的 trustedHosts 条目精确匹配；不带端口的条目匹配同主机的任意端口。 */
-function isTrustedAuthority(hostUrl: URL, trustedHosts: string[]) {
-  return trustedHosts.some((entry) => {
-    if (typeof entry !== "string") return false;
-    const entryUrl = parseAuthority(entry);
-    if (!entryUrl || !isCanonicalAuthority(entry, entryUrl)) return false;
-    return canonicalAuthority(entry, entryUrl) === entryUrl.hostname
-      ? entryUrl.hostname === hostUrl.hostname
-      : entryUrl.host === hostUrl.host;
-  });
-}
-
-/**
- * 复用 DSH Web runtime 的 trustedHosts（LAN IP + `--trusted-host`），同时
- * 保留 loopback 默认值；未知 Host、跨站 Fetch 或异源 Origin 继续拒绝。
- */
-function validateRequestOrigin(req: IncomingMessage, trustedHosts: string[] = []) {
-  const host = typeof req.headers.host === "string" ? req.headers.host : "";
-  const hostUrl = parseAuthority(host);
-  if (!hostUrl || !isCanonicalAuthority(host, hostUrl)) {
-    return { statusCode: 403, code: "error.proto.forbiddenHost", error: "forbidden host" };
-  }
-  if (!isLoopbackHostname(hostUrl.hostname) && !isTrustedAuthority(hostUrl, trustedHosts)) {
-    return { statusCode: 403, code: "error.proto.forbiddenHost", error: "forbidden host" };
-  }
-  if (req.headers["sec-fetch-site"] === "cross-site") {
-    return { statusCode: 403, code: "error.proto.forbiddenHost", error: "forbidden host" };
-  }
-  const origin = req.headers.origin;
-  if (typeof origin === "string") {
+/** 写接口额外要求自定义头与 JSON；跨站与未登录由官方宿主 connection.admit / owner 门禁负责。 */
+function validateMutationRequest(req: Request) {
+  const marker = req.headers.get(CLIENT_MARKER_HEADER) || req.headers.get("x-michengai-client");
+  if (marker !== "1") return { statusCode: 403, code: "error.proto.forbidden", error: "forbidden mutation request" };
+  const origin = req.headers.get("origin");
+  if (origin) {
     try {
-      if (new URL(origin).host !== hostUrl.host) {
-        return { statusCode: 403, code: "error.proto.forbiddenHost", error: "forbidden host" };
+      const originHost = new URL(origin).host;
+      const reqHost = req.headers.get("host") || new URL(req.url).host;
+      if (originHost !== reqHost) {
+        return { statusCode: 403, code: "error.proto.forbidden", error: "forbidden cross-origin mutation request" };
       }
     } catch {
-      return { statusCode: 403, code: "error.proto.forbiddenHost", error: "forbidden host" };
+      return { statusCode: 403, code: "error.proto.forbidden", error: "forbidden origin" };
     }
   }
+  const contentType = String(req.headers.get("content-type") || "").split(";", 1)[0].trim().toLowerCase();
+  if (contentType !== "application/json") return { statusCode: 415, code: "error.proto.contentType", error: "content-type must be application/json" };
   return null;
 }
 
-/** 写接口额外要求自定义头与 JSON；自定义头迫使跨站 fetch 预检，且本接口不回 CORS。 */
-function validateMutationRequest(req: IncomingMessage, trustedHosts: string[]) {
-  const hostError = validateRequestOrigin(req, trustedHosts);
-  if (hostError) return hostError;
-  if (req.headers[CLIENT_MARKER_HEADER] !== "1") return { statusCode: 403, code: "error.proto.forbidden", error: "forbidden mutation request" };
-  const contentType = String(req.headers["content-type"] || "").split(";", 1)[0].trim().toLowerCase();
-  if (contentType !== "application/json") return { statusCode: 415, code: "error.proto.contentType", error: "content-type must be application/json" };
-  return null;
+function jsonResponse(code: number, payload: unknown, headOnly = false): Response {
+  const body = JSON.stringify(payload);
+  return new Response(headOnly ? null : body, {
+    status: code,
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "no-store",
+      "content-length": String(Buffer.byteLength(body)),
+    },
+  });
+}
+
+/** 成功统一包成 { ok: true, data }；核心返回 { ok:false, error } 时透传为 400。 */
+async function runFetch(task: () => unknown, afterSuccess?: () => void, headOnly = false): Promise<Response> {
+  try {
+    const r = await task();
+    if (r && typeof r === "object" && "ok" in r && (r as any).ok === false) {
+      return jsonResponse(400, r, headOnly);
+    }
+    if (afterSuccess) {
+      try { afterSuccess(); } catch { /* 目录刷新失败不影响已完成的文件操作 */ }
+    }
+    return jsonResponse(200, { ok: true, data: r }, headOnly);
+  } catch (caught) {
+    const e = caught as CodedError;
+    const status = Number.isInteger(e && e.statusCode) ? e.statusCode! : 500;
+    return jsonResponse(status, {
+      ok: false,
+      ...(e && typeof e.code === "string" ? { code: e.code } : {}),
+      ...(e && e.params && typeof e.params === "object" && !Array.isArray(e.params) ? { params: e.params } : {}),
+      error: String(e && e.message ? e.message : e),
+    }, headOnly);
+  }
 }
 
 function json(res: ServerResponse, code: number, payload: unknown, headOnly = false) {
@@ -214,32 +168,6 @@ function json(res: ServerResponse, code: number, payload: unknown, headOnly = fa
   } catch {
     /* 客户端已断开 */
   }
-}
-
-/** 成功统一包成 { ok: true, data }；核心返回 { ok:false, error } 时透传为 400。 */
-function run(res: ServerResponse, task: () => unknown, afterSuccess?: () => void, headOnly = false) {
-  return Promise.resolve().then(task).then((r) => {
-    if (r && typeof r === "object" && "ok" in r && r.ok === false) json(res, 400, r, headOnly);
-    else {
-      try {
-        if (afterSuccess) afterSuccess();
-      } catch {
-        /* 目录刷新失败不影响已完成的文件操作 */
-      }
-      json(res, 200, { ok: true, data: r }, headOnly);
-    }
-  }).catch((e) => {
-    try {
-      json(res, Number.isInteger(e && e.statusCode) ? e.statusCode! : 500, {
-        ok: false,
-        ...(e && typeof e.code === "string" ? { code: e.code } : {}),
-        ...(e && e.params && typeof e.params === "object" && !Array.isArray(e.params) ? { params: e.params } : {}),
-        error: String(e && e.message ? e.message : e),
-      }, headOnly);
-    } catch {
-      /* response already closed */
-    }
-  });
 }
 
 /** 文件写入后刷新宿主技能目录，并通知 Web 端重拉 `/` 菜单缓存。 */
@@ -378,51 +306,6 @@ function apply(ctx: HostContext, config?: PluginConfig) {
   }), "skills-manager: plugin updater");
   const log = makeLog();
   const repositories = createRepositoryManager({ log, registeredWorkspaces: () => registeredWorkspacePaths(ctx) });
-  const getTrustedHosts = () => {
-    const hosts: string[] = [];
-    try {
-      const rawCtx = ctx as unknown as Record<string, unknown>;
-      // Cordis context proxy throws "cannot get property X without inject" on rawCtx[service] or rawCtx.get
-      const root = (rawCtx.root || rawCtx) as Record<string, unknown>;
-      let startup: Record<string, unknown> | undefined;
-      try {
-        startup = root.webStartup as Record<string, unknown> | undefined;
-      } catch {
-        // ignore proxy getter throw
-      }
-      if (startup && typeof startup === "object") {
-        if (Array.isArray(startup.trustedHosts)) {
-          for (const item of startup.trustedHosts) {
-            if (typeof item === "string" && item.trim()) hosts.push(item.trim());
-          }
-        }
-        if (typeof startup.host === "string" && startup.host.trim()) {
-          const rawHost = startup.host.trim();
-          const zoneAt = rawHost.indexOf("%");
-          const address = zoneAt === -1 ? rawHost : rawHost.slice(0, zoneAt);
-          const normalizedHost = address.includes(":") && !address.startsWith("[") ? `[${address}]` : address;
-          hosts.push(normalizedHost);
-        }
-        if (typeof startup.publicUrl === "string" && startup.publicUrl.trim()) {
-          try {
-            hosts.push(new URL(startup.publicUrl.trim()).host);
-          } catch {
-            // ignore malformed publicUrl
-          }
-        }
-      }
-    } catch {
-      // ignore
-    }
-    const envHosts = process.env.DSH_SKILLS_MANAGER_TRUSTED_HOSTS;
-    if (typeof envHosts === "string" && envHosts.trim()) {
-      for (const item of envHosts.split(",")) {
-        const trimmed = item.trim();
-        if (trimmed) hosts.push(trimmed);
-      }
-    }
-    return hosts;
-  };
   // 目录可被 roots.json 改写，来源定义必须在每次请求时重新读取，不能缓存在启动时。
   const findUserRoot = (key: string) => userRoots().find((root) => root.key === key);
 
@@ -475,258 +358,455 @@ function apply(ctx: HostContext, config?: PluginConfig) {
     });
   }
 
-  // Cordis can construct a plain function apply(), so its returned disposer
-  // is not collected. Own the route explicitly for restart and startup failure.
-  ctx.effect(() => ctx.webServer.register({
-    kind: "prefix",
-    path: "/api/michengai/dsh-skills-manager",
-    handler: async (req, res) => {
-      const u = new URL(req.url!, "http://localhost");
-      const path = u.pathname.replace(/\/+$/, "");
-      const sessionId = req.headers["x-dsh-skills-session"];
-      const projectOptions = () => ({ projectCwds: activeSessionCwds(ctx, sessionId) });
-      /** 请求体带 workspace 时只经登记列表解析；字段存在但无效也拒绝，不静默回退到用户目录。 */
-      const workspaceTarget = async (body: RequestBody) => {
-        if (body.workspace === undefined) return null;
-        return resolveWorkspaceTarget(body.workspace, registeredWorkspacePaths(ctx));
-      };
-      /** 项目页操作带 workspace：先按登记路径校验，再只在该项目的来源里解析，不依赖当前会话。 */
-      const workspaceScope = async (body: RequestBody): Promise<{ projectCwds: string[] } | OperationError | null> => {
-        const target = await workspaceTarget(body);
-        if (!target) return null;
-        if ("ok" in target && target.ok === false) return target;
-        return { projectCwds: (target as { root: SkillRoot }).root.workspaceCwds ?? [] };
-      };
-      const scopedOptions = (scope: { projectCwds: string[] } | null) => scope ?? projectOptions();
-      const requestRoot = async (key: string, cwds?: string[]) => cwds ? (await projectRoots(cwds)).find((root) => root.key === key) : findUserRoot(key) || (await projectRoots(projectOptions().projectCwds)).find((root) => root.key === key);
-      /** 单项操作的统一入口：有 workspace 就在其作用域内解析根，无则沿用当前会话。 */
-      const withScope = async <T>(body: RequestBody, action: (scope: { projectCwds: string[] } | null) => Promise<T>) => {
-        const scope = await workspaceScope(body);
-        if (scope && "ok" in scope && scope.ok === false) return scope;
-        return action(scope as { projectCwds: string[] } | null);
-      };
-      const attachSources = async <T extends { roots: RootView[]; warnings: Diagnostic[] }>(snapshot: T) => {
-        try {
-          const sources = await repositories.sources();
-          for (const root of snapshot.roots) {
-            const realRoot = await realpath(root.path).catch(() => root.path);
-            for (const skill of root.skills || []) skill.installSource = sources[installationSourceKey(realRoot, skill.name)] ?? null;
-          }
-        } catch (caught) { const error = caught as CodedError; snapshot.warnings.push({ code: "error.repo.state", error: error.message }); }
-        return snapshot;
-      };
-      const stateWithSources = async () => attachSources(await state(projectOptions()));
-      try {
-        const hostError = validateRequestOrigin(req, getTrustedHosts());
-        if (hostError) {
-          json(res, hostError.statusCode, { ok: false, code: hostError.code, error: hostError.error });
-          return;
-        }
-        if (req.method === "GET" && path === "/api/michengai/dsh-skills-manager/state") {
-          return run(res, stateWithSources);
-        }
-        if (req.method === "GET" && path === "/api/michengai/dsh-skills-manager/sidebar-entry") {
-          return run(res, async () => ({ enabled: await getSidebarEntry() }));
-        }
-        if (req.method === "GET" && path === "/api/michengai/dsh-skills-manager/online-update") {
-          return run(res, async () => ({ enabled: await isUpdateEnabled(), locked: hostDisabled }));
-        }
-        if ((req.method === "GET" || req.method === "HEAD") && path === "/api/michengai/dsh-skills-manager/workspaces") {
-          return run(res, async () => ({ items: await listWorkspaces(registeredWorkspacePaths(ctx) ?? []) }), undefined, req.method === "HEAD");
-        }
-        if ((req.method === "GET" || req.method === "HEAD") && path === "/api/michengai/dsh-skills-manager/repositories") {
-          return run(res, () => enqueueMutation(() => repositories.list()), undefined, req.method === "HEAD");
-        }
-        if (req.method === "GET" && (path === "/api/michengai/dsh-skills-manager/clawhub/list" || path === "/api/michengai/dsh-skills-manager/clawhub/search")) {
-          const searching = path.endsWith("/search");
-          const allowed = searching ? ["q", "limit"] : ["limit", "cursor", "sort"];
-          if ([...u.searchParams.keys()].some(key => !allowed.includes(key) || u.searchParams.getAll(key).length !== 1) || searching && !u.searchParams.has("q")) {
-            json(res, 400, { ok: false, code: "error.catalog.query", error: "目录查询参数无效" });
-            return;
-          }
-          const parameter = (key: string) => u.searchParams.get(key) ?? undefined;
-          return run(res, () => searching ? searchClawHub(parameter("q")!, { limit: parameter("limit") }) : listClawHub({ limit: parameter("limit"), sort: parameter("sort"), cursor: parameter("cursor") }));
-        }
-        if (req.method === "GET" && path === "/api/michengai/dsh-skills-manager/skills-sh/search") {
-          const queries = u.searchParams.getAll("q");
-          if (queries.length !== 1) {
-            json(res, 400, { ok: false, code: "error.catalog.query", error: "搜索词不能为空且不能超过 100 个字符" });
-            return;
-          }
-          return run(res, () => searchSkillsSh(queries[0]));
-        }
-        if (req.method === "HEAD") {
-          // HEAD 复用 GET/405 的载荷计算 content-length，保持与实体一致的响应头语义。
-          if (path === "/api/michengai/dsh-skills-manager/state") return run(res, stateWithSources, undefined, true);
-          if (path === "/api/michengai/dsh-skills-manager/sidebar-entry") return run(res, async () => ({ enabled: await getSidebarEntry() }), undefined, true);
-          if (path === "/api/michengai/dsh-skills-manager/online-update") return run(res, async () => ({ enabled: await isUpdateEnabled(), locked: hostDisabled }), undefined, true);
-          json(res, 405, { ok: false, code: "error.proto.method", error: `method not allowed: ${req.method}` }, true);
-          return;
-        }
-        if (req.method !== "POST") {
-          json(res, 405, { ok: false, code: "error.proto.method", error: `method not allowed: ${req.method}` });
-          return;
-        }
-        const requestError = validateMutationRequest(req, getTrustedHosts());
-        if (requestError) {
-          json(res, requestError.statusCode, { ok: false, code: requestError.code, error: requestError.error });
-          return;
-        }
-        const body = await readBody(req, path === "/api/michengai/dsh-skills-manager/upload" ? MAX_UPLOAD_BODY_BYTES : undefined);
-        if (path.startsWith("/api/michengai/dsh-skills-manager/repositories/") && (!body || typeof body !== "object" || Array.isArray(body))) {
-          json(res, 400, { ok: false, code: "error.repo.invalid", error: "仓库参数必须是对象" });
-          return;
-        }
-        if (path === "/api/michengai/dsh-skills-manager/browse") {
-          return run(res, () => browseDirectories(body.path));
-        }
-        // 网络只读阶段不占本地写入队列；最终文件和状态提交仍串行。
-        if (path === "/api/michengai/dsh-skills-manager/repositories/refresh") return run(res, () => repositories.refresh(body));
-        if (path === "/api/michengai/dsh-skills-manager/catalog/detail") return run(res, () => readCatalogSkill(body));
-        if (path === "/api/michengai/dsh-skills-manager/catalog/install") {
-          return run(res, async () => {
-            if (body.root !== undefined && body.root !== "dsh" && body.root !== "agents") throw Object.assign(new Error("技能安装位置无效"), { statusCode: 400, code: "error.repo.invalid" });
-            if (body.workspace !== undefined && body.root !== undefined && body.root !== "dsh") throw Object.assign(new Error("工作区只能安装到项目 DSH skills"), { statusCode: 400, code: "error.repo.invalid" });
-            const target = await workspaceTarget(body);
-            if (target && "ok" in target && target.ok === false) return target;
-            const pack = await loadCatalogPackage(body);
-            const catalogId = body.catalog === "skillsh" ? `skillsh:${body.source}/${body.skillId}` : `clawhub:${body.owner}/${body.slug}`;
-            return enqueueMutation(() => repositories.installCatalog(catalogId, pack, { root: body.root, ...(body.workspace === undefined ? {} : { workspace: body.workspace }) }));
-          }, afterWrite);
-        }
-        return enqueueMutation(() => {
-          switch (path) {
-            case "/api/michengai/dsh-skills-manager/sidebar-entry":
-              return run(res, async () => {
-                if (!body || typeof body.enabled !== "boolean") {
-                  throw Object.assign(new Error("enabled 必须是布尔值"), { statusCode: 400, code: "error.proto.invalidParams" });
-                }
-                const enabled = await setSidebarEntry(body.enabled);
-                return { enabled };
-              });
-            case "/api/michengai/dsh-skills-manager/online-update":
-              return run(res, async () => {
-                if (!body || typeof body.enabled !== "boolean") {
-                  throw Object.assign(new Error("enabled 必须是布尔值"), { statusCode: 400, code: "error.proto.invalidParams" });
-                }
-                if (hostDisabled) {
-                  throw Object.assign(new Error("在线更新已被宿主配置锁定禁用"), { statusCode: 403, code: "error.update.disabled" });
-                }
-                const enabled = await setOnlineUpdate(body.enabled);
-                return { enabled };
-              });
-            case "/api/michengai/dsh-skills-manager/repositories/add":
-              return run(res, () => repositories.add(body));
-            case "/api/michengai/dsh-skills-manager/repositories/remove":
-              return run(res, () => repositories.remove(body));
-            case "/api/michengai/dsh-skills-manager/repositories/detail":
-              return run(res, () => repositories.detail(body));
-            case "/api/michengai/dsh-skills-manager/repositories/install":
-              return run(res, () => repositories.install(body, registeredWorkspacePaths(ctx)), afterWrite);
-            case "/api/michengai/dsh-skills-manager/repositories/uninstall":
-              return run(res, () => repositories.uninstall(body), afterWrite);
-            case "/api/michengai/dsh-skills-manager/repositories/preview":
-              return run(res, () => repositories.preview(body));
-            case "/api/michengai/dsh-skills-manager/repositories/update":
-              return run(res, () => repositories.update(body), afterWrite);
-            case "/api/michengai/dsh-skills-manager/repositories/rollback":
-              return run(res, () => repositories.rollback(body), afterWrite);
-            case "/api/michengai/dsh-skills-manager/workspace-skills":
-              return run(res, async () => {
-                const snapshot = await workspaceSkills(body.workspace, registeredWorkspacePaths(ctx));
-                return "roots" in snapshot ? attachSources(snapshot) : snapshot;
-              });
-            case "/api/michengai/dsh-skills-manager/enable":
-              return run(res, () => withScope(body, async (scope) => setSkillEnabled(await requestRoot(String(body.root || "dsh"), scope?.projectCwds), String(body.name || ""), true, log)), afterWrite);
-            case "/api/michengai/dsh-skills-manager/disable":
-              return run(res, () => withScope(body, async (scope) => setSkillEnabled(await requestRoot(String(body.root || "dsh"), scope?.projectCwds), String(body.name || ""), false, log)), afterWrite);
-            case "/api/michengai/dsh-skills-manager/source-enable":
-              return run(res, () => withScope(body, (scope) => setSourceEnabled(String(body.root || ""), true, log, scopedOptions(scope))), afterWrite);
-            case "/api/michengai/dsh-skills-manager/source-disable":
-              return run(res, () => withScope(body, (scope) => setSourceEnabled(String(body.root || ""), false, log, scopedOptions(scope))), afterWrite);
-            case "/api/michengai/dsh-skills-manager/root-path":
-              // path: null / "" 表示恢复默认目录；只改读取位置，不移动任何文件。
-              return run(res, () => setRootPath(String(body.key || ""), body.path === undefined ? null : body.path), afterWrite);
-            case "/api/michengai/dsh-skills-manager/custom-source-add":
-              // sources 支持批量：扫描结果可以一次登记多个来源；单条时直接读 label/path。
-              return run(res, () => addCustomSources(Array.isArray(body.sources) ? body.sources : body), afterWrite);
-            case "/api/michengai/dsh-skills-manager/custom-source-update":
-              return run(res, () => updateCustomSource(String(body.id || ""), body), afterWrite);
-            case "/api/michengai/dsh-skills-manager/custom-source-remove":
-              return run(res, () => removeCustomSource(String(body.id || "")), afterWrite);
-            case "/api/michengai/dsh-skills-manager/custom-source-scan":
-              // 只读扫描，不改动任何文件，也不登记；登记由用户确认后走 add。
-              return run(res, () => scanCustomSourceCandidates(body.path));
-            case "/api/michengai/dsh-skills-manager/category-create":
-              return run(res, () => withScope(body, (scope) => createCategory(String(body.root || ""), String(body.name || ""), log, scopedOptions(scope))));
-            case "/api/michengai/dsh-skills-manager/category-rename":
-              return run(res, () => withScope(body, (scope) => renameCategory(String(body.root || ""), String(body.id || ""), String(body.name || ""), log, scopedOptions(scope))));
-            case "/api/michengai/dsh-skills-manager/category-delete":
-              return run(res, () => withScope(body, (scope) => deleteCategory(String(body.root || ""), String(body.id || ""), log, scopedOptions(scope))));
-            case "/api/michengai/dsh-skills-manager/category-assign":
-              return run(res, () => withScope(body, (scope) => assignSkillCategory(String(body.root || ""), String(body.name || ""), String(body.category || ""), log, scopedOptions(scope))));
-            case "/api/michengai/dsh-skills-manager/category-move":
-              return run(res, () => withScope(body, (scope) => moveSkillInCategory(String(body.root || ""), String(body.name || ""), String(body.category || ""), body.targetName ? String(body.targetName) : undefined, body.position === undefined ? "before" : String(body.position), log, scopedOptions(scope))));
-            case "/api/michengai/dsh-skills-manager/category-enable":
-              return run(res, () => withScope(body, (scope) => setCategoryEnabled(String(body.root || ""), String(body.category || ""), true, log, scopedOptions(scope))), afterWrite);
-            case "/api/michengai/dsh-skills-manager/category-disable":
-              return run(res, () => withScope(body, (scope) => setCategoryEnabled(String(body.root || ""), String(body.category || ""), false, log, scopedOptions(scope))), afterWrite);
-            case "/api/michengai/dsh-skills-manager/delete":
-                          return run(res, () => withScope(body, async (scope) => {
-                            const target = await workspaceTarget(body);
-                            if (target && "ok" in target && target.ok === false) return target;
-                            const root = target ? (target as { root: SkillRoot }).root : await requestRoot(String(body.root || "dsh"), scope?.projectCwds);
-                            return repositories.trashSkill(root, String(body.name || ""));
-                          }), afterWrite);
-            case "/api/michengai/dsh-skills-manager/trash-restore":
-              return run(res, () => withScope(body, (scope) => repositories.restoreTrash(String(body.id || ""), { ...(scope ?? {}), registeredWorkspaces: registeredWorkspacePaths(ctx) })), afterWrite);
-            case "/api/michengai/dsh-skills-manager/trash-delete":
-              return run(res, () => repositories.permanentlyDeleteTrash(String(body.id || "")));
-            case "/api/michengai/dsh-skills-manager/detail":
-              return run(res, () => withScope(body, (scope) => skillDetail(String(body.root || "dsh"), String(body.name || ""), scope ? { ...scope, workspaceBound: true } : projectOptions())));
-            case "/api/michengai/dsh-skills-manager/create":
-              return run(res, async () => {
-                const target = await workspaceTarget(body);
-                if (target && "ok" in target && target.ok === false) return target;
-                return createSkill(
-                  { name: body.name, description: body.description, body: body.body },
-                  log,
-                  { root: target ? (target as { root: SkillRoot }).root : await requestRoot(String(body.root || "dsh")) },
-                );
-              }, afterWrite);
-            case "/api/michengai/dsh-skills-manager/import":
-              return run(res, async () => {
-                const target = await workspaceTarget(body);
-                if (target && "ok" in target && target.ok === false) return target;
-                return importSkill(String(body.source || ""), log, {
-                  conflict: body.conflict === "overwrite" ? "overwrite" : "skip",
-                  dryRun: body.dryRun === true,
-                  ...(target ? { root: (target as { root: SkillRoot }).root } : body.root === "agents" ? { root: await requestRoot("agents") } : {}),
-                });
-              }, body.dryRun === true ? undefined : afterWrite);
-            case "/api/michengai/dsh-skills-manager/upload":
-              return run(res, async () => {
-                const target = await workspaceTarget(body);
-                if (target && "ok" in target && target.ok === false) return target;
-                return importUploadedSkill({ name: body.name, entries: body.entries, zip: body.zip }, log, {
-                  conflict: body.conflict === "overwrite" ? "overwrite" : "skip",
-                  ...(target ? { root: (target as { root: SkillRoot }).root } : body.root === "agents" ? { root: await requestRoot("agents") } : {}),
-                });
-              }, afterWrite);
-            default:
-              json(res, 404, { ok: false, code: "error.proto.unknownAction", error: `unknown action: ${path}` });
-          }
-        });
-      } catch (caught) { const e = caught as CodedError;
-        json(res, Number.isInteger(e && e.statusCode) ? e.statusCode! : 500, {
-          ok: false,
-          ...(e && typeof e.code === "string" ? { code: e.code } : {}),
-          ...(e && e.params && typeof e.params === "object" && !Array.isArray(e.params) ? { params: e.params } : {}),
-          error: String(e && e.message ? e.message : e),
-        });
+  const API_PREFIX = "/api/michengai/dsh-skills-manager";
+  const projectOptions = (sessionId?: string | null) => ({ projectCwds: activeSessionCwds(ctx, sessionId ?? undefined) });
+  const workspaceTarget = async (body: RequestBody) => {
+    if (body.workspace === undefined) return null;
+    return resolveWorkspaceTarget(body.workspace, registeredWorkspacePaths(ctx));
+  };
+  const workspaceScope = async (body: RequestBody): Promise<{ projectCwds: string[] } | OperationError | null> => {
+    const target = await workspaceTarget(body);
+    if (!target) return null;
+    if ("ok" in target && target.ok === false) return target;
+    return { projectCwds: (target as { root: SkillRoot }).root.workspaceCwds ?? [] };
+  };
+  const scopedOptions = (scope: { projectCwds: string[] } | null, sessionId?: string | null) => scope ?? projectOptions(sessionId);
+  const requestRoot = async (key: string, cwds?: string[], sessionId?: string | null) => cwds ? (await projectRoots(cwds)).find((root) => root.key === key) : findUserRoot(key) || (await projectRoots(projectOptions(sessionId).projectCwds)).find((root) => root.key === key);
+
+  const attachSources = async <T extends { roots: RootView[]; warnings: Diagnostic[] }>(snapshot: T) => {
+    try {
+      const sources = await repositories.sources();
+      for (const root of snapshot.roots) {
+        const realRoot = await realpath(root.path).catch(() => root.path);
+        for (const skill of root.skills || []) skill.installSource = sources[installationSourceKey(realRoot, skill.name)] ?? null;
       }
+    } catch (caught) { const error = caught as CodedError; snapshot.warnings.push({ code: "error.repo.state", error: error.message }); }
+    return snapshot;
+  };
+  const stateWithSources = async (req: Request) => attachSources(await state(projectOptions(req.headers.get("x-dsh-skills-session"))));
+
+  const handlePost = async (
+    req: Request,
+    action: (body: RequestBody, scope: { projectCwds: string[] } | null) => Promise<unknown>,
+    options?: { maxBytes?: number; afterSuccess?: () => void; isRepo?: boolean; queued?: boolean }
+  ) => {
+    const mutationError = validateMutationRequest(req);
+    if (mutationError) {
+      return jsonResponse(mutationError.statusCode, { ok: false, code: mutationError.code, error: mutationError.error });
+    }
+    const body = await readJsonBody(req, options?.maxBytes);
+    if (options?.isRepo && (!body || typeof body !== "object" || Array.isArray(body))) {
+      return jsonResponse(400, { ok: false, code: "error.repo.invalid", error: "仓库参数必须是对象" });
+    }
+    const execute = async () => {
+      const scope = await workspaceScope(body);
+      if (scope && "ok" in scope && scope.ok === false) return scope;
+      return action(body, scope as { projectCwds: string[] } | null);
+    };
+    return runFetch(() => (options?.queued !== false ? enqueueMutation(execute) : execute()), options?.afterSuccess);
+  };
+
+  interface ApiFetchRoute {
+    path: string;
+    methods: string[];
+    requestBody?: "buffered" | "streaming";
+    fetch: (request: Request) => Promise<Response>;
+  }
+
+  const routes: ApiFetchRoute[] = [
+    {
+      path: `${API_PREFIX}/state`,
+      methods: ["GET", "HEAD"],
+      fetch: (req) => runFetch(() => stateWithSources(req), undefined, req.method === "HEAD"),
     },
-  }), "skills-manager: API route");
+    {
+      path: `${API_PREFIX}/sidebar-entry`,
+      methods: ["GET", "HEAD", "POST"],
+      fetch: (req) => {
+        if (req.method === "GET" || req.method === "HEAD") {
+          return runFetch(async () => ({ enabled: await getSidebarEntry() }), undefined, req.method === "HEAD");
+        }
+        return handlePost(req, async (b) => {
+          if (!b || typeof b.enabled !== "boolean") {
+            throw Object.assign(new Error("enabled 必须是布尔值"), { statusCode: 400, code: "error.proto.invalidParams" });
+          }
+          const enabled = await setSidebarEntry(b.enabled);
+          return { enabled };
+        });
+      },
+    },
+    {
+      path: `${API_PREFIX}/online-update`,
+      methods: ["GET", "HEAD", "POST"],
+      fetch: (req) => {
+        if (req.method === "GET" || req.method === "HEAD") {
+          return runFetch(async () => ({ enabled: await isUpdateEnabled(), locked: hostDisabled }), undefined, req.method === "HEAD");
+        }
+        return handlePost(req, async (b) => {
+          if (!b || typeof b.enabled !== "boolean") {
+            throw Object.assign(new Error("enabled 必须是布尔值"), { statusCode: 400, code: "error.proto.invalidParams" });
+          }
+          if (hostDisabled) {
+            throw Object.assign(new Error("在线更新已被宿主配置锁定禁用"), { statusCode: 403, code: "error.update.disabled" });
+          }
+          const enabled = await setOnlineUpdate(b.enabled);
+          return { enabled };
+        });
+      },
+    },
+    {
+      path: `${API_PREFIX}/workspaces`,
+      methods: ["GET", "HEAD"],
+      fetch: (req) => runFetch(async () => ({ items: await listWorkspaces(registeredWorkspacePaths(ctx) ?? []) }), undefined, req.method === "HEAD"),
+    },
+    {
+      path: `${API_PREFIX}/repositories`,
+      methods: ["GET", "HEAD"],
+      fetch: (req) => runFetch(() => enqueueMutation(() => repositories.list()), undefined, req.method === "HEAD"),
+    },
+    {
+      path: `${API_PREFIX}/clawhub/list`,
+      methods: ["GET"],
+      fetch: (req) => {
+        const u = new URL(req.url);
+        const allowed = ["limit", "cursor", "sort"];
+        if ([...u.searchParams.keys()].some((key) => !allowed.includes(key) || u.searchParams.getAll(key).length !== 1)) {
+          return Promise.resolve(jsonResponse(400, { ok: false, code: "error.catalog.query", error: "目录查询参数无效" }));
+        }
+        const parameter = (key: string) => u.searchParams.get(key) ?? undefined;
+        return runFetch(() => listClawHub({ limit: parameter("limit"), sort: parameter("sort"), cursor: parameter("cursor") }));
+      },
+    },
+    {
+      path: `${API_PREFIX}/clawhub/search`,
+      methods: ["GET"],
+      fetch: (req) => {
+        const u = new URL(req.url);
+        const allowed = ["q", "limit"];
+        if ([...u.searchParams.keys()].some((key) => !allowed.includes(key) || u.searchParams.getAll(key).length !== 1) || !u.searchParams.has("q")) {
+          return Promise.resolve(jsonResponse(400, { ok: false, code: "error.catalog.query", error: "目录查询参数无效" }));
+        }
+        const parameter = (key: string) => u.searchParams.get(key) ?? undefined;
+        return runFetch(() => searchClawHub(parameter("q")!, { limit: parameter("limit") }));
+      },
+    },
+    {
+      path: `${API_PREFIX}/skills-sh/search`,
+      methods: ["GET"],
+      fetch: (req) => {
+        const u = new URL(req.url);
+        const queries = u.searchParams.getAll("q");
+        if (queries.length !== 1) {
+          return Promise.resolve(jsonResponse(400, { ok: false, code: "error.catalog.query", error: "搜索词不能为空且不能超过 100 个字符" }));
+        }
+        return runFetch(() => searchSkillsSh(queries[0]));
+      },
+    },
+    {
+      path: `${API_PREFIX}/browse`,
+      methods: ["POST"],
+      fetch: (req) => handlePost(req, (b) => browseDirectories(b.path), { queued: false }),
+    },
+    {
+      path: `${API_PREFIX}/repositories/refresh`,
+      methods: ["POST"],
+      fetch: (req) => handlePost(req, (b) => repositories.refresh(b), { queued: false, isRepo: true }),
+    },
+    {
+      path: `${API_PREFIX}/catalog/detail`,
+      methods: ["POST"],
+      fetch: (req) => handlePost(req, (b) => readCatalogSkill(b), { queued: false }),
+    },
+    {
+      path: `${API_PREFIX}/catalog/install`,
+      methods: ["POST"],
+      fetch: (req) => handlePost(req, async (b) => {
+        if (b.root !== undefined && b.root !== "dsh" && b.root !== "agents") throw Object.assign(new Error("技能安装位置无效"), { statusCode: 400, code: "error.repo.invalid" });
+        if (b.workspace !== undefined && b.root !== undefined && b.root !== "dsh") throw Object.assign(new Error("工作区只能安装到项目 DSH skills"), { statusCode: 400, code: "error.repo.invalid" });
+        const target = await workspaceTarget(b);
+        if (target && "ok" in target && target.ok === false) return target;
+        const pack = await loadCatalogPackage(b);
+        const catalogId = b.catalog === "skillsh" ? `skillsh:${b.source}/${b.skillId}` : `clawhub:${b.owner}/${b.slug}`;
+        return enqueueMutation(() => repositories.installCatalog(catalogId, pack, { root: b.root, ...(b.workspace === undefined ? {} : { workspace: b.workspace }) }));
+      }, { queued: false, afterSuccess: afterWrite }),
+    },
+    {
+      path: `${API_PREFIX}/repositories/add`,
+      methods: ["POST"],
+      fetch: (req) => handlePost(req, (b) => repositories.add(b), { isRepo: true }),
+    },
+    {
+      path: `${API_PREFIX}/repositories/remove`,
+      methods: ["POST"],
+      fetch: (req) => handlePost(req, (b) => repositories.remove(b), { isRepo: true }),
+    },
+    {
+      path: `${API_PREFIX}/repositories/detail`,
+      methods: ["POST"],
+      fetch: (req) => handlePost(req, (b) => repositories.detail(b), { isRepo: true }),
+    },
+    {
+      path: `${API_PREFIX}/repositories/install`,
+      methods: ["POST"],
+      fetch: (req) => handlePost(req, (b) => repositories.install(b, registeredWorkspacePaths(ctx)), { isRepo: true, afterSuccess: afterWrite }),
+    },
+    {
+      path: `${API_PREFIX}/repositories/uninstall`,
+      methods: ["POST"],
+      fetch: (req) => handlePost(req, (b) => repositories.uninstall(b), { isRepo: true, afterSuccess: afterWrite }),
+    },
+    {
+      path: `${API_PREFIX}/repositories/preview`,
+      methods: ["POST"],
+      fetch: (req) => handlePost(req, (b) => repositories.preview(b), { isRepo: true }),
+    },
+    {
+      path: `${API_PREFIX}/repositories/update`,
+      methods: ["POST"],
+      fetch: (req) => handlePost(req, (b) => repositories.update(b), { isRepo: true, afterSuccess: afterWrite }),
+    },
+    {
+      path: `${API_PREFIX}/repositories/rollback`,
+      methods: ["POST"],
+      fetch: (req) => handlePost(req, (b) => repositories.rollback(b), { isRepo: true, afterSuccess: afterWrite }),
+    },
+    {
+      path: `${API_PREFIX}/workspace-skills`,
+      methods: ["POST"],
+      fetch: (req) => handlePost(req, async (b) => {
+        const snapshot = await workspaceSkills(b.workspace, registeredWorkspacePaths(ctx));
+        return "roots" in snapshot ? attachSources(snapshot) : snapshot;
+      }),
+    },
+    {
+      path: `${API_PREFIX}/enable`,
+      methods: ["POST"],
+      fetch: (req) => handlePost(req, async (b, scope) => setSkillEnabled(await requestRoot(String(b.root || "dsh"), scope?.projectCwds, req.headers.get("x-dsh-skills-session")), String(b.name || ""), true, log), { afterSuccess: afterWrite }),
+    },
+    {
+      path: `${API_PREFIX}/disable`,
+      methods: ["POST"],
+      fetch: (req) => handlePost(req, async (b, scope) => setSkillEnabled(await requestRoot(String(b.root || "dsh"), scope?.projectCwds, req.headers.get("x-dsh-skills-session")), String(b.name || ""), false, log), { afterSuccess: afterWrite }),
+    },
+    {
+      path: `${API_PREFIX}/source-enable`,
+      methods: ["POST"],
+      fetch: (req) => handlePost(req, (b, scope) => setSourceEnabled(String(b.root || ""), true, log, scopedOptions(scope, req.headers.get("x-dsh-skills-session"))), { afterSuccess: afterWrite }),
+    },
+    {
+      path: `${API_PREFIX}/source-disable`,
+      methods: ["POST"],
+      fetch: (req) => handlePost(req, (b, scope) => setSourceEnabled(String(b.root || ""), false, log, scopedOptions(scope, req.headers.get("x-dsh-skills-session"))), { afterSuccess: afterWrite }),
+    },
+    {
+      path: `${API_PREFIX}/root-path`,
+      methods: ["POST"],
+      fetch: (req) => handlePost(req, (b) => setRootPath(String(b.key || ""), b.path === undefined ? null : b.path), { afterSuccess: afterWrite }),
+    },
+    {
+      path: `${API_PREFIX}/custom-source-add`,
+      methods: ["POST"],
+      fetch: (req) => handlePost(req, (b) => addCustomSources(Array.isArray(b.sources) ? b.sources : b), { afterSuccess: afterWrite }),
+    },
+    {
+      path: `${API_PREFIX}/custom-source-update`,
+      methods: ["POST"],
+      fetch: (req) => handlePost(req, (b) => updateCustomSource(String(b.id || ""), b), { afterSuccess: afterWrite }),
+    },
+    {
+      path: `${API_PREFIX}/custom-source-remove`,
+      methods: ["POST"],
+      fetch: (req) => handlePost(req, (b) => removeCustomSource(String(b.id || "")), { afterSuccess: afterWrite }),
+    },
+    {
+      path: `${API_PREFIX}/custom-source-scan`,
+      methods: ["POST"],
+      fetch: (req) => handlePost(req, (b) => scanCustomSourceCandidates(b.path)),
+    },
+    {
+      path: `${API_PREFIX}/category-create`,
+      methods: ["POST"],
+      fetch: (req) => handlePost(req, (b, scope) => createCategory(String(b.root || ""), String(b.name || ""), log, scopedOptions(scope, req.headers.get("x-dsh-skills-session")))),
+    },
+    {
+      path: `${API_PREFIX}/category-rename`,
+      methods: ["POST"],
+      fetch: (req) => handlePost(req, (b, scope) => renameCategory(String(b.root || ""), String(b.id || ""), String(b.name || ""), log, scopedOptions(scope, req.headers.get("x-dsh-skills-session")))),
+    },
+    {
+      path: `${API_PREFIX}/category-delete`,
+      methods: ["POST"],
+      fetch: (req) => handlePost(req, (b, scope) => deleteCategory(String(b.root || ""), String(b.id || ""), log, scopedOptions(scope, req.headers.get("x-dsh-skills-session")))),
+    },
+    {
+      path: `${API_PREFIX}/category-assign`,
+      methods: ["POST"],
+      fetch: (req) => handlePost(req, (b, scope) => assignSkillCategory(String(b.root || ""), String(b.name || ""), String(b.category || ""), log, scopedOptions(scope, req.headers.get("x-dsh-skills-session")))),
+    },
+    {
+      path: `${API_PREFIX}/category-move`,
+      methods: ["POST"],
+      fetch: (req) => handlePost(req, (b, scope) => moveSkillInCategory(String(b.root || ""), String(b.name || ""), String(b.category || ""), b.targetName ? String(b.targetName) : undefined, b.position === undefined ? "before" : String(b.position), log, scopedOptions(scope, req.headers.get("x-dsh-skills-session")))),
+    },
+    {
+      path: `${API_PREFIX}/category-enable`,
+      methods: ["POST"],
+      fetch: (req) => handlePost(req, (b, scope) => setCategoryEnabled(String(b.root || ""), String(b.category || ""), true, log, scopedOptions(scope, req.headers.get("x-dsh-skills-session"))), { afterSuccess: afterWrite }),
+    },
+    {
+      path: `${API_PREFIX}/category-disable`,
+      methods: ["POST"],
+      fetch: (req) => handlePost(req, (b, scope) => setCategoryEnabled(String(b.root || ""), String(b.category || ""), false, log, scopedOptions(scope, req.headers.get("x-dsh-skills-session"))), { afterSuccess: afterWrite }),
+    },
+    {
+      path: `${API_PREFIX}/delete`,
+      methods: ["POST"],
+      fetch: (req) => handlePost(req, async (b, scope) => {
+        const target = await workspaceTarget(b);
+        if (target && "ok" in target && target.ok === false) return target;
+        const root = target ? (target as { root: SkillRoot }).root : await requestRoot(String(b.root || "dsh"), scope?.projectCwds, req.headers.get("x-dsh-skills-session"));
+        return repositories.trashSkill(root, String(b.name || ""));
+      }, { afterSuccess: afterWrite }),
+    },
+    {
+      path: `${API_PREFIX}/trash-restore`,
+      methods: ["POST"],
+      fetch: (req) => handlePost(req, (b, scope) => repositories.restoreTrash(String(b.id || ""), { ...(scope ?? {}), registeredWorkspaces: registeredWorkspacePaths(ctx) }), { afterSuccess: afterWrite }),
+    },
+    {
+      path: `${API_PREFIX}/trash-delete`,
+      methods: ["POST"],
+      fetch: (req) => handlePost(req, (b) => repositories.permanentlyDeleteTrash(String(b.id || ""))),
+    },
+    {
+      path: `${API_PREFIX}/detail`,
+      methods: ["POST"],
+      fetch: (req) => handlePost(req, (b, scope) => skillDetail(String(b.root || "dsh"), String(b.name || ""), scope ? { ...scope, workspaceBound: true } : projectOptions(req.headers.get("x-dsh-skills-session")))),
+    },
+    {
+      path: `${API_PREFIX}/create`,
+      methods: ["POST"],
+      fetch: (req) => handlePost(req, async (b) => {
+        const target = await workspaceTarget(b);
+        if (target && "ok" in target && target.ok === false) return target;
+        return createSkill(
+          { name: b.name, description: b.description, body: b.body },
+          log,
+          { root: target ? (target as { root: SkillRoot }).root : await requestRoot(String(b.root || "dsh"), undefined, req.headers.get("x-dsh-skills-session")) },
+        );
+      }, { afterSuccess: afterWrite }),
+    },
+    {
+      path: `${API_PREFIX}/import`,
+      methods: ["POST"],
+      fetch: (req) => handlePost(req, async (b) => {
+        const target = await workspaceTarget(b);
+        if (target && "ok" in target && target.ok === false) return target;
+        return importSkill(String(b.source || ""), log, {
+          conflict: b.conflict === "overwrite" ? "overwrite" : "skip",
+          dryRun: b.dryRun === true,
+          ...(target ? { root: (target as { root: SkillRoot }).root } : b.root === "agents" ? { root: await requestRoot("agents", undefined, req.headers.get("x-dsh-skills-session")) } : {}),
+        });
+      }, { afterSuccess: afterWrite }),
+    },
+    {
+      path: `${API_PREFIX}/upload`,
+      methods: ["POST"],
+      fetch: (req) => handlePost(req, async (b) => {
+        const target = await workspaceTarget(b);
+        if (target && "ok" in target && target.ok === false) return target;
+        return importUploadedSkill({ name: b.name, entries: b.entries, zip: b.zip }, log, {
+          conflict: b.conflict === "overwrite" ? "overwrite" : "skip",
+          ...(target ? { root: (target as { root: SkillRoot }).root } : b.root === "agents" ? { root: await requestRoot("agents", undefined, req.headers.get("x-dsh-skills-session")) } : {}),
+        });
+      }, { afterSuccess: afterWrite, maxBytes: MAX_UPLOAD_BODY_BYTES }),
+    },
+  ];
+
+  ctx.effect(() => {
+    // 方案 A：优先官方标准 connection.fetch.register
+    if (ctx.connection?.fetch?.register) {
+      const disposers = routes.map((route) =>
+        ctx.connection!.fetch.register({
+          path: route.path,
+          methods: route.methods,
+          requestBody: route.requestBody ?? "buffered",
+          fetch: route.fetch,
+        })
+      );
+      return () => {
+        for (const disposer of disposers) {
+          try {
+            disposer();
+          } catch {
+            /* ignore */
+          }
+        }
+      };
+    }
+    // 兜底：无 connection 时自动通过 webServer 桥接 Fetch 路由（兼顾老测试和纯 webServer 环境）
+    if (ctx.webServer?.register) {
+      const routeMap = new Map<string, ApiFetchRoute>();
+      for (const r of routes) routeMap.set(r.path, r);
+      return ctx.webServer.register({
+        kind: "prefix",
+        path: API_PREFIX,
+        handler: async (req, res) => {
+          const u = new URL(req.url!, "http://localhost");
+          const path = u.pathname.replace(/\/+$/, "");
+          const route = routeMap.get(path);
+          if (!route) {
+            json(res, 404, { ok: false, code: "error.proto.unknownAction", error: `unknown action: ${path}` });
+            return;
+          }
+          if (!route.methods.includes(req.method!)) {
+            json(res, 405, { ok: false, code: "error.proto.method", error: `method not allowed: ${req.method}` });
+            return;
+          }
+          const headers = new Headers();
+          for (const [k, v] of Object.entries(req.headers)) {
+            if (v !== undefined) {
+              if (Array.isArray(v)) for (const item of v) headers.append(k, item);
+              else headers.set(k, v);
+            }
+          }
+          try {
+            let bodyBuffer: Buffer | null = null;
+            if (req.method !== "GET" && req.method !== "HEAD") {
+              bodyBuffer = await new Promise<Buffer>((resolve, reject) => {
+                const chunks: Buffer[] = [];
+                req.on("data", (c) => chunks.push(c));
+                req.on("end", () => resolve(Buffer.concat(chunks)));
+                req.on("error", reject);
+              });
+            }
+            const fetchReq = new Request(u.toString(), {
+              method: req.method,
+              headers,
+              body: bodyBuffer && bodyBuffer.length > 0 ? new Uint8Array(bodyBuffer) : undefined,
+            });
+            const response = await route.fetch(fetchReq);
+            res.writeHead(response.status, Object.fromEntries(response.headers.entries()));
+            if (req.method === "HEAD") {
+              res.end();
+              return;
+            }
+            const responseBuf = Buffer.from(await response.arrayBuffer());
+            res.end(responseBuf);
+          } catch (caught) {
+            const e = caught as CodedError;
+            json(res, Number.isInteger(e && e.statusCode) ? e.statusCode! : 500, {
+              ok: false,
+              ...(e && typeof e.code === "string" ? { code: e.code } : {}),
+              ...(e && e.params && typeof e.params === "object" && !Array.isArray(e.params) ? { params: e.params } : {}),
+              error: String(e && e.message ? e.message : e),
+            });
+          }
+        },
+      });
+    }
+    return () => {};
+  }, "skills-manager: API routes");
 }
 
 export { activeSessionCwds, apply, inject, name, notifyChatCatalog, registerAgentSkillProviders };
