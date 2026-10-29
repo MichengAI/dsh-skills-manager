@@ -15,7 +15,7 @@ const server = {
 };
 for (const [name, value] of Object.entries({
   webServer: server,
-  webRuntime: { trustedHosts: [] },
+  webStartup: { trustedHosts: [] },
   skills: { registerProvider() { return () => {}; } },
   tools: {},
   sessions: {},

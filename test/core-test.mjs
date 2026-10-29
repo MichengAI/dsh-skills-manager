@@ -2868,13 +2868,15 @@ applyHost({
       return function () {};
     },
   },
-  webRuntime: {
+  webStartup: {
     trustedHosts: [
       "dsh.ere.lan",
       "dsh.fixed.lan:8443",
       "192.168.50.10",
       "attacker.example/path",
     ],
+    host: "10.0.0.8",
+    publicUrl: "https://public.dsh.lan:8443/app",
   },
   skills: {
     registerProvider(register) {
@@ -3437,7 +3439,23 @@ try {
   eq(
     trustedLanResponse.status,
     200,
-    "state route inherits LAN IP authorities derived by DSH Web runtime",
+    "state route inherits LAN IP authorities derived by DSH Web startup",
+  );
+  const bindHostResponse = await requestJson(api + "/state", "GET", {
+    host: "10.0.0.8:" + address.port,
+  });
+  eq(
+    bindHostResponse.status,
+    200,
+    "state route inherits DSH webStartup.host bind authority on arbitrary ports",
+  );
+  const publicUrlHostResponse = await requestJson(api + "/state", "GET", {
+    host: "public.dsh.lan:8443",
+  });
+  eq(
+    publicUrlHostResponse.status,
+    200,
+    "state route inherits authority extracted from DSH webStartup.publicUrl",
   );
   const malformedRequestHostResponse = await requestJson(
     api + "/state",

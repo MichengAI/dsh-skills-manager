@@ -45,7 +45,7 @@ let route;
 apply({
   effect(register) { return register(); },
   skills: { registerProvider() { return () => {}; } },
-  webRuntime: { trustedHosts: [] },
+  webStartup: { trustedHosts: [] },
   webServer: { register(value) { if (value.kind === "prefix") route = value; return () => {}; } },
   get(name) { return name === "workspaceRegistry" ? { list: () => registered } : undefined; },
 });

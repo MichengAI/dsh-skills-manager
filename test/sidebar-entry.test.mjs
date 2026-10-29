@@ -40,7 +40,7 @@ try {
   apply({
     effect(fn) { return fn(); },
     skills: { registerProvider() { return () => {}; } },
-    webRuntime: { trustedHosts: [] },
+    webStartup: { trustedHosts: [] },
     webServer: {
       register(value) {
         if (value.kind === "prefix") route = value;

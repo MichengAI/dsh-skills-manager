@@ -379,19 +379,49 @@ function apply(ctx: HostContext, config?: PluginConfig) {
   const log = makeLog();
   const repositories = createRepositoryManager({ log, registeredWorkspaces: () => registeredWorkspacePaths(ctx) });
   const getTrustedHosts = () => {
+    const hosts: string[] = [];
     try {
       const rawCtx = ctx as unknown as Record<string, unknown>;
-      // Cordis context proxy throws "cannot get property X without inject" on rawCtx.webRuntime or rawCtx.get
-      // Check root properties or safe get without throwing
+      // Cordis context proxy throws "cannot get property X without inject" on rawCtx[service] or rawCtx.get
       const root = (rawCtx.root || rawCtx) as Record<string, unknown>;
-      const candidate = root.webRuntime || root.webStartup;
-      if (candidate && typeof candidate === "object" && Array.isArray((candidate as { trustedHosts?: unknown }).trustedHosts)) {
-        return (candidate as { trustedHosts: string[] }).trustedHosts;
+      let startup: Record<string, unknown> | undefined;
+      try {
+        startup = root.webStartup as Record<string, unknown> | undefined;
+      } catch {
+        // ignore proxy getter throw
+      }
+      if (startup && typeof startup === "object") {
+        if (Array.isArray(startup.trustedHosts)) {
+          for (const item of startup.trustedHosts) {
+            if (typeof item === "string" && item.trim()) hosts.push(item.trim());
+          }
+        }
+        if (typeof startup.host === "string" && startup.host.trim()) {
+          const rawHost = startup.host.trim();
+          const zoneAt = rawHost.indexOf("%");
+          const address = zoneAt === -1 ? rawHost : rawHost.slice(0, zoneAt);
+          const normalizedHost = address.includes(":") && !address.startsWith("[") ? `[${address}]` : address;
+          hosts.push(normalizedHost);
+        }
+        if (typeof startup.publicUrl === "string" && startup.publicUrl.trim()) {
+          try {
+            hosts.push(new URL(startup.publicUrl.trim()).host);
+          } catch {
+            // ignore malformed publicUrl
+          }
+        }
       }
     } catch {
       // ignore
     }
-    return [];
+    const envHosts = process.env.DSH_SKILLS_MANAGER_TRUSTED_HOSTS;
+    if (typeof envHosts === "string" && envHosts.trim()) {
+      for (const item of envHosts.split(",")) {
+        const trimmed = item.trim();
+        if (trimmed) hosts.push(trimmed);
+      }
+    }
+    return hosts;
   };
   // 目录可被 roots.json 改写，来源定义必须在每次请求时重新读取，不能缓存在启动时。
   const findUserRoot = (key: string) => userRoots().find((root) => root.key === key);

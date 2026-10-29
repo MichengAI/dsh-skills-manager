@@ -27,7 +27,7 @@ globalThis.fetch = async (url, options) => {
 };
 const { apply } = await import("../lib/index.js");
 let route;
-apply({ effect: fn => fn(), skills: { registerProvider() { return () => {}; } }, webRuntime: { trustedHosts: [] },
+apply({ effect: fn => fn(), skills: { registerProvider() { return () => {}; } }, webStartup: { trustedHosts: [] },
   webServer: { register(value) { if (value.kind === "prefix") route = value; return () => {}; } },
   get(name) { if (name === "workspaceRegistry") return { list: () => [{ id: "one", title: "项目", path: workspace }] }; },
 });

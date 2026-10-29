@@ -31,7 +31,7 @@ apply({
   sessions: { get: () => ({ header: { cwd: registered } }) },
   effect(register) { return register(); },
   skills: { registerProvider() { return () => {}; } },
-  webRuntime: { trustedHosts: [] },
+  webStartup: { trustedHosts: [] },
   webServer: { register(value) { if (value.kind === "prefix") route = value; return () => {}; } },
   get(name) {
     if (name === "sessions") return { list: () => [{ id: "test-session", header: { agentPreset: "default" } }] };

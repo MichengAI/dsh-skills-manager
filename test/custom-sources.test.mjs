@@ -339,7 +339,7 @@ try {
         return function () {};
       },
     },
-    webRuntime: { trustedHosts: [] },
+    webStartup: { trustedHosts: [] },
     skills: {
       registerProvider(register) {
         register({

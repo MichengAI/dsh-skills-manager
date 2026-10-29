@@ -62,8 +62,10 @@ export interface HostContext {
     get?: <K extends keyof Services>(key: K) => Services[K] | undefined;
     sessions?: Sessions;
     skills: Skills;
-    webRuntime: {
+    webStartup?: {
         trustedHosts?: string[];
+        host?: string;
+        publicUrl?: string;
     };
     webServer: {
         register: (route: {

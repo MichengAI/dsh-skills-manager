@@ -41,7 +41,7 @@ try {
   apply({
     effect(fn) { return fn(); },
     skills: { registerProvider() { return () => {}; } },
-    webRuntime: { trustedHosts: [] },
+    webStartup: { trustedHosts: [] },
     webServer: {
       register(value) {
         if (value.kind === "prefix") prefixRoute = value;
@@ -133,7 +133,7 @@ try {
   apply({
     effect(fn) { return fn(); },
     skills: { registerProvider() { return () => {}; } },
-    webRuntime: { trustedHosts: [] },
+    webStartup: { trustedHosts: [] },
     webServer: {
       register(value) {
         if (value.kind === "prefix") vibePrefixRoute = value;
