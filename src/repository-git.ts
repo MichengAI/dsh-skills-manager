@@ -343,36 +343,66 @@ export async function probeGitRemote(
   }
 }
 
+export async function probeGitHubHttp(
+  owner: string,
+  name: string,
+  fetchImpl: typeof fetch = globalThis.fetch,
+  timeoutMs = 15_000
+): Promise<void> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetchImpl(`https://github.com/${owner}/${name}`, {
+      method: "HEAD",
+      redirect: "manual",
+      signal: controller.signal,
+      headers: { "User-Agent": "Mozilla/5.0" }
+    });
+    if (res.status === 404) {
+      throw failure("仓库无法访问或不存在，请检查地址或权限", "error.repo.network");
+    }
+  } catch (caught: any) {
+    if (caught && caught.code === "error.repo.network") throw caught;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export async function fetchGitRepository(
   repo: RepositorySource,
   destinationDir: string,
   options: GitFetchOptions = {}
 ): Promise<{ commit: string }> {
   const maxBytes = options.maxBytes ?? 2 * 1024 * 1024 * 1024;
-  const timeoutMs = options.timeoutMs ?? 300_000;
+  const timeoutMs = options.timeoutMs ?? 900_000;
+  const deadline = Date.now() + timeoutMs;
   const gitBinary = options.gitBinary || "git";
-  const runOpts = { timeoutMs, gitBinary };
+  const remainingTimeout = () => {
+    const remain = deadline - Date.now();
+    if (remain <= 0) throw failure("Git 请求超时，请检查网络后重试", "error.repo.network");
+    return Math.max(1000, remain);
+  };
   const repoUrl = repo.url || `https://github.com/${repo.owner}/${repo.name}.git`;
   const ref = repo.ref && repo.ref !== "HEAD" ? repo.ref : "HEAD";
 
   await fs.mkdir(destinationDir, { recursive: true });
 
   try {
-    await runGit(["init", "-q"], destinationDir, runOpts);
+    await runGit(["init", "-q"], destinationDir, { timeoutMs: remainingTimeout(), gitBinary });
     const refsToTry = ref === "HEAD" ? ["HEAD"] : [`refs/heads/${ref}`, `refs/tags/${ref}`, ref];
     let fetched = false;
     let lastError: unknown;
 
     for (const r of refsToTry) {
       try {
-        await runGit(["fetch", "--progress", "--depth", "1", "--no-tags", "--", repoUrl, r], destinationDir, runOpts);
+        await runGit(["fetch", "--progress", "--depth", "1", "--no-tags", "--", repoUrl, r], destinationDir, { timeoutMs: remainingTimeout(), gitBinary });
         fetched = true;
         break;
       } catch (err) {
         lastError = err;
         if (r === refsToTry[refsToTry.length - 1]) {
           try {
-            await runGit(["fetch", "--progress", "--no-tags", "--", repoUrl, r], destinationDir, runOpts);
+            await runGit(["fetch", "--progress", "--no-tags", "--", repoUrl, r], destinationDir, { timeoutMs: remainingTimeout(), gitBinary });
             fetched = true;
           } catch {
             throw err;
@@ -382,8 +412,8 @@ export async function fetchGitRepository(
     }
     if (!fetched) throw lastError || failure("Git 分支或标签不存在", "error.repo.network");
 
-    await runGit(["checkout", "-q", "FETCH_HEAD"], destinationDir, runOpts);
-    const { stdout: commitOut } = await runGit(["rev-parse", "FETCH_HEAD^{commit}"], destinationDir, runOpts);
+    await runGit(["checkout", "-q", "FETCH_HEAD"], destinationDir, { timeoutMs: remainingTimeout(), gitBinary });
+    const { stdout: commitOut } = await runGit(["rev-parse", "FETCH_HEAD^{commit}"], destinationDir, { timeoutMs: remainingTimeout(), gitBinary });
     const commit = commitOut.trim();
 
     await rmWithRetry(join(destinationDir, ".git"));

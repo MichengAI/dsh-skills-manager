@@ -6,7 +6,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { unzipSync } from "fflate";
 import { managerHomePath, resolveWorkspaceTarget, repositoryDestinations, trashRootPath, listTrash, restoreTrash as restoreSkillTrash, permanentlyDeleteTrash, parseSkillDoc, importUploadedSkill, deleteSkill, setSkillEnabled, readManagerState, state, createWorkspaceIndex, type indexRegisteredWorkspaces } from "./core.js";
 import { createRepositoryUpdater, fileIndex, signature, readSkillTree, repositoryInstallRoot, recordInstallRoot, selectInstallRecord } from "./repository-updates.js";
-import { parseGitUrl, fetchGitRepository, probeGitRemote } from "./repository-git.js";
+import { parseGitUrl, fetchGitRepository, probeGitRemote, probeGitHubHttp } from "./repository-git.js";
 
 const LIMIT = 32 << 20;
 const STATE_LIMIT = 16 << 20;
@@ -237,7 +237,7 @@ export function createRepositoryManager({
     const keepDir = `${repo.id}-${repo.commit}`;
     const keepZip = `${repo.id}-${repo.commit}.zip`;
     for (const name of await fs.readdir(dir)) {
-      if (name.startsWith(".stage-" + repo.id + "-") || (name.startsWith(repo.id + "-") && name !== keepDir && name !== keepZip)) {
+      if (name.startsWith(".stage-") || (name.startsWith(repo.id + "-") && name !== keepDir && name !== keepZip)) {
         await fs.rm(join(dir, name), { recursive: true, force: true }).catch(() => undefined);
       }
     }
@@ -674,19 +674,25 @@ export function createRepositoryManager({
       return { catalogInstalls: catalogRecords(data).map(record => record.id) };
     }, false),
     ...createRepositoryUpdater({ read, write, repository, download, serialize, parseRepositoryInput, registeredWorkspaces, onWorkspaceIndexBuild }),
-    add: (input: RepositoryInput) => serialize(async () => {
-      const source = parseRepositoryInput(input), data = await read();
-      const id = createHash("sha256").update(JSON.stringify(source)).digest("hex").slice(0, 24);
-      if (data.repositories.some((r) => r.id === id)) throw failure("该仓库已添加");
-      if (data.repositories.length >= 30) throw failure("最多添加 30 个仓库");
+    add: async (input: RepositoryInput) => {
+      const source = parseRepositoryInput(input);
       const shouldProbe = !gitFetch && defaultProbe && input.skipProbe !== true && process.env.DSH_SKILLS_MANAGER_SKIP_PROBE !== "1";
       if (shouldProbe) {
-        const probeTarget = source.url || `https://github.com/${source.owner}/${source.name}.git`;
-        await probeGitRemote(probeTarget);
+        if (source.url) {
+          await probeGitRemote(source.url);
+        } else {
+          await probeGitHubHttp(source.owner, source.name, fetchImpl);
+        }
       }
-      const repo: Repository = { ...source, id, skills: [], commit: null, refreshedAt: null, error: null };
-      data.repositories.push(repo); await write(data); return repo;
-    }, false),
+      return serialize(async () => {
+        const data = await read();
+        const id = createHash("sha256").update(JSON.stringify(source)).digest("hex").slice(0, 24);
+        if (data.repositories.some((r) => r.id === id)) throw failure("该仓库已添加");
+        if (data.repositories.length >= 30) throw failure("最多添加 30 个仓库");
+        const repo: Repository = { ...source, id, skills: [], commit: null, refreshedAt: null, error: null };
+        data.repositories.push(repo); await write(data); return repo;
+      }, false);
+    },
     remove: ({ id }: {id: string}) => serialize(async () => {
       const data = await read(); const repo = repository(data, id);
       for (const record of data.installs.filter(i => i.id === id)) record.source ||= { owner: repo.owner, name: repo.name, ref: repo.ref, subdirectory: repo.subdirectory, ...(repo.url ? { url: repo.url } : {}) };
@@ -697,7 +703,7 @@ export function createRepositoryManager({
       try {
         const dir = await cacheDirectory();
         for (const name of await fs.readdir(dir)) {
-          if (name.startsWith(id + "-") || name.startsWith(".stage-" + id + "-")) {
+          if (name.startsWith(id + "-") || name.startsWith(".stage-" + id + "-") || name.startsWith(".stage-")) {
             await fs.rm(join(dir, name), { recursive: true, force: true }).catch(() => undefined);
           }
         }
