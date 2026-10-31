@@ -321,11 +321,19 @@ try {
   await reloadRootPathOverrides();
   eq(userRoots().find((root) => root.key === persisted.added[0].id)?.label, "Persisted", "重新读取配置后仍然生效");
 
+  // 移除前显式在 raw state.json 中为该自定义来源写入备注与分类，确保移除时有真实数据被清理（防同义反复假绿）
+  const statePath = join(process.env.DSH_HOME, "skills-manager", "state.json");
+  const rawStateBefore = JSON.parse(await readFile(statePath, "utf8"));
+  rawStateBefore.customNotes = rawStateBefore.customNotes || {};
+  rawStateBefore.customNotes[persisted.added[0].id] = { "some-skill": "自定义备注内容" };
+  rawStateBefore.categories = rawStateBefore.categories || {};
+  rawStateBefore.categories[persisted.added[0].id] = [{ id: "cat1", name: "分类1" }];
+  await writeFile(statePath, JSON.stringify(rawStateBefore, null, 2));
+
   const removed = await removeCustomSource(persisted.added[0].id);
   eq(removed.ok, true, "移除登记成功");
   ok(!userRoots().some((root) => root.key === persisted.added[0].id), "移除后来源消失");
   // 验证移除来源时主动清理原始 state.json 中的孤立数据
-  const statePath = join(process.env.DSH_HOME, "skills-manager", "state.json");
   const rawStateAfterRemove = JSON.parse(await readFile(statePath, "utf8"));
   eq(rawStateAfterRemove.customNotes?.[persisted.added[0].id], undefined, "移除来源后清理 customNotes 映射");
   eq(rawStateAfterRemove.categories?.[persisted.added[0].id], undefined, "移除来源后清理 categories 映射");
