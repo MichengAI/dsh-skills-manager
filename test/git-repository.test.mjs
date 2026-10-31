@@ -1,6 +1,6 @@
 // 验证支持多种 Git 托管平台（Gitee、GitLab 等）、加速代理地址及 Git 获取与大小限制。
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, writeFile, readFile, rm, readdir } from "node:fs/promises";
+import { mkdtemp, mkdir, writeFile, readFile, rm, readdir, utimes } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
@@ -10,7 +10,7 @@ process.env.DSH_HOME = join(sandbox, "home");
 process.env.USERPROFILE = join(sandbox, "user");
 
 try {
-  const { parseGitUrl, fetchGitRepository } = await import("../lib/repository-git.js");
+  const { parseGitUrl, fetchGitRepository, probeGitRemote, probeGitHubHttp } = await import("../lib/repository-git.js");
   const { parseRepositoryInput, createRepositoryManager } = await import("../lib/repositories.js");
   const { installationSourceKey } = await import("../lib/repository-updates.js");
 
@@ -137,6 +137,32 @@ try {
   await manager.remove({ id: addedGitee.id });
   const cacheAfterRemove = await readdir(cacheDir);
   assert.ok(!cacheAfterRemove.some((name) => name.startsWith(addedGitee.id)), "移除后磁盘上的快照缓存已清理");
+
+  // 4. probeGitHubHttp 单元测试（200放行、404拦截、网络异常宽容）
+  await probeGitHubHttp("valid-owner", "valid-repo", async () => ({ status: 200 }));
+  await assert.rejects(
+    probeGitHubHttp("invalid-owner", "invalid-repo", async () => ({ status: 404 })),
+    (err) => err.code === "error.repo.network",
+    "GitHub 简写返回 404 时必须抛出 error.repo.network"
+  );
+  // 网络超时或 500 不硬阻断
+  await probeGitHubHttp("err-owner", "err-repo", async () => { throw new Error("fetch failed"); });
+
+  // 5. 并发 stage 目录隔离测试：pruneCache 不得清理其他仓库在途的 .stage- 目录
+  await mkdir(cacheDir, { recursive: true });
+  const otherRepoStage = join(cacheDir, ".stage-otherRepoA-inflight");
+  const staleOrphanStage = join(cacheDir, ".stage-staleOrphan-old");
+  await mkdir(otherRepoStage, { recursive: true });
+  await mkdir(staleOrphanStage, { recursive: true });
+  const twoHoursAgo = new Date(Date.now() - 2 * 3600_000);
+  await utimes(staleOrphanStage, twoHoursAgo, twoHoursAgo);
+
+  const testRepoB = await manager.add({ url: remoteDir, subdirectory: "skills" });
+  await manager.refresh({ id: testRepoB.id });
+  const cacheAfterRefresh = await readdir(cacheDir);
+  assert.ok(cacheAfterRefresh.includes(".stage-otherRepoA-inflight"), "并发仓库在途的 .stage 目录不得被清理");
+  assert.ok(!cacheAfterRefresh.includes(".stage-staleOrphan-old"), "超过 1 小时的孤儿 .stage 目录应被安全回收");
+  await manager.remove({ id: testRepoB.id });
 
   console.log("Git 仓库地址解析、Git 检出、配额防御与端到端管理测试通过");
 } finally {

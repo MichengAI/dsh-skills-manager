@@ -187,7 +187,7 @@ export async function getDirectorySize(dir: string): Promise<number> {
   return total;
 }
 
-function mapGitError(stderr: string, url: string): CodedError {
+function mapGitError(stderr: string): CodedError {
   const low = stderr.toLowerCase();
   if (
     low.includes("could not read username") ||
@@ -197,7 +197,12 @@ function mapGitError(stderr: string, url: string): CodedError {
   ) {
     return failure("Git 仓库需要鉴权或无权访问，请确认仓库公开可访问", "error.repo.network");
   }
-  if (low.includes("couldn't find remote ref") || low.includes("unknown revision") || low.includes("not found")) {
+  if (
+    low.includes("couldn't find remote ref") ||
+    low.includes("unknown revision") ||
+    low.includes("not found") ||
+    low.includes("does not appear to be a git repository")
+  ) {
     return failure("Git 仓库或分支不存在", "error.repo.network");
   }
   if (
@@ -267,6 +272,7 @@ function runGit(
           LANGUAGE: "C",
         },
         stdio: ["ignore", "pipe", "pipe"],
+        detached: process.platform !== "win32",
       }
     );
     let stdout = "";
@@ -301,7 +307,7 @@ function runGit(
       clearTimeout(timer);
       if (killed) return;
       if (code === 0) resolve({ stdout, stderr });
-      else reject(mapGitError(stderr || stdout, ""));
+      else reject(mapGitError(stderr || stdout));
     });
   });
 }
@@ -325,15 +331,6 @@ export async function probeGitRemote(
 ): Promise<void> {
   const timeoutMs = options.timeoutMs ?? 30_000;
   const gitBinary = options.gitBinary || "git";
-
-  if (repoUrl.startsWith("/") || /^[a-zA-Z]:[\\/]/.test(repoUrl)) {
-    try {
-      const st = await fs.lstat(repoUrl);
-      if (st.isDirectory()) return;
-    } catch {
-      throw failure("本地 Git 仓库路径不存在", "error.repo.invalid");
-    }
-  }
 
   try {
     await runGit(["ls-remote", "--heads", "-q", "--", repoUrl], process.cwd(), { timeoutMs, gitBinary });
@@ -415,6 +412,11 @@ export async function fetchGitRepository(
     await runGit(["checkout", "-q", "FETCH_HEAD"], destinationDir, { timeoutMs: remainingTimeout(), gitBinary });
     const { stdout: commitOut } = await runGit(["rev-parse", "FETCH_HEAD^{commit}"], destinationDir, { timeoutMs: remainingTimeout(), gitBinary });
     const commit = commitOut.trim();
+
+    const rawSize = await getDirectorySize(destinationDir);
+    if (rawSize > maxBytes) {
+      throw failure("仓库超过大小限制", "error.repo.tooLarge", { limit: maxBytes, actual: rawSize });
+    }
 
     await rmWithRetry(join(destinationDir, ".git"));
     const totalSize = await getDirectorySize(destinationDir);

@@ -30,10 +30,8 @@ function validateStoredState(input: unknown): asserts input is RepositoryState {
   for (const repo of value.repositories) {
     if (!repo || typeof repo.id !== "string" || !Array.isArray(repo.skills) || repo.skills.length > 500) throw failure("仓库状态格式无效");
     const source = parseRepositoryInput({ url: repo.url || `${repo.owner}/${repo.name}`, ref: repo.ref, subdirectory: repo.subdirectory });
-    const legacySource = repo.url ? { owner: repo.owner, name: repo.name, ref: repo.ref, subdirectory: repo.subdirectory, url: repo.url } : null;
     const expectedId = hash(JSON.stringify(source)).slice(0, 24);
-    const legacyId = legacySource ? hash(JSON.stringify(legacySource)).slice(0, 24) : null;
-    if ((expectedId !== repo.id && legacyId !== repo.id) || (repo.commit !== null && !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(repo.commit))) throw failure("仓库状态来源无效");
+    if (expectedId !== repo.id || (repo.commit !== null && !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(repo.commit))) throw failure("仓库状态来源无效");
     for (const skill of repo.skills) {
       if (!skill || typeof skill.name !== "string" || typeof skill.description !== "string" || typeof skill.body !== "string" || typeof skill.valid !== "boolean" || !/^[a-f0-9]{64}$/.test(skill.documentHash)) throw failure("仓库技能状态无效");
       safePath(skill.path, true);
@@ -236,9 +234,17 @@ export function createRepositoryManager({
     const dir = await cacheDirectory();
     const keepDir = `${repo.id}-${repo.commit}`;
     const keepZip = `${repo.id}-${repo.commit}.zip`;
+    const now = Date.now();
     for (const name of await fs.readdir(dir)) {
-      if (name.startsWith(".stage-") || (name.startsWith(repo.id + "-") && name !== keepDir && name !== keepZip)) {
+      if (name.startsWith(".stage-" + repo.id + "-") || (name.startsWith(repo.id + "-") && name !== keepDir && name !== keepZip)) {
         await fs.rm(join(dir, name), { recursive: true, force: true }).catch(() => undefined);
+      } else if (name.startsWith(".stage-")) {
+        try {
+          const st = await fs.stat(join(dir, name));
+          if (now - st.mtimeMs > 3600_000) {
+            await fs.rm(join(dir, name), { recursive: true, force: true }).catch(() => undefined);
+          }
+        } catch {}
       }
     }
   }
@@ -703,7 +709,7 @@ export function createRepositoryManager({
       try {
         const dir = await cacheDirectory();
         for (const name of await fs.readdir(dir)) {
-          if (name.startsWith(id + "-") || name.startsWith(".stage-" + id + "-") || name.startsWith(".stage-")) {
+          if (name.startsWith(id + "-") || name.startsWith(".stage-" + id + "-")) {
             await fs.rm(join(dir, name), { recursive: true, force: true }).catch(() => undefined);
           }
         }
