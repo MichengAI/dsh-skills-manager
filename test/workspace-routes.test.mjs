@@ -283,6 +283,18 @@ try {
   response = await post("category-move", { root: projectKey, name: "route-create", category: categoryId, workspace: registered });
   assert.equal(response.status, 200, await response.clone().text());
   assert.deepEqual(emitted, [], "排序只改管理器元数据，不刷新宿主技能目录");
+  // 验证 /skill-note 路由：作用域、成功与失败校验
+  response = await post("skill-note", { root: projectKey, name: "route-create", note: "路由测试备注", workspace: registered });
+  assert.equal(response.status, 200, await response.clone().text());
+  assert.equal((await response.json()).data.note, "路由测试备注");
+  // 不存在的技能返回 400 与 error.skill.notFound
+  response = await post("skill-note", { root: projectKey, name: "ghost-skill", note: "测试", workspace: registered });
+  assert.equal(response.status, 400);
+  assert.equal((await response.json()).code, "error.skill.notFound");
+  // 未登记的项目根返回 400
+  response = await post("skill-note", { root: "project-dsh:0123456789abcdef", name: "route-create", note: "测试", workspace: registered });
+  assert.equal(response.status, 400);
+  assert.equal((await response.json()).code, "error.note.root");
   response = await post("category-disable", { root: projectKey, category: categoryId, workspace: registered });
   assert.equal(response.status, 200, await response.clone().text());
   assert.ok(emitted.some(([name]) => name === "commands/change"), "分类启停仍刷新宿主技能目录");

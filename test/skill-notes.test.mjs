@@ -107,6 +107,26 @@ try {
   const rawStateAfter = (await readManagerState()).state;
   assert.equal(rawStateAfter.customNotes?.dsh?.["kept-skill"], undefined, "永久删除后清理备注");
 
+  // 9. 边界缺陷：同名现役技能防误删
+  // 场景：技能 active-note 被移入回收站（旧条目），随后用户又新建了同名技能 active-note 并设置了新备注；
+  // 此时去永久删除旧回收站条目，不能误杀现役 active-note 的新备注！
+  await writeSkill(dsh, "active-note", "旧说明");
+  await setSkillNote("dsh", "active-note", "旧备注");
+  const oldTrash = await deleteSkill(dsh, "active-note");
+  // 新建同名技能并写新备注
+  await writeSkill(dsh, "active-note", "新说明");
+  await setSkillNote("dsh", "active-note", "新现役备注");
+  assert.equal((await readManagerState()).state.customNotes?.dsh?.["active-note"], "新现役备注");
+  // 永久删除旧条目
+  await permanentlyDeleteTrash(oldTrash.id);
+  // 断言：现役同名技能的备注绝不能被清空！
+  const stateAfterTrashDelete = (await readManagerState()).state;
+  assert.equal(
+    stateAfterTrashDelete.customNotes?.dsh?.["active-note"],
+    "新现役备注",
+    "永久删除旧回收站条目时，如果该来源下当前已有同名现役技能，绝不能清空现役技能的备注！"
+  );
+
   console.log("skill-notes.test.mjs passed");
 } finally {
   await rm(temporary, { recursive: true, force: true });

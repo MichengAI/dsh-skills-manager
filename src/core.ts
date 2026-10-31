@@ -2130,6 +2130,15 @@ function validManagerStateDocument(value: ManagerState) {
     if ((enabledSkills[key] || []).some((name) => disabled.has(name)))
       return false;
   }
+  if (value.customNotes !== undefined) {
+    if (!value.customNotes || typeof value.customNotes !== "object" || Array.isArray(value.customNotes)) return false;
+    for (const [key, record] of Object.entries(value.customNotes)) {
+      if (!categoryRootKey(key) || !record || typeof record !== "object" || Array.isArray(record)) return false;
+      for (const [name, note] of Object.entries(record)) {
+        if (!validStateSkillName(name) || typeof note !== "string" || note.length > SKILL_NOTE_MAX) return false;
+      }
+    }
+  }
   return true;
 }
 
@@ -2578,25 +2587,25 @@ export async function setSkillEnabled(root: RootInput, name: string, enabled: bo
   return setPolicySkillEnabled(root, name, enabled, log);
 }
 
-function noteError(code: string, error: string, params?: Record<string, unknown>): OperationError {
+function categoryError(code: string, error: string, params?: Record<string, unknown>): OperationError {
   return { ok: false, code, error, ...(params ? { params } : {}) };
 }
 
 export async function setSkillNote(key: string, skillName: string, noteText: string, log?: Log, options: ScopeOptions = {}) {
   const rootKey = categoryRootKey(key);
-  if (!rootKey) return noteError("error.note.root", `技能来源不存在: ${key}`, { root: key });
+  if (!rootKey) return categoryError("error.note.root", `技能来源不存在: ${key}`, { root: key });
   const root = await resolvedCategoryRoot(rootKey, options);
-  if (!root) return noteError("error.note.root", `技能来源不存在: ${key}`, { root: key });
+  if (!root) return categoryError("error.note.root", `技能来源不存在: ${key}`, { root: key });
   if (!validStateSkillName(skillName))
-    return noteError("error.skill.notFound", `技能不存在: ${skillName}`, { name: skillName });
+    return categoryError("error.skill.notFound", `技能不存在: ${skillName}`, { name: skillName });
 
   const entry = await resolveEntry(root, skillName);
   if (!entry)
-    return noteError("error.skill.notFound", `技能不存在: ${skillName}`, { name: skillName });
+    return categoryError("error.skill.notFound", `技能不存在: ${skillName}`, { name: skillName });
 
   const text = String(noteText || "").trim();
   if (text.length > SKILL_NOTE_MAX)
-    return noteError("error.note.tooLarge", `自定义简介过长（最多 ${SKILL_NOTE_MAX} 个字符）`, { max: SKILL_NOTE_MAX });
+    return categoryError("error.note.tooLarge", `自定义简介过长（最多 ${SKILL_NOTE_MAX} 个字符）`, { max: SKILL_NOTE_MAX });
 
   const current = await readManagerState();
   if (current.writable === false) return invalidManagerStateWrite();
@@ -2611,10 +2620,6 @@ export async function setSkillNote(key: string, skillName: string, noteText: str
   await writeManagerState(current.state);
   if (log) log("skill-note", `${root.key}/${skillName} 更新自定义简介: ${text ? `"${text}"` : "已清空"}`);
   return { root: root.key, name: skillName, note: text || null };
-}
-
-function categoryError(code: string, error: string, params?: Record<string, unknown>): OperationError {
-  return { ok: false, code, error, ...(params ? { params } : {}) };
 }
 
 async function resolvedCategoryRoot(key: string, options: ScopeOptions = {}) {
@@ -3104,6 +3109,18 @@ async function forgetCategoryMember(metadata: TrashMetadata) {
   // 回收站目录已经删除。这里单独再写一次状态；写入失败时成员记录会留下，同名新建可能回到旧分类。不再回滚已删除的回收站目录。
   const key = metadata.root?.key;
   if (!key || !validStateSkillName(metadata.name)) return;
+  // 如果当前来源下已经存在同名的现役技能，则保留现役技能的分类、排序与自定义备注，不予误删。
+  if (key) {
+    try {
+      const root = await resolvedCategoryRoot(key, metadata.root?.projectRoot ? { projectCwds: [metadata.root.projectRoot] } : {});
+      if (root) {
+        const activeEntry = await resolveEntry(root, metadata.name);
+        if (activeEntry) return;
+      }
+    } catch {
+      // 容错处理：若检查异常则继续保守清理
+    }
+  }
   const current = await readManagerState();
   if (current.writable === false) return;
   const members = current.state.categoryMembers[key];
