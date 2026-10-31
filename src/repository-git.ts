@@ -166,6 +166,7 @@ export function parseGitUrl(input: RepositoryInput = {}): RepositorySource {
 export interface GitFetchOptions {
   maxBytes?: number;
   timeoutMs?: number;
+  idleTimeoutMs?: number;
   gitBinary?: string;
 }
 
@@ -213,11 +214,35 @@ function mapGitError(stderr: string, url: string): CodedError {
   return failure(line ? `Git 请求失败: ${line}` : "Git 请求失败，请检查网络或仓库地址", "error.repo.network");
 }
 
-function runGit(args: string[], cwd: string, timeoutMs: number, gitBinary = "git"): Promise<{ stdout: string; stderr: string }> {
+interface RunGitOptions {
+  timeoutMs?: number;
+  idleTimeoutMs?: number;
+  gitBinary?: string;
+}
+
+function runGit(
+  args: string[],
+  cwd: string,
+  optionsOrTimeout: RunGitOptions | number,
+  legacyGitBinary = "git"
+): Promise<{ stdout: string; stderr: string }> {
+  const options = typeof optionsOrTimeout === "number" ? { timeoutMs: optionsOrTimeout, gitBinary: legacyGitBinary } : optionsOrTimeout;
+  const timeoutMs = options.timeoutMs ?? 300_000;
+  const idleTimeoutMs = options.idleTimeoutMs ?? 45_000;
+  const gitBinary = options.gitBinary || "git";
+
   return new Promise((resolve, reject) => {
     const child = spawn(
       gitBinary,
-      ["-c", "protocol.ext.allow=never", "-c", "core.symlinks=false", "-c", "core.autocrlf=false", "-c", "advice.detachedHead=false", ...args],
+      [
+        "-c", "protocol.ext.allow=never",
+        "-c", "core.symlinks=false",
+        "-c", "core.autocrlf=false",
+        "-c", "advice.detachedHead=false",
+        "-c", "http.lowSpeedLimit=1000",
+        "-c", "http.lowSpeedTime=30",
+        ...args
+      ],
       {
         cwd,
         env: {
@@ -231,19 +256,37 @@ function runGit(args: string[], cwd: string, timeoutMs: number, gitBinary = "git
     );
     let stdout = "";
     let stderr = "";
+    const startTime = Date.now();
+    let lastActivity = Date.now();
+    let killed = false;
+
     child.stdout.on("data", (chunk) => {
       stdout += chunk;
+      lastActivity = Date.now();
     });
     child.stderr.on("data", (chunk) => {
       stderr += chunk;
+      lastActivity = Date.now();
     });
-    const timer = setTimeout(() => {
-      child.kill("SIGKILL");
-      reject(failure("Git 请求超时，请检查网络后重试", "error.repo.network"));
-    }, timeoutMs);
+
+    const checkInterval = setInterval(() => {
+      const now = Date.now();
+      if (now - startTime > timeoutMs) {
+        killed = true;
+        clearInterval(checkInterval);
+        child.kill("SIGKILL");
+        reject(failure("Git 请求超时，请检查网络后重试", "error.repo.network"));
+      } else if (now - lastActivity > idleTimeoutMs) {
+        killed = true;
+        clearInterval(checkInterval);
+        child.kill("SIGKILL");
+        reject(failure("Git 传输停滞超时，请检查网络或加速站点状态", "error.repo.network"));
+      }
+    }, 1000);
 
     child.on("error", (err: unknown) => {
-      clearTimeout(timer);
+      clearInterval(checkInterval);
+      if (killed) return;
       const code = (err as { code?: string })?.code;
       if (code === "ENOENT") {
         reject(failure("未检测到 Git 命令行工具，请先安装 Git 后重试", "error.repo.noGit"));
@@ -253,7 +296,8 @@ function runGit(args: string[], cwd: string, timeoutMs: number, gitBinary = "git
     });
 
     child.on("close", (code) => {
-      clearTimeout(timer);
+      clearInterval(checkInterval);
+      if (killed) return;
       if (code === 0) resolve({ stdout, stderr });
       else reject(mapGitError(stderr || stdout, ""));
     });
@@ -277,7 +321,7 @@ export async function probeGitRemote(
   repoUrl: string,
   options: { timeoutMs?: number; gitBinary?: string } = {}
 ): Promise<void> {
-  const timeoutMs = options.timeoutMs ?? 8_000;
+  const timeoutMs = options.timeoutMs ?? 10_000;
   const gitBinary = options.gitBinary || "git";
 
   if (repoUrl.startsWith("/") || /^[a-zA-Z]:[\\/]/.test(repoUrl)) {
@@ -290,7 +334,7 @@ export async function probeGitRemote(
   }
 
   try {
-    await runGit(["ls-remote", "--heads", "-q", "--", repoUrl], process.cwd(), timeoutMs, gitBinary);
+    await runGit(["ls-remote", "--heads", "-q", "--", repoUrl], process.cwd(), { timeoutMs, idleTimeoutMs: timeoutMs, gitBinary });
   } catch (caught) {
     const err = caught as CodedError;
     throw failure(err.message || "仓库无法访问或不存在，请检查地址或权限", "error.repo.network");
@@ -303,29 +347,31 @@ export async function fetchGitRepository(
   options: GitFetchOptions = {}
 ): Promise<{ commit: string }> {
   const maxBytes = options.maxBytes ?? 2 * 1024 * 1024 * 1024;
-  const timeoutMs = options.timeoutMs ?? 60_000;
+  const timeoutMs = options.timeoutMs ?? 300_000;
+  const idleTimeoutMs = options.idleTimeoutMs ?? 45_000;
   const gitBinary = options.gitBinary || "git";
+  const runOpts = { timeoutMs, idleTimeoutMs, gitBinary };
   const repoUrl = repo.url || `https://github.com/${repo.owner}/${repo.name}.git`;
   const ref = repo.ref && repo.ref !== "HEAD" ? repo.ref : "HEAD";
 
   await fs.mkdir(destinationDir, { recursive: true });
 
   try {
-    await runGit(["init", "-q"], destinationDir, timeoutMs, gitBinary);
+    await runGit(["init", "-q"], destinationDir, runOpts);
     const refsToTry = ref === "HEAD" ? ["HEAD"] : [`refs/heads/${ref}`, `refs/tags/${ref}`, ref];
     let fetched = false;
     let lastError: unknown;
 
     for (const r of refsToTry) {
       try {
-        await runGit(["fetch", "-q", "--depth", "1", "--no-tags", "--", repoUrl, r], destinationDir, timeoutMs, gitBinary);
+        await runGit(["fetch", "--progress", "--depth", "1", "--no-tags", "--", repoUrl, r], destinationDir, runOpts);
         fetched = true;
         break;
       } catch (err) {
         lastError = err;
         if (r === refsToTry[refsToTry.length - 1]) {
           try {
-            await runGit(["fetch", "-q", "--no-tags", "--", repoUrl, r], destinationDir, timeoutMs, gitBinary);
+            await runGit(["fetch", "--progress", "--no-tags", "--", repoUrl, r], destinationDir, runOpts);
             fetched = true;
           } catch {
             throw err;
@@ -335,8 +381,8 @@ export async function fetchGitRepository(
     }
     if (!fetched) throw lastError || failure("Git 分支或标签不存在", "error.repo.network");
 
-    await runGit(["checkout", "-q", "FETCH_HEAD"], destinationDir, timeoutMs, gitBinary);
-    const { stdout: commitOut } = await runGit(["rev-parse", "FETCH_HEAD"], destinationDir, timeoutMs, gitBinary);
+    await runGit(["checkout", "-q", "FETCH_HEAD"], destinationDir, runOpts);
+    const { stdout: commitOut } = await runGit(["rev-parse", "FETCH_HEAD"], destinationDir, runOpts);
     const commit = commitOut.trim();
 
     await rmWithRetry(join(destinationDir, ".git"));
