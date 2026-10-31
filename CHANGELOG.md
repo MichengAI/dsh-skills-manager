@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.2.24 - 2026-10-31
+
+- Support custom skill notes without modifying `SKILL.md` (Issue #73):
+  - Add "Edit note" option under skill card "More" menu to record custom descriptions and usage scenarios;
+  - Display custom notes directly on skill cards while preserving the original prompt description in tooltip;
+  - Support searching skill cards by custom notes keywords;
+  - Store notes safely in plugin display mapping layer without modifying underlying `SKILL.md` files;
+  - Automatically cleanup note entries upon permanently deleting trash items or removing custom sources, while protecting active skills with the same name.
+
 ## 1.2.23 - 2026-10-29
 
 - Refactor API routes to host `connection.fetch.register`:
