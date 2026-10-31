@@ -243,6 +243,7 @@ export interface RepositoryInput {
     url?: string;
     ref?: string;
     subdirectory?: string;
+    skipProbe?: boolean;
 }
 export interface SkillRequest {
     root?: RepositoryRoot;

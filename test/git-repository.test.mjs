@@ -1,6 +1,6 @@
 // 验证支持多种 Git 托管平台（Gitee、GitLab 等）、加速代理地址及 Git 获取与大小限制。
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, writeFile, readFile, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, writeFile, readFile, rm, readdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
@@ -67,16 +67,17 @@ try {
   await writeFile(join(remoteDir, "skills/test-skill/reference.txt"), "Git 仓库资源数据", "utf8");
   execFileSync("git", ["add", "."], { cwd: remoteDir, stdio: "ignore" });
   execFileSync("git", ["commit", "-m", "initial commit"], { cwd: remoteDir, stdio: "ignore" });
+  execFileSync("git", ["tag", "-a", "v1.0.0", "-m", "version 1.0.0 tag"], { cwd: remoteDir, stdio: "ignore" });
   const realCommitSha = execFileSync("git", ["rev-parse", "HEAD"], { cwd: remoteDir, encoding: "utf8" }).trim();
 
-  // 验证 fetchGitRepository
+  // 验证 fetchGitRepository 及 Tag 引用解引用为 Commit SHA
   const checkoutDest = join(sandbox, "checkout-target");
   const fetchRes = await fetchGitRepository(
-    { owner: "local", name: "remote-repo", ref: "", subdirectory: "", url: remoteDir },
+    { owner: "local", name: "remote-repo", ref: "v1.0.0", subdirectory: "", url: remoteDir },
     checkoutDest,
     { maxBytes: 10 * 1024 * 1024 }
   );
-  assert.equal(fetchRes.commit, realCommitSha, "获取到的提交号与本地仓库 HEAD 一致");
+  assert.equal(fetchRes.commit, realCommitSha, "Tag 引用正确解引用为对应 Commit SHA");
   assert.equal(await readFile(join(checkoutDest, "skills/test-skill/SKILL.md"), "utf8"), skillDoc);
 
   // 验证超限拦截
@@ -94,11 +95,12 @@ try {
   // 3. createRepositoryManager 完整集成测试（非 GitHub 来源与加速站）
   const manager = createRepositoryManager();
 
-  // 添加不存在的远程仓库应在 add 阶段被拒绝，不能返回 200 或存入列表
+  // 添加不存在的仓库应在 add 阶段被拒绝（本地非联网路径离线探测）
+  const fakeLocal = join(sandbox, "non-existent-local-repo-404");
   await assert.rejects(
-    manager.add({ url: "https://gitee.com/demo-user/non-existent-skill-repo-404.git" }),
-    /无法访问|不存在|error\.repo/,
-    "不存在的仓库在 add() 探测阶段即被拦截"
+    manager.add({ url: fakeLocal }),
+    /本地 Git 仓库路径不存在|无法访问|不存在|error\.repo/,
+    "不存在的本地仓库在 add() 探测阶段即被拦截"
   );
 
   const addedGitee = await manager.add({
@@ -127,6 +129,14 @@ try {
   const sourceKey = installationSourceKey(join(process.env.DSH_HOME, "skills"), "git-test-skill");
   assert.ok(sources[sourceKey], "应记录完整的安装来源");
   assert.equal(sources[sourceKey].url, remoteDir);
+
+  // 验证 remove 仓库时清理磁盘快照缓存
+  const cacheDir = join(process.env.DSH_HOME, "skills-manager/repository-cache");
+  const cacheBeforeRemove = await readdir(cacheDir);
+  assert.ok(cacheBeforeRemove.some((name) => name.startsWith(addedGitee.id)), "移除前磁盘上存在快照缓存");
+  await manager.remove({ id: addedGitee.id });
+  const cacheAfterRemove = await readdir(cacheDir);
+  assert.ok(!cacheAfterRemove.some((name) => name.startsWith(addedGitee.id)), "移除后磁盘上的快照缓存已清理");
 
   console.log("Git 仓库地址解析、Git 检出、配额防御与端到端管理测试通过");
 } finally {

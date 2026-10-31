@@ -10,6 +10,7 @@ const temporary = await mkdtemp(join(tmpdir(), "dssm-ws-routes-"));
 process.env.DSH_HOME = join(temporary, "home");
 process.env.DSH_AGENTS_HOME = join(temporary, "agents");
 process.env.HOME = process.env.USERPROFILE = join(temporary, "user");
+process.env.DSH_SKILLS_MANAGER_SKIP_PROBE = "1";
 for (const key of ["CODEX", "CLAUDE", "GEMINI", "OPENCODE", "CURSOR", "COPILOT"]) process.env[`DSH_${key}_HOME`] = join(temporary, `configured-${key.toLowerCase()}`);
 const nativeFetch = globalThis.fetch;
 let download;

@@ -12,6 +12,7 @@ process.env.DSH_AGENTS_HOME = join(temporary, "agents");
 process.env.HOME = process.env.USERPROFILE = join(temporary, "user");
 process.env.DSH_CODEX_HOME = join(temporary, "configured-codex");
 process.env.DSH_CLAUDE_HOME = join(temporary, "configured-claude");
+process.env.DSH_SKILLS_MANAGER_SKIP_PROBE = "1";
 const nativeFetch = globalThis.fetch;
 let interceptedDownload;
 let interceptedSkillshSearch;

@@ -8,7 +8,7 @@ type RepoView = ApiRoutes['/repositories']['repositories'][number];
 type RepoCopy = { installedRoot: RepositoryRoot | null; installedWorkspace?: string; tracked?: boolean; status: string; updateAvailable?: boolean; canRollback?: boolean; canUninstall?: boolean };
 type RepoSkill = RepoView['skills'][number] & { installations?: RepoCopy[] };
 type CopyTarget = { root?: RepositoryRoot; workspace?: string };
-type Feedback = {error?: boolean; payload?: unknown; key?: string; name?: string; text?: string};
+type Feedback = {error?: boolean; payload?: unknown; key?: string; name?: string; text?: string; params?: Record<string, unknown>};
 type InstallRoot = RepositoryRoot;
 type Installation = Feedback & CopyTarget & {id: string; path: string; pending?: boolean; action?: 'install' | 'uninstall'};
 type CatalogCopy = { id: string; name: string; installedRoot: RepositoryRoot; installedWorkspace?: string; canUninstall?: boolean };
@@ -25,7 +25,7 @@ export const repositoryLocales = {
     "repo.catalog.installRefreshWarning": "技能已安装并启用，但列表刷新失败。请重新打开发现页；不要重复安装。",
     "repo.catalog.uninstallRefreshWarning": "技能已移入回收站，但列表刷新失败。请刷新技能列表或重新打开设置页；不要重复卸载。",
     "repo.installElsewhere": "安装到其他位置", "repo.destinationUnavailable": "原项目未登记或目录不可用，无法管理此副本。请在侧栏重新登记原项目后刷新。", "repo.scope.user": "全局", "repo.scope.project": "项目", "repo.source.dsh": "DSH", "repo.source.agents": "Shared Agent",
-    "repo.refreshing": "正在检查更新…", "repo.refreshed": "刷新与更新检查完成", "repo.detailLoading": "正在读取技能说明…",
+    "repo.refreshing": "正在检查更新…", "repo.refreshed": "刷新与更新检查完成", "repo.partialRefreshFailed": "部分仓库检查更新失败（{names}），其余已完成", "repo.detailLoading": "正在读取技能说明…",
     "repo.local": "本机", "repo.source": "安装来源", "repo.update": "可更新", "repo.review": "查看更新", "repo.rollback": "恢复上一版", "repo.confirmUpdate": "备份并更新", "repo.confirmRollback": "备份并恢复", "repo.overwrite": "备份本地修改并替换", "repo.modified": "检测到本地修改。替换会覆盖当前文件，原文件将完整备份，可恢复。", "repo.noChanges": "文件内容没有变化。", "repo.added": "新增", "repo.removed": "删除", "repo.modifiedFile": "修改", "repo.updating": "更新中…", "repo.updateProgress": "正在校验、备份并替换，请稍候…", "repo.updateSuccess": "更新完成，已保留上一版备份。", "repo.rollbackSuccess": "已恢复上一版。", "repo.manageUpdate": "管理更新", "error.repo.modified": "存在本地修改，请预览并确认备份后替换。",
     "scope.repositories": "发现技能", "repo.add": "添加仓库", "repo.manage": "管理仓库", "repo.refresh": "刷新并检查更新", "repo.save": "添加并扫描",
     "repo.subsource.github": "Git 仓库", "repo.subsource.skillsh": "skills.sh", "repo.subsource.clawhub": "ClawHub", "repo.subsource.popular": "热门下载 Top 100", "repo.catalog.states": "全部状态", "repo.catalog.uninstalled": "未安装", "repo.catalog.searchClawhub": "搜索 ClawHub 技能", "repo.catalog.searchLoading": "正在搜索 ClawHub…", "repo.catalog.searchEmpty": "没有找到匹配的 ClawHub 技能。", "repo.catalog.searchError": "ClawHub 搜索失败，请重试。", "repo.catalog.searchSkillsh": "搜索 skills.sh 技能", "repo.catalog.skillshLoading": "正在搜索 skills.sh…", "repo.catalog.skillshEmpty": "没有找到匹配的 skills.sh 技能。", "repo.catalog.skillshError": "skills.sh 搜索失败，请重试。", "repo.sort.installs": "安装量从高到低", "repo.sort.name": "名称 A-Z", "repo.subsource.catalogNote": "ClawHub 下载量榜 · 最多 100 条，仅对当前显示条目排序", "repo.catalog.empty": "ClawHub 当前没有匹配的技能。", "repo.catalog.loading": "正在加载 ClawHub 榜单…", "repo.catalog.loadError": "ClawHub 榜单加载失败。请检查网络后重试。", "repo.catalog.retry": "重试", "repo.catalog.loadingMore": "正在加载更多…", "repo.catalog.downloads": "下载", "repo.catalog.installs": "安装", "repo.catalog.stars": "星标",
@@ -48,7 +48,7 @@ export const repositoryLocales = {
     "repo.catalog.installRefreshWarning": "Installed and enabled, but the list could not refresh. Reopen Discover Skills; do not install again.",
     "repo.catalog.uninstallRefreshWarning": "Moved to trash, but the list could not refresh. Refresh the skill list or reopen Settings; do not uninstall again.",
     "repo.installElsewhere": "Install elsewhere", "repo.destinationUnavailable": "The original project is unregistered or unavailable. Re-register it in the sidebar and refresh to manage this copy.", "repo.scope.user": "Global", "repo.scope.project": "Project", "repo.source.dsh": "DSH", "repo.source.agents": "Shared Agent",
-    "repo.refreshing": "Checking updates…", "repo.refreshed": "Refresh and update check completed", "repo.detailLoading": "Loading skill instructions…",
+    "repo.refreshing": "Checking updates…", "repo.refreshed": "Refresh and update check completed", "repo.partialRefreshFailed": "Failed to check updates for some repositories ({names}); others completed.", "repo.detailLoading": "Loading skill instructions…",
     "repo.local": "Local", "repo.source": "Installed from", "repo.update": "Update available", "repo.review": "Review update", "repo.rollback": "Restore previous version", "repo.confirmUpdate": "Back up and update", "repo.confirmRollback": "Back up and restore", "repo.overwrite": "Back up local edits and replace", "repo.modified": "Local edits detected. Replacement overwrites current files and keeps a complete backup for restoration.", "repo.noChanges": "No file changes.", "repo.added": "Added", "repo.removed": "Removed", "repo.modifiedFile": "Modified", "repo.updating": "Updating…", "repo.updateProgress": "Verifying, backing up and replacing files. Please wait…", "repo.updateSuccess": "Updated. Previous version backed up.", "repo.rollbackSuccess": "Previous version restored.", "repo.manageUpdate": "Manage updates", "error.repo.modified": "Local edits detected. Review and confirm replacement with a backup.",
     "scope.repositories": "Discover Skills", "repo.add": "Add repository", "repo.manage": "Manage repositories", "repo.refresh": "Refresh & check updates", "repo.save": "Add and scan",
     "repo.subsource.github": "Git Repos", "repo.subsource.skillsh": "skills.sh", "repo.subsource.clawhub": "ClawHub", "repo.subsource.popular": "Top 100 by downloads", "repo.catalog.states": "All statuses", "repo.catalog.uninstalled": "Not installed", "repo.catalog.searchClawhub": "Search ClawHub skills", "repo.catalog.searchLoading": "Searching ClawHub…", "repo.catalog.searchEmpty": "No matching ClawHub skills were found.", "repo.catalog.searchError": "ClawHub search failed. Please retry.", "repo.catalog.searchSkillsh": "Search skills.sh", "repo.catalog.skillshLoading": "Searching skills.sh…", "repo.catalog.skillshEmpty": "No matching skills.sh skills were found.", "repo.catalog.skillshError": "skills.sh search failed. Please retry.", "repo.sort.installs": "Installs: high to low", "repo.sort.name": "Name A–Z", "repo.subsource.catalogNote": "ClawHub download ranking · Up to 100; sort only displayed items", "repo.catalog.empty": "No matching skills were returned by ClawHub.", "repo.catalog.loading": "Loading ClawHub ranking…", "repo.catalog.loadError": "Failed to load the ClawHub ranking. Check your connection and retry.", "repo.catalog.retry": "Retry", "repo.catalog.loadingMore": "Loading more…", "repo.catalog.downloads": "downloads", "repo.catalog.installs": "installs", "repo.catalog.stars": "stars",
@@ -251,7 +251,16 @@ export function createRepositoryUI({ react, Modal, Input, Button, SourceSelect, 
       const path = item?.params?.path;
       return typeof path === 'string' && path && !translated.includes(path) ? translated + ' · ' + path : translated;
     }
-    function feedbackText(value: Feedback) { return value.payload ? message(value.payload) : (value.key ? t(value.key) : value.text || "") + (value.name ? " · " + value.name : ""); }
+    function feedbackText(value: Feedback) {
+      if (value.payload) return message(value.payload);
+      if (value.key) {
+        const params = value.params || (value.name ? { name: value.name, names: value.name } : undefined);
+        const text = t(value.key, params);
+        const nameSuffix = value.name && !text.includes(value.name) ? " · " + value.name : "";
+        return text + nameSuffix;
+      }
+      return value.text || "";
+    }
     async function perform(task: () => Promise<unknown>, reload = true, quiet = false) {
       if (locked.current) return;
       locked.current = true; if (!quiet) { setBusy(true); setFeedback(null); }
@@ -478,7 +487,8 @@ export function createRepositoryUI({ react, Modal, Input, Button, SourceSelect, 
             } else if (failed.length === selected.length) {
               setFeedback({ error: true, payload: lastError });
             } else {
-              setFeedback({ error: true, text: `部分仓库检查更新失败（${failed.join("、")}），其余已完成` });
+              const sep = (getLocale?.() || "").toLowerCase().startsWith("zh") ? "、" : ", ";
+              setFeedback({ error: true, key: "repo.partialRefreshFailed", params: { names: failed.join(sep) } });
             }
           }
         } finally {

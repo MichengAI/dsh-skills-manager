@@ -138,18 +138,23 @@ async function readResponse(response: Response, limit: number) {
 export function createRepositoryManager({
   fetchImpl = globalThis.fetch,
   gitFetch,
-  maxRepositoryBytes = 2 * 1024 * 1024 * 1024,
+  probeRemote,
+  maxRepositoryBytes: rawMaxBytes = 2 * 1024 * 1024 * 1024,
   log,
   registeredWorkspaces,
   onWorkspaceIndexBuild,
 }: {
   fetchImpl?: typeof fetch;
   gitFetch?: (repo: Repository, destinationDir: string, options?: { maxBytes?: number; timeoutMs?: number }) => Promise<{ commit: string }>;
+  probeRemote?: boolean;
   maxRepositoryBytes?: number;
   log?: Log;
   registeredWorkspaces?: () => string[] | undefined;
   onWorkspaceIndexBuild?: () => void;
 } = {}) {
+  const maxRepositoryBytes = typeof rawMaxBytes === "number" && Number.isFinite(rawMaxBytes) && rawMaxBytes > 0 ? rawMaxBytes : 2 * 1024 * 1024 * 1024;
+  const isDefaultFetch = fetchImpl === globalThis.fetch;
+  const defaultProbe = probeRemote ?? isDefaultFetch;
   const file = join(managerHomePath(), "repositories.json");
   let queue: Promise<unknown> = Promise.resolve();
   let catalogWarnings: Array<{ id: string; code: string; error: string }> = [];
@@ -232,7 +237,7 @@ export function createRepositoryManager({
     const keepDir = `${repo.id}-${repo.commit}`;
     const keepZip = `${repo.id}-${repo.commit}.zip`;
     for (const name of await fs.readdir(dir)) {
-      if (name.startsWith(repo.id + "-") && name !== keepDir && name !== keepZip) {
+      if (name.startsWith(".stage-" + repo.id + "-") || (name.startsWith(repo.id + "-") && name !== keepDir && name !== keepZip)) {
         await fs.rm(join(dir, name), { recursive: true, force: true }).catch(() => undefined);
       }
     }
@@ -269,6 +274,7 @@ export function createRepositoryManager({
       }
     } catch (e: any) {
       if (e.code && e.code.startsWith("error.repo.")) throw e;
+      if (e.code !== "ENOENT") throw e;
     }
 
     // 检查历史 ZIP 归档缓存
@@ -673,8 +679,10 @@ export function createRepositoryManager({
       const id = createHash("sha256").update(JSON.stringify(source)).digest("hex").slice(0, 24);
       if (data.repositories.some((r) => r.id === id)) throw failure("该仓库已添加");
       if (data.repositories.length >= 30) throw failure("最多添加 30 个仓库");
-      if (source.url && !gitFetch) {
-        await probeGitRemote(source.url);
+      const shouldProbe = !gitFetch && defaultProbe && input.skipProbe !== true && process.env.DSH_SKILLS_MANAGER_SKIP_PROBE !== "1";
+      if (shouldProbe) {
+        const probeTarget = source.url || `https://github.com/${source.owner}/${source.name}.git`;
+        await probeGitRemote(probeTarget);
       }
       const repo: Repository = { ...source, id, skills: [], commit: null, refreshedAt: null, error: null };
       data.repositories.push(repo); await write(data); return repo;
@@ -685,6 +693,16 @@ export function createRepositoryManager({
       data.repositories = data.repositories.filter((r) => r.id !== id);
       await write(data);
       refreshVersions.set(id, (refreshVersions.get(id) || 0) + 1);
+
+      try {
+        const dir = await cacheDirectory();
+        for (const name of await fs.readdir(dir)) {
+          if (name.startsWith(id + "-") || name.startsWith(".stage-" + id + "-")) {
+            await fs.rm(join(dir, name), { recursive: true, force: true }).catch(() => undefined);
+          }
+        }
+      } catch {}
+
       return { id };
     }, false),
     refresh: async ({ id }: {id: string}) => {
@@ -698,7 +716,7 @@ export function createRepositoryManager({
       let skills: RepositorySkill[] = [];
       let scanError: Repository["error"] = null;
       const dir = await cacheDirectory();
-      const stageDir = join(dir, `.stage-${randomUUID()}`);
+      const stageDir = join(dir, `.stage-${repo.id}-${randomUUID()}`);
       try {
         if (gitFetch) {
           const res = await gitFetch(repo, stageDir, { maxBytes: maxRepositoryBytes });

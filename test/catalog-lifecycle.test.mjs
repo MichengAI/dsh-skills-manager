@@ -11,6 +11,7 @@ const sandbox = await mkdtemp(join(process.env.TMPDIR || tmpdir(), "dssm-catalog
 process.env.DSH_HOME = join(sandbox, "home");
 process.env.DSH_AGENTS_HOME = join(sandbox, "agents");
 process.env.HOME = process.env.USERPROFILE = join(sandbox, "user");
+process.env.DSH_SKILLS_MANAGER_SKIP_PROBE = "1";
 const workspace = join(sandbox, "project");
 await mkdir(join(workspace, ".git"), { recursive: true });
 const nativeFetch = globalThis.fetch;
