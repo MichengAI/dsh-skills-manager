@@ -451,21 +451,40 @@ export function createRepositoryUI({ react, Modal, Input, Button, SourceSelect, 
       if (!node || typeof node.getBoundingClientRect !== "function" || !catalogNearBottom(node)) return;
       void loadClawHubPage(false, true);
     }
-    async function refreshRepo(id: string) { const result = await post("refresh", { id }); if (result.error) setFeedback({ error: true, payload: result.error }); }
+    async function refreshRepo(id: string) {
+      const result = await post("refresh", { id });
+      const err = result.error || (result as any).data?.error;
+      if (err) setFeedback({ error: true, payload: err });
+    }
     function refresh(selected: RepoView[]) {
       return perform(async () => {
-        let failed = false;
+        const failed: string[] = [];
+        let lastError: unknown;
         try {
           for (let i = 0; i < selected.length; i++) {
             const repo = selected[i];
             setRefreshing({ id: repo.id, name: repo.owner + "/" + repo.name, index: i + 1, total: selected.length });
             const result = await post("refresh", { id: repo.id });
-            if (result.error) { failed = true; setFeedback({ error: true, payload: result.error }); }
+            const err = result.error || (result as any).data?.error;
+            if (err) {
+              failed.push(repo.owner + "/" + repo.name);
+              lastError = err;
+            }
           }
           await load();
-          if (!failed && mounted.current) setFeedback({ key: "repo.refreshed" });
-        } finally { if (mounted.current) setRefreshing(null); }
-      }, false);
+          if (mounted.current) {
+            if (failed.length === 0) {
+              setFeedback({ key: "repo.refreshed" });
+            } else if (failed.length === selected.length) {
+              setFeedback({ error: true, payload: lastError });
+            } else {
+              setFeedback({ error: true, text: `部分仓库检查更新失败（${failed.join("、")}），其余已完成` });
+            }
+          }
+        } finally {
+          if (mounted.current) setRefreshing(null);
+        }
+      }, false, true);
     }
     function openDetail(repo: RepoView, skill: RepoSkill) {
       return perform(async () => {
@@ -567,7 +586,7 @@ export function createRepositoryUI({ react, Modal, Input, Button, SourceSelect, 
     }
     function refreshButton(selected: RepoView[], row = false) {
       const pending = refreshing && (!row || refreshing.id === selected[0]?.id);
-      return h(PrimitiveButton, { variant: "outline", disabled: busy || !selected.length, "aria-busy": !!pending, onClick: () => refresh(selected) },
+      return h(PrimitiveButton, { variant: "outline", disabled: busy || !!refreshing || !selected.length, "aria-busy": !!pending, onClick: () => refresh(selected) },
         pending ? h("span", { className: "dssm-repo-spinner", "aria-hidden": true }) : null, t(pending ? "repo.refreshing" : "repo.refresh"));
     }
     function close() { if (!locked.current) { setCopyState("idle"); setModal(null); } }

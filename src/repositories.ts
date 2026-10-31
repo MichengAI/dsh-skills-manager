@@ -6,7 +6,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { unzipSync } from "fflate";
 import { managerHomePath, resolveWorkspaceTarget, repositoryDestinations, trashRootPath, listTrash, restoreTrash as restoreSkillTrash, permanentlyDeleteTrash, parseSkillDoc, importUploadedSkill, deleteSkill, setSkillEnabled, readManagerState, state, createWorkspaceIndex, type indexRegisteredWorkspaces } from "./core.js";
 import { createRepositoryUpdater, fileIndex, signature, readSkillTree, repositoryInstallRoot, recordInstallRoot, selectInstallRecord } from "./repository-updates.js";
-import { parseGitUrl, fetchGitRepository } from "./repository-git.js";
+import { parseGitUrl, fetchGitRepository, probeGitRemote } from "./repository-git.js";
 
 const LIMIT = 32 << 20;
 const STATE_LIMIT = 16 << 20;
@@ -30,7 +30,10 @@ function validateStoredState(input: unknown): asserts input is RepositoryState {
   for (const repo of value.repositories) {
     if (!repo || typeof repo.id !== "string" || !Array.isArray(repo.skills) || repo.skills.length > 500) throw failure("仓库状态格式无效");
     const source = parseRepositoryInput({ url: repo.url || `${repo.owner}/${repo.name}`, ref: repo.ref, subdirectory: repo.subdirectory });
-    if (hash(JSON.stringify(source)).slice(0, 24) !== repo.id || (repo.commit !== null && !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(repo.commit))) throw failure("仓库状态来源无效");
+    const legacySource = repo.url ? { owner: repo.owner, name: repo.name, ref: repo.ref, subdirectory: repo.subdirectory, url: repo.url } : null;
+    const expectedId = hash(JSON.stringify(source)).slice(0, 24);
+    const legacyId = legacySource ? hash(JSON.stringify(legacySource)).slice(0, 24) : null;
+    if ((expectedId !== repo.id && legacyId !== repo.id) || (repo.commit !== null && !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(repo.commit))) throw failure("仓库状态来源无效");
     for (const skill of repo.skills) {
       if (!skill || typeof skill.name !== "string" || typeof skill.description !== "string" || typeof skill.body !== "string" || typeof skill.valid !== "boolean" || !/^[a-f0-9]{64}$/.test(skill.documentHash)) throw failure("仓库技能状态无效");
       safePath(skill.path, true);
@@ -162,6 +165,15 @@ export function createRepositoryManager({
       if (info.isSymbolicLink() || !info.isFile() || info.size > STATE_READ_LIMIT) throw failure("仓库状态文件不安全");
       const value: unknown = JSON.parse(await fs.readFile(file, "utf8"));
       validateStoredState(value);
+      for (const repo of value.repositories) {
+        if (repo.url) {
+          try {
+            const fresh = parseRepositoryInput({ url: repo.url, ref: repo.ref, subdirectory: repo.subdirectory });
+            repo.owner = fresh.owner;
+            repo.name = fresh.name;
+          } catch {}
+        }
+      }
       return value;
     } catch (caught) { const error = caught as CodedError;
       if (error.code === "ENOENT") return { version: 1, repositories: [], installs: [] };
@@ -661,6 +673,9 @@ export function createRepositoryManager({
       const id = createHash("sha256").update(JSON.stringify(source)).digest("hex").slice(0, 24);
       if (data.repositories.some((r) => r.id === id)) throw failure("该仓库已添加");
       if (data.repositories.length >= 30) throw failure("最多添加 30 个仓库");
+      if (source.url && !gitFetch) {
+        await probeGitRemote(source.url);
+      }
       const repo: Repository = { ...source, id, skills: [], commit: null, refreshedAt: null, error: null };
       data.repositories.push(repo); await write(data); return repo;
     }, false),

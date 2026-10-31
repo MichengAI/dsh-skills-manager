@@ -37,10 +37,11 @@ try {
   assert.equal(gitlab.url, "https://gitlab.example.com/team/subgroup/project.git");
 
   // 加速站前缀地址（例如 gh-proxy）
-  const proxyUrl = "https://gh-proxy.com/https://github.com/author/super-skills.git";
+  const proxyUrl = "https://gh-proxy.com/https://github.com/Unclecheng-li/AI_Animation.git";
   const proxy = parseRepositoryInput({ url: proxyUrl });
-  assert.equal(proxy.name, "super-skills");
-  assert.equal(proxy.url, proxyUrl);
+  assert.equal(proxy.owner, "unclecheng-li", "加速前缀应正确提取真实 owner，而不是代理协议头");
+  assert.equal(proxy.name, "ai_animation", "加速前缀应正确提取真实 name");
+  assert.equal(proxy.url, proxyUrl, "保留完整加速代理下载地址");
 
   // 安全拦截：带凭据、危险协议、非法参数开头
   for (const invalid of [
@@ -92,6 +93,14 @@ try {
 
   // 3. createRepositoryManager 完整集成测试（非 GitHub 来源与加速站）
   const manager = createRepositoryManager();
+
+  // 添加不存在的远程仓库应在 add 阶段被拒绝，不能返回 200 或存入列表
+  await assert.rejects(
+    manager.add({ url: "https://gitee.com/demo-user/non-existent-skill-repo-404.git" }),
+    /无法访问|不存在|error\.repo/,
+    "不存在的仓库在 add() 探测阶段即被拦截"
+  );
+
   const addedGitee = await manager.add({
     url: remoteDir,
     subdirectory: "skills",

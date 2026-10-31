@@ -116,12 +116,24 @@ export function parseGitUrl(input: RepositoryInput = {}): RepositorySource {
   let extractedRef = "";
   let extractedSubdir = "";
 
+  // 识别并解构常见的代理/镜像前缀（如 https://gh-proxy.com/https://github.com/owner/name）
+  let targetPath = pathname;
+  const proxyMatch = raw.match(/^https?:\/\/[^/]+\/(https?:\/\/.+)$/i) || raw.match(/^https?:\/\/[^/]+\/(github\.com\/.+)$/i);
+  if (proxyMatch) {
+    try {
+      const innerUrl = proxyMatch[1].startsWith("http") ? new URL(proxyMatch[1]) : new URL("https://" + proxyMatch[1]);
+      targetPath = innerUrl.pathname;
+    } catch {
+      // 保持原有 pathname
+    }
+  }
+
   const treeMarkers = ["/-/tree/", "/-/blob/", "/src/branch/", "/src/tag/", "/tree/"];
   for (const marker of treeMarkers) {
-    const idx = pathname.indexOf(marker);
+    const idx = targetPath.indexOf(marker);
     if (idx !== -1) {
-      const rest = pathname.slice(idx + marker.length);
-      pathname = pathname.slice(0, idx);
+      const rest = targetPath.slice(idx + marker.length);
+      targetPath = targetPath.slice(0, idx);
       const slash = rest.indexOf("/");
       if (slash !== -1) {
         extractedRef = decodeURIComponent(rest.slice(0, slash));
@@ -133,8 +145,8 @@ export function parseGitUrl(input: RepositoryInput = {}): RepositorySource {
     }
   }
 
-  pathname = pathname.replace(/\/$/, "");
-  const segments = pathname.split("/").filter(Boolean);
+  targetPath = targetPath.replace(/\/$/, "");
+  const segments = targetPath.split("/").filter(Boolean);
   if (!segments.length) throw failure("仓库地址无效");
   const rawName = segments[segments.length - 1].replace(/\.git$/, "");
   const name = rawName.toLowerCase();
@@ -261,13 +273,37 @@ async function rmWithRetry(target: string, retries = 10, delay = 50): Promise<vo
   }
 }
 
+export async function probeGitRemote(
+  repoUrl: string,
+  options: { timeoutMs?: number; gitBinary?: string } = {}
+): Promise<void> {
+  const timeoutMs = options.timeoutMs ?? 8_000;
+  const gitBinary = options.gitBinary || "git";
+
+  if (repoUrl.startsWith("/") || /^[a-zA-Z]:[\\/]/.test(repoUrl)) {
+    try {
+      const st = await fs.lstat(repoUrl);
+      if (st.isDirectory()) return;
+    } catch {
+      throw failure("本地 Git 仓库路径不存在", "error.repo.invalid");
+    }
+  }
+
+  try {
+    await runGit(["ls-remote", "--heads", "-q", "--", repoUrl], process.cwd(), timeoutMs, gitBinary);
+  } catch (caught) {
+    const err = caught as CodedError;
+    throw failure(err.message || "仓库无法访问或不存在，请检查地址或权限", "error.repo.network");
+  }
+}
+
 export async function fetchGitRepository(
   repo: RepositorySource,
   destinationDir: string,
   options: GitFetchOptions = {}
 ): Promise<{ commit: string }> {
   const maxBytes = options.maxBytes ?? 2 * 1024 * 1024 * 1024;
-  const timeoutMs = options.timeoutMs ?? 120_000;
+  const timeoutMs = options.timeoutMs ?? 60_000;
   const gitBinary = options.gitBinary || "git";
   const repoUrl = repo.url || `https://github.com/${repo.owner}/${repo.name}.git`;
   const ref = repo.ref && repo.ref !== "HEAD" ? repo.ref : "HEAD";
