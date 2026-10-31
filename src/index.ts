@@ -673,7 +673,7 @@ function apply(ctx: HostContext, config?: PluginConfig) {
     {
       path: `${API_PREFIX}/skill-note`,
       methods: ["POST"],
-      fetch: (req) => handlePost(req, (b, scope) => setSkillNote(String(b.root || ""), String(b.name || ""), String(b.note || ""), log, scopedOptions(scope, req.headers.get("x-dsh-skills-session")))),
+      fetch: (req) => handlePost(req, (b, scope) => setSkillNote(String(b.root || ""), String(b.name || ""), String(b.note || ""), log, scopedOptions(scope, req.headers.get("x-dsh-skills-session"))), { afterSuccess: afterWrite }),
     },
     {
       path: `${API_PREFIX}/delete`,

@@ -127,6 +127,18 @@ try {
     "永久删除旧回收站条目时，如果该来源下当前已有同名现役技能，绝不能清空现役技能的备注！"
   );
 
+  // 10. 边界缺陷：移除来源或历史来源残留备注时，不能触发 state.json fail-closed
+  // 场景：用户曾为自定义来源写过备注，随后该来源被移除或暂时不可用，state.json 中留有其 customNotes 记录；
+  // 读取 state.json 时必须保持 writable: true，不能误判为文件损坏！
+  const stateFilePath = join(process.env.DSH_HOME, "skills-manager", "state.json");
+  const rawState = JSON.parse(await readFile(stateFilePath, "utf8"));
+  rawState.customNotes["custom:removed-source"] = { "some-skill": "历史遗留备注" };
+  await writeFile(stateFilePath, JSON.stringify(rawState, null, 2));
+
+  const loadedStateResult = await readManagerState();
+  assert.equal(loadedStateResult.writable, true, "存在历史或已移除来源的备注记录时，状态文件仍应可写，绝不能 fail-closed 锁定！");
+  assert.equal(loadedStateResult.warning, null);
+
   console.log("skill-notes.test.mjs passed");
 } finally {
   await rm(temporary, { recursive: true, force: true });

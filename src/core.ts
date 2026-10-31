@@ -1086,6 +1086,34 @@ export async function removeCustomSource(key: unknown) {
   await writeRootPathConfig(config, {
     customSources: config.customSources.filter((item) => item.id !== id),
   });
+  // 同步清理 state.json 中该自定义来源的分类与自定义备注，避免留下孤立数据
+  try {
+    const managerState = await readManagerState();
+    if (managerState.writable !== false) {
+      let dirty = false;
+      if (managerState.state.customNotes && managerState.state.customNotes[id]) {
+        delete managerState.state.customNotes[id];
+        dirty = true;
+      }
+      if (managerState.state.categories && managerState.state.categories[id]) {
+        delete managerState.state.categories[id];
+        dirty = true;
+      }
+      if (managerState.state.categoryMembers && managerState.state.categoryMembers[id]) {
+        delete managerState.state.categoryMembers[id];
+        dirty = true;
+      }
+      if (managerState.state.categoryOrder && managerState.state.categoryOrder[id]) {
+        delete managerState.state.categoryOrder[id];
+        dirty = true;
+      }
+      if (dirty) {
+        await writeManagerState(managerState.state);
+      }
+    }
+  } catch {
+    // 容错处理：不阻断来源移除主操作
+  }
   return { ok: true as const, removed: id };
 }
 
@@ -2133,7 +2161,9 @@ function validManagerStateDocument(value: ManagerState) {
   if (value.customNotes !== undefined) {
     if (!value.customNotes || typeof value.customNotes !== "object" || Array.isArray(value.customNotes)) return false;
     for (const [key, record] of Object.entries(value.customNotes)) {
-      if (!categoryRootKey(key) || !record || typeof record !== "object" || Array.isArray(record)) return false;
+      if (!record || typeof record !== "object" || Array.isArray(record)) return false;
+      // 来源键如果不是当前已知来源或合规项目键，属于已移除/未加载来源，跳过内部校验不视为文件损坏
+      if (!categoryRootKey(key)) continue;
       for (const [name, note] of Object.entries(record)) {
         if (!validStateSkillName(name) || typeof note !== "string" || note.length > SKILL_NOTE_MAX) return false;
       }
