@@ -221,7 +221,7 @@ try {
       "挂起远端在达到总 deadline 时必须抛出超时且不应多次重试翻倍"
     );
     const dElapsed = Date.now() - dStart;
-    assert.ok(dElapsed < 2800, `共享 deadline 耗尽后立即返回，不进行多分支重试累加，实际耗时: ${dElapsed}ms`);
+    assert.ok(dElapsed < 1100, `共享 deadline 耗尽后立即返回，不进行多分支重试累加，实际耗时: ${dElapsed}ms`);
   } finally {
     hangingServer.close();
   }
