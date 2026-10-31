@@ -165,6 +165,7 @@ export function parseGitUrl(input: RepositoryInput = {}): RepositorySource {
 
 export interface GitFetchOptions {
   maxBytes?: number;
+  maxTransientBytes?: number;
   timeoutMs?: number;
   gitBinary?: string;
 }
@@ -371,6 +372,7 @@ export async function fetchGitRepository(
   options: GitFetchOptions = {}
 ): Promise<{ commit: string }> {
   const maxBytes = options.maxBytes ?? 2 * 1024 * 1024 * 1024;
+  const maxTransientBytes = options.maxTransientBytes ?? Math.max(maxBytes * 2.5, 4 * 1024 * 1024 * 1024);
   const timeoutMs = options.timeoutMs ?? 900_000;
   const deadline = Date.now() + timeoutMs;
   const gitBinary = options.gitBinary || "git";
@@ -414,8 +416,8 @@ export async function fetchGitRepository(
     const commit = commitOut.trim();
 
     const rawSize = await getDirectorySize(destinationDir);
-    if (rawSize > maxBytes) {
-      throw failure("仓库超过大小限制", "error.repo.tooLarge", { limit: maxBytes, actual: rawSize });
+    if (rawSize > maxTransientBytes) {
+      throw failure("仓库临时下载体积过大（包含 Git 历史对象）", "error.repo.tooLarge", { limit: maxTransientBytes, actual: rawSize });
     }
 
     await rmWithRetry(join(destinationDir, ".git"));

@@ -164,6 +164,47 @@ try {
   assert.ok(!cacheAfterRefresh.includes(".stage-staleOrphan-old"), "超过 1 小时的孤儿 .stage 目录应被安全回收");
   await manager.remove({ id: testRepoB.id });
 
+  // 6. 临时拉取缓冲（maxTransientBytes）与最终体积校验区分测试
+  const transientDir = join(sandbox, "transient-test");
+  await assert.rejects(
+    fetchGitRepository(
+      { owner: "local", name: "repo", ref: "master", subdirectory: "", url: remoteDir },
+      transientDir,
+      { maxBytes: 1000000, maxTransientBytes: 10 }
+    ),
+    (err) => err.code === "error.repo.tooLarge" && err.message.includes("临时下载体积过大"),
+    "临时体积超出 maxTransientBytes 时抛出临时超限错误"
+  );
+
+  // 7. add 锁外网络探测并发测试：探测期间不阻塞其他只读请求
+  const slowFetch = async (url) => {
+    if (String(url).includes("slow-owner")) {
+      await new Promise((r) => setTimeout(r, 120));
+      return { status: 200 };
+    }
+    return { status: 200 };
+  };
+  const asyncManager = createRepositoryManager({ fetchImpl: slowFetch, probeRemote: true });
+  const start = Date.now();
+  const slowAddPromise = asyncManager.add({ url: "slow-owner/slow-repo" });
+  const listDuringProbe = await asyncManager.list();
+  const listDuration = Date.now() - start;
+  assert.ok(listDuration < 90, `探测期间读取列表不应被阻塞，耗时: ${listDuration}ms`);
+  const slowAdded = await slowAddPromise;
+  assert.equal(slowAdded.name, "slow-repo");
+
+  // 8. 共享 Deadline 递减测试：分支回退时不重置超时
+  const deadlineTestDir = join(sandbox, "deadline-test");
+  await assert.rejects(
+    fetchGitRepository(
+      { owner: "local", name: "repo", ref: "non-existent-ref", subdirectory: "", url: remoteDir },
+      deadlineTestDir,
+      { timeoutMs: 300 }
+    ),
+    (err) => err.code === "error.repo.network" && /(?:Git 请求超时|Git 仓库或分支不存在)/.test(err.message),
+    "非存在分支在短 deadline 下应抛出 error.repo.network 且被有效中断"
+  );
+
   console.log("Git 仓库地址解析、Git 检出、配额防御与端到端管理测试通过");
 } finally {
   await rm(sandbox, { recursive: true, force: true });

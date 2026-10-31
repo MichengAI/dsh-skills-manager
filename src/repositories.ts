@@ -138,6 +138,7 @@ export function createRepositoryManager({
   gitFetch,
   probeRemote,
   maxRepositoryBytes: rawMaxBytes = 2 * 1024 * 1024 * 1024,
+  gitTimeoutMs: rawTimeoutMs = 900_000,
   log,
   registeredWorkspaces,
   onWorkspaceIndexBuild,
@@ -146,11 +147,13 @@ export function createRepositoryManager({
   gitFetch?: (repo: Repository, destinationDir: string, options?: { maxBytes?: number; timeoutMs?: number }) => Promise<{ commit: string }>;
   probeRemote?: boolean;
   maxRepositoryBytes?: number;
+  gitTimeoutMs?: number;
   log?: Log;
   registeredWorkspaces?: () => string[] | undefined;
   onWorkspaceIndexBuild?: () => void;
 } = {}) {
   const maxRepositoryBytes = typeof rawMaxBytes === "number" && Number.isFinite(rawMaxBytes) && rawMaxBytes > 0 ? rawMaxBytes : 2 * 1024 * 1024 * 1024;
+  const gitTimeoutMs = typeof rawTimeoutMs === "number" && Number.isFinite(rawTimeoutMs) && rawTimeoutMs > 0 ? rawTimeoutMs : 900_000;
   const isDefaultFetch = fetchImpl === globalThis.fetch;
   const defaultProbe = probeRemote ?? isDefaultFetch;
   const file = join(managerHomePath(), "repositories.json");
@@ -731,11 +734,11 @@ export function createRepositoryManager({
       const stageDir = join(dir, `.stage-${repo.id}-${randomUUID()}`);
       try {
         if (gitFetch) {
-          const res = await gitFetch(repo, stageDir, { maxBytes: maxRepositoryBytes });
+          const res = await gitFetch(repo, stageDir, { maxBytes: maxRepositoryBytes, timeoutMs: gitTimeoutMs });
           commit = res.commit;
           skills = await scanSkillsFromDirectory(stageDir, repo.subdirectory, repo.name);
         } else if (repo.url) {
-          const res = await fetchGitRepository(repo, stageDir, { maxBytes: maxRepositoryBytes });
+          const res = await fetchGitRepository(repo, stageDir, { maxBytes: maxRepositoryBytes, timeoutMs: gitTimeoutMs });
           commit = res.commit;
           skills = await scanSkillsFromDirectory(stageDir, repo.subdirectory, repo.name);
         } else {
