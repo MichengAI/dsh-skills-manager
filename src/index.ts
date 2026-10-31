@@ -291,6 +291,7 @@ export interface PluginConfig {
   updater?: boolean;
   onlineUpdate?: boolean;
   maxRepositoryBytes?: number;
+  maxTransientBytes?: number;
   gitTimeoutMs?: number;
 }
 
@@ -311,6 +312,7 @@ function apply(ctx: HostContext, config?: PluginConfig) {
   const repositories = createRepositoryManager({
     log,
     maxRepositoryBytes: config?.maxRepositoryBytes,
+    maxTransientBytes: config?.maxTransientBytes,
     gitTimeoutMs: config?.gitTimeoutMs,
     registeredWorkspaces: () => registeredWorkspacePaths(ctx),
   });

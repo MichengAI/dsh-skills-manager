@@ -372,14 +372,14 @@ export async function fetchGitRepository(
   options: GitFetchOptions = {}
 ): Promise<{ commit: string }> {
   const maxBytes = options.maxBytes ?? 2 * 1024 * 1024 * 1024;
-  const maxTransientBytes = options.maxTransientBytes ?? Math.max(maxBytes * 2.5, 4 * 1024 * 1024 * 1024);
+  const maxTransientBytes = options.maxTransientBytes ?? (maxBytes * 2.5);
   const timeoutMs = options.timeoutMs ?? 900_000;
   const deadline = Date.now() + timeoutMs;
   const gitBinary = options.gitBinary || "git";
   const remainingTimeout = () => {
     const remain = deadline - Date.now();
     if (remain <= 0) throw failure("Git 请求超时，请检查网络后重试", "error.repo.network");
-    return Math.max(1000, remain);
+    return remain;
   };
   const repoUrl = repo.url || `https://github.com/${repo.owner}/${repo.name}.git`;
   const ref = repo.ref && repo.ref !== "HEAD" ? repo.ref : "HEAD";
@@ -417,7 +417,7 @@ export async function fetchGitRepository(
 
     const rawSize = await getDirectorySize(destinationDir);
     if (rawSize > maxTransientBytes) {
-      throw failure("仓库临时下载体积过大（包含 Git 历史对象）", "error.repo.tooLarge", { limit: maxTransientBytes, actual: rawSize });
+      throw failure("仓库临时下载体积过大（包含 Git 历史对象）", "error.repo.transientTooLarge", { limit: maxTransientBytes, actual: rawSize });
     }
 
     await rmWithRetry(join(destinationDir, ".git"));

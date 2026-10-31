@@ -138,21 +138,24 @@ export function createRepositoryManager({
   gitFetch,
   probeRemote,
   maxRepositoryBytes: rawMaxBytes = 2 * 1024 * 1024 * 1024,
+  maxTransientBytes: rawMaxTransientBytes,
   gitTimeoutMs: rawTimeoutMs = 900_000,
   log,
   registeredWorkspaces,
   onWorkspaceIndexBuild,
 }: {
   fetchImpl?: typeof fetch;
-  gitFetch?: (repo: Repository, destinationDir: string, options?: { maxBytes?: number; timeoutMs?: number }) => Promise<{ commit: string }>;
+  gitFetch?: (repo: Repository, destinationDir: string, options?: { maxBytes?: number; maxTransientBytes?: number; timeoutMs?: number }) => Promise<{ commit: string }>;
   probeRemote?: boolean;
   maxRepositoryBytes?: number;
+  maxTransientBytes?: number;
   gitTimeoutMs?: number;
   log?: Log;
   registeredWorkspaces?: () => string[] | undefined;
   onWorkspaceIndexBuild?: () => void;
 } = {}) {
   const maxRepositoryBytes = typeof rawMaxBytes === "number" && Number.isFinite(rawMaxBytes) && rawMaxBytes > 0 ? rawMaxBytes : 2 * 1024 * 1024 * 1024;
+  const maxTransientBytes = typeof rawMaxTransientBytes === "number" && Number.isFinite(rawMaxTransientBytes) && rawMaxTransientBytes > 0 ? rawMaxTransientBytes : maxRepositoryBytes * 2.5;
   const gitTimeoutMs = typeof rawTimeoutMs === "number" && Number.isFinite(rawTimeoutMs) && rawTimeoutMs > 0 ? rawTimeoutMs : 900_000;
   const isDefaultFetch = fetchImpl === globalThis.fetch;
   const defaultProbe = probeRemote ?? isDefaultFetch;
@@ -734,11 +737,11 @@ export function createRepositoryManager({
       const stageDir = join(dir, `.stage-${repo.id}-${randomUUID()}`);
       try {
         if (gitFetch) {
-          const res = await gitFetch(repo, stageDir, { maxBytes: maxRepositoryBytes, timeoutMs: gitTimeoutMs });
+          const res = await gitFetch(repo, stageDir, { maxBytes: maxRepositoryBytes, maxTransientBytes, timeoutMs: gitTimeoutMs });
           commit = res.commit;
           skills = await scanSkillsFromDirectory(stageDir, repo.subdirectory, repo.name);
         } else if (repo.url) {
-          const res = await fetchGitRepository(repo, stageDir, { maxBytes: maxRepositoryBytes, timeoutMs: gitTimeoutMs });
+          const res = await fetchGitRepository(repo, stageDir, { maxBytes: maxRepositoryBytes, maxTransientBytes, timeoutMs: gitTimeoutMs });
           commit = res.commit;
           skills = await scanSkillsFromDirectory(stageDir, repo.subdirectory, repo.name);
         } else {

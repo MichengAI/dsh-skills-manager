@@ -4,6 +4,7 @@ import { mkdtemp, mkdir, writeFile, readFile, rm, readdir, utimes } from "node:f
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
+import http from "node:http";
 
 const sandbox = await mkdtemp(join(tmpdir(), "dssm-git-repo-test-"));
 process.env.DSH_HOME = join(sandbox, "home");
@@ -88,8 +89,8 @@ try {
       tinyDest,
       { maxBytes: 10 }
     ),
-    (err) => err.code === "error.repo.tooLarge",
-    "超出指定大小配额时应抛出 error.repo.tooLarge"
+    (err) => err.code === "error.repo.tooLarge" || err.code === "error.repo.transientTooLarge",
+    "超出指定大小配额时应抛出 error.repo.tooLarge 或 error.repo.transientTooLarge"
   );
 
   // 3. createRepositoryManager 完整集成测试（非 GitHub 来源与加速站）
@@ -172,14 +173,24 @@ try {
       transientDir,
       { maxBytes: 1000000, maxTransientBytes: 10 }
     ),
-    (err) => err.code === "error.repo.tooLarge" && err.message.includes("临时下载体积过大"),
-    "临时体积超出 maxTransientBytes 时抛出临时超限错误"
+    (err) => err.code === "error.repo.transientTooLarge" && err.message.includes("临时下载体积过大"),
+    "临时体积超出 maxTransientBytes 时抛出 error.repo.transientTooLarge"
+  );
+  const finalTooLargeDir = join(sandbox, "final-too-large-test");
+  await assert.rejects(
+    fetchGitRepository(
+      { owner: "local", name: "repo", ref: "master", subdirectory: "", url: remoteDir },
+      finalTooLargeDir,
+      { maxBytes: 10, maxTransientBytes: 1000000 }
+    ),
+    (err) => err.code === "error.repo.tooLarge" && err.message.includes("仓库超过大小限制"),
+    "解压后最终体积超出 maxBytes 时抛出 error.repo.tooLarge"
   );
 
   // 7. add 锁外网络探测并发测试：探测期间不阻塞其他只读请求
   const slowFetch = async (url) => {
     if (String(url).includes("slow-owner")) {
-      await new Promise((r) => setTimeout(r, 120));
+      await new Promise((r) => setTimeout(r, 140));
       return { status: 200 };
     }
     return { status: 200 };
@@ -189,21 +200,31 @@ try {
   const slowAddPromise = asyncManager.add({ url: "slow-owner/slow-repo" });
   const listDuringProbe = await asyncManager.list();
   const listDuration = Date.now() - start;
-  assert.ok(listDuration < 90, `探测期间读取列表不应被阻塞，耗时: ${listDuration}ms`);
+  assert.ok(listDuration < 100, `探测期间读取列表不应被阻塞，耗时: ${listDuration}ms`);
   const slowAdded = await slowAddPromise;
   assert.equal(slowAdded.name, "slow-repo");
 
-  // 8. 共享 Deadline 递减测试：分支回退时不重置超时
+  // 8. 共享 Deadline 递减测试：单次尝试耗尽总预算后立即终止，不进行重试累加
+  const hangingServer = http.createServer((req, res) => {});
+  await new Promise((resolve) => hangingServer.listen(0, "127.0.0.1", resolve));
+  const hangPort = hangingServer.address().port;
   const deadlineTestDir = join(sandbox, "deadline-test");
-  await assert.rejects(
-    fetchGitRepository(
-      { owner: "local", name: "repo", ref: "non-existent-ref", subdirectory: "", url: remoteDir },
-      deadlineTestDir,
-      { timeoutMs: 300 }
-    ),
-    (err) => err.code === "error.repo.network" && /(?:Git 请求超时|Git 仓库或分支不存在)/.test(err.message),
-    "非存在分支在短 deadline 下应抛出 error.repo.network 且被有效中断"
-  );
+  const dStart = Date.now();
+  try {
+    await assert.rejects(
+      fetchGitRepository(
+        { owner: "hang", name: "repo", ref: "multi-retry-ref", subdirectory: "", url: `http://127.0.0.1:${hangPort}/hang.git` },
+        deadlineTestDir,
+        { timeoutMs: 250 }
+      ),
+      (err) => err.code === "error.repo.network" && err.message.includes("Git 请求超时"),
+      "挂起远端在达到总 deadline 时必须抛出超时且不应多次重试翻倍"
+    );
+    const dElapsed = Date.now() - dStart;
+    assert.ok(dElapsed < 2800, `共享 deadline 耗尽后立即返回，不进行多分支重试累加，实际耗时: ${dElapsed}ms`);
+  } finally {
+    hangingServer.close();
+  }
 
   console.log("Git 仓库地址解析、Git 检出、配额防御与端到端管理测试通过");
 } finally {
