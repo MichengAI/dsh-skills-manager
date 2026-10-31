@@ -165,6 +165,7 @@ export interface RepositorySource {
     name: string;
     ref: string;
     subdirectory: string;
+    url?: string;
 }
 export interface RepositorySkill {
     path: string;
@@ -261,7 +262,7 @@ export interface RepositoryDependencies {
     read: () => Promise<RepositoryState>;
     write: (state: RepositoryState) => Promise<void>;
     repository: (state: RepositoryState, id: string) => Repository;
-    download: (repo: Repository) => Promise<Archive>;
+    download: (repo: Repository, path?: string) => Promise<Archive>;
     serialize: Serialize;
     parseRepositoryInput: (input?: RepositoryInput) => RepositorySource;
 }

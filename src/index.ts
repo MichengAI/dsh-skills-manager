@@ -290,6 +290,7 @@ function registerAgentSkillProviders(ctx: HostContext, invalidators: Set<() => v
 export interface PluginConfig {
   updater?: boolean;
   onlineUpdate?: boolean;
+  maxRepositoryBytes?: number;
 }
 
 function apply(ctx: HostContext, config?: PluginConfig) {
@@ -306,7 +307,11 @@ function apply(ctx: HostContext, config?: PluginConfig) {
     isEnabled: isUpdateEnabled,
   }), "skills-manager: plugin updater");
   const log = makeLog();
-  const repositories = createRepositoryManager({ log, registeredWorkspaces: () => registeredWorkspacePaths(ctx) });
+  const repositories = createRepositoryManager({
+    log,
+    maxRepositoryBytes: config?.maxRepositoryBytes,
+    registeredWorkspaces: () => registeredWorkspacePaths(ctx),
+  });
   // 目录可被 roots.json 改写，来源定义必须在每次请求时重新读取，不能缓存在启动时。
   const findUserRoot = (key: string) => userRoots().find((root) => root.key === key);
 

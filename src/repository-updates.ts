@@ -105,7 +105,7 @@ export function createRepositoryUpdater({ read, write, repository, download, ser
       if (repo.error || !skill?.valid || skill.name !== record.name || !skill.files) throw failure("请先成功检查更新；技能改名或已移除时不能直接替换");
       next = skill.files; commit = repo.commit;
       if (includeArchive) {
-        const archive = await download(repo), prefix = path ? path + "/" : "";
+        const archive = await download(repo, path), prefix = path ? path + "/" : "";
         entries = Object.fromEntries(Object.entries(archive).filter(([p]) => p.startsWith(prefix)).map(([p, bytes]) => [p.slice(prefix.length), bytes]));
         if (signature(fileIndex(entries)) !== signature(next)) throw failure("下载内容与预览版本不同，请重新检查更新");
       }
@@ -155,7 +155,7 @@ export function createRepositoryUpdater({ read, write, repository, download, ser
     for (const record of data.installs.filter(i => i.complete && !i.trashId)) {
       const source = record.source || data.repositories.find(r => r.id === record.id);
       if (!source) continue;
-      const parsed = parseRepositoryInput({ url: `${source.owner}/${source.name}`, ref: source.ref, subdirectory: source.subdirectory });
+      const parsed = parseRepositoryInput({ url: source.url || `${source.owner}/${source.name}`, ref: source.ref, subdirectory: source.subdirectory });
       try {
         const root = await recordInstallRoot(record, index.registered, record.workspace === undefined ? undefined : await index.load());
         const realRoot = await fs.realpath(root.path);
