@@ -212,6 +212,31 @@ try {
 
   assert.ok(nodes(work).some((node) => node.props.className === "dssm-skill-desc" && node.children[0] === "DESC_kept"), "第二行只有描述");
   assert.equal(nodes(work).some((node) => node.props.className === "dssm-row-source"), false, "技能行不再另起来源标签");
+
+  // 验证更多操作菜单中存在「编辑备注」入口
+  const moreSelect = nodes(loose).find((node) => node.props["aria-label"] === t("btn.more") && Array.isArray(node.props.options));
+  assert.ok(moreSelect, "技能行应包含更多操作菜单");
+  assert.ok(moreSelect.props.options.some((opt) => opt.value === "note" && opt.label === t("skill.editNote")), "菜单应包含编辑备注项");
+
+  // 触发打开编辑备注弹窗
+  moreSelect.props.onChange("note");
+  render();
+  const noteModalTitle = nodes().find((node) => node.props.title === t("note.title"));
+  assert.ok(noteModalTitle, "应弹出自定义简介 / 备注弹窗");
+  const noteTextarea = find((node) => node.props["aria-label"] === t("note.label"));
+  assert.ok(noteTextarea, "弹窗内应有备注文本输入框");
+  noteTextarea.props.onChange({ target: { value: "我的自定义中文备注" } });
+  render();
+  const confirmNoteBtn = nodes().filter((node) => node.children.includes(t("btn.confirm")) && node.props.onClick).at(-1);
+  assert.ok(confirmNoteBtn, "找到确定提交按钮");
+  confirmNoteBtn.props.onClick();
+  await settle();
+  const noteCall = calls.filter((call) => call.url.endsWith("/skill-note")).at(-1);
+  assert.ok(noteCall, "应发起 /skill-note 请求");
+  assert.equal(noteCall.body.root, "dsh");
+  assert.equal(noteCall.body.name, "loose");
+  assert.equal(noteCall.body.note, "我的自定义中文备注");
+
   const keptToggle = nodes(work).find((node) => node.props["aria-label"] === t("skill.toggle") + " kept");
   assert.equal(keptToggle.props.role, "switch", "技能启停使用 switch 角色");
   assert.equal(keptToggle.props["aria-checked"], true, "已启用的技能开关 aria 状态为 true");

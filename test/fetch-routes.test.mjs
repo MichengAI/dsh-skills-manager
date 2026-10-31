@@ -47,6 +47,7 @@ test("方案 A 契约检查：管理 API 必须全面通过 ctx.connection.fetch
     "/api/michengai/dsh-skills-manager/sidebar-entry",
     "/api/michengai/dsh-skills-manager/online-update",
     "/api/michengai/dsh-skills-manager/create",
+    "/api/michengai/dsh-skills-manager/skill-note",
     "/api/michengai/dsh-skills-manager/import",
     "/api/michengai/dsh-skills-manager/upload",
     "/api/michengai/dsh-skills-manager/delete",

@@ -8,7 +8,7 @@ type SelectionResult = UploadSelection | {error: Diagnostic};
 type ScannedCustomSource = {path: string; label: string; group: string; depth: number; skillCount: number; conflict: boolean; registered: boolean};
 type CustomSourceScanResult = {ok: true; root: string; candidates: ScannedCustomSource[]};
 type ResultMessage = {ok: boolean; text: string; warning?: boolean; scope?: string};
-type ConfirmModal = {type: 'trash-confirm'; root: string; name: string; workspace?: string} | {type: 'delete-confirm'; id: string; name: string} | {type: 'category-create'; root: string; workspace?: string} | {type: 'category-rename'; root: string; id: string; name: string; workspace?: string} | {type: 'category-delete'; root: string; id: string; name: string; workspace?: string} | {type: 'category-add'; root: string; id: string; name: string; workspace?: string; skills: {name: string; declaredName?: string; description?: string; currentCatName: string}[]} | {type: 'root-path'; root: string; label: string; path: string; defaultPath?: string};
+type ConfirmModal = {type: 'trash-confirm'; root: string; name: string; workspace?: string} | {type: 'delete-confirm'; id: string; name: string} | {type: 'category-create'; root: string; workspace?: string} | {type: 'category-rename'; root: string; id: string; name: string; workspace?: string} | {type: 'category-delete'; root: string; id: string; name: string; workspace?: string} | {type: 'category-add'; root: string; id: string; name: string; workspace?: string; skills: {name: string; declaredName?: string; description?: string; currentCatName: string}[]} | {type: 'root-path'; root: string; label: string; path: string; defaultPath?: string} | {type: 'skill-note'; root: string; name: string; note: string; workspace?: string};
 type ModalState = 'detail' | 'create' | 'import' | ConfirmModal | null;
 import { createRepositoryUI, repositoryLocales } from "./repository-ui.js";
 import { createDestinationKit, defaultDestination, destinationPayload, destinationReady, destinationLocales, destinationCss, type DestinationValue } from "./destination-picker.js";
@@ -66,7 +66,9 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
         "summary.total.one": "{count} 个技能", "summary.total.other": "{count} 个技能", "summary.enabled.one": "{count} 个已启用", "summary.enabled.other": "{count} 个已启用", "summary.disabled.one": "{count} 个已停用", "summary.disabled.other": "{count} 个已停用", "summary.shadowed.one": "{count} 个被覆盖", "summary.shadowed.other": "{count} 个被覆盖", "summary.invalid.one": "{count} 个诊断异常", "summary.invalid.other": "{count} 个诊断异常", "table.skill": "技能名称与描述", "table.status": "调用状态",
         "filter.workspace": "工作区", "filter.source": "来源", "filter.all": "全部来源", "filter.option": "{name}（{count}）", "search": "搜索", "search.placeholder": "搜索技能名称或描述", "search.clear": "清除搜索",
         "empty.search": "没有匹配的技能。", "empty.source": "该来源目录不存在或暂时没有技能。", "loading": "正在加载技能…", "note.missing": "未提供简介", "skill.linked": "外部目录链接，只读", "source.toggle": "启停来源", "skill.toggle": "启停技能", "category.toggle": "启停分类", "category.create": "新建分类", "category.uncategorized": "未分类", "category.assign": "归入{name}", "category.rename": "重命名", "category.delete": "删除分类", "category.note": "分类只记在这个来源里，不移动文件。", "category.name": "分类名称", "category.empty": "还没有技能。从条目的「更多」归入。", "category.progress": "{count} 项 · {enabled}/{usable} 启用", "category.actions": "分类操作", "category.created": "已添加分类「{name}」。文件没有新建目录。", "category.renamed": "已重命名。技能文件名没有变化。", "category.deleted": "已删除分类「{name}」。技能回到未分类，没有进回收站。", "category.assigned": "已将 {name} 归入「{category}」。文件没有移动。", "category.dragTip": "拖拽调整顺序或移动到其他分类", "category.moved": "已调整技能 {name} 的分类或顺序。", "confirm.category.title": "删除分类？", "confirm.category.desc": "「{name}」会消失，里面的技能回到未分类。文件不会移动。", "error.category.duplicate": "已有同名分类: {name}", "error.category.name": "分类名称不能为空，且不能超过 24 个字符", "error.category.notFound": "分类不存在", "error.category.root": "技能来源不存在: {root}", "error.category.position": "技能排序位置无效", "error.category.target": "排序目标不属于目标分类",
-        "detail.title": "技能详情", "detail.description": "简介", "detail.document": "SKILL.md", "detail.body": "正文", "detail.frontmatter": "Frontmatter", "detail.diagnostics": "诊断", "detail.path": "源文件", "detail.noIssues": "未发现诊断问题。", "detail.copyBody": "复制正文", "detail.copied": "已复制", "detail.copyFailed": "复制失败",
+        "detail.title": "技能详情", "detail.description": "简介", "detail.customNote": "自定义简介", "detail.document": "SKILL.md", "detail.body": "正文", "detail.frontmatter": "Frontmatter", "detail.diagnostics": "诊断", "detail.path": "源文件", "detail.noIssues": "未发现诊断问题。", "detail.copyBody": "复制正文", "detail.copied": "已复制", "detail.copyFailed": "复制失败",
+        "skill.editNote": "编辑备注", "note.title": "自定义简介 / 备注", "note.label": "备注内容", "note.placeholder": "记录这个技能是干嘛的、什么时候用…", "note.help": "保存在插件内部显示层，不修改原 SKILL.md。清空可还原为原简介。", "note.clear": "清空", "note.updated": "已更新「{name}」的自定义简介。", "note.cleared": "已清除「{name}」的自定义简介。",
+        "error.note.root": "技能来源不存在: {root}", "error.note.tooLarge": "自定义简介过长（最多 {max} 个字符）",
         "create.title": "创建技能", "create.name": "名称", "create.name.placeholder": "例如 code-review-helper", "create.description": "简介", "create.description.placeholder": "一句话说明什么时候使用", "create.body": "正文（Markdown）", "create.body.placeholder": "写下技能要遵循的指令、步骤和边界…", "create.chat.note": "创建的技能不会挂仓库更新，也不会修改原文件。",
         "import.title": "导入技能", "upload.drop.title": "拖拽技能到此处", "upload.drop.copy": "支持 .zip、技能文件夹或单个 SKILL.md", "upload.selected.one": "{count} 个文件 · {size}", "upload.selected.other": "{count} 个文件 · {size}", "upload.remove": "移除所选内容", "upload.requirements": "文件要求", "upload.requirement.skill": "压缩包或文件夹需包含 SKILL.md", "upload.requirement.frontmatter": "SKILL.md 需包含 YAML 格式的技能名称和描述", "upload.requirement.copy": "导入时复制完整内容，不修改原始来源", "upload.importing": "正在安装…", "status.selected": "已选择", "select.file.invalid": "请选择 .zip 或单个 SKILL.md。", "select.folder.invalid": "所选文件夹中没有找到 SKILL.md。", "error.browse.absolute": "目录路径必须是绝对路径：{path}", "error.browse.unreadable": "无法读取目录：{path}", "error.browse.notDirectory": "不是目录：{path}",
         "trash.title": "回收站", "trash.empty": "回收站为空。", "trash.deletedAt": "删除于 {time}", "trash.source": "来源：{source}",
@@ -94,7 +96,9 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
         "summary.total.one": "{count} skill", "summary.total.other": "{count} skills", "summary.enabled.one": "{count} enabled", "summary.enabled.other": "{count} enabled", "summary.disabled.one": "{count} disabled", "summary.disabled.other": "{count} disabled", "summary.shadowed.one": "{count} shadowed", "summary.shadowed.other": "{count} shadowed", "summary.invalid.one": "{count} diagnostic", "summary.invalid.other": "{count} diagnostics", "table.skill": "Skill name and description", "table.status": "Invocation status",
         "filter.workspace": "Workspace", "filter.source": "Source", "filter.all": "All sources", "filter.option": "{name} ({count})", "search": "Search", "search.placeholder": "Search skill names or descriptions", "search.clear": "Clear search",
         "empty.search": "No matching skills.", "empty.source": "This source does not exist or has no skills yet.", "loading": "Loading skills…", "note.missing": "No description provided", "skill.linked": "External directory link, read-only", "source.toggle": "Toggle source", "skill.toggle": "Toggle skill", "category.toggle": "Toggle category", "category.create": "New category", "category.uncategorized": "Uncategorized", "category.assign": "Move to {name}", "category.rename": "Rename", "category.delete": "Delete category", "category.note": "Categories stay in this source and do not move files.", "category.name": "Category name", "category.empty": "No skills yet. Use More on a skill to place it here.", "category.progress": "{count} · {enabled}/{usable} enabled", "category.actions": "Category actions", "category.created": "Added category “{name}”. No directory was created.", "category.renamed": "Renamed. Skill file names are unchanged.", "category.deleted": "Deleted category “{name}”. Skills returned to Uncategorized and were not trashed.", "category.assigned": "Moved {name} to “{category}”. The file was not moved.", "category.dragTip": "Drag to reorder or move to another category", "category.moved": "Updated the category or order for {name}.", "confirm.category.title": "Delete category?", "confirm.category.desc": "“{name}” will be removed. Its skills return to Uncategorized. Files are not moved.", "error.category.duplicate": "A category with this name already exists: {name}", "error.category.name": "Category name is required and must be at most 24 characters", "error.category.notFound": "Category not found", "error.category.root": "Skill source not found: {root}", "error.category.position": "Invalid skill ordering position", "error.category.target": "The target skill is not in the destination category",
-        "detail.title": "Skill details", "detail.description": "Description", "detail.document": "SKILL.md", "detail.body": "Body", "detail.frontmatter": "Frontmatter", "detail.diagnostics": "Diagnostics", "detail.path": "Source file", "detail.noIssues": "No diagnostic issues found.", "detail.copyBody": "Copy body", "detail.copied": "Copied", "detail.copyFailed": "Copy failed",
+        "detail.title": "Skill details", "detail.description": "Description", "detail.customNote": "Custom note", "detail.document": "SKILL.md", "detail.body": "Body", "detail.frontmatter": "Frontmatter", "detail.diagnostics": "Diagnostics", "detail.path": "Source file", "detail.noIssues": "No diagnostic issues found.", "detail.copyBody": "Copy body", "detail.copied": "Copied", "detail.copyFailed": "Copy failed",
+        "skill.editNote": "Edit note", "note.title": "Custom description / Note", "note.label": "Note", "note.placeholder": "Record what this skill does and when to use it…", "note.help": "Saved in the plugin display layer without modifying SKILL.md. Clear to revert to original description.", "note.clear": "Clear", "note.updated": "Updated custom note for “{name}”.", "note.cleared": "Cleared custom note for “{name}”.",
+        "error.note.root": "Skill source not found: {root}", "error.note.tooLarge": "Custom note is too long (maximum {max} characters)",
         "create.title": "Create skill", "create.name": "Name", "create.name.placeholder": "e.g. code-review-helper", "create.description": "Description", "create.description.placeholder": "One sentence describing when to use it", "create.body": "Body (Markdown)", "create.body.placeholder": "Write the instructions, steps, and boundaries…", "create.chat.note": "Created skills are not linked to repository updates, and no source file is modified.",
         "import.title": "Import skill", "upload.drop.title": "Drop a skill here", "upload.drop.copy": "Supports .zip, a skill folder, or one SKILL.md", "upload.selected.one": "{count} file · {size}", "upload.selected.other": "{count} files · {size}", "upload.remove": "Remove selection", "upload.requirements": "File requirements", "upload.requirement.skill": "Archives and folders must contain SKILL.md", "upload.requirement.frontmatter": "SKILL.md must include a YAML name and description", "upload.requirement.copy": "Import copies all content and never modifies the source", "upload.importing": "Installing…", "status.selected": "Selected", "select.file.invalid": "Choose a .zip archive or one SKILL.md.", "select.folder.invalid": "No SKILL.md was found in the selected folder.", "error.browse.absolute": "Folder path must be absolute: {path}", "error.browse.unreadable": "Could not read folder: {path}", "error.browse.notDirectory": "Not a folder: {path}",
         "trash.title": "Trash", "trash.empty": "Trash is empty.", "trash.deletedAt": "Deleted {time}", "trash.source": "Source: {source}",
@@ -205,6 +209,8 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
 .dssm-detail-head .dssm-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .dssm-detail-head button{flex:none}
 .dssm-detail-body{box-sizing:border-box;width:100%;font-family:ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",Menlo,monospace!important;font-size:13px!important;line-height:20px!important;resize:vertical!important}
+.dssm-skill-desc.dssm-custom-note{color:var(--dsw-alias-label-primary,#fff);font-style:normal}
+.dssm-desc.dssm-desc-secondary{color:var(--dsw-alias-label-tertiary);font-size:12px;margin-top:2px}
 
 `;
 
@@ -247,7 +253,7 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
       return summary;
     }
     function normalizeSkillQuery(query: unknown) { return String(query == null ? "" : query).trim().toLowerCase(); }
-    function matchSkillQuery(skill: SearchSkill, query: unknown) { var q = normalizeSkillQuery(query); if (!q) return true; return [skill.name, skill.declaredName, skill.description, skill.kind, skill.kindLabel, skill.statusLabel, skill.rootKey, skill.rootLabel].some(function (value) { return String(value == null ? "" : value).toLowerCase().includes(q); }); }
+    function matchSkillQuery(skill: SearchSkill, query: unknown) { var q = normalizeSkillQuery(query); if (!q) return true; return [skill.name, skill.declaredName, skill.description, skill.customNote, skill.kind, skill.kindLabel, skill.statusLabel, skill.rootKey, skill.rootLabel].some(function (value) { return String(value == null ? "" : value).toLowerCase().includes(q); }); }
     function filterSkills<T extends SearchSkill>(list: T[], options?: {rootKey?: string; query?: unknown}) { var rootKey = options && options.rootKey != null ? options.rootKey : ""; return list.filter(function (skill) { return (!rootKey || skill.rootKey === rootKey) && matchSkillQuery(skill, options && options.query); }); }
     function visibleSkillRoots<T extends {mutable?: boolean; exists?: boolean; overridden?: boolean}>(roots: T[]) {
       return (roots || []).filter(function (root) {
@@ -544,6 +550,7 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
       function setResult(value: ResultMessage | null) { rs[1](value ? Object.assign({}, value, { scope: scope }) : null); }
       var fms = react.useState<Record<string, string>>({ root: "dsh", name: "", description: "", body: "" }), form = fms[0], setForm = fms[1];
       var cns = react.useState(""), categoryName = cns[0], setCategoryName = cns[1];
+      var snt = react.useState(""), skillNoteText = snt[0], setSkillNoteText = snt[1];
       var cds = react.useState<DestinationValue>(defaultDestination()), createDestination = cds[0], setCreateDestination = cds[1];
       var ids = react.useState<DestinationValue>(defaultDestination()), importDestination = ids[0], setImportDestination = ids[1];
       var wss = react.useState<ApiRoutes["/workspaces"]["items"]>([]), workspaceRows = wss[0], setWorkspaceRows = wss[1];
@@ -823,6 +830,7 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
           menu.push({ value: "category:", label: t("category.assign", { name: t("category.uncategorized") }) });
         }
         if (skill.installSource && skill.linked !== true) menu.push({ value: "update", label: t("repo.manageUpdate") });
+        menu.push({ value: "note", label: t("skill.editNote") });
         if (root.mutable && skill.linked !== true) menu.push({ value: "trash", label: t("btn.trash"), danger: true });
         var statusTitle = skill.shadowedBy ? t("status.shadowedBy", { source: (function () { var winner = allRoots.find(function (item) { return item.key === skill.shadowedBy!.root; }); return winner ? rootDisplayName(t, winner) : skill.shadowedBy!.root; })() }) : undefined;
         var skillActions: React.ReactNode[] = [
@@ -834,13 +842,18 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
             post("/category-assign", scoped({ root: root.key, name: skill.name, category: categoryId }), "category.assigned", { name: skill.name, category: category ? category.name : t("category.uncategorized") });
           }
           if (action === "update") { repositoryUI.focusSource(skill.installSource!, skill.name); setScope("repositories"); }
+          if (action === "note") { setSkillNoteText(skill.customNote || ""); setModal({ type: "skill-note", root: root.key, name: skill.name, note: skill.customNote || "", workspace: workspacePath }); }
           if (action === "trash") setModal({ type: "trash-confirm", root: root.key, name: skill.name, workspace: workspacePath });
         } }),
         ];
         skillActions.push(h("div", { className: "dssm-row-state" }, showStatus ? renderSkillStatusIcon(statusKey, statusTitle, cls) : null, showSwitch ? enableSwitch(enabled, t("skill.toggle") + " " + skill.name, busy || root.enabled === false || (!enabled && skill.loadable === false), function () { post(enabled ? "/disable" : "/enable", scoped({ root: root.key, name: skill.name })); }) : null));
         var skillName = skill.declaredName || skill.name;
-        var description = skill.description || t("note.missing");
+        var hasCustomNote = typeof skill.customNote === "string" && skill.customNote.trim().length > 0;
+        var description = hasCustomNote ? skill.customNote : (skill.description || t("note.missing"));
         var canDrag = root.mutable === true || !!(root.categories && root.categories.length);
+        var descTitle = hasCustomNote
+          ? (skill.description ? `${skill.customNote}\n(${t("detail.description")}: ${skill.description})` : skill.customNote)
+          : (skill.description || undefined);
         return h("div", {
           key: root.key + ":" + skill.name,
           className: "dssm-skill-row",
@@ -882,7 +895,7 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
           }
         },
         canDrag ? h("div", { className: "dssm-drag-handle", title: t("category.dragTip") }, "⋮⋮") : null,
-        h("div", { className: "dssm-skill-copy" }, h("div", { className: "dssm-name" }, skillName), h("div", { className: "dssm-skill-desc", title: skill.description || undefined }, description), renderLinkedNote(skill), renderFallback(skill)), h("div", { className: "dssm-skill-actions" }, skillActions));
+        h("div", { className: "dssm-skill-copy" }, h("div", { className: "dssm-name" }, skillName), h("div", { className: "dssm-skill-desc" + (hasCustomNote ? " dssm-custom-note" : ""), title: descTitle }, description), renderLinkedNote(skill), renderFallback(skill)), h("div", { className: "dssm-skill-actions" }, skillActions));
       }
       var rows = roots.flatMap(function (root) { return (root.skills || []).map(function (skill) { return { root: root, skill: skill }; }); });
       var filteredRows = rows.filter(function (row) { return (!activeSource || row.root.key === activeSource) && (!filters.status || skillStatus(row.skill) === filters.status) && matchSkillQuery(Object.assign({}, row.skill, { rootLabel: rootDisplayName(t, row.root) }), query); });
@@ -1172,7 +1185,7 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
       if (modal === "detail") {
         var currentDetail = detail;
         var detailTitle = currentDetail ? currentDetail.declaredName || currentDetail.name : "";
-        content.push(h(Modal, { key: "detail", className: "dssm-modal-wide", title: t("detail.title"), closeLabel: t("btn.close"), onClose: function () { setCopyState("idle"); setModal(null); } }, currentDetail ? h("div", { className: "dssm-detail" }, h("div", { className: "dssm-detail-head" }, h("div", { className: "dssm-name", title: detailTitle }, detailTitle), currentDetail.body ? h(PrimitiveButton, { variant: "outline", size: "sm", "aria-live": "polite", onClick: function () { if (currentDetail && currentDetail.body) copyText(currentDetail.body); } }, copyState === "copied" ? t("detail.copied") : copyState === "failed" ? t("detail.copyFailed") : t("detail.copyBody")) : null), currentDetail.description ? h("p", { className: "dssm-desc" }, currentDetail.description) : null, h("div", { className: "dssm-detail-path" }, currentDetail.path), currentDetail.diagnostics.length ? currentDetail.diagnostics.map(function (item, index) { return h("div", { key: index, className: "dssm-diag" }, t(item.code!, item.params || {})); }) : null, h(Input.TextArea, { className: "dssm-detail-body", readOnly: true, value: currentDetail.body || "", rows: 16 })) : h("div", { className: "dssm-empty" }, t("loading"))));
+        content.push(h(Modal, { key: "detail", className: "dssm-modal-wide", title: t("detail.title"), closeLabel: t("btn.close"), onClose: function () { setCopyState("idle"); setModal(null); } }, currentDetail ? h("div", { className: "dssm-detail" }, h("div", { className: "dssm-detail-head" }, h("div", { className: "dssm-name", title: detailTitle }, detailTitle), currentDetail.body ? h(PrimitiveButton, { variant: "outline", size: "sm", "aria-live": "polite", onClick: function () { if (currentDetail && currentDetail.body) copyText(currentDetail.body); } }, copyState === "copied" ? t("detail.copied") : copyState === "failed" ? t("detail.copyFailed") : t("detail.copyBody")) : null), currentDetail.customNote ? h("p", { className: "dssm-desc dssm-custom-note", title: t("detail.customNote") }, currentDetail.customNote) : null, currentDetail.description ? h("p", { className: "dssm-desc" + (currentDetail.customNote ? " dssm-desc-secondary" : "") }, currentDetail.description) : null, h("div", { className: "dssm-detail-path" }, currentDetail.path), currentDetail.diagnostics.length ? currentDetail.diagnostics.map(function (item, index) { return h("div", { key: index, className: "dssm-diag" }, t(item.code!, item.params || {})); }) : null, h(Input.TextArea, { className: "dssm-detail-body", readOnly: true, value: currentDetail.body || "", rows: 16 })) : h("div", { className: "dssm-empty" }, t("loading"))));
       }
       if (modal && typeof modal === "object" && modal.type === "trash-confirm") content.push(h(Modal, { key: "trash-confirm", title: t("confirm.trash.title"), description: t("confirm.trash.desc", { name: modal.name }), closeLabel: t("btn.close"), onClose: function () { setModal(null); }, footer: h(React.Fragment, null, hostButton(t("btn.cancel"), function () { setModal(null); }, "outline"), hostButton(t("btn.trash"), function () { post("/delete", Object.assign({ root: (modal as Extract<ConfirmModal, {type: "trash-confirm"}>).root, name: (modal as Extract<ConfirmModal, {name: string}>).name }, (modal as { workspace?: string }).workspace ? { workspace: (modal as { workspace?: string }).workspace } : {}), "result.trashed", { name: (modal as Extract<ConfirmModal, {name: string}>).name }).then(function () { setModal(null); }).catch(function () {}); }, "danger", busy)) }));
       if (modal && typeof modal === "object" && modal.type === "delete-confirm") content.push(h(Modal, { key: "delete-confirm", title: t("confirm.delete.title"), description: t("confirm.delete.desc", { name: modal.name }), closeLabel: t("btn.close"), onClose: function () { setModal(null); }, footer: h(React.Fragment, null, hostButton(t("btn.cancel"), function () { setModal(null); }, "outline"), hostButton(t("btn.delete.forever"), function () { post("/trash-delete", { id: (modal as Extract<ConfirmModal, {type: "delete-confirm"}>).id }, "result.deleted", { name: (modal as Extract<ConfirmModal, {name: string}>).name }).then(function () { setModal(null); }).catch(function () {}); }, "danger", busy)) }));
@@ -1246,6 +1259,40 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
             }, "primary", busy || !chosenCount)
           )
         ));
+      }
+      if (modal && typeof modal === "object" && modal.type === "skill-note") {
+        var noteModal = modal as Extract<ConfirmModal, {type: "skill-note"}>;
+        var noteTrimmed = skillNoteText.trim();
+        var isChanged = noteTrimmed !== (noteModal.note || "");
+        var submitSkillNote = function () {
+          if (busy || !isChanged) return;
+          var scopedPayload = noteModal.workspace
+            ? { root: noteModal.root, name: noteModal.name, note: noteTrimmed, workspace: noteModal.workspace }
+            : { root: noteModal.root, name: noteModal.name, note: noteTrimmed };
+          post("/skill-note", scopedPayload, noteTrimmed ? "note.updated" : "note.cleared", { name: noteModal.name })
+            .then(function () { setModal(null); })
+            .catch(function () {});
+        };
+        content.push(h(Modal, { key: "skill-note", title: t("note.title"), closeLabel: t("btn.close"), onClose: function () { setModal(null); } },
+          h("div", { className: "dssm-form" },
+            h("label", { className: "dssm-field" },
+              h("span", { className: "dssm-label" }, t("note.label")),
+              h(Input.TextArea, {
+                value: skillNoteText,
+                maxLength: 500,
+                rows: 4,
+                placeholder: t("note.placeholder"),
+                "aria-label": t("note.label"),
+                onChange: function (event) { setSkillNoteText(event.target.value); }
+              })
+            ),
+            h("p", { className: "dssm-help" }, t("note.help"))
+          ),
+          h("div", { className: "dssm-modal-actions" },
+            hostButton(t("btn.cancel"), function () { setModal(null); }, "outline"),
+            noteModal.note ? hostButton(t("note.clear"), function () { setSkillNoteText(""); }, "outline", busy) : null,
+            hostButton(t("btn.confirm"), submitSkillNote, "primary", busy || !isChanged)
+          )));
       }
       if (modal && typeof modal === "object" && modal.type === "category-delete") content.push(h(Modal, { key: "category-delete", title: t("confirm.category.title"), description: t("confirm.category.desc", { name: modal.name }), closeLabel: t("btn.close"), onClose: function () { setModal(null); }, footer: h(React.Fragment, null, hostButton(t("btn.cancel"), function () { setModal(null); }, "outline"), hostButton(t("category.delete"), function () { post("/category-delete", { root: (modal as Extract<ConfirmModal, {type: "category-delete"}>).root, id: (modal as Extract<ConfirmModal, {type: "category-delete"}>).id, workspace: (modal as Extract<ConfirmModal, {type: "category-delete"}>).workspace }, "category.deleted", { name: (modal as Extract<ConfirmModal, {type: "category-delete"}>).name }).then(function () { setModal(null); }).catch(function () {}); }, "danger", busy)) }));
       return h("section", { className: "dssm-section" }, content);

@@ -2057,7 +2057,7 @@ function defaultManagerState(): ManagerState {
     disabledSkills[root.key] = [];
     enabledSkills[root.key] = [];
   }
-  return { version: 1, sources, disabledSkills, enabledSkills, sidebarEntry: false, onlineUpdate: true, categories: Object.create(null), categoryMembers: Object.create(null), categoryOrder: Object.create(null) };
+  return { version: 1, sources, disabledSkills, enabledSkills, sidebarEntry: false, onlineUpdate: true, categories: Object.create(null), categoryMembers: Object.create(null), categoryOrder: Object.create(null), customNotes: Object.create(null) };
 }
 
 function validStateSkillName(name: unknown): name is string {
@@ -2217,10 +2217,30 @@ function normalizeManagerState(value: ManagerState) {
   normalized.categories = normalizeCategories(value.categories);
   normalized.categoryMembers = normalizeCategoryMembers(value.categoryMembers, normalized.categories);
   normalized.categoryOrder = normalizeCategoryOrder(value.categoryOrder, normalized.categories);
+  normalized.customNotes = normalizeCustomNotes(value.customNotes);
   return normalized;
 }
 
 const CATEGORY_NAME_MAX = 24;
+const SKILL_NOTE_MAX = 500;
+
+function normalizeCustomNotes(value: ManagerState["customNotes"] | undefined) {
+  const notes: NonNullable<ManagerState["customNotes"]> = Object.create(null);
+  if (!value || typeof value !== "object" || Array.isArray(value)) return notes;
+  for (const [key, record] of Object.entries(value)) {
+    if (!categoryRootKey(key) || !record || typeof record !== "object" || Array.isArray(record)) continue;
+    notes[key] = Object.create(null);
+    for (const [name, note] of Object.entries(record)) {
+      if (validStateSkillName(name) && typeof note === "string") {
+        const trimmed = note.trim();
+        if (trimmed && trimmed.length <= SKILL_NOTE_MAX) {
+          notes[key][name] = trimmed;
+        }
+      }
+    }
+  }
+  return notes;
+}
 
 function categoryRootKey(key: string) {
   if (rootByKey(key) || PROJECT_ROOT_KEY_RE.test(key)) return key;
@@ -2556,6 +2576,41 @@ async function setPolicySkillEnabled(root: RootInput, name: string, enabled: boo
 /** enabled=true 恢复模型与 / 手动调用；false 同时停用两种调用入口。 */
 export async function setSkillEnabled(root: RootInput, name: string, enabled: boolean, log?: Log) {
   return setPolicySkillEnabled(root, name, enabled, log);
+}
+
+function noteError(code: string, error: string, params?: Record<string, unknown>): OperationError {
+  return { ok: false, code, error, ...(params ? { params } : {}) };
+}
+
+export async function setSkillNote(key: string, skillName: string, noteText: string, log?: Log, options: ScopeOptions = {}) {
+  const rootKey = categoryRootKey(key);
+  if (!rootKey) return noteError("error.note.root", `技能来源不存在: ${key}`, { root: key });
+  const root = await resolvedCategoryRoot(rootKey, options);
+  if (!root) return noteError("error.note.root", `技能来源不存在: ${key}`, { root: key });
+  if (!validStateSkillName(skillName))
+    return noteError("error.skill.notFound", `技能不存在: ${skillName}`, { name: skillName });
+
+  const entry = await resolveEntry(root, skillName);
+  if (!entry)
+    return noteError("error.skill.notFound", `技能不存在: ${skillName}`, { name: skillName });
+
+  const text = String(noteText || "").trim();
+  if (text.length > SKILL_NOTE_MAX)
+    return noteError("error.note.tooLarge", `自定义简介过长（最多 ${SKILL_NOTE_MAX} 个字符）`, { max: SKILL_NOTE_MAX });
+
+  const current = await readManagerState();
+  if (current.writable === false) return invalidManagerStateWrite();
+  const customNotes = current.state.customNotes || (current.state.customNotes = Object.create(null));
+  if (!customNotes[root.key]) customNotes[root.key] = Object.create(null);
+
+  if (text) {
+    customNotes[root.key][skillName] = text;
+  } else {
+    delete customNotes[root.key][skillName];
+  }
+  await writeManagerState(current.state);
+  if (log) log("skill-note", `${root.key}/${skillName} 更新自定义简介: ${text ? `"${text}"` : "已清空"}`);
+  return { root: root.key, name: skillName, note: text || null };
 }
 
 function categoryError(code: string, error: string, params?: Record<string, unknown>): OperationError {
@@ -3055,11 +3110,15 @@ async function forgetCategoryMember(metadata: TrashMetadata) {
   const orders = current.state.categoryOrder[key];
   const hasMember = !!(members && members[metadata.name]);
   const hasOrder = !!(orders && Object.values(orders).some((names) => names.includes(metadata.name)));
-  if (!hasMember && !hasOrder) return;
+  const hasNote = !!(current.state.customNotes?.[key]?.[metadata.name]);
+  if (!hasMember && !hasOrder && !hasNote) return;
   if (members) delete members[metadata.name];
   if (orders) {
     for (const id of Object.keys(orders))
       orders[id] = orders[id].filter((name) => name !== metadata.name);
+  }
+  if (current.state.customNotes?.[key]?.[metadata.name]) {
+    delete current.state.customNotes[key][metadata.name];
   }
   await writeManagerState(current.state);
 }
@@ -3877,11 +3936,14 @@ export async function skillDetail(key: string, name: string, options: ScopeOptio
   }
   const doc = parseSkillDoc(raw);
   const summary = entryOf(name, entry.kind, entry.docPath, doc);
+  const managerStateResult = await readManagerState();
+  const customNote = managerStateResult.state?.customNotes?.[root.key]?.[name] || null;
   return {
     root: root.key,
     name,
     declaredName: summary.declaredName,
     description: summary.description,
+    customNote,
     path: entry.docPath,
     kind: entry.kind,
     body: doc.body.trim(),
@@ -4245,6 +4307,7 @@ export async function state(options: ScopeOptions = {}) {
         diagnostics: e.diagnostics,
         path: e.docPath,
         categoryId: policyResult.state.categoryMembers[root.key]?.[e.name] || null,
+        customNote: policyResult.state.customNotes?.[root.key]?.[e.name] || null,
         linked: e.linked === true,
       });
       all.push({

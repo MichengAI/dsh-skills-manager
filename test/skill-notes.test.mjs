@@ -1,0 +1,113 @@
+import assert from "node:assert/strict";
+import { mkdtemp, mkdir, writeFile, readFile, rm } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+
+const temporary = await mkdtemp(join(tmpdir(), "dssm-note-"));
+process.env.DSH_HOME = join(temporary, "dsh");
+process.env.DSH_AGENTS_HOME = join(temporary, "agents");
+process.env.DSH_CODEX_HOME = join(temporary, "codex");
+process.env.HOME = process.env.USERPROFILE = join(temporary, "user");
+
+const {
+  setSkillNote,
+  readManagerState,
+  state,
+  projectRoots,
+  deleteSkill,
+  permanentlyDeleteTrash,
+} = await import("../lib/core.js");
+
+const skillText = (name, desc = "原始说明") => `---
+name: ${name}
+description: ${desc}
+---
+正文
+`;
+
+const writeSkill = async (root, name, desc) => {
+  const dir = join(root, name);
+  await mkdir(dir, { recursive: true });
+  await writeFile(join(dir, "SKILL.md"), skillText(name, desc));
+  return join(dir, "SKILL.md");
+};
+
+const dsh = join(process.env.DSH_HOME, "skills");
+const codex = join(process.env.DSH_CODEX_HOME, "skills");
+const keptPath = await writeSkill(dsh, "kept-skill", "原始 DSH 说明");
+const codexPath = await writeSkill(codex, "codex-skill", "Original Codex prompt");
+const keptBefore = await readFile(keptPath, "utf8");
+const codexBefore = await readFile(codexPath, "utf8");
+
+try {
+  // 1. 设置自定义简介
+  const res1 = await setSkillNote("dsh", "kept-skill", "我自己的中文备注");
+  assert.equal(res1.ok, undefined);
+  assert.equal(res1.root, "dsh");
+  assert.equal(res1.name, "kept-skill");
+  assert.equal(res1.note, "我自己的中文备注");
+  assert.equal(await readFile(keptPath, "utf8"), keptBefore, "设置备注绝对不修改 SKILL.md");
+
+  // 2. 外部只读来源也可以设置备注且不修改外部文件
+  const res2 = await setSkillNote("codex", "codex-skill", "用于快速审查代码");
+  assert.equal(res2.ok, undefined);
+  assert.equal(res2.note, "用于快速审查代码");
+  assert.equal(await readFile(codexPath, "utf8"), codexBefore, "只读来源也不改动文件");
+
+  // 3. state() 接口返回的视图中应包含 customNote
+  const view = await state();
+  const dshSkill = view.roots.find((r) => r.key === "dsh").skills.find((s) => s.name === "kept-skill");
+  assert.equal(dshSkill.customNote, "我自己的中文备注");
+  assert.equal(dshSkill.description, "原始 DSH 说明", "原 description 保持不变");
+
+  const codexSkill = view.roots.find((r) => r.key === "codex").skills.find((s) => s.name === "codex-skill");
+  assert.equal(codexSkill.customNote, "用于快速审查代码");
+  assert.equal(codexSkill.description, "Original Codex prompt");
+
+  // 4. 清空备注（传空字符串或纯空白）会移除自定义简介
+  const clearRes = await setSkillNote("dsh", "kept-skill", "   ");
+  assert.equal(clearRes.ok, undefined);
+  assert.equal(clearRes.note, null);
+  const viewAfterClear = await state();
+  const dshSkillCleared = viewAfterClear.roots.find((r) => r.key === "dsh").skills.find((s) => s.name === "kept-skill");
+  assert.equal(dshSkillCleared.customNote, null);
+
+  // 5. 长度超出 500 字符限制应报错
+  const tooLong = "a".repeat(501);
+  const failLong = await setSkillNote("dsh", "kept-skill", tooLong);
+  assert.equal(failLong.ok, false);
+  assert.equal(failLong.code, "error.note.tooLarge");
+
+  // 6. 不存在的技能或不存在的来源
+  const noSkill = await setSkillNote("dsh", "non-existent", "test");
+  assert.equal(noSkill.ok, false);
+  assert.equal(noSkill.code, "error.skill.notFound");
+
+  const noRoot = await setSkillNote("invalid-root", "kept-skill", "test");
+  assert.equal(noRoot.ok, false);
+  assert.equal(noRoot.code, "error.note.root");
+
+  // 7. 项目来源支持
+  const project = join(temporary, "workspace");
+  await mkdir(join(project, ".git"), { recursive: true });
+  await writeSkill(join(project, ".dsh", "skills"), "project-skill", "项目原生说明");
+  const projectRoot = (await projectRoots([project])).find((item) => item.kind === "project-dsh");
+  assert.ok(projectRoot);
+
+  const projRes = await setSkillNote(projectRoot.key, "project-skill", "项目专用备注", undefined, { projectCwds: [project] });
+  assert.equal(projRes.ok, undefined);
+  assert.equal(projRes.note, "项目专用备注");
+
+  // 8. 回收站永久删除后清理备注记录
+  await setSkillNote("dsh", "kept-skill", "待清空备注");
+  const trashed = await deleteSkill(dsh, "kept-skill");
+  const rawStateBefore = (await readManagerState()).state;
+  assert.equal(rawStateBefore.customNotes?.dsh?.["kept-skill"], "待清空备注", "软删除进回收站仍保留备注");
+  await permanentlyDeleteTrash(trashed.id);
+  const rawStateAfter = (await readManagerState()).state;
+  assert.equal(rawStateAfter.customNotes?.dsh?.["kept-skill"], undefined, "永久删除后清理备注");
+
+  console.log("skill-notes.test.mjs passed");
+} finally {
+  await rm(temporary, { recursive: true, force: true });
+}

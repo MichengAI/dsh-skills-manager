@@ -1,6 +1,7 @@
 node_modules/
 *.log
 *.tgz
+_local-packs/
 .DS_Store
 
 .codegraph/

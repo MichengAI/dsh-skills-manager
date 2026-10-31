@@ -46,6 +46,7 @@ export type ApiRoutes = RepositoryRoutes & Record<SkillsShSearchPath, SkillsShSe
     '/category-move': unknown;
     '/category-enable': unknown;
     '/category-disable': unknown;
+    '/skill-note': unknown;
     '/sidebar-entry': { enabled: boolean };
     '/online-update': { enabled: boolean };
 };

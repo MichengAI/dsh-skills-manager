@@ -96,6 +96,8 @@ export interface ManagerState {
     categoryMembers: Record<string, Record<string, string>>;
     /** 每个来源、分类（空字符串代表未分类）里的手动排序；旧状态文件可以缺省。 */
     categoryOrder: Record<string, Record<string, string[]>>;
+    /** 每个来源、技能的自定义简介/备注。不改写 SKILL.md，旧状态文件可缺省。 */
+    customNotes?: Record<string, Record<string, string>>;
 }
 export interface PolicyResult {
     state: ManagerState;
@@ -129,6 +131,8 @@ export interface SkillView extends Omit<SkillEntry, 'docPath' | 'entryPath' | 'r
     };
     installSource?: InstallSource | null;
     categoryId?: string | null;
+    /** 用户自定义简介/备注。若未设置则为 null。 */
+    customNote?: string | null;
     /** 可写根里的顶层目录链接。详情和启停可用，删除与覆盖不可用。 */
     linked?: boolean;
 }

@@ -21,6 +21,7 @@ import {
   assignSkillCategory,
   moveSkillInCategory,
   setCategoryEnabled,
+  setSkillNote,
   importSkill,
   importUploadedSkill,
   browseDirectories,
@@ -670,6 +671,11 @@ function apply(ctx: HostContext, config?: PluginConfig) {
       fetch: (req) => handlePost(req, (b, scope) => setCategoryEnabled(String(b.root || ""), String(b.category || ""), false, log, scopedOptions(scope, req.headers.get("x-dsh-skills-session"))), { afterSuccess: afterWrite }),
     },
     {
+      path: `${API_PREFIX}/skill-note`,
+      methods: ["POST"],
+      fetch: (req) => handlePost(req, (b, scope) => setSkillNote(String(b.root || ""), String(b.name || ""), String(b.note || ""), log, scopedOptions(scope, req.headers.get("x-dsh-skills-session")))),
+    },
+    {
       path: `${API_PREFIX}/delete`,
       methods: ["POST"],
       fetch: (req) => handlePost(req, async (b, scope) => {
@@ -829,4 +835,4 @@ function apply(ctx: HostContext, config?: PluginConfig) {
 export { activeSessionCwds, apply, inject, name, notifyChatCatalog, registerAgentSkillProviders };
 
 /** 请求体由各业务入口现有校验解析，此类型只声明路由转交的字段。 */
-type RequestBody = CreateInput & UploadInput & SkillRequest & RepositoryInput & {root?: string; source?: string; conflict?: string; dryRun?: boolean; workspace?: unknown; enabled?: boolean; category?: string; targetName?: string; position?: "before" | "after"; catalog?: string; skillId?: string; owner?: string; slug?: string; path?: unknown; key?: string; id?: string; label?: unknown; group?: unknown; sources?: unknown[]};
+type RequestBody = CreateInput & UploadInput & SkillRequest & RepositoryInput & {root?: string; source?: string; conflict?: string; dryRun?: boolean; workspace?: unknown; enabled?: boolean; category?: string; targetName?: string; position?: "before" | "after"; catalog?: string; skillId?: string; owner?: string; slug?: string; path?: unknown; key?: string; id?: string; label?: unknown; group?: unknown; sources?: unknown[]; note?: string};
