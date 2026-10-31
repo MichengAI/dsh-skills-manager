@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.2.25 - 2026-11-01
+
+- Support arbitrary public Git hosting platforms and proxy mirrors (Issue #74):
+  - Allow adding any valid Git HTTPS / HTTP repository URLs, including GitLab, Gitee, GitCode, Codeup, self-hosted Git services, and GitHub acceleration proxy mirrors (such as `gh-proxy.com`);
+  - Automatically detect the repository platform and display brand icons (GitHub, GitLab, Gitee, and a generic Git icon for self-hosted / other servers);
+  - Add remote connectivity checks prior to adding repositories with clear error messages for unreachable URLs;
+  - Improve checkout support for large skill repositories, preventing unexpected size limit rejections during clone;
+  - Adopt host native refresh and rotating loading icons, resolving distortion and visual overlap to align seamlessly with DSH host appearance.
+
 ## 1.2.24 - 2026-10-31
 
 - Support custom skill notes without modifying `SKILL.md` (Issue #73):
