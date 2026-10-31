@@ -1086,29 +1086,21 @@ export async function removeCustomSource(key: unknown) {
   await writeRootPathConfig(config, {
     customSources: config.customSources.filter((item) => item.id !== id),
   });
-  // 同步清理 state.json 中该自定义来源的分类与自定义备注，避免留下孤立数据
+  // 同步清理 state.json 原文档中该自定义来源的分类与自定义备注，避免留下孤立数据
+  // 注意：不能用 readManagerState()，因为 normalize 会在解析前就先过滤掉非活跃来源导致 dirty 永远为 false
   try {
-    const managerState = await readManagerState();
-    if (managerState.writable !== false) {
+    const raw = await fs.readFile(managerStatePath(), "utf8");
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
       let dirty = false;
-      if (managerState.state.customNotes && managerState.state.customNotes[id]) {
-        delete managerState.state.customNotes[id];
-        dirty = true;
-      }
-      if (managerState.state.categories && managerState.state.categories[id]) {
-        delete managerState.state.categories[id];
-        dirty = true;
-      }
-      if (managerState.state.categoryMembers && managerState.state.categoryMembers[id]) {
-        delete managerState.state.categoryMembers[id];
-        dirty = true;
-      }
-      if (managerState.state.categoryOrder && managerState.state.categoryOrder[id]) {
-        delete managerState.state.categoryOrder[id];
-        dirty = true;
+      for (const field of ["customNotes", "categories", "categoryMembers", "categoryOrder"] as const) {
+        if (parsed[field] && typeof parsed[field] === "object" && parsed[field][id]) {
+          delete parsed[field][id];
+          dirty = true;
+        }
       }
       if (dirty) {
-        await writeManagerState(managerState.state);
+        await writeFileAtomically(managerStatePath(), `${JSON.stringify(parsed, null, 2)}\n`);
       }
     }
   } catch {

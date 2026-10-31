@@ -324,6 +324,11 @@ try {
   const removed = await removeCustomSource(persisted.added[0].id);
   eq(removed.ok, true, "移除登记成功");
   ok(!userRoots().some((root) => root.key === persisted.added[0].id), "移除后来源消失");
+  // 验证移除来源时主动清理原始 state.json 中的孤立数据
+  const statePath = join(process.env.DSH_HOME, "skills-manager", "state.json");
+  const rawStateAfterRemove = JSON.parse(await readFile(statePath, "utf8"));
+  eq(rawStateAfterRemove.customNotes?.[persisted.added[0].id], undefined, "移除来源后清理 customNotes 映射");
+  eq(rawStateAfterRemove.categories?.[persisted.added[0].id], undefined, "移除来源后清理 categories 映射");
   const removedAgain = await removeCustomSource(persisted.added[0].id);
   eq(removedAgain.ok, false, "重复移除报错");
   eq(removedAgain.code, "error.customSource.unknown", "重复移除给出 unknown 错误码");
