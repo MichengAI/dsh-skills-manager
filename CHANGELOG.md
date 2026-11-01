@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.26 - 2026-11-01
+
+- Improve responsive layout on mobile and narrow viewports:
+  - Prevent ugly single-character wrapping on segmented view tabs (Global/Project/Repositories/Trash);
+  - Upgrade summary stats cards into a 2x2 grid on narrow containers, saving 50% vertical height and improving above-the-fold space utilization;
+  - Support responsive wrapping for filter toolbar on narrow screens, letting the search input span the full second row to completely eliminate clipping overflow.
+
 ## 1.2.25 - 2026-11-01
 
 - Support arbitrary public Git hosting platforms and proxy mirrors (Issue #74):
