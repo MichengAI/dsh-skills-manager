@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.27 - 2026-11-03
+
+- Integrate official native settings navigation icon slot: present dedicated vector icon on newer hosts while maintaining graceful compatibility with older hosts to prevent dual icons.
+
 ## 1.2.26 - 2026-11-01
 
 - Improve responsive layout on mobile and narrow viewports:
