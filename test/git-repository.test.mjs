@@ -228,5 +228,7 @@ try {
 
   console.log("Git 仓库地址解析、Git 检出、配额防御与端到端管理测试通过");
 } finally {
-  await rm(sandbox, { recursive: true, force: true });
+  // Windows 上超时分支用异步 taskkill 收尾，git 子进程退出前仍占着 deadline-test 目录，
+  // 单次 rm 会撞 EBUSY；重试几次即可，否则整个沙箱会残留在 %TEMP%。
+  await rm(sandbox, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 }
