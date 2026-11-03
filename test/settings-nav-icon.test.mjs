@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 const {
-  NAV_ICON_CLASS,
   NAV_ICON_MARKER,
   NAV_ROW_SELECTOR,
   isOwnNavRow,
@@ -152,7 +151,7 @@ test("别的对话框里同名 Skills 行不会被当成技能导航", () => {
   const { button, svg } = fakeButton(doc, "Skills", "<path d=\"other\"/>");
   assert.equal(applySettingsNavIcon(button, () => "技能"), false);
   assert.equal(svg.innerHTML, "<path d=\"other\"/>", "非本插件导航行的图标不能被替换");
-  assert.equal(button.querySelector(`.${NAV_ICON_CLASS}`), null);
+  assert.equal(button.hasAttribute(NAV_ICON_MARKER), false, "非本插件导航行不能被打上 marker");
 });
 
 test("对齐 dshmarket：使用纯属性标记与 ::before 伪元素渲染图标，不向 button 插入 DOM 节点", () => {
@@ -251,29 +250,33 @@ test("插件卸载时的清理回调会移除图标并保留样式单例", async
   globalThis.MutationObserver = previousObserver;
 });
 
-test("老宿主未声明 settings.section.icon 时，设置分区仍成功注册且不崩溃", async () => {
+/** 加载真实构建产物（bundle 的 require 桩只提供最小原语集合） */
+async function loadClientBundle() {
   const { readFile } = await import("node:fs/promises");
   const source = await readFile(new URL("../lib/client.js", import.meta.url), "utf8");
   let definition;
   new Function("window", source)({ __ModuleLoader__: { load(value) { definition = value; } } });
   const react = await import("react");
+  // primitives 用 Proxy 兜底：缺任一宿主原语都会让组件渲染直接抛错，与本次要验证的槽位行为无关
+  const primitives = new Proxy({}, {
+    get(_target, key) {
+      if (key === "Input") return Object.assign(() => null, { TextArea: () => null });
+      return () => null;
+    },
+  });
   const client = definition.factory((id) => {
     if (id === "react") return react;
     if (id === "react/jsx-runtime") return { jsx: react.createElement, jsxs: react.createElement, Fragment: react.Fragment };
     if (id.startsWith("react-dom")) return {};
-    if (id === "@deepseek-ai/dsh-client-ui-primitives") return {
-      Switch: () => null,
-      SegmentedControl: () => null,
-      Button: () => null,
-      Input: () => null,
-      Modal: () => null,
-      SegmentedTabs: () => null,
-    };
+    if (id === "@deepseek-ai/dsh-client-ui-primitives") return primitives;
     throw new Error("unexpected require: " + id);
   });
+  return { client, react };
+}
 
-  const registeredSlots = new Map();
-  const fakeCtx = {
+/** 老宿主：声明了 settings.section 但完全没有 settings.section.icon 这个子槽位 */
+function createLegacyCtx(registered) {
+  return {
     locale: {
       register: () => () => {},
       bind: () => (k) => k,
@@ -282,23 +285,62 @@ test("老宿主未声明 settings.section.icon 时，设置分区仍成功注册
     effect: (fn) => fn(),
     slots: {
       inject(name, fn) {
-        if (name === "settings.section") return fn();
-        // 模拟老宿主：根本不触发 settings.section.icon 的 inject 回调
+        // 老宿主有 settings.section 与 plugins.bundle.config，但完全不声明 settings.section.icon
+        if (name === "settings.section" || name === "plugins.bundle.config") return fn();
       },
       register(options, component) {
         if (options.name === "settings.section.icon") {
-          throw new Error("slot settings.section.icon is not declared");
+          throw new Error('slot "settings.section.icon" is not declared (a parent entry\'s children table must declare it)');
         }
-        registeredSlots.set(options.name, options);
-        return () => registeredSlots.delete(options.name);
+        registered.set(options.name, { options, component });
+        return () => registered.delete(options.name);
       },
     },
   };
+}
 
-  client.apply(fakeCtx);
-  assert.ok(registeredSlots.has("settings.section"), "老宿主未声明 settings.section.icon 时，settings.section 必须注册成功");
+test("老宿主未声明 settings.section.icon 时，设置分区仍成功注册且不崩溃", async () => {
+  const { client } = await loadClientBundle();
+  const registered = new Map();
+  client.apply(createLegacyCtx(registered));
+  assert.ok(registered.has("settings.section"), "老宿主未声明 settings.section.icon 时，settings.section 必须注册成功");
 });
 
+test("老宿主切换入口位置后设置分区不丢失（回归：图标槽位注册抛错曾连带吞掉正文注册）", async () => {
+  const { client } = await loadClientBundle();
+  const registered = new Map();
+  const warnings = [];
+  const previousWarn = console.warn;
+  const previousFetch = globalThis.fetch;
+  console.warn = (...args) => { warnings.push(args.map((item) => String(item)).join(" ")); };
+  // 控制器保存入口位置会 POST /sidebar-entry，这里让保存成功，避免走回滚分支
+  globalThis.fetch = async () => ({
+    ok: true,
+    status: 200,
+    json: async () => ({ ok: true, data: { location: "sidebar" } }),
+  });
+  try {
+    client.apply(createLegacyCtx(registered));
+    const card = registered.get("plugins.bundle.config");
+    assert.ok(card, "插件管理页配置卡必须注册成功");
+    // 配置卡的 occupant 返回元素而不执行 hooks，可直接取到生产控制器的 setLocation
+    const setLocation = card.component({ view: "page" }).props.setLocation;
+    assert.equal(typeof setLocation, "function", "配置卡必须暴露入口位置切换入口");
+
+    await setLocation("sidebar");
+    assert.equal(registered.has("settings.section"), false, "切到「仅侧边栏」后设置分区应注销");
+
+    await setLocation("settings");
+    assert.ok(registered.has("settings.section"), "切回「仅设置」后设置分区必须重新注册");
+    assert.deepEqual(warnings, [], "老宿主不应在执行路径上产生注册失败日志");
+  } finally {
+    console.warn = previousWarn;
+    globalThis.fetch = previousFetch;
+  }
+});
+
+// 粗粒度哨兵：只证明构建产物里存在声明式门控写法，改写成别名或动态取值可绕过，
+// 真正的行为约束由上面「老宿主切换入口位置后设置分区不丢失」用例守住。
 test("源码契约：必须通过 slots.inject 声明式门控注册 settings.section.icon", async () => {
   const { readFile } = await import("node:fs/promises");
   const source = await readFile(new URL("../lib/client.js", import.meta.url), "utf8");
