@@ -6,11 +6,11 @@ import React from "react";
  * 图标矢量路径与 dsh-codex-ui (observeSettingsNavIcons) 保持一致：
  * 技能清单卡片轮廓 + 代码横线 + 右下角 AI 闪烁星芒 (Sparkle)。
  *
- * 渲染方式使用独立的 CSS mask span，而不是改写宿主 svg 的内容：
+ * 渲染方式使用纯属性标记控制 ::before 伪元素渲染，不修改或插入 DOM 节点：
  * 第三方皮肤（如 orca-link / dsh-deep-whale）会按 svg 内部形状识别图标，
  * 给 svg 打标记后用 CSS 隐藏其子节点。直接替换 svg.innerHTML 会与皮肤的
  * 内容级识别机制互相覆盖，并残留皮肤标记，最终导致图标整体不可见 (#49)。
- * mask span 不参与皮肤对 svg 子节点的识别与隐藏，宿主 svg 只负责被隐藏。
+ * 伪元素渲染不参与皮肤对 svg 子节点的识别与隐藏，宿主 svg 只负责被隐藏。
  */
 
 export const NAV_ICON_MARKER = "data-dssm-nav-icon";
