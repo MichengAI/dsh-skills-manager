@@ -174,6 +174,24 @@ test("对齐 dshmarket：使用纯属性标记与 ::before 伪元素渲染图标
   assert.equal(applySettingsNavIcon(button, () => "其他"), false);
 });
 
+test("当宿主已使用原生插槽容器渲染图标时，不打 marker 避免双图标", () => {
+  const { doc } = createDom();
+  const button = doc.createElement("button");
+  button.textContent = "技能";
+  const navSpan = doc.createElement("span");
+  navSpan.className = "navIcon";
+  navSpan.setAttribute("aria-hidden", "true");
+  const svg = doc.createElement("svg");
+  navSpan.appendChild(svg);
+  button.appendChild(navSpan);
+  const label = doc.createElement("span");
+  label.textContent = "技能";
+  button.appendChild(label);
+
+  assert.equal(applySettingsNavIcon(button, () => "技能"), false, "不打 marker");
+  assert.equal(button.getAttribute(NAV_ICON_MARKER), null);
+});
+
 test("卸载后移除 marker 属性，宿主齿轮与内容保持不变", () => {
   const { doc } = createDom();
   const { button, svg } = fakeButton(doc, "技能");

@@ -18,7 +18,7 @@ import { createSourceSelect } from "./source-select.js";
 import * as primitives from "@deepseek-ai/dsh-client-ui-primitives";
 import { Button as PrimitiveButton, Modal as PrimitiveModal, SegmentedTabs } from "@deepseek-ai/dsh-client-ui-primitives";
 import { Input, foldChevron } from "./plugin-ui.js";
-import { installSettingsNavIcon } from "./settings-nav-icon.js";
+import { SkillsNavIcon, installSettingsNavIcon } from "./settings-nav-icon.js";
 import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-entry.js";
 
 // dsh-skills-manager client half：按全局与项目作用域切换的多 Agent Skills 管理面板。
@@ -1353,6 +1353,11 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
         if (!settingsSectionSupported || offSettingsSection) return;
         if (sidebarController && !sidebarController.isSettingsSectionEnabled()) return;
         try {
+          (ctx.slots.register as any)({
+            name: "settings.section.icon",
+            id: "skills-manager",
+            locale: NS,
+          }, SkillsNavIcon);
           const unreg = ctx.slots.register({ name: "settings.section", id: "skills-manager", order: 25, label: function () { return ctx.locale.bind(NS)("title"); }, icon: "skill", locale: NS }, SkillManagerSection);
           offSettingsSection = typeof unreg === "function" ? (unreg as () => void) : () => {};
         } catch (reason) {
