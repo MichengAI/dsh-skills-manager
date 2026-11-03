@@ -1370,9 +1370,9 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
         }
       };
 
-      const mountSettingsNavIcon = () => {
-        if (!settingsNavIconSupported || offSettingsNavIcon) return;
-        if (sidebarController && !sidebarController.isSettingsSectionEnabled()) return;
+      // 图标槽位的唯一注册入口：inject 声明回调与入口位置同步都走这里，避免两处语句漂移
+      const registerSettingsNavIcon = () => {
+        if (offSettingsNavIcon) return true;
         try {
           const unreg = (ctx.slots.register as any)({
             name: "settings.section.icon",
@@ -1380,16 +1380,25 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
             locale: NS,
           }, SkillsNavIcon);
           offSettingsNavIcon = typeof unreg === "function" ? (unreg as () => void) : () => {};
-        } catch {
+          return true;
+        } catch (reason) {
+          console.warn("skills-manager: register settings.section.icon failed:", reason);
           offSettingsNavIcon = null;
+          return false;
         }
       };
 
+      const mountSettingsNavIcon = () => {
+        if (!settingsNavIconSupported) return;
+        if (sidebarController && !sidebarController.isSettingsSectionEnabled()) return;
+        registerSettingsNavIcon();
+      };
+
       const unmountSettingsNavIcon = () => {
-        if (offSettingsNavIcon) {
-          try { offSettingsNavIcon(); } catch {}
-          offSettingsNavIcon = null;
-        }
+        const unreg = offSettingsNavIcon;
+        offSettingsNavIcon = null;
+        if (!unreg) return;
+        try { unreg(); } catch {}
       };
 
       const syncSettingsSection = () => {
@@ -1402,32 +1411,25 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
         }
       };
 
-      // 对齐 codex-pet 与 dsh-im-connect：在宿主支持 settings.section.icon 插槽时通过 inject 按需注册；老宿主不请求该插槽则永不触发回调
+      // 对齐 codex-pet 与 dsh-im-connect：宿主声明 settings.section.icon 时才注册；
+      // 老宿主不声明该槽位，inject 回调永不触发，也就不存在 register 抛错。
       if (typeof ctx.slots?.inject === "function") {
         try {
           (ctx.slots.inject as any)("settings.section.icon", function () {
             settingsNavIconSupported = true;
-            try {
-              if (sidebarController && !sidebarController.isSettingsSectionEnabled()) {
-                return function () {
-                  settingsNavIconSupported = false;
-                  unmountSettingsNavIcon();
-                };
-              }
-              const unreg = (ctx.slots.register as any)({
-                name: "settings.section.icon",
-                id: "skills-manager",
-                locale: NS,
-              }, SkillsNavIcon);
-              offSettingsNavIcon = typeof unreg === "function" ? (unreg as () => void) : () => {};
-              return unreg;
-            } catch {
-              return function () {
-                settingsNavIconSupported = false;
-              };
-            }
+            // 声明撤销时宿主会清空该槽位的全部条目，本地句柄必须一起归零：
+            // 留着 stale 句柄会让后续 mount 提前 return，图标再也回不来。
+            const releaseDeclaration = function () {
+              settingsNavIconSupported = false;
+              unmountSettingsNavIcon();
+            };
+            if (sidebarController && !sidebarController.isSettingsSectionEnabled()) return releaseDeclaration;
+            if (!registerSettingsNavIcon()) return releaseDeclaration;
+            return releaseDeclaration;
           });
-        } catch {}
+        } catch (reason) {
+          console.warn("skills-manager: inject settings.section.icon failed:", reason);
+        }
       }
 
       ctx.slots.inject("settings.section", function () {
