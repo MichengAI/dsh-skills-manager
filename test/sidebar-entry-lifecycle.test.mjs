@@ -36,7 +36,7 @@ function fixture() {
     if (id === "react") return react;
     if (id === "react/jsx-runtime") return { jsx: react.createElement, jsxs: react.createElement, Fragment: react.Fragment };
     if (id.startsWith("react-dom")) return {};
-    if (id === "@deepseek-ai/dsh-client-ui-primitives") return { Switch: function Switch() {}, Button: () => null, Input: () => null, Modal: () => null, SegmentedTabs: () => null };
+    if (id === "@deepseek-ai/dsh-client-ui-primitives") return { Switch: function Switch() {}, SegmentedControl: () => null, Button: () => null, Input: () => null, Modal: () => null, SegmentedTabs: () => null };
     throw new Error("未知测试依赖：" + id);
   });
   const gets = { "/sidebar-entry": deferred(), "/online-update": deferred() };

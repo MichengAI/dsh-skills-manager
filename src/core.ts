@@ -1,4 +1,4 @@
-import type { SkillRoot, RepositoryDestination, RootInput, Diagnostic, OperationError, CodedError, Log, DiscoveredEntry, SkillEntry, ParsedSkill, Scan, ManagerState, SkillCategory, PolicyResult, Policy, SkillItem, ViewItem, RootView, SkillView, ScopeOptions, MutationOptions, RenameOptions, UploadInput, CreateInput, ImportCandidate, ImportPending, ImportConflict, ImportFailure, ImportResult } from "./types.js";
+import type { EntryLocation, SkillRoot, RepositoryDestination, RootInput, Diagnostic, OperationError, CodedError, Log, DiscoveredEntry, SkillEntry, ParsedSkill, Scan, ManagerState, SkillCategory, PolicyResult, Policy, SkillItem, ViewItem, RootView, SkillView, ScopeOptions, MutationOptions, RenameOptions, UploadInput, CreateInput, ImportCandidate, ImportPending, ImportConflict, ImportFailure, ImportResult } from "./types.js";
 // dsh-skills-manager core —— 纯 Node 技能文件管理核心（仅 ZIP 解压使用 fflate，可独立单测）
 //
 // 覆盖 DSH 用户级与活动 Session 项目级技能根：
@@ -2415,21 +2415,38 @@ function invalidManagerStateWrite() {
   };
 }
 
-export async function getSidebarEntry(): Promise<boolean> {
+export async function getEntryLocation(): Promise<EntryLocation> {
   const current = await readManagerState();
-  return current.state.sidebarEntry === true;
+  if (current.state.entryLocation === "both" || current.state.entryLocation === "sidebar" || current.state.entryLocation === "settings") {
+    return current.state.entryLocation;
+  }
+  return current.state.sidebarEntry === true ? "both" : "settings";
+}
+
+export async function setEntryLocation(location: EntryLocation): Promise<EntryLocation> {
+  if (location !== "both" && location !== "sidebar" && location !== "settings") {
+    throw codedError("entryLocation must be one of 'both', 'sidebar', or 'settings'", "error.proto.invalidParams");
+  }
+  const current = await readManagerState();
+  if (current.writable === false) {
+    throw codedError("manager state file is read-only", "error.state.invalid");
+  }
+  current.state.entryLocation = location;
+  current.state.sidebarEntry = location !== "settings";
+  await writeManagerState(current.state);
+  return location;
+}
+
+export async function getSidebarEntry(): Promise<boolean> {
+  const location = await getEntryLocation();
+  return location !== "settings";
 }
 
 export async function setSidebarEntry(enabled: boolean): Promise<boolean> {
   if (typeof enabled !== "boolean") {
     throw codedError("sidebarEntry must be a boolean", "error.proto.invalidParams");
   }
-  const current = await readManagerState();
-  if (current.writable === false) {
-    throw codedError("manager state file is read-only", "error.state.invalid");
-  }
-  current.state.sidebarEntry = enabled;
-  await writeManagerState(current.state);
+  await setEntryLocation(enabled ? "both" : "settings");
   return enabled;
 }
 

@@ -67,6 +67,22 @@ declare module '@deepseek-ai/dsh-client-ui-primitives' {
     className?: string
   }): ReactElement
 
+  export interface SegmentedControlOption<Value extends string = string> {
+    value: Value
+    label: string
+    disabled?: boolean
+    title?: string
+  }
+  export function SegmentedControl<Value extends string>(props: {
+    id: string
+    value: Value
+    options: readonly SegmentedControlOption<Value>[]
+    onChange: (next: Value) => void
+    label: string
+    disabled?: boolean
+    className?: string | undefined
+  }): ReactElement
+
   export function Switch(props: {
     checked: boolean
     onChange: (next: boolean) => void

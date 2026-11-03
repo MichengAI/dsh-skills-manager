@@ -1345,7 +1345,56 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
         };
       }, "skills-manager: plugin update ui");
       installSettingsNavIcon(ctx, function () { return ctx.locale.bind(NS)("title"); });
-      ctx.slots.inject("settings.section", function () { return ctx.slots.register({ name: "settings.section", id: "skills-manager", order: 25, label: function () { return ctx.locale.bind(NS)("title"); }, icon: "skill", locale: NS }, SkillManagerSection); });
+
+      let offSettingsSection: (() => void) | null = null;
+      let settingsSectionSupported = false;
+
+      const mountSettingsSection = () => {
+        if (!settingsSectionSupported || offSettingsSection) return;
+        if (sidebarController && !sidebarController.isSettingsSectionEnabled()) return;
+        try {
+          const unreg = ctx.slots.register({ name: "settings.section", id: "skills-manager", order: 25, label: function () { return ctx.locale.bind(NS)("title"); }, icon: "skill", locale: NS }, SkillManagerSection);
+          offSettingsSection = typeof unreg === "function" ? (unreg as () => void) : () => {};
+        } catch (reason) {
+          console.warn("skills-manager: register settings.section failed:", reason);
+          offSettingsSection = null;
+        }
+      };
+
+      const unmountSettingsSection = () => {
+        if (offSettingsSection) {
+          try { offSettingsSection(); } catch {}
+          offSettingsSection = null;
+        }
+      };
+
+      const syncSettingsSection = () => {
+        if (sidebarController?.isSettingsSectionEnabled?.() ?? true) {
+          mountSettingsSection();
+        } else {
+          unmountSettingsSection();
+        }
+      };
+
+      ctx.slots.inject("settings.section", function () {
+        settingsSectionSupported = true;
+        try {
+          if (sidebarController && !sidebarController.isSettingsSectionEnabled()) {
+            return function () {
+              settingsSectionSupported = false;
+              unmountSettingsSection();
+            };
+          }
+          const unreg = ctx.slots.register({ name: "settings.section", id: "skills-manager", order: 25, label: function () { return ctx.locale.bind(NS)("title"); }, icon: "skill", locale: NS }, SkillManagerSection);
+          offSettingsSection = typeof unreg === "function" ? (unreg as () => void) : () => {};
+          return unreg;
+        } catch (reason) {
+          console.warn("skills-manager: register settings.section failed:", reason);
+          return function () {
+            settingsSectionSupported = false;
+          };
+        }
+      });
       sidebarController = setupSidebarEntry(ctx, {
         callApi: callApi,
         headers: MUTATION_HEADERS,
@@ -1355,6 +1404,9 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
           if (updateCleanup && typeof updateCleanup.refresh === "function") {
             updateCleanup.refresh();
           }
+        },
+        onLocationChange: function () {
+          syncSettingsSection();
         }
       });
       ctx.effect(function () {
@@ -1363,6 +1415,7 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
             sidebarController.destroy();
             sidebarController = undefined;
           }
+          unmountSettingsSection();
         };
       }, "skills-manager: sidebar entry cleanup");
     }

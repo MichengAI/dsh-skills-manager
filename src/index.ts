@@ -40,7 +40,9 @@ import {
   listWorkspaces,
   workspaceSkills,
   logPath,
+  getEntryLocation,
   getSidebarEntry,
+  setEntryLocation,
   setSidebarEntry,
   getOnlineUpdate,
   setOnlineUpdate,
@@ -445,14 +447,27 @@ function apply(ctx: HostContext, config?: PluginConfig) {
       methods: ["GET", "HEAD", "POST"],
       fetch: (req) => {
         if (req.method === "GET" || req.method === "HEAD") {
-          return runFetch(async () => ({ enabled: await getSidebarEntry() }), undefined, req.method === "HEAD");
+          return runFetch(async () => {
+            const location = await getEntryLocation();
+            return { ok: true, location, enabled: location !== "settings" };
+          }, undefined, req.method === "HEAD");
         }
         return handlePost(req, async (b) => {
-          if (!b || typeof b.enabled !== "boolean") {
-            throw Object.assign(new Error("enabled 必须是布尔值"), { statusCode: 400, code: "error.proto.invalidParams" });
+          if (!b) {
+            throw Object.assign(new Error("请求体不能为空"), { statusCode: 400, code: "error.proto.invalidParams" });
           }
-          const enabled = await setSidebarEntry(b.enabled);
-          return { enabled };
+          if (typeof b.location === "string") {
+            if (b.location !== "both" && b.location !== "sidebar" && b.location !== "settings") {
+              throw Object.assign(new Error("location 必须是 both、sidebar 或 settings"), { statusCode: 400, code: "error.proto.invalidParams" });
+            }
+            const location = await setEntryLocation(b.location);
+            return { ok: true, location, enabled: location !== "settings" };
+          }
+          if (typeof b.enabled === "boolean") {
+            const location = await setEntryLocation(b.enabled ? "both" : "settings");
+            return { ok: true, location, enabled: location !== "settings" };
+          }
+          throw Object.assign(new Error("缺少合法的 location 或 enabled 参数"), { statusCode: 400, code: "error.proto.invalidParams" });
         });
       },
     },
@@ -844,4 +859,4 @@ function apply(ctx: HostContext, config?: PluginConfig) {
 export { activeSessionCwds, apply, inject, name, notifyChatCatalog, registerAgentSkillProviders };
 
 /** 请求体由各业务入口现有校验解析，此类型只声明路由转交的字段。 */
-type RequestBody = CreateInput & UploadInput & SkillRequest & RepositoryInput & {root?: string; source?: string; conflict?: string; dryRun?: boolean; workspace?: unknown; enabled?: boolean; category?: string; targetName?: string; position?: "before" | "after"; catalog?: string; skillId?: string; owner?: string; slug?: string; path?: unknown; key?: string; id?: string; label?: unknown; group?: unknown; sources?: unknown[]; note?: string};
+type RequestBody = CreateInput & UploadInput & SkillRequest & RepositoryInput & {root?: string; source?: string; conflict?: string; dryRun?: boolean; workspace?: unknown; enabled?: boolean; location?: string; category?: string; targetName?: string; position?: "before" | "after"; catalog?: string; skillId?: string; owner?: string; slug?: string; path?: unknown; key?: string; id?: string; label?: unknown; group?: unknown; sources?: unknown[]; note?: string};

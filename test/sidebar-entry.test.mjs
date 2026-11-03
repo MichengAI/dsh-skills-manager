@@ -123,6 +123,7 @@ try {
         Input: (props) => react.createElement("input", props),
         Modal: (props) => null,
         SegmentedTabs: (props) => null,
+        SegmentedControl: (props) => react.createElement("div", props),
         Switch: (props) => react.createElement("input", { type: "checkbox", checked: props.checked, onChange: (e) => props.onChange(e.target.checked) }),
       };
     }
@@ -202,11 +203,27 @@ try {
   // 打开开关
   await controller.setEnabled(true);
   assert.equal(controller.isEnabled(), true);
+  assert.equal(controller.getLocation(), "both");
+  assert.equal(controller.isSettingsSectionEnabled(), true);
   assert.ok(slotRegistrations.has("main"), "开启后注册 main 槽位");
   assert.equal(slotRegistrations.get("main").meta.key, "skills-manager");
   assert.ok(slotRegistrations.has("sidebar.panellist"), "开启后注册 sidebar.panellist 槽位");
   assert.equal(slotRegistrations.get("sidebar.panellist").meta.id, "skills-manager");
   assert.equal(slotRegistrations.get("sidebar.panellist").meta.order, 2);
+
+  // 切换到仅侧边栏 (sidebar)
+  await controller.setLocation("sidebar");
+  assert.equal(controller.getLocation(), "sidebar");
+  assert.equal(controller.isEnabled(), true);
+  assert.equal(controller.isSettingsSectionEnabled(), false, "仅侧边栏模式下设置菜单项不显示");
+  assert.ok(slotRegistrations.has("sidebar.panellist"), "仅侧边栏模式下保留侧边栏图标");
+
+  // 切换到仅设置 (settings)
+  await controller.setLocation("settings");
+  assert.equal(controller.getLocation(), "settings");
+  assert.equal(controller.isEnabled(), false);
+  assert.equal(controller.isSettingsSectionEnabled(), true, "仅设置模式下显示设置菜单项");
+  assert.equal(slotRegistrations.has("sidebar.panellist"), false, "仅设置模式下注销侧边栏图标");
 
   // 关闭开关：验证安全切走当前激活面板并注销槽位
   selectedPanel = "skills-manager";

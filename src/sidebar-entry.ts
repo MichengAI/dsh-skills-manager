@@ -1,6 +1,7 @@
 import * as React from "react";
-import { Switch as PrimitiveSwitch } from "@deepseek-ai/dsh-client-ui-primitives";
+import { SegmentedControl, Switch as PrimitiveSwitch } from "@deepseek-ai/dsh-client-ui-primitives";
 import type { ClientContext, Translate } from "./client-types.js";
+import type { EntryLocation } from "./types.js";
 import { SKILL_PATHS } from "./settings-nav-icon.js";
 
 const h = React.createElement;
@@ -11,6 +12,11 @@ export const SIDEBAR_PANEL_ORDER = 2;
 
 export const sidebarLocales = {
   zh: {
+    "entry.location.title": "入口展示位置",
+    "entry.location.desc": "选择技能管理入口的展示位置（至少保留一处，防止无法打开面板）。",
+    "entry.location.both": "两边显示",
+    "entry.location.sidebar": "仅侧边栏",
+    "entry.location.settings": "仅设置",
     "sidebar.entry.title": "侧边栏入口",
     "sidebar.entry.desc": "在侧栏「插件」下方显示技能。设置里的入口不变。",
     "sidebar.entry.toggle": "切换侧边栏入口",
@@ -20,6 +26,11 @@ export const sidebarLocales = {
     "update.entry.locked": "在线更新已被宿主配置禁用",
   },
   en: {
+    "entry.location.title": "Entry placement",
+    "entry.location.desc": "Choose where to show the entry (at least one is retained to avoid losing access).",
+    "entry.location.both": "Both",
+    "entry.location.sidebar": "Sidebar only",
+    "entry.location.settings": "Settings only",
     "sidebar.entry.title": "Sidebar entry",
     "sidebar.entry.desc": "Show Skills below Plugins in the sidebar. The Settings entry stays either way.",
     "sidebar.entry.toggle": "Toggle sidebar entry",
@@ -65,8 +76,10 @@ export function SkillSidebarIcon(props?: { size?: number }) {
 
 export function SkillBundleConfigCard(props: {
   t: Translate;
-  enabled: boolean;
-  onToggle: (enabled: boolean) => void;
+  location?: EntryLocation;
+  onLocationChange?: (location: EntryLocation) => void;
+  enabled?: boolean;
+  onToggle?: (enabled: boolean) => void;
   disabled?: boolean;
   onlineUpdateEnabled?: boolean;
   onToggleOnlineUpdate?: (enabled: boolean) => void;
@@ -76,7 +89,9 @@ export function SkillBundleConfigCard(props: {
   ensureSidebarEntryStyle();
   const {
     t,
-    enabled,
+    location: propLocation,
+    onLocationChange,
+    enabled = false,
     onToggle,
     disabled,
     onlineUpdateEnabled = true,
@@ -85,17 +100,35 @@ export function SkillBundleConfigCard(props: {
     onlineUpdateLocked,
   } = props;
 
+  const effectiveLocation: EntryLocation = propLocation ?? (enabled ? "both" : "settings");
+
+  const handleLocationChange = (next: string) => {
+    if (next === "both" || next === "sidebar" || next === "settings") {
+      if (typeof onLocationChange === "function") {
+        onLocationChange(next);
+      } else if (typeof onToggle === "function") {
+        onToggle(next !== "settings");
+      }
+    }
+  };
+
   const rows = [
-    h("div", { key: "sidebar-entry", className: "dssm-bundle-row" },
+    h("div", { key: "entry-location", className: "dssm-bundle-row" },
       h("div", { className: "dssm-bundle-label-box" },
-        h("span", { className: "dssm-bundle-title" }, t("sidebar.entry.title")),
-        h("span", { className: "dssm-bundle-desc" }, t("sidebar.entry.desc"))
+        h("span", { className: "dssm-bundle-title" }, t("entry.location.title") || t("sidebar.entry.title")),
+        h("span", { className: "dssm-bundle-desc" }, t("entry.location.desc") || t("sidebar.entry.desc"))
       ),
-      h(PrimitiveSwitch, {
-        checked: enabled,
-        onChange: onToggle,
-        label: t("sidebar.entry.toggle"),
+      h(SegmentedControl, {
+        id: "dssm-bundle-entry-location",
+        value: effectiveLocation,
+        onChange: handleLocationChange,
+        label: t("entry.location.title") || t("sidebar.entry.title"),
         disabled: disabled,
+        options: [
+          { value: "both", label: t("entry.location.both") || "两边显示" },
+          { value: "sidebar", label: t("entry.location.sidebar") || "仅侧边栏" },
+          { value: "settings", label: t("entry.location.settings") || "仅设置" },
+        ],
       })
     ),
   ];
@@ -123,22 +156,24 @@ export function SkillBundleConfigCard(props: {
 
 function SkillBundleConfigCardWrapper(props: {
   t: Translate;
-  getEnabled: () => boolean;
-  setSidebar: (next: boolean) => Promise<unknown>;
+  getLocation: () => EntryLocation;
+  setLocation: (next: EntryLocation) => Promise<unknown>;
+  getEnabled?: () => boolean;
+  setSidebar?: (next: boolean) => Promise<unknown>;
   getOnlineUpdateEnabled?: () => boolean;
   setOnlineUpdate?: (next: boolean) => Promise<unknown>;
   getOnlineUpdateLocked?: () => boolean;
   subscribe: (fn: () => void) => () => void;
 }) {
-  const [enabled, setEnabled] = React.useState(props.getEnabled);
+  const [location, setLocation] = React.useState<EntryLocation>(props.getLocation);
   const [onlineUpdateEnabled, setOnlineUpdateEnabled] = React.useState(props.getOnlineUpdateEnabled ? props.getOnlineUpdateEnabled : () => true);
   const [onlineUpdateLocked, setOnlineUpdateLocked] = React.useState(props.getOnlineUpdateLocked ? props.getOnlineUpdateLocked : () => false);
-  const [savingSidebar, setSavingSidebar] = React.useState(false);
+  const [savingLocation, setSavingLocation] = React.useState(false);
   const [savingUpdate, setSavingUpdate] = React.useState(false);
 
   React.useEffect(() => {
     const syncState = () => {
-      setEnabled(props.getEnabled());
+      setLocation(props.getLocation());
       if (props.getOnlineUpdateEnabled) {
         setOnlineUpdateEnabled(props.getOnlineUpdateEnabled());
       }
@@ -150,13 +185,13 @@ function SkillBundleConfigCardWrapper(props: {
     return props.subscribe(syncState);
   }, [props]);
 
-  const onToggleSidebar = (next: boolean) => {
-    setSavingSidebar(true);
-    setEnabled(next);
-    props.setSidebar(next).catch(() => {
-      setEnabled(props.getEnabled());
+  const onLocationChange = (next: EntryLocation) => {
+    setSavingLocation(true);
+    setLocation(next);
+    props.setLocation(next).catch(() => {
+      setLocation(props.getLocation());
     }).finally(() => {
-      setSavingSidebar(false);
+      setSavingLocation(false);
     });
   };
 
@@ -175,9 +210,9 @@ function SkillBundleConfigCardWrapper(props: {
 
   return h(SkillBundleConfigCard, {
     t: props.t,
-    enabled,
-    disabled: savingSidebar,
-    onToggle: onToggleSidebar,
+    location,
+    disabled: savingLocation,
+    onLocationChange,
     onlineUpdateEnabled,
     onlineUpdateDisabled: savingUpdate || onlineUpdateLocked,
     onlineUpdateLocked,
@@ -186,14 +221,18 @@ function SkillBundleConfigCardWrapper(props: {
 }
 
 export interface SetupSidebarEntryOptions {
-  callApi: (path: "/sidebar-entry" | "/online-update", options?: RequestInit) => Promise<{ enabled: boolean; locked?: boolean }>;
+  callApi: (path: "/sidebar-entry" | "/online-update", options?: RequestInit) => Promise<{ location?: EntryLocation; enabled?: boolean; locked?: boolean }>;
   headers: Record<string, string>;
   renderPanel: (ownerProps?: any) => React.ReactNode;
   ns: string;
   onOnlineUpdateChange?: (enabled: boolean) => void;
+  onLocationChange?: (location: EntryLocation) => void;
 }
 
 export interface SidebarEntryController {
+  getLocation(): EntryLocation;
+  setLocation(location: EntryLocation): Promise<EntryLocation>;
+  isSettingsSectionEnabled(): boolean;
   isEnabled(): boolean;
   isSupported(): boolean;
   setEnabled(enabled: boolean): Promise<boolean>;
@@ -209,6 +248,9 @@ export function setupSidebarEntry(
   ensureSidebarEntryStyle();
   if (!ctx.locale) {
     return {
+      getLocation: () => "settings",
+      setLocation: async () => "settings",
+      isSettingsSectionEnabled: () => true,
       isEnabled: () => false,
       isSupported: () => false,
       setEnabled: async () => false,
@@ -218,7 +260,7 @@ export function setupSidebarEntry(
     };
   }
   const { callApi, headers, renderPanel, ns } = options;
-  let sidebarEntryEnabled = false;
+  let entryLocation: EntryLocation = "settings";
   let sidebarSupported = false;
   let offPanel: (() => void) | null = null;
   let offRow: (() => void) | null = null;
@@ -230,6 +272,9 @@ export function setupSidebarEntry(
   } | undefined;
   const listeners = new Set<() => void>();
 
+  const isSidebarEnabled = () => entryLocation === "both" || entryLocation === "sidebar";
+  const isSettingsSectionEnabled = () => entryLocation === "both" || entryLocation === "settings";
+
   const notify = () => {
     if (destroyed) return;
     for (const listener of listeners) {
@@ -239,7 +284,7 @@ export function setupSidebarEntry(
 
   const sync = () => {
     if (destroyed) return;
-    if (sidebarSupported && sidebarEntryEnabled) {
+    if (sidebarSupported && isSidebarEnabled()) {
       if (!offPanel) {
         const res = ctx.slots.register({
           name: "main",
@@ -278,27 +323,39 @@ export function setupSidebarEntry(
     }
   };
 
-  const setEnabled = async (next: boolean): Promise<boolean> => {
-    if (destroyed) return sidebarEntryEnabled;
+  const setLocation = async (next: EntryLocation): Promise<EntryLocation> => {
+    if (destroyed) return entryLocation;
     const currentEpoch = ++epoch;
-    sidebarEntryEnabled = next;
+    const previous = entryLocation;
+    entryLocation = next;
     sync();
     notify();
+    if (typeof options.onLocationChange === "function") {
+      try { options.onLocationChange(next); } catch {}
+    }
     try {
       await callApi("/sidebar-entry", {
         method: "POST",
         headers,
-        body: JSON.stringify({ enabled: next }),
+        body: JSON.stringify({ location: next }),
       });
       return next;
     } catch (err) {
       if (currentEpoch === epoch) {
-        sidebarEntryEnabled = !next;
+        entryLocation = previous;
         sync();
         notify();
+        if (typeof options.onLocationChange === "function") {
+          try { options.onLocationChange(previous); } catch {}
+        }
       }
       throw err;
     }
+  };
+
+  const setEnabled = async (next: boolean): Promise<boolean> => {
+    await setLocation(next ? "both" : "settings");
+    return isSidebarEnabled();
   };
 
   let onlineUpdateEnabled = true;
@@ -343,10 +400,17 @@ export function setupSidebarEntry(
   const loadEpoch = epoch;
   callApi("/sidebar-entry")
     .then((res) => {
-      if (!destroyed && epoch === loadEpoch && res && typeof res.enabled === "boolean") {
-        sidebarEntryEnabled = res.enabled;
+      if (!destroyed && epoch === loadEpoch && res) {
+        if (res.location === "both" || res.location === "sidebar" || res.location === "settings") {
+          entryLocation = res.location;
+        } else if (typeof res.enabled === "boolean") {
+          entryLocation = res.enabled ? "both" : "settings";
+        }
         sync();
         notify();
+        if (typeof options.onLocationChange === "function") {
+          try { options.onLocationChange(entryLocation); } catch {}
+        }
       }
     })
     .catch(() => {});
@@ -390,7 +454,9 @@ export function setupSidebarEntry(
       if (ownerProps && ownerProps.view === "summary") return null;
       return h(SkillBundleConfigCardWrapper, {
         t: ctx.locale.bind(ns),
-        getEnabled: () => sidebarEntryEnabled,
+        getLocation: () => entryLocation,
+        setLocation,
+        getEnabled: () => isSidebarEnabled(),
         setSidebar: setEnabled,
         getOnlineUpdateEnabled: () => onlineUpdateEnabled,
         setOnlineUpdate: setOnlineUpdate,
@@ -404,7 +470,10 @@ export function setupSidebarEntry(
   });
 
   return {
-    isEnabled: () => sidebarEntryEnabled,
+    getLocation: () => entryLocation,
+    setLocation,
+    isSettingsSectionEnabled,
+    isEnabled: () => isSidebarEnabled(),
     isSupported: () => sidebarSupported,
     setEnabled,
     isOnlineUpdateEnabled: () => onlineUpdateEnabled,
