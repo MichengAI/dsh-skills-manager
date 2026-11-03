@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.29 - 2026-11-04
+
+- Fix settings navigation icon fallback to generic gear on legacy hosts, ensuring the custom skills icon displays properly.
+- Fix settings section disappearing when toggling the skills manager entry location between sidebar and settings on legacy hosts.
+- Improve navigation icon selector compatibility with external settings theme skins.
+
 ## 1.2.28 - 2026-11-03
 
 - Integrate official native settings navigation icon slot: present dedicated vector icon on newer hosts while maintaining graceful compatibility with older hosts to prevent dual icons.
