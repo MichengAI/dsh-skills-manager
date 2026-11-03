@@ -192,6 +192,24 @@ test("当宿主已使用原生插槽容器渲染图标时，不打 marker 避免
   assert.equal(button.getAttribute(NAV_ICON_MARKER), null);
 });
 
+test("老版本宿主图标包在普通 aria-hidden span 里时，仍正常打 marker 渲染图标", () => {
+  const { doc } = createDom();
+  const button = doc.createElement("button");
+  button.textContent = "技能";
+  const hostIconSpan = doc.createElement("span");
+  hostIconSpan.className = "host-icon-wrapper";
+  hostIconSpan.setAttribute("aria-hidden", "true");
+  const svg = doc.createElement("svg");
+  hostIconSpan.appendChild(svg);
+  button.appendChild(hostIconSpan);
+  const label = doc.createElement("span");
+  label.textContent = "技能";
+  button.appendChild(label);
+
+  assert.equal(applySettingsNavIcon(button, () => "技能"), true, "老宿主应正常打 marker");
+  assert.equal(button.getAttribute(NAV_ICON_MARKER), "");
+});
+
 test("卸载后移除 marker 属性，宿主齿轮与内容保持不变", () => {
   const { doc } = createDom();
   const { button, svg } = fakeButton(doc, "技能");
@@ -231,4 +249,58 @@ test("插件卸载时的清理回调会移除图标并保留样式单例", async
   assert.equal(svg.innerHTML, "<path d=\"gear\"/>");
   globalThis.document = previousDocument;
   globalThis.MutationObserver = previousObserver;
+});
+
+test("老宿主未声明 settings.section.icon 时，设置分区仍成功注册且不崩溃", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const source = await readFile(new URL("../lib/client.js", import.meta.url), "utf8");
+  let definition;
+  new Function("window", source)({ __ModuleLoader__: { load(value) { definition = value; } } });
+  const react = await import("react");
+  const client = definition.factory((id) => {
+    if (id === "react") return react;
+    if (id === "react/jsx-runtime") return { jsx: react.createElement, jsxs: react.createElement, Fragment: react.Fragment };
+    if (id.startsWith("react-dom")) return {};
+    if (id === "@deepseek-ai/dsh-client-ui-primitives") return {
+      Switch: () => null,
+      SegmentedControl: () => null,
+      Button: () => null,
+      Input: () => null,
+      Modal: () => null,
+      SegmentedTabs: () => null,
+    };
+    throw new Error("unexpected require: " + id);
+  });
+
+  const registeredSlots = new Map();
+  const fakeCtx = {
+    locale: {
+      register: () => () => {},
+      bind: () => (k) => k,
+      getLocale: () => ({ active: "zh", revision: 1, locales: [] }),
+    },
+    effect: (fn) => fn(),
+    slots: {
+      inject(name, fn) {
+        if (name === "settings.section") return fn();
+        // 模拟老宿主：根本不触发 settings.section.icon 的 inject 回调
+      },
+      register(options, component) {
+        if (options.name === "settings.section.icon") {
+          throw new Error("slot settings.section.icon is not declared");
+        }
+        registeredSlots.set(options.name, options);
+        return () => registeredSlots.delete(options.name);
+      },
+    },
+  };
+
+  client.apply(fakeCtx);
+  assert.ok(registeredSlots.has("settings.section"), "老宿主未声明 settings.section.icon 时，settings.section 必须注册成功");
+});
+
+test("源码契约：必须通过 slots.inject 声明式门控注册 settings.section.icon", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const source = await readFile(new URL("../lib/client.js", import.meta.url), "utf8");
+  assert.match(source, /slots\.inject\(["']settings\.section\.icon["']/, "必须包含 settings.section.icon 的 inject 门控");
 });

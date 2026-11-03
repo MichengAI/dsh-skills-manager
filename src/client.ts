@@ -1347,17 +1347,14 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
       installSettingsNavIcon(ctx, function () { return ctx.locale.bind(NS)("title"); });
 
       let offSettingsSection: (() => void) | null = null;
+      let offSettingsNavIcon: (() => void) | null = null;
       let settingsSectionSupported = false;
+      let settingsNavIconSupported = false;
 
       const mountSettingsSection = () => {
         if (!settingsSectionSupported || offSettingsSection) return;
         if (sidebarController && !sidebarController.isSettingsSectionEnabled()) return;
         try {
-          (ctx.slots.register as any)({
-            name: "settings.section.icon",
-            id: "skills-manager",
-            locale: NS,
-          }, SkillsNavIcon);
           const unreg = ctx.slots.register({ name: "settings.section", id: "skills-manager", order: 25, label: function () { return ctx.locale.bind(NS)("title"); }, icon: "skill", locale: NS }, SkillManagerSection);
           offSettingsSection = typeof unreg === "function" ? (unreg as () => void) : () => {};
         } catch (reason) {
@@ -1373,13 +1370,65 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
         }
       };
 
+      const mountSettingsNavIcon = () => {
+        if (!settingsNavIconSupported || offSettingsNavIcon) return;
+        if (sidebarController && !sidebarController.isSettingsSectionEnabled()) return;
+        try {
+          const unreg = (ctx.slots.register as any)({
+            name: "settings.section.icon",
+            id: "skills-manager",
+            locale: NS,
+          }, SkillsNavIcon);
+          offSettingsNavIcon = typeof unreg === "function" ? (unreg as () => void) : () => {};
+        } catch {
+          offSettingsNavIcon = null;
+        }
+      };
+
+      const unmountSettingsNavIcon = () => {
+        if (offSettingsNavIcon) {
+          try { offSettingsNavIcon(); } catch {}
+          offSettingsNavIcon = null;
+        }
+      };
+
       const syncSettingsSection = () => {
         if (sidebarController?.isSettingsSectionEnabled?.() ?? true) {
           mountSettingsSection();
+          mountSettingsNavIcon();
         } else {
           unmountSettingsSection();
+          unmountSettingsNavIcon();
         }
       };
+
+      // 对齐 codex-pet 与 dsh-im-connect：在宿主支持 settings.section.icon 插槽时通过 inject 按需注册；老宿主不请求该插槽则永不触发回调
+      if (typeof ctx.slots?.inject === "function") {
+        try {
+          (ctx.slots.inject as any)("settings.section.icon", function () {
+            settingsNavIconSupported = true;
+            try {
+              if (sidebarController && !sidebarController.isSettingsSectionEnabled()) {
+                return function () {
+                  settingsNavIconSupported = false;
+                  unmountSettingsNavIcon();
+                };
+              }
+              const unreg = (ctx.slots.register as any)({
+                name: "settings.section.icon",
+                id: "skills-manager",
+                locale: NS,
+              }, SkillsNavIcon);
+              offSettingsNavIcon = typeof unreg === "function" ? (unreg as () => void) : () => {};
+              return unreg;
+            } catch {
+              return function () {
+                settingsNavIconSupported = false;
+              };
+            }
+          });
+        } catch {}
+      }
 
       ctx.slots.inject("settings.section", function () {
         settingsSectionSupported = true;
@@ -1420,6 +1469,7 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
             sidebarController.destroy();
             sidebarController = undefined;
           }
+          unmountSettingsNavIcon();
           unmountSettingsSection();
         };
       }, "skills-manager: sidebar entry cleanup");
