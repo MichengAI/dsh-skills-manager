@@ -74,7 +74,7 @@ jobs:
           node-version: ${{ matrix.node }}
           package-manager-cache: false
       - run: corepack enable
-      - run: pnpm install --frozen-lockfile --config.minimumReleaseAge=0 --config.auto-install-peers=true --config.strictDepBuilds=false
+      - run: pnpm install --frozen-lockfile --config.minimumReleaseAge=0 --config.minimumReleaseAge=0 --config.auto-install-peers=true --config.strictDepBuilds=false
       - run: npm run verify
 
   compatibility:
