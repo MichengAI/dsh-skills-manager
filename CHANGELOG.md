@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.30] - 2026-11-04
+
+### Compatibility & Dependencies
+
+- Align with official DSH `0.2.2-rc.1` release; upgrade development dependencies to `0.2.2-rc.1`.
+- Clean up obsolete alpha versions from the host compatibility matrix; support all `0.2.x` RC hosts (`0.2.0-rc.1` through `0.2.2-rc.1`).
+- Update documentation badges and verified build ranges.
+
 ## 1.2.29 - 2026-11-04
 
 - Fix settings navigation icon fallback to generic gear on legacy hosts, ensuring the custom skills icon displays properly.

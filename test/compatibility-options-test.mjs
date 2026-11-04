@@ -34,8 +34,8 @@ for (const host of supportedHosts) {
   const overrides = hostCordisOverrides(host);
   for (const name of requiredPins) assert.ok(overrides[name], `${host} 缺少 ${name}`);
 }
-assert.equal(developmentHost, "0.2.1-rc.3");
-assert.deepEqual(supportedHosts, ["0.2.0-rc.1", "0.2.0-rc.2", "0.2.1-rc.1", "0.2.1-rc.2", "0.2.1-rc.3"]);
+assert.equal(developmentHost, "0.2.2-rc.1");
+assert.deepEqual(supportedHosts, ["0.2.0-rc.1", "0.2.0-rc.2", "0.2.1-rc.1", "0.2.1-rc.2", "0.2.1-rc.3", "0.2.1-rc.4", "0.2.1-rc.5", "0.2.2-rc.1"]);
 assert.deepEqual(parseOptions(["--keep"]).versions, supportedHosts);
 assert.equal(parseOptions(["--keep", supportedHosts[0]]).keep, true);
 assert.deepEqual(parseOptions([supportedHosts[0], "--keep"]).versions, [supportedHosts[0]]);
