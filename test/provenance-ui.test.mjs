@@ -17,7 +17,7 @@ const filteredRows = [
 ].map(skill => ({ root, skill }));
 const h = (type, props, ...children) => ({ type, props: props || {}, children: children.flat(Infinity).filter(x => x != null && typeof x !== 'boolean') });
 const t = key => key;
-const make = new Function('filteredRows', 'h', 't', 'expanded', 'query', 'activeSource', 'filters', 'filterKey', 'renderSkill', 'foldChevron', 'sourceExtra', 'rootDisplayName', 'renderRootIcon', 'GithubMark16', 'countKey', 'setExpanded', grouping + '\nreturn { collectProvenanceRoots, renderProvenanceRepo, renderProvenanceRoot };');
+const make = new Function('filteredRows', 'h', 't', 'expanded', 'query', 'activeSource', 'filters', 'filterKey', 'renderSkill', 'foldChevron', 'sourceExtra', 'rootDisplayName', 'renderRootIcon', 'GithubMark16', 'countKey', 'setExpanded', grouping + '\nreturn { collectProvenanceRoots, renderProvenanceRepo, renderProvenanceRoot, renderProvenanceList };');
 const ui = make(filteredRows, h, t, {}, 'search', '', {}, 'user', (root, skill) => h('skill', { name: skill.name }), () => null, () => null, () => 'DSH', () => null, () => null, key => key, () => {});
 const projectExpanded = {};
 const projectUI = make(filteredRows, h, t, projectExpanded, '', '', {}, 'project', (root, skill) => h('skill', { name: skill.name }), () => null, () => null, () => 'DSH', () => null, () => null, key => key, update => Object.assign(projectExpanded, update(projectExpanded)));
@@ -26,14 +26,28 @@ flattenEarly(projectUI.renderProvenanceRoot(pg, 'D:/first')).find(node => node.t
 assert.equal(flattenEarly(projectUI.renderProvenanceRoot(pg, 'D:/second')).find(node => node.type === 'button').props['aria-expanded'], true, '项目来源折叠状态不能跨工作区串用');
 function flattenEarly(node) { return node && typeof node === 'object' ? [node, ...(node.children || []).flatMap(flattenEarly)] : []; }
 const groups = ui.collectProvenanceRoots();
+const repoList = ui.renderProvenanceList();
+assert.ok(repoList.props.className.split(/\s+/).includes('dssm-sources'), '仓库视图的来源卡片应复用目录视图的间距容器');
+assert.match(source, /\.dssm-sources\{display:flex;flex-direction:column;gap:9px\}/, '两种视图使用同一来源间距规则');
 assert.equal(groups[0].repos.length, 3, 'same display name on different hosts must remain distinct repositories');
 const flatten = node => node && typeof node === 'object' ? [node, ...(node.children || []).flatMap(flatten)] : [];
 const github = groups[0].repos.find(group => group.rows.some(row => row.skill.name === 'one'));
 const gitlab = groups[0].repos.find(group => group.rows.some(row => row.skill.name === 'two'));
 const githubRendered = ui.renderProvenanceRepo(groups[0], github);
+const classes = node => String(node?.props?.className || '').split(/\s+/);
+assert.ok(classes(githubRendered).includes('dssm-cat'), '仓库组复用原有分类外框');
+assert.ok(flatten(githubRendered).some(node => classes(node).includes('dssm-cat-head')), '仓库组复用分类标题行');
+assert.ok(flatten(githubRendered).some(node => classes(node).includes('dssm-cat-main')), '仓库组复用分类折叠按钮');
+assert.ok(flatten(githubRendered).some(node => classes(node).includes('dssm-cat-title')), '仓库组复用分类标题样式');
+assert.ok(flatten(githubRendered).some(node => node.type === 'skill'), '展开后仍展示技能');
+const nestedDirectory = flatten(githubRendered).find(node => classes(node).includes('dssm-prov-cat'));
+assert.ok(classes(nestedDirectory).includes('dssm-cat'), '仓库内目录也复用分类外框');
+assert.ok(flatten(nestedDirectory).some(node => classes(node).includes('dssm-cat-main')), '仓库内目录复用分类折叠按钮');
 const githubLink = flatten(githubRendered).find(node => node.type === 'a');
 assert.equal(githubLink?.props.href, 'https://github.com/team/tool');
 assert.equal(githubLink.props.target, '_blank');
+assert.deepEqual(githubLink.children, ['↗'], '只显示精简外链图标，不重复展示来源仓库文字');
+assert.equal(githubLink.props['aria-label'], 'group.openRepo', '图标链接保留可访问名称');
 assert.match(githubLink.props.rel, /noopener/);
 assert.ok(flatten(githubRendered).some(node => node.type === 'button' && node.props['aria-expanded'] === true), 'repository toggle is a keyboard-operable button');
 assert.ok(flatten(githubRendered).filter(node => node.type === 'button').every(button => !flatten(button).some(node => node.type === 'a')), 'repository link is never inside a button');
@@ -78,7 +92,7 @@ assert.ok(flatten(ui.renderProvenanceRepo(groups[0], fallback)).some(node => nod
 assert.match(source, /"group\.unknownSource": "来源未知"/);
 assert.match(source, /"group\.unknownSource": "Unknown source"/);
 const rootOnly = { ...github, categories: [''], rows: [{ root, skill: skill('root-skill', { category: '' }) }] };
-assert.equal(flatten(ui.renderProvenanceRepo(groups[0], rootOnly)).some(node => node.props.className === 'dssm-prov-cat-title'), false, '只有根目录时不增加空目录层');
+assert.equal(flatten(ui.renderProvenanceRepo(groups[0], rootOnly)).some(node => classes(node).includes('dssm-prov-cat')), false, '只有根目录时不增加空目录层');
 assert.ok(flatten(ui.renderProvenanceRepo(groups[0], rootOnly)).some(node => node.type === 'skill' && node.props.name === 'root-skill'));
 assert.doesNotMatch(source.match(/"group\.hint": "([^"]+)"/)[1], /目录名后缀/, '来源说明不得把目录名后缀当作来源证据');
 const sourceUI = makeSkill({ h, t, filters: { group: '' } });

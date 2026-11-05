@@ -227,17 +227,8 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
 .dssm-prov-note{display:block;margin:0 0 6px 0}
 .dssm-prov-badge{flex:none;border:1px solid var(--dsw-alias-border-secondary,#e2e2e2);border-radius:999px;padding:0 6px;font-size:11px;line-height:16px;color:var(--dsw-alias-label-secondary,#666);white-space:nowrap}
 .dssm-prov-path{font-size:11px;color:var(--dsw-alias-label-tertiary,#999);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:320px}
-.dssm-prov-repo-link{color:inherit;text-decoration:none;border-bottom:1px dashed var(--dsw-alias-border-secondary,#d0d0d0)}
-.dssm-prov-repo-link:hover{text-decoration:none;border-bottom-color:currentColor}
-.dssm-prov-repo{margin:2px 0 8px 10px}
-.dssm-prov-repo-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:2px 4px;border-radius:6px}
-.dssm-prov-repo-head:hover{background:var(--dsw-alias-fill-secondary,#f5f5f5)}
-.dssm-prov-repo-title{font-size:12px;font-weight:600;color:var(--dsw-alias-label-primary,#222)}
-.dssm-prov-cat{margin:2px 0 6px 12px;border-left:2px solid var(--dsw-alias-border-secondary,#eee);padding-left:8px}
-.dssm-prov-cat-head{display:flex;align-items:center;gap:8px;padding:2px 4px}
-.dssm-prov-cat-toggle{display:inline-flex;align-items:center;gap:6px;border:0;background:transparent;padding:2px 4px;font:inherit;color:inherit;cursor:pointer;border-radius:6px}
-.dssm-prov-cat-toggle:hover{background:var(--dsw-alias-fill-secondary,#f5f5f5)}
-.dssm-prov-cat-title{font-size:12px;font-weight:600;color:var(--dsw-alias-label-secondary,#555)}
+.dssm-prov-repo-link{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;color:inherit;text-decoration:none;font-size:14px;line-height:1}
+.dssm-prov-repo-link:hover{color:var(--dsw-alias-label-primary,currentColor)}
 
 `;
 
@@ -1151,11 +1142,11 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
       function renderProvenanceCategory(rootGroup: ProvenanceRootGroup, repoGroup: ProvenanceRepoGroup, category: string, rows: ProvenanceRow[], workspacePath?: string) {
         var catKey = JSON.stringify(["provcat", filterKey, workspacePath || "", rootGroup.key, repoGroup.key, category, query, activeSource, filters.status]);
         var open = expanded[catKey] === undefined ? provenanceAutoOpen() : expanded[catKey];
-        return h("div", { className: "dssm-prov-cat", key: catKey },
-          h("div", { className: "dssm-prov-cat-head" },
-            h("button", { type: "button", className: "dssm-prov-cat-toggle", "aria-expanded": open, onClick: function () { setExpanded(function (previous) { var next: Record<string, boolean> = {}; next[catKey] = !open; return Object.assign({}, previous, next); }); } },
-              foldChevron(h, open), h("span", { className: "dssm-prov-cat-title" }, categoryLabel(category))),
-            h("span", { className: "dssm-count" }, t(countKey("summary.group", rows.length), { count: rows.length }))),
+        return h("section", { className: "dssm-cat dssm-prov-cat", key: catKey },
+          h("div", { className: "dssm-cat-head" },
+            h("button", { type: "button", className: "dssm-cat-main", "aria-expanded": open, onClick: function () { setExpanded(function (previous) { var next: Record<string, boolean> = {}; next[catKey] = !open; return Object.assign({}, previous, next); }); } },
+              foldChevron(h, open), h("span", { className: "dssm-cat-title" }, categoryLabel(category)),
+              h("span", { className: "dssm-count" }, t(countKey("summary.group", rows.length), { count: rows.length })))),
           open ? renderProvenanceSkills(rows, workspacePath) : null);
       }
       /** 第二层：来源目录里的仓库（或「未归类」）。 */
@@ -1177,15 +1168,15 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
             return rows.length ? renderProvenanceCategory(rootGroup, repoGroup, category, rows, workspacePath) : null;
           });
         }
-        return h("div", { className: "dssm-prov-repo", key: repoGroup.key },
-          h("div", { className: "dssm-prov-repo-head" },
-            h("button", { type: "button", className: "dssm-prov-cat-toggle dssm-prov-repo-toggle", "aria-expanded": open, onClick: function () { setExpanded(function (previous) { var next: Record<string, boolean> = {}; next[expansionKey] = !open; return Object.assign({}, previous, next); }); } },
+        return h("section", { className: "dssm-cat dssm-prov-repo", key: repoGroup.key },
+          h("div", { className: "dssm-cat-head" },
+            h("button", { type: "button", className: "dssm-cat-main", "aria-expanded": open, onClick: function () { setExpanded(function (previous) { var next: Record<string, boolean> = {}; next[expansionKey] = !open; return Object.assign({}, previous, next); }); } },
               foldChevron(h, open),
               repoGroup.repo ? h("span", { className: "dssm-brand-icon", "aria-hidden": true }, h(GithubMark16)) : null,
-              h("span", { className: "dssm-prov-repo-title" }, label),
+              h("span", { className: "dssm-cat-title" }, label),
               h("span", { className: "dssm-count" }, t(countKey("summary.group", repoGroup.rows.length), { count: repoGroup.rows.length })),
               h("span", { className: "dssm-prov-badge", title: t("group.hint") }, t("group.evidence." + repoGroup.kind))),
-            h("span", { className: "dssm-source-actions" }, repoGroup.url ? h("a", { className: "dssm-prov-repo-link", href: repoGroup.url, target: "_blank", rel: "noopener noreferrer", title: t("group.openRepo", { repo: repoGroup.repo || "" }) }, t("group.repo")) : null, repoGroup.repoPath ? h("span", { className: "dssm-prov-path", title: repoGroup.repoPath }, t("group.repoPath", { path: repoGroup.repoPath })) : null)),
+            h("span", { className: "dssm-source-actions" }, repoGroup.url ? h("a", { className: "dssm-prov-repo-link", href: repoGroup.url, target: "_blank", rel: "noopener noreferrer", "aria-label": t("group.openRepo", { repo: repoGroup.repo || "" }), title: t("group.openRepo", { repo: repoGroup.repo || "" }) }, "↗") : null, repoGroup.repoPath ? h("span", { className: "dssm-prov-path", title: repoGroup.repoPath }, t("group.repoPath", { path: repoGroup.repoPath })) : null)),
           body);
       }
       /** 第一层：来源目录本身，与默认视图保持同一套头部控件（新建分类 / 启停来源）。 */
@@ -1221,7 +1212,7 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
           group.repos.forEach(function (repoGroup) { if (!repoGroup.fallback) reposSeen[repoGroup.key] = true; });
         });
         var repoCount = Object.keys(reposSeen).length;
-        return h("div", { className: "dssm-provenance" },
+        return h("div", { className: "dssm-sources dssm-provenance" },
           h("p", { className: "dssm-note dssm-prov-note" }, h("strong", null, t("group.provenanceCount", { repos: repoCount, dirs: dirCount })), " ", t("group.hint")),
           rootGroups.map(function (group) { return renderProvenanceRoot(group, workspacePath); }));
       }
