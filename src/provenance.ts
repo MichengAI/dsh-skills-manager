@@ -137,7 +137,9 @@ export async function resolveProvenance(input: ProvenanceInput, lock: LockIndex 
     const resolved = fromLockEntry(entry);
     if (resolved) return resolved;
   }
-  return await fromMarketMeta(dirname(input.skillPath)) ?? unknown();
+  const dir = dirname(input.skillPath);
+  if (input.rootPath && dir === input.rootPath) return unknown();
+  return await fromMarketMeta(dir) ?? unknown();
 }
 export async function attachProvenance<T extends { roots: RootView[] }>(snapshot: T): Promise<T> {
   const lockByRoot = new Map<string, LockIndex | null>();

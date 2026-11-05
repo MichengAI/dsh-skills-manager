@@ -120,7 +120,7 @@ export interface Policy {
  * `root` 表示没有仓库证据、只能按目录落点归类，界面上必须与真实仓库区分开。
  */
 export interface SkillProvenance {
-    kind: 'install' | 'lock' | 'meta' | 'suffix' | 'root';
+    kind: 'install' | 'lock' | 'meta' | 'root';
     /** 仓库全名（owner/name）或渠道名；目录落点时为 null。 */
     repo: string | null;
     /** 唯一分组键；未知为 null。 */

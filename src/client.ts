@@ -89,9 +89,9 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
         "scope.user": "全局技能", "scope.project": "项目技能", "scope.trash": "回收站", "scope.label": "技能管理视图", "scope.userHint": "跨项目可用。启停仅影响 DSH 中的调用。", "scope.projectHint": "按工作区查看项目技能。启停不修改其他 Agent 的源文件。", "project.empty": "还没有已登记的工作区。请先在侧栏添加工作区。", "project.noSkills": "已登记的工作区里还没有技能。", "workspace.unavailable": "目录不可用", "workspace.missing": "目录不存在", "workspace.unreadable": "无读取权限", "workspace.noSkills": "这个工作区还没有技能。", "workspace.loading": "正在读取…", "workspace.loadFailed": "读取失败：{error}", "workspace.listFailed": "无法读取工作区列表：{error}", "filter.status": "调用状态", "filter.statusAll": "全部状态", "status.shadowedBy": "被 {source} 中的同名技能覆盖", "status.fallback.user": "当前使用全局 {source} 副本。", "status.fallback.project": "当前使用项目 {source} 副本。", "root.copilot": "GitHub Copilot", "source.selectHint": "先选择一个来源，才能查看目录或关闭整个来源。关闭来源只影响 DSH 调用，不改文件。", "import.global": "导入技能", "category.batchAssigned": "已将 {count} 个技能添加到“{category}”。文件未移动。", "category.selectSkills": "添加技能到“{name}”", "category.noAvailableSkills": "没有可添加的技能", "category.addSkills": "添加技能", "root.dsh": "DSH", "root.agents": "公共 Agent", "root.ccswitch": "CC Switch", "root.projectDsh": "DSH", "root.projectAgents": "项目 Agent", "root.codex": "Codex", "root.claude": "Claude Code", "root.gemini": "Gemini", "root.opencode": "OpenCode", "root.cursor": "Cursor", "root.windsurf": "Windsurf", "root.windsurfUser": "Windsurf (用户目录)", "root.trae": "Trae", "root.traeCn": "Trae (国内版)", "root.openclaw": "OpenClaw", "root.clawdbot": "OpenClaw (旧目录)", "root.roo": "Roo", "root.codebuddy": "CodeBuddy", "root.workbuddy": "WorkBuddy", "root.qoder": "Qoder", "root.qoderCn": "Qoder CN CLI", "root.lingma": "Qoder CN", "root.antigravity": "Google Antigravity",
         "group.label": "分组方式", "group.bySource": "按来源目录", "group.byRepo": "按来源仓库",
         "group.hint": "在来源目录下按可核查的记录再分「仓库 → 仓库内目录」：安装记录 → 目录锁文件 → 技能元数据；没有记录的标为「来源未知」，不按目录名称猜测。",
-        "group.provenanceCount": "{repos} 个来源仓库 · {dirs} 个目录只有落点", "group.repo": "来源仓库", "group.directory": "目录落点", "group.unknownSource": "来源未知", "group.repoRoot": "仓库根目录（未分目录）", "group.category": "类别",
-        "group.evidence.install": "安装记录", "group.evidence.lock": "目录锁文件", "group.evidence.meta": "技能元数据", "group.evidence.suffix": "目录名后缀", "group.evidence.root": "目录落点",
-        "group.repoPath": "仓库内路径：{path}", "group.openRepo": "打开 {repo}", "group.summary": "{count} 个技能 · {categories} 个目录", "group.noRepo": "没有可核查的仓库记录，按来源目录归类。"
+        "group.provenanceCount": "{repos} 个来源仓库 · {dirs} 个目录只有落点", "group.unknownSource": "来源未知", "group.repoRoot": "仓库根目录（未分目录）",
+        "group.evidence.install": "安装记录", "group.evidence.lock": "目录锁文件", "group.evidence.meta": "技能元数据", "group.evidence.root": "目录落点",
+        "group.repoPath": "仓库内路径：{path}", "group.openRepo": "打开 {repo}", "group.noRepo": "没有可核查的仓库记录，按来源目录归类。"
       },
       en: {
         "summary.group.one": "{count} skill", "summary.group.other": "{count} skills", "format.locale": "en-US", "format.warningSeparator": "; ",
@@ -124,9 +124,9 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
         "scope.user": "Global skills", "scope.project": "Project skills", "scope.trash": "Trash", "scope.label": "Skill manager views", "scope.userHint": "Available across projects. Toggles only affect invocation in DSH.", "scope.projectHint": "View project skills by workspace. Toggles do not modify other agents’ source files.", "project.empty": "No registered workspaces yet. Add one in the sidebar first.", "project.noSkills": "Registered workspaces do not have skills yet.", "workspace.unavailable": "Directory unavailable", "workspace.missing": "Directory missing", "workspace.unreadable": "No read permission", "workspace.noSkills": "No skills in this workspace yet.", "workspace.loading": "Loading…", "workspace.loadFailed": "Failed to load: {error}", "workspace.listFailed": "Cannot read the workspace list: {error}", "filter.status": "Invocation status", "filter.statusAll": "All statuses", "status.shadowedBy": "Overridden by the same skill in {source}", "status.fallback.user": "Currently using the global {source} copy.", "status.fallback.project": "Currently using the project {source} copy.", "source.selectHint": "Select a source to view its directory or turn the whole source off. Turning a source off only affects invocation in DSH and does not change files.", "import.global": "Import skill", "category.batchAssigned": "Added {count} skills to “{category}”. Files were not moved.", "category.selectSkills": "Add skills to “{name}”", "category.noAvailableSkills": "No skills available to add", "category.addSkills": "Add skills", "root.dsh": "DSH skills", "root.agents": "Shared Agent", "root.ccswitch": "CC Switch", "root.projectDsh": "DSH skills", "root.projectAgents": "Project Agent", "root.codex": "Codex", "root.claude": "Claude Code", "root.gemini": "Gemini", "root.opencode": "OpenCode", "root.cursor": "Cursor", "root.copilot": "GitHub Copilot", "root.windsurf": "Windsurf", "root.windsurfUser": "Windsurf (User Home)", "root.trae": "Trae", "root.traeCn": "Trae CN", "root.openclaw": "OpenClaw", "root.clawdbot": "OpenClaw (Legacy)", "root.roo": "Roo", "root.codebuddy": "CodeBuddy", "root.workbuddy": "WorkBuddy", "root.qoder": "Qoder", "root.qoderCn": "Qoder CN CLI", "root.lingma": "Qoder CN", "root.antigravity": "Google Antigravity",
         "group.label": "Group by", "group.bySource": "Source directory", "group.byRepo": "Source repository",
         "group.hint": "Inside each source directory, verifiable records add a repository → directory hierarchy: install record → directory lock file → skill metadata; other sources are marked Unknown source. Directory names are not guessed.",
-        "group.provenanceCount": "{repos} repositories · {dirs} directories with fallback only", "group.repo": "Repository", "group.directory": "Directory fallback", "group.unknownSource": "Unknown source", "group.repoRoot": "Repository root (no category)", "group.category": "Category",
-        "group.evidence.install": "Install record", "group.evidence.lock": "Directory lock file", "group.evidence.meta": "Skill metadata", "group.evidence.suffix": "Directory suffix", "group.evidence.root": "Directory fallback",
-        "group.repoPath": "Path in repository: {path}", "group.openRepo": "Open {repo}", "group.summary": "{count} skills · {categories} directories", "group.noRepo": "No verifiable repository record; grouped by source directory."
+        "group.provenanceCount": "{repos} repositories · {dirs} directories with fallback only", "group.unknownSource": "Unknown source", "group.repoRoot": "Repository root (no category)",
+        "group.evidence.install": "Install record", "group.evidence.lock": "Directory lock file", "group.evidence.meta": "Skill metadata", "group.evidence.root": "Directory fallback",
+        "group.repoPath": "Path in repository: {path}", "group.openRepo": "Open {repo}", "group.noRepo": "No verifiable repository record; grouped by source directory."
       }
     };
 
@@ -270,7 +270,25 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
       return summary;
     }
     function normalizeSkillQuery(query: unknown) { return String(query == null ? "" : query).trim().toLowerCase(); }
-    function matchSkillQuery(skill: SearchSkill, query: unknown) { var q = normalizeSkillQuery(query); if (!q) return true; return [skill.name, skill.declaredName, skill.description, skill.customNote, skill.kind, skill.kindLabel, skill.statusLabel, skill.rootKey, skill.rootLabel].some(function (value) { return String(value == null ? "" : value).toLowerCase().includes(q); }); }
+    function matchSkillQuery(skill: SearchSkill, query: unknown) {
+      var q = normalizeSkillQuery(query);
+      if (!q) return true;
+      var prov = skill.provenance;
+      return [
+        skill.name,
+        skill.declaredName,
+        skill.description,
+        skill.customNote,
+        skill.kind,
+        skill.kindLabel,
+        skill.statusLabel,
+        skill.rootKey,
+        skill.rootLabel,
+        prov ? prov.repo : null,
+        prov ? prov.category : null,
+        prov ? prov.path : null
+      ].some(function (value) { return String(value == null ? "" : value).toLowerCase().includes(q); });
+    }
     function filterSkills<T extends SearchSkill>(list: T[], options?: {rootKey?: string; query?: unknown}) { var rootKey = options && options.rootKey != null ? options.rootKey : ""; return list.filter(function (skill) { return (!rootKey || skill.rootKey === rootKey) && matchSkillQuery(skill, options && options.query); }); }
     function visibleSkillRoots<T extends {mutable?: boolean; exists?: boolean; overridden?: boolean}>(roots: T[]) {
       return (roots || []).filter(function (root) {

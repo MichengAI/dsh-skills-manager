@@ -116,8 +116,10 @@ test('refresh invalidates changed, deleted, and newly created lock and metadata'
 test('JSON size limit accepts one MiB and rejects larger files even after caching', async (t) => {
   const root = await mkdtemp(join(tmpdir(), 'provenance-size-'));
   t.after(() => rm(root, {recursive: true, force: true}));
-  const meta = join(root, '_meta.json');
-  const input = {rootPath: root, skillPath: join(root, 'SKILL.md'), name:'one'};
+  const sub = join(root, 'one');
+  await mkdir(sub);
+  const meta = join(sub, '_meta.json');
+  const input = {rootPath: root, skillPath: join(sub, 'SKILL.md'), name:'one'};
   const prefix = '{"source":"https://example.com/a/b","padding":"';
   const contents = prefix + 'x'.repeat(1024 * 1024 - Buffer.byteLength(prefix) - 2) + '"}';
   assert.equal(Buffer.byteLength(contents), 1024 * 1024);
@@ -125,6 +127,16 @@ test('JSON size limit accepts one MiB and rejects larger files even after cachin
   assert.equal((await resolveProvenance(input, null)).kind, 'meta');
   await writeFile(meta, contents + ' ');
   assert.equal((await resolveProvenance(input, null)).kind, 'root');
+});
+
+test('flat skills in root directory do not claim root level _meta.json', async (t) => {
+  const root = await mkdtemp(join(tmpdir(), 'provenance-flat-'));
+  t.after(() => rm(root, {recursive: true, force: true}));
+  await writeFile(join(root, '_meta.json'), JSON.stringify({source: 'https://example.com/root/repo'}));
+  const input = {rootPath: root, skillPath: join(root, 'alpha.md'), name: 'alpha'};
+  const res = await resolveProvenance(input, null);
+  assert.equal(res.kind, 'root', '平铺在根目录的技能不应继承根目录的 _meta.json');
+  assert.equal(res.repo, null);
 });
 
 test('cache evicts old entries when its byte budget is exceeded', async (t) => {
