@@ -56,7 +56,7 @@ if (options.versions.length > 1) {
           ...(options.keep ? ["--keep"] : []),
           ...(options.serve ? ["--serve"] : []),
         ],
-        { stdio: "inherit", windowsHide: true },
+        { stdio: ["ignore", "inherit", "inherit"], windowsHide: true },
       );
       child.once("error", reject);
       child.once("exit", done);
