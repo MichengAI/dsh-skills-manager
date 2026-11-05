@@ -91,7 +91,7 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
         "group.hint": "在来源目录下按可核查的记录再分「仓库 → 仓库内目录」：安装记录 → 目录锁文件 → 技能元数据；没有记录的标为「来源未知」，不按目录名称猜测。",
         "group.provenanceCount": "{repos} 个来源仓库 · {dirs} 个目录只有落点", "group.unknownSource": "来源未知", "group.repoRoot": "仓库根目录（未分目录）",
         "group.evidence.install": "安装记录", "group.evidence.lock": "目录锁文件", "group.evidence.meta": "技能元数据", "group.evidence.root": "目录落点",
-        "group.repoPath": "仓库内路径：{path}", "group.openRepo": "打开 {repo}", "group.noRepo": "没有可核查的仓库记录，按来源目录归类。"
+        "group.openRepo": "打开 {repo}", "group.noRepo": "没有可核查的仓库记录，按来源目录归类。"
       },
       en: {
         "summary.group.one": "{count} skill", "summary.group.other": "{count} skills", "format.locale": "en-US", "format.warningSeparator": "; ",
@@ -126,7 +126,7 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
         "group.hint": "Inside each source directory, verifiable records add a repository → directory hierarchy: install record → directory lock file → skill metadata; other sources are marked Unknown source. Directory names are not guessed.",
         "group.provenanceCount": "{repos} repositories · {dirs} directories with fallback only", "group.unknownSource": "Unknown source", "group.repoRoot": "Repository root (no category)",
         "group.evidence.install": "Install record", "group.evidence.lock": "Directory lock file", "group.evidence.meta": "Skill metadata", "group.evidence.root": "Directory fallback",
-        "group.repoPath": "Path in repository: {path}", "group.openRepo": "Open {repo}", "group.noRepo": "No verifiable repository record; grouped by source directory."
+        "group.openRepo": "Open {repo}", "group.noRepo": "No verifiable repository record; grouped by source directory."
       }
     };
 
@@ -1129,7 +1129,6 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
         fallback: boolean;
         rows: ProvenanceRow[];
         categories: string[];
-        repoPath: string | null;
       }
       interface ProvenanceRootGroup {
         key: string;
@@ -1173,14 +1172,13 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
             }
           }
           if (!repoGroup) {
-            repoGroup = { key: repoKey, kind: repositoryKey && provenance ? provenance.kind : "root", repo: repo || identity || null, url: safeProvenanceUrl(provenance && (provenance as SkillProvenance & { url?: string | null }).url), fallback: !repositoryKey, rows: [], categories: [], repoPath: null };
+            repoGroup = { key: repoKey, kind: repositoryKey && provenance ? provenance.kind : "root", repo: repo || identity || null, url: safeProvenanceUrl(provenance && (provenance as SkillProvenance & { url?: string | null }).url), fallback: !repositoryKey, rows: [], categories: [] };
             rootGroup.repos.push(repoGroup);
           }
           repoGroup.rows.push(row);
           if (repositoryKey && provenance) {
             var category = provenance.category || "";
             if (repoGroup.categories.indexOf(category) < 0) repoGroup.categories.push(category);
-            if (!repoGroup.repoPath && provenance.path) repoGroup.repoPath = provenance.path;
             rootGroup.hasEvidence = true;
           }
         });
