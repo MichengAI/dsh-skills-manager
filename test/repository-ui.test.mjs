@@ -513,10 +513,12 @@ assert.match(repoSource, /\.dssm-repo-manage-row\{[^}]*flex-direction:row/, "管
 holdRefresh = true; failRefresh = true;
 await clickModal("repo.refresh");
 assert.ok(modalNodes().some(n => n.props.className === "dssm-repo-spinner" || n.props.icon?.props?.className === "dssm-repo-spinner"), "管理弹窗中的当前仓库也显示动画");
+dialog().props.onClose(); render();
+assert.equal(dialog(), undefined, "管理仓库在更新检查或扫描期间允许点击关闭按钮关闭弹窗");
+assert.ok(find(n => n.props.role === "status" && n.children.some(c => typeof c === "string" && c.includes("repo.refreshing"))), "管理弹窗关闭后主页面仍展示刷新进度");
 finishRefresh(); await settle(); holdRefresh = false; failRefresh = false;
 assert.equal(find(n => n.props.className === "dssm-repo-spinner"), undefined, "失败后停止动画");
 assert.ok(find(n => n.props.role === "alert" && n.children.includes("仓库网络失败")), "失败提示保留");
-dialog().props.onClose(); render();
 
 // Install 先打开带原生单选框的无障碍 modal；取消没有写请求。
 await click("repo.install");

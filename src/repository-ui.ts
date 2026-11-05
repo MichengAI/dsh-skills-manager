@@ -653,7 +653,10 @@ export function createRepositoryUI({ react, Modal, Input, Button, SourceSelect, 
       return h(PrimitiveButton, { variant: "outline", disabled: busy || !!refreshing || !selected.length, "aria-busy": !!pending, onClick: () => refresh(selected) },
         pending ? h(LoadingIconComponent, { size: 14, className: "dssm-repo-spinner" }) : null, t(pending ? "repo.refreshing" : "repo.refresh"));
     }
-    function close() { if (!locked.current) { setCopyState("idle"); setModal(null); } }
+    function isBusyModal(m: RepoModal | null) {
+      return !!m && (m.type === "install" || m.type === "uninstall" || m.type === "catalog-install" || m.type === "catalog-uninstall" || m.type === "review" || m.type === "rollback");
+    }
+    function close() { if (locked.current && isBusyModal(modal)) return; setCopyState("idle"); setModal(null); }
     function openInstallation(type: 'install' | 'uninstall', repo: RepoView, skill: RepoSkill, copy?: RepoCopy) {
       if (locked.current || type === 'uninstall' && (!copy || !copy.canUninstall || !copyTarget(copy))) return;
       setFeedback(null); setModal({ type, repo, skill, copy });
