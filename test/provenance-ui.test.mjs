@@ -4,10 +4,32 @@ import { stripTypeScriptTypes } from 'node:module';
 
 // Execute the actual grouping functions directly from source, without a bundle.
 const source = await readFile(new URL('../src/client.ts', import.meta.url), 'utf8');
+const h = (type, props, ...children) => ({ type, props: props || {}, children: children.flat(Infinity).filter(x => x != null && typeof x !== 'boolean') });
+const t = key => key;
+const brandStart = source.indexOf('    function resolveRepoBrand(');
+const brandEnd = source.indexOf('    function GithubMark16()', brandStart);
+assert.ok(brandStart >= 0 && brandEnd > brandStart, 'brand resolution functions are present');
+const brandFns = stripTypeScriptTypes(source.slice(brandStart, brandEnd));
+const { resolveRepoBrand, renderRepoBrandIconByUrl } = new Function('h', brandFns + '\nreturn { resolveRepoBrand, renderRepoBrandIconByUrl };')(h);
+
+// 验证 resolveRepoBrand 矩阵与防误判
+assert.equal(resolveRepoBrand('https://github.com/team/tool'), 'GitHub');
+assert.equal(resolveRepoBrand('https://github.com/gitlab/runner'), 'GitHub', 'GitHub 上的 gitlab 组织不得误判为 GitLab');
+assert.equal(resolveRepoBrand('https://example.com/gitlab/foo'), 'Git', '非 gitlab 域名的路径含 gitlab 不得误判为 GitLab');
+assert.equal(resolveRepoBrand('https://gitlab.com/team/tool'), 'GitLab');
+assert.equal(resolveRepoBrand('https://my-gitlab.corp.net/team/tool'), 'GitLab', '自建 GitLab 域名应识别为 GitLab');
+assert.equal(resolveRepoBrand('git@gitlab.com:team/tool.git'), 'GitLab');
+assert.equal(resolveRepoBrand('https://gitee.com/team/tool'), 'Gitee');
+assert.equal(resolveRepoBrand('git@gitee.com:team/tool.git'), 'Gitee');
+assert.equal(resolveRepoBrand('https://git.kernel.org/pub/scm/linux'), 'Git');
+assert.equal(resolveRepoBrand('file:///local/path'), 'Git');
+assert.equal(resolveRepoBrand(null, 'team/tool'), 'GitHub', '默认简写 repo 归为 GitHub');
+
 const start = source.indexOf('      type ProvenanceRow =');
 const end = source.indexOf('      function renderList()', start);
 assert.ok(start >= 0 && end > start, 'provenance UI source is present');
 const grouping = stripTypeScriptTypes(source.slice(start, end));
+const make = new Function('filteredRows', 'h', 't', 'expanded', 'query', 'activeSource', 'filters', 'filterKey', 'renderSkill', 'foldChevron', 'sourceExtra', 'rootDisplayName', 'renderRootIcon', 'renderRepoBrandIconByUrl', 'countKey', 'setExpanded', 'strokeIcon', grouping + '\nreturn { collectProvenanceRoots, renderProvenanceRepo, renderProvenanceRoot, renderProvenanceList };');
 const root = { key: 'dsh', path: '/skills', mutable: true, categories: [] };
 const skill = (name, provenance) => ({ name, provenance });
 const filteredRows = [
@@ -15,17 +37,9 @@ const filteredRows = [
   skill('two', { repo: 'team/tool', identity: 'gitlab:team/tool', url: 'https://gitlab.com/team/tool', kind: 'install', category: 'docs' }),
   skill('unknown', null),
 ].map(skill => ({ root, skill }));
-const h = (type, props, ...children) => ({ type, props: props || {}, children: children.flat(Infinity).filter(x => x != null && typeof x !== 'boolean') });
-const t = key => key;
-const make = new Function('filteredRows', 'h', 't', 'expanded', 'query', 'activeSource', 'filters', 'filterKey', 'renderSkill', 'foldChevron', 'sourceExtra', 'rootDisplayName', 'renderRootIcon', 'renderRepoBrandIconByUrl', 'countKey', 'setExpanded', 'strokeIcon', grouping + '\nreturn { collectProvenanceRoots, renderProvenanceRepo, renderProvenanceRoot, renderProvenanceList };');
-const brandHelper = (url, repo) => {
-  const target = (url || repo || '').toLowerCase();
-  const viewBox = /gitlab/i.test(target) ? '0 0 24 24' : '0 0 16 16';
-  return h('span', { className: 'dssm-brand-icon' }, h('svg', { viewBox }));
-};
-const ui = make(filteredRows, h, t, {}, 'search', '', {}, 'user', (root, skill) => h('skill', { name: skill.name }), () => null, () => null, () => 'DSH', () => null, brandHelper, key => key, () => {}, () => h('svg', {}));
+const ui = make(filteredRows, h, t, {}, 'search', '', {}, 'user', (root, skill) => h('skill', { name: skill.name }), () => null, () => null, () => 'DSH', () => null, renderRepoBrandIconByUrl, key => key, () => {}, () => h('svg', {}));
 const projectExpanded = {};
-const projectUI = make(filteredRows, h, t, projectExpanded, '', '', {}, 'project', (root, skill) => h('skill', { name: skill.name }), () => null, () => null, () => 'DSH', () => null, brandHelper, key => key, update => Object.assign(projectExpanded, update(projectExpanded)), () => h('svg', {}));
+const projectUI = make(filteredRows, h, t, projectExpanded, '', '', {}, 'project', (root, skill) => h('skill', { name: skill.name }), () => null, () => null, () => 'DSH', () => null, renderRepoBrandIconByUrl, key => key, update => Object.assign(projectExpanded, update(projectExpanded)), () => h('svg', {}));
 const pg = projectUI.collectProvenanceRoots()[0];
 flattenEarly(projectUI.renderProvenanceRoot(pg, 'D:/first')).find(node => node.type === 'button').props.onClick();
 assert.equal(flattenEarly(projectUI.renderProvenanceRoot(pg, 'D:/second')).find(node => node.type === 'button').props['aria-expanded'], true, '项目来源折叠状态不能跨工作区串用');

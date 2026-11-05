@@ -474,22 +474,45 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
       );
     }
 
+    function resolveRepoBrand(url?: string | null, repo?: string | null): "GitHub" | "GitLab" | "Gitee" | "Git" {
+      var raw = (url || repo || "").trim();
+      if (!raw) return "GitHub";
+      var host = "";
+      try {
+        if (/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(raw)) {
+          host = new URL(raw).hostname.toLowerCase();
+        } else if (/^git@[^:]+:/.test(raw)) {
+          host = raw.slice(4).split(":")[0].toLowerCase();
+        }
+      } catch (_) {
+        host = "";
+      }
+      if (host) {
+        if (host === "github.com" || host.endsWith(".github.com")) return "GitHub";
+        if (host === "gitee.com" || host.endsWith(".gitee.com")) return "Gitee";
+        if (host === "gitlab.com" || host.endsWith(".gitlab.com") || host.includes("gitlab")) return "GitLab";
+        return "Git";
+      }
+      var lower = raw.toLowerCase();
+      if (lower.startsWith("gitee.com/") || lower.startsWith("gitee:")) return "Gitee";
+      if (lower.startsWith("gitlab.com/") || lower.startsWith("gitlab:")) return "GitLab";
+      if (lower.startsWith("github.com/") || lower.startsWith("github:")) return "GitHub";
+      if (/^[a-z0-9_.-]+\/[a-z0-9_.-]+$/i.test(raw)) return "GitHub";
+      return "Git";
+    }
+
     function renderRepoBrandIconByUrl(url?: string | null, repo?: string | null) {
-      var target = (url || repo || "").toLowerCase();
-      var brand = "GitHub";
+      var brand = resolveRepoBrand(url, repo);
       var viewBox = "0 0 16 16";
       var path = "M8 0a8 8 0 0 0-2.53 15.59c.4.074.547-.173.547-.385 0-.19-.007-.693-.01-1.36-2.226.484-2.695-1.073-2.695-1.073-.364-.924-.89-1.17-.89-1.17-.726-.496.055-.486.055-.486.803.056 1.225.824 1.225.824.714 1.223 1.872.87 2.328.665.072-.517.28-.87.508-1.07-1.777-.202-3.645-.888-3.645-3.956 0-.874.31-1.588.823-2.148-.083-.202-.357-1.017.078-2.12 0 0 .672-.215 2.2.82A7.65 7.65 0 0 1 8 4.8c.68.003 1.365.092 2.004.27 1.527-1.035 2.197-.82 2.197-.82.437 1.103.162 1.918.08 2.12.513.56.822 1.274.822 2.148 0 3.076-1.872 3.752-3.654 3.95.288.248.544.735.544 1.482 0 1.07-.01 1.932-.01 2.195 0 .214.144.463.55.384A8.001 8.001 0 0 0 8 0Z";
 
-      if (/gitee\.com/i.test(target)) {
-        brand = "Gitee";
+      if (brand === "Gitee") {
         viewBox = "0 0 24 24";
         path = "M11.984 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12a12 12 0 0 0 12-12A12 12 0 0 0 12 0zm6.09 5.333c.328 0 .593.266.592.593v1.482a.594.594 0 0 1-.593.592H9.777c-.982 0-1.778.796-1.778 1.778v5.63c0 .327.266.592.593.592h5.63c.982 0 1.778-.796 1.778-1.778v-.296a.593.593 0 0 0-.592-.593h-4.15a.59.59 0 0 1-.592-.592v-1.482a.593.593 0 0 1 .593-.592h6.815c.327 0 .593.265.593.592v3.408a4 4 0 0 1-4 4H5.926a.593.593 0 0 1-.593-.593V9.778a4.444 4.444 0 0 1 4.445-4.444h8.296Z";
-      } else if (/gitlab(\.|\/)/i.test(target)) {
-        brand = "GitLab";
+      } else if (brand === "GitLab") {
         viewBox = "0 0 24 24";
         path = "m23.6 9.593l-.033-.086L20.3.98a.85.85 0 0 0-.336-.405a.875.875 0 0 0-1 .054a.9.9 0 0 0-.29.44L16.47 7.818H7.537L5.333 1.07a.86.86 0 0 0-.29-.441a.875.875 0 0 0-1-.054a.86.86 0 0 0-.336.405L.433 9.502l-.032.086a6.066 6.066 0 0 0 2.012 7.01l.01.009l.03.021l4.977 3.727l2.462 1.863l1.5 1.132a1.01 1.01 0 0 0 1.22 0l1.499-1.132l2.461-1.863l5.006-3.75l.013-.01a6.07 6.07 0 0 0 2.01-7.002";
-      } else if (target && !/github\.com/i.test(target)) {
-        brand = "Git";
+      } else if (brand === "Git") {
         viewBox = "0 0 24 24";
         path = "M23.546 10.93L13.067.452a1.55 1.55 0 0 0-2.188 0L8.708 2.627l2.76 2.76a1.838 1.838 0 0 1 2.327 2.341l2.658 2.66a1.838 1.838 0 0 1 1.9 3.039a1.837 1.837 0 0 1-2.6 0a1.85 1.85 0 0 1-.404-1.996L12.86 8.955v6.525c.176.086.342.203.488.348a1.85 1.85 0 0 1 0 2.6a1.844 1.844 0 0 1-2.609 0a1.834 1.834 0 0 1 0-2.598c.182-.18.387-.316.605-.406V8.835a1.834 1.834 0 0 1-.996-2.41L7.636 3.7L.45 10.881c-.6.605-.6 1.584 0 2.189l10.48 10.477a1.545 1.545 0 0 0 2.186 0l10.43-10.43a1.544 1.544 0 0 0 0-2.187";
       }
@@ -1685,4 +1708,4 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
         };
       }, "skills-manager: sidebar entry cleanup");
     }
-    module.exports.formatTrashTime = formatTrashTime; module.exports.DICT = DICT; module.exports.translateError = translateError; module.exports.parseApiResponse = parseApiResponse; module.exports.resolveApiUrl = resolveApiUrl; module.exports.isSkillEnabled = isSkillEnabled; module.exports.countKey = countKey; module.exports.rootDisplayName = rootDisplayName; module.exports.summarizeImportResult = summarizeImportResult; module.exports.normalizeSkillQuery = normalizeSkillQuery; module.exports.matchSkillQuery = matchSkillQuery; module.exports.filterSkills = filterSkills; module.exports.visibleSkillRoots = visibleSkillRoots; module.exports.scopeSkillRoots = scopeSkillRoots; module.exports.skillStatus = skillStatus; module.exports.countSkillStatuses = countSkillStatuses; module.exports.currentSessionId = currentSessionId; module.exports.canToggleSource = canToggleSource; module.exports.recoverModalFocus = recoverModalFocus; module.exports.trapModalFocus = trapModalFocus; module.exports.inspectUploadSelection = inspectUploadSelection; module.exports.setupSidebarEntry = setupSidebarEntry; module.exports.apply = apply; module.exports.inject = inject;
+    module.exports.formatTrashTime = formatTrashTime; module.exports.DICT = DICT; module.exports.translateError = translateError; module.exports.parseApiResponse = parseApiResponse; module.exports.resolveApiUrl = resolveApiUrl; module.exports.resolveRepoBrand = resolveRepoBrand; module.exports.isSkillEnabled = isSkillEnabled; module.exports.countKey = countKey; module.exports.rootDisplayName = rootDisplayName; module.exports.summarizeImportResult = summarizeImportResult; module.exports.normalizeSkillQuery = normalizeSkillQuery; module.exports.matchSkillQuery = matchSkillQuery; module.exports.filterSkills = filterSkills; module.exports.visibleSkillRoots = visibleSkillRoots; module.exports.scopeSkillRoots = scopeSkillRoots; module.exports.skillStatus = skillStatus; module.exports.countSkillStatuses = countSkillStatuses; module.exports.currentSessionId = currentSessionId; module.exports.canToggleSource = canToggleSource; module.exports.recoverModalFocus = recoverModalFocus; module.exports.trapModalFocus = trapModalFocus; module.exports.inspectUploadSelection = inspectUploadSelection; module.exports.setupSidebarEntry = setupSidebarEntry; module.exports.apply = apply; module.exports.inject = inject;
