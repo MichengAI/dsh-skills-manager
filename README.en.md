@@ -19,8 +19,6 @@
 
 > DSH Skills Manager is a community-maintained DeepSeek Harness (DSH) plugin, not an official DeepSeek AI product.
 
-This README describes **1.2.30**. Released changes are in the [changelog](CHANGELOG.md).
-
 ## Features
 
 Bring skills from your computer and projects into DSH without switching between Agent folders.

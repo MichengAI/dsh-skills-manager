@@ -50,21 +50,6 @@ for (const [file, pattern, line] of [
   ],
   [
     "README.en.md",
-      /^This README describes \*\*[^*]+\*\*\. Released changes are in the \[changelog\]\(CHANGELOG\.md\)\.$/m,
-    `This README describes **${manifest.version}**. Released changes are in the [changelog](CHANGELOG.md).`,
-  ],
-  [
-    "README.md",
-    /^本文描述 \*\*[^*]+\*\*\。已发布变更见\[更新日志\]\(CHANGELOG\.zh-CN\.md\)。$/m,
-    `本文描述 **${manifest.version}**。已发布变更见[更新日志](CHANGELOG.zh-CN.md)。`,
-  ],
-  [
-    "README.zh-CN.md",
-    /^本文描述 \*\*[^*]+\*\*\。已发布变更见\[更新日志\]\(CHANGELOG\.zh-CN\.md\)。$/m,
-    `本文描述 **${manifest.version}**。已发布变更见[更新日志](CHANGELOG.zh-CN.md)。`,
-  ],
-  [
-    "README.en.md",
     /^  \[!\[DSH supported through [^[]+\]\(https:\/\/img\.shields\.io\/badge\/DSH-up%20to%20[^)]+\)\]\(#installation\)$/m,
     `  [![DSH supported through ${latestHost}](https://img.shields.io/badge/DSH-up%20to%20${shieldsHost}-2563eb.svg)](#installation)`,
   ],
