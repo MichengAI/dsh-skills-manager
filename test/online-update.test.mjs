@@ -103,6 +103,23 @@ try {
     });
     assert.equal(postForbidden.status, 403);
 
+    // 在线更新接口同源与专有头保护
+    const updateForbidden = await fetch(updateUrl, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+    });
+    assert.equal(updateForbidden.status, 403, "缺少更新专用头返回 403");
+
+    const updateCrossOrigin = await fetch(updateUrl, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-michengai-plugin-update": "1",
+        "origin": "http://evil.com",
+      },
+    });
+    assert.equal(updateCrossOrigin.status, 403, "跨域 Origin 更新请求返回 403");
+
     // HEAD 请求
     const headRes = await fetch(baseUrl, { method: "HEAD" });
     assert.equal(headRes.status, 200);

@@ -1,4 +1,3 @@
-import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { CreateInput, ScopeOptions } from './types.js';
 import type { ProviderCandidate, createSkill, getProviderSkill } from './core.js';
 /** 七版宿主实际使用的最小服务契约，兼容旧版可选服务与返回值。 */

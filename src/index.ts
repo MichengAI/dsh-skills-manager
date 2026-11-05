@@ -1,4 +1,3 @@
-import type { IncomingMessage, ServerResponse } from "node:http";
 import type { HostContext, ProviderControl, Agent } from "./host-types.js";
 import type { Log, Serialize, CreateInput, UploadInput, SkillRequest, RepositoryInput, ScopeOptions, SkillRoot, OperationError, RootView, Diagnostic } from "./types.js";
 import type { ProviderCandidate } from "./core.js";
@@ -155,22 +154,6 @@ async function runFetch(task: () => unknown, afterSuccess?: () => void, headOnly
       ...(e && e.params && typeof e.params === "object" && !Array.isArray(e.params) ? { params: e.params } : {}),
       error: String(e && e.message ? e.message : e),
     }, headOnly);
-  }
-}
-
-function json(res: ServerResponse, code: number, payload: unknown, headOnly = false) {
-  if (!res || res.writableEnded || res.destroyed) return;
-  res.once("error", () => {});
-  try {
-    const body = JSON.stringify(payload);
-    res.writeHead(code, {
-      "content-type": "application/json; charset=utf-8",
-      "content-length": Buffer.byteLength(body),
-    });
-    // HEAD 按 RFC 语义返回与实体一致的 content-length，但不输出 body。
-    res.end(headOnly ? undefined : body);
-  } catch {
-    /* 客户端已断开 */
   }
 }
 

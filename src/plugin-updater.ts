@@ -1,4 +1,3 @@
-import type { IncomingMessage, ServerResponse } from "node:http";
 import type { HostContext, UpdateOptions, UpdateTarget } from "./host-types.js";
 import type { CodedError } from "./types.js";
 import { spawn } from "node:child_process";
@@ -9,37 +8,6 @@ import { basename, delimiter, dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 const PLUGIN_UPDATE_HEADER = "x-michengai-plugin-update";
 const PLUGIN_UPDATE_IPC = "apply-plugin-updates";
-function header(request: IncomingMessage, name: string) {
-  const value = request.headers?.[name];
-  return Array.isArray(value) ? value[0] : value;
-}
-function isLoopbackAddress(value?: string) {
-  const address = value?.toLowerCase().replace(/^\[|\]$/g, "");
-  return address === "localhost" || address === "localhost." || address === "::1" || address?.startsWith("127.") === true || address?.startsWith("::ffff:127.") === true;
-}
-function isTrustedUpdateRequest(request: IncomingMessage) {
-  if (header(request, PLUGIN_UPDATE_HEADER) !== "1") return false;
-  if (!isLoopbackAddress(request.socket?.remoteAddress)) return false;
-  const site = header(request, "sec-fetch-site");
-  if (site !== void 0 && site !== "same-origin") return false;
-  const host = header(request, "host");
-  if (host === void 0 || host === "") return false;
-  const origin = header(request, "origin");
-  // 官方 Desktop 从 dsh-app://app 转发时会去掉 origin。只接受本机 Host，浏览器带来的跨源 origin 仍然拒绝。
-  if (origin === void 0 || origin === "") {
-    try {
-      return isLoopbackAddress(new URL(`http://${host}`).hostname);
-    } catch {
-      return false;
-    }
-  }
-  try {
-    const url = new URL(origin);
-    return (url.protocol === "http:" || url.protocol === "https:") && isLoopbackAddress(url.hostname) && url.host === host;
-  } catch {
-    return false;
-  }
-}
 function validProfileName(value: unknown): value is string {
   return typeof value === "string" && value !== "" && value !== "." && value !== ".." && !value.includes("/") && !value.includes("\\") && !/[\0-\x1f\x7f]/.test(value);
 }
@@ -434,10 +402,6 @@ async function install(target: UpdateTarget, packageSpec: string) {
   await runCliInstall(target, packageSpec);
   await recordReleaseAgeExclude(target.profileDir, packageSpec);
 }
-function json(response: ServerResponse, statusCode: number, value: unknown) {
-  response.writeHead(statusCode, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
-  response.end(JSON.stringify(value));
-}
 function publicError(error: unknown) {
   const message = error instanceof Error ? error.message : "\u66F4\u65B0\u6682\u4E0D\u53EF\u7528\u3002";
   return /[A-Za-z]:[\\/]|\/(?:home|root|Users|var|tmp)\//.test(message) ? "\u66F4\u65B0\u5931\u8D25\uFF0C\u8BF7\u67E5\u770B\u670D\u52A1\u7AEF\u65E5\u5FD7\u3002" : message;
@@ -471,6 +435,18 @@ function registerPluginUpdater(ctx: HostContext, options: UpdateOptions) {
           }
           if (request.headers.get(PLUGIN_UPDATE_HEADER) !== "1") {
             return Response.json({ error: "已拒绝非同源专用更新请求。" }, { status: 403 });
+          }
+          const origin = request.headers.get("origin");
+          if (origin) {
+            try {
+              const originHost = new URL(origin).host;
+              const reqHost = request.headers.get("host") || new URL(request.url).host;
+              if (originHost !== reqHost) {
+                return Response.json({ error: "已拒绝非同源专用更新请求。" }, { status: 403 });
+              }
+            } catch {
+              return Response.json({ error: "已拒绝非同源专用更新请求。" }, { status: 403 });
+            }
           }
           if (installing) {
             return Response.json({ error: "当前插件正在更新，请稍候。" }, { status: 409 });
@@ -511,7 +487,6 @@ export {
   PLUGIN_UPDATE_IPC,
   isDshCliEntry,
   isNewerVersion,
-  isTrustedUpdateRequest,
   recordReleaseAgeExclude,
   registerPluginUpdater
 };
