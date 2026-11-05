@@ -289,19 +289,19 @@ try {
     }
   }
   report.checks.push("精确版本的宿主、全部官方 peer 与传递依赖已安装");
-  const pack = JSON.parse(
-    await run(
-      [
-        npm,
-        "pack",
-        "--ignore-scripts",
-        "--json",
-        "--pack-destination",
-        sandbox,
-      ],
-      root,
-    ),
+  const packOutput = await run(
+    [
+      npm,
+      "pack",
+      "--ignore-scripts",
+      "--json",
+      "--pack-destination",
+      sandbox,
+    ],
+    root,
   );
+  const packJsonStart = packOutput.indexOf('[');
+  const pack = JSON.parse(packJsonStart >= 0 ? packOutput.slice(packJsonStart) : packOutput);
   const cli = join(
     sandbox,
     "node_modules",
