@@ -65,7 +65,7 @@ interface Services {
     };
 }
 export interface HostContext {
-    get?: (<K extends keyof Services>(key: K) => Services[K] | undefined) & ((key: string) => unknown);
+    get?: <K extends keyof Services>(key: K) => Services[K] | undefined;
     sessions?: Sessions;
     skills: Skills;
     connection?: {

@@ -102,27 +102,21 @@ assert.ok(preExecuteHandler, "tools/pre-execute 钩子必须被注册");
   assert.deepEqual(decision, { kind: "allow" }, "danger-full-access 下返回 next() 的结果");
 }
 
-// 用例 3：通过 agent.ctx.sandboxPolicy 或 sessionProjections 识别到 danger-full-access
+// 用例 3：通过 sessionProjections 识别到 danger-full-access
 {
   let nextCalled = false;
   fakeCtx.sandboxPolicy = undefined;
+  fakeCtx.sessionProjections = {
+    stateOf(session, key) {
+      if (key === "sandboxMode") return "danger-full-access";
+      return undefined;
+    },
+  };
   const exec = {
     name: "create_skill",
     arguments: { name: "test-skill-3", description: "desc", body: "body" },
     agent: {
-      session: { id: "s3", header: { cwd: "/workspace" } },
-      ctx: {
-        get(name) {
-          if (name === "sandboxPolicy") {
-            return {
-              resolve() {
-                return { mode: "danger-full-access" };
-              },
-            };
-          }
-          return undefined;
-        },
-      },
+      session: { id: "s3" },
     },
   };
   const decision = await preExecuteHandler(exec, () => {
@@ -130,11 +124,29 @@ assert.ok(preExecuteHandler, "tools/pre-execute 钩子必须被注册");
     return Promise.resolve({ kind: "allow" });
   });
 
-  assert.equal(nextCalled, true, "agent.ctx 中的 danger-full-access 必须放行");
+  assert.equal(nextCalled, true, "sessionProjections 中的 danger-full-access 必须放行");
   assert.deepEqual(decision, { kind: "allow" });
 }
 
-// 用例 4：其他非 create_skill 工具直接放行
+// 用例 4：服务均缺失（无 sandboxPolicy / 无 sessionProjections）时必须 fail-closed 拦截并返回 ask
+{
+  let nextCalled = false;
+  fakeCtx.sandboxPolicy = undefined;
+  fakeCtx.sessionProjections = undefined;
+  const exec = {
+    name: "create_skill",
+    arguments: { name: "test-skill-missing", description: "desc", body: "body" },
+  };
+  const decision = await preExecuteHandler(exec, () => {
+    nextCalled = true;
+    return Promise.resolve({ kind: "allow" });
+  });
+
+  assert.equal(nextCalled, false, "策略服务缺失时不得放行，必须 fail-closed 请求审批");
+  assert.equal(decision?.kind, "ask");
+}
+
+// 用例 5：其他非 create_skill 工具直接放行
 {
   let nextCalled = false;
   const exec = {

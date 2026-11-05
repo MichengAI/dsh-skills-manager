@@ -297,7 +297,7 @@ function registerAgentSkillProviders(ctx: HostContext, invalidators: Set<() => v
  */
 function isDangerFullAccess(ctx: HostContext, exec?: { agent?: unknown }): boolean {
   try {
-    const agent = exec?.agent as { session?: { header?: { cwd?: string; sandboxMode?: string; sandbox?: { mode?: string } }; id?: string }; ctx?: { get?: (name: string) => unknown; sandboxPolicy?: unknown } } | undefined;
+    const agent = exec?.agent as { session?: { id?: string }; ctx?: { get?: (name: string) => unknown; sandboxPolicy?: unknown; sessionProjections?: unknown } } | undefined;
     const session = agent?.session;
     const sandboxPolicy = (ctx.sandboxPolicy as { resolve?: (req: unknown) => { mode?: string } } | undefined)
       || (typeof ctx.get === "function" ? (ctx.get("sandboxPolicy") as { resolve?: (req: unknown) => { mode?: string } } | undefined) : undefined)
@@ -311,16 +311,12 @@ function isDangerFullAccess(ctx: HostContext, exec?: { agent?: unknown }): boole
 
     const sessionProjections = (ctx.sessionProjections as { stateOf?: (session: unknown, key: string) => unknown } | undefined)
       || (typeof ctx.get === "function" ? (ctx.get("sessionProjections") as { stateOf?: (session: unknown, key: string) => unknown } | undefined) : undefined)
-      || (agent?.ctx && typeof agent.ctx.get === "function" ? (agent.ctx.get("sessionProjections") as { stateOf?: (session: unknown, key: string) => unknown } | undefined) : undefined);
+      || (agent?.ctx && typeof agent.ctx.get === "function" ? (agent.ctx.get("sessionProjections") as { stateOf?: (session: unknown, key: string) => unknown } | undefined) : undefined)
+      || (agent?.ctx && (agent.ctx.sessionProjections as { stateOf?: (session: unknown, key: string) => unknown } | undefined));
 
     if (session && sessionProjections && typeof sessionProjections.stateOf === "function") {
       const mode = sessionProjections.stateOf(session, "sandboxMode");
       if (mode === "danger-full-access") return true;
-    }
-
-    const header = session?.header;
-    if (header?.sandboxMode === "danger-full-access" || header?.sandbox?.mode === "danger-full-access") {
-      return true;
     }
 
     return false;
