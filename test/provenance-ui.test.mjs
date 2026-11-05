@@ -17,10 +17,15 @@ const filteredRows = [
 ].map(skill => ({ root, skill }));
 const h = (type, props, ...children) => ({ type, props: props || {}, children: children.flat(Infinity).filter(x => x != null && typeof x !== 'boolean') });
 const t = key => key;
-const make = new Function('filteredRows', 'h', 't', 'expanded', 'query', 'activeSource', 'filters', 'filterKey', 'renderSkill', 'foldChevron', 'sourceExtra', 'rootDisplayName', 'renderRootIcon', 'GithubMark16', 'countKey', 'setExpanded', grouping + '\nreturn { collectProvenanceRoots, renderProvenanceRepo, renderProvenanceRoot, renderProvenanceList };');
-const ui = make(filteredRows, h, t, {}, 'search', '', {}, 'user', (root, skill) => h('skill', { name: skill.name }), () => null, () => null, () => 'DSH', () => null, () => null, key => key, () => {});
+const make = new Function('filteredRows', 'h', 't', 'expanded', 'query', 'activeSource', 'filters', 'filterKey', 'renderSkill', 'foldChevron', 'sourceExtra', 'rootDisplayName', 'renderRootIcon', 'renderRepoBrandIconByUrl', 'countKey', 'setExpanded', 'strokeIcon', grouping + '\nreturn { collectProvenanceRoots, renderProvenanceRepo, renderProvenanceRoot, renderProvenanceList };');
+const brandHelper = (url, repo) => {
+  const target = (url || repo || '').toLowerCase();
+  const viewBox = /gitlab/i.test(target) ? '0 0 24 24' : '0 0 16 16';
+  return h('span', { className: 'dssm-brand-icon' }, h('svg', { viewBox }));
+};
+const ui = make(filteredRows, h, t, {}, 'search', '', {}, 'user', (root, skill) => h('skill', { name: skill.name }), () => null, () => null, () => 'DSH', () => null, brandHelper, key => key, () => {}, () => h('svg', {}));
 const projectExpanded = {};
-const projectUI = make(filteredRows, h, t, projectExpanded, '', '', {}, 'project', (root, skill) => h('skill', { name: skill.name }), () => null, () => null, () => 'DSH', () => null, () => null, key => key, update => Object.assign(projectExpanded, update(projectExpanded)));
+const projectUI = make(filteredRows, h, t, projectExpanded, '', '', {}, 'project', (root, skill) => h('skill', { name: skill.name }), () => null, () => null, () => 'DSH', () => null, brandHelper, key => key, update => Object.assign(projectExpanded, update(projectExpanded)), () => h('svg', {}));
 const pg = projectUI.collectProvenanceRoots()[0];
 flattenEarly(projectUI.renderProvenanceRoot(pg, 'D:/first')).find(node => node.type === 'button').props.onClick();
 assert.equal(flattenEarly(projectUI.renderProvenanceRoot(pg, 'D:/second')).find(node => node.type === 'button').props['aria-expanded'], true, '项目来源折叠状态不能跨工作区串用');
@@ -46,12 +51,14 @@ assert.ok(flatten(nestedDirectory).some(node => classes(node).includes('dssm-cat
 const githubLink = flatten(githubRendered).find(node => node.type === 'a');
 assert.equal(githubLink?.props.href, 'https://github.com/team/tool');
 assert.equal(githubLink.props.target, '_blank');
-assert.deepEqual(githubLink.children, ['↗'], '只显示精简外链图标，不重复展示来源仓库文字');
+assert.ok(classes(githubLink).includes('dssm-icon-action'), '仓库外链复用分组操作按钮的外框样式');
+assert.ok(flatten(githubLink).some(node => node.type === 'svg'), '仓库外链使用标准化矢量图标');
 assert.equal(githubLink.props['aria-label'], 'group.openRepo', '图标链接保留可访问名称');
 assert.match(githubLink.props.rel, /noopener/);
 assert.ok(flatten(githubRendered).some(node => node.type === 'button' && node.props['aria-expanded'] === true), 'repository toggle is a keyboard-operable button');
 assert.ok(flatten(githubRendered).filter(node => node.type === 'button').every(button => !flatten(button).some(node => node.type === 'a')), 'repository link is never inside a button');
-assert.equal(flatten(ui.renderProvenanceRepo(groups[0], gitlab)).find(node => node.type === 'a')?.props.href, 'https://gitlab.com/team/tool', 'links must use the supplied host');
+assert.ok(flatten(ui.renderProvenanceRepo(groups[0], gitlab)).some(node => node.type === 'svg' && node.props.viewBox === '0 0 24 24'), 'GitLab 仓库使用 GitLab 品牌图标而非 GitHub 图标');
+assert.ok(flatten(ui.renderProvenanceRepo(groups[0], github)).some(node => node.type === 'svg' && node.props.viewBox === '0 0 16 16'), 'GitHub 仓库保留 GitHub 图标');
 for (const url of ['javascript:alert(1)', '//evil.test/x', 'https://', null]) {
   filteredRows[0].skill.provenance.url = url;
   const group = ui.collectProvenanceRoots()[0];
