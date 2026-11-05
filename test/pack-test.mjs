@@ -14,7 +14,7 @@ const npm = process.env.npm_execpath;
 assert.ok(npm, '请通过 npm run verify 运行，以使用当前 npm 入口');
 
 try {
-  for (const name of ['package.json', 'tsconfig.json', 'src', 'scripts', 'test/types', 'assets', 'cordis.patch.yml', 'LICENSE', 'README.md', 'README.zh-CN.md', 'CHANGELOG.md', 'CHANGELOG.zh-CN.md']) {
+  for (const name of ['package.json', 'tsconfig.json', 'src', 'scripts', 'test/types', 'assets', 'cordis.patch.yml', 'LICENSE', 'README.md', 'README.zh-CN.md', 'README.en.md', 'CHANGELOG.md', 'CHANGELOG.zh-CN.md']) {
     await cp(join(root, name), join(sandbox, name), { recursive: true });
   }
   // 仅复用已安装依赖，既不下载依赖，也不复制或读取工作区 lib。
