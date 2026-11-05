@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.2.33] - 2026-11-05
+
+### Improvements
+
+- **Allow closing the repository management modal during updates and scans** (Issue #78):
+  - In the "Discover Skills -> Manage Repositories" panel, clicking the top-right close button (X) now immediately closes the modal while repository updates or initial scans are in progress.
+  - Background refresh tasks continue smoothly with progress visible on the main page, avoiding modal freeze during network delays.
+
+[中文文档](CHANGELOG.zh-CN.md)
+
 ## [1.2.32] - 2026-11-05
 
 ### Security & Compatibility
