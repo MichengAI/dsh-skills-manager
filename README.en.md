@@ -26,6 +26,7 @@ This README describes **1.2.30**. Released changes are in the [changelog](CHANGE
 Bring skills from your computer and projects into DSH without switching between Agent folders.
 
 - **Unified multi-view management**: Browse Global Skills, Project Skills, Discover, and Trash in unified tabs with instant search, status filtering, and collapsible source groups.
+- **Browse by source repository**: Switch between directory and repository views. Sources are identified from install records, lock files, and skill metadata; skills without a reliable source are marked as unknown.
 - **Broad ecosystem support**: Full coverage for 20+ tools and CLI environments including DSH, Shared Agent, Codex, Claude Code, Copilot, Cursor, Google Antigravity, Windsurf, Qoder, and Trae without touching third-party files.
 - **Categorization and drag & drop**: Create category folders inside sources, drag skill rows (`⋮⋮`) to organize and order them, batch assign skills, and toggle entire categories with a single switch. Category metadata is saved without moving files.
 - **Public markets & repositories**: Integrated Discover hub to explore trending skills from ClawHub and skills.sh, or subscribe to public GitHub repositories with incremental diff inspection and backups.
@@ -119,6 +120,12 @@ Two native switches are available:
 | **Update repository skills** | Click **Refresh**, inspect file diffs with **Review update**, and confirm to update with an automated backup. |
 | **Roll back updates** | Click **Restore previous version** on skills with backup history, preview changes, and confirm rollback. |
 | **Recover deletions** | Open **Trash** to restore accidentally deleted DSH skills with their original locations preserved. |
+
+### Browse by source repository
+
+Switch between the default directory view and the repository view to browse skills by source directory, repository and in-repository directory. Skills without a known source are marked as unknown. Sources come from install records, directory lock files and skill metadata, not guessed directory names.
+
+The repository view does not move skill files; individual skill controls remain available. Switch back to the directory view to create categories, assign skills or reorder them by dragging.
 
 ### Four Main Tabs
 

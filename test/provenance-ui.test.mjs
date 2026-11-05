@@ -1,0 +1,93 @@
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import { stripTypeScriptTypes } from 'node:module';
+
+// Execute the actual grouping functions directly from source, without a bundle.
+const source = await readFile(new URL('../src/client.ts', import.meta.url), 'utf8');
+const start = source.indexOf('      type ProvenanceRow =');
+const end = source.indexOf('      function renderList()', start);
+assert.ok(start >= 0 && end > start, 'provenance UI source is present');
+const grouping = stripTypeScriptTypes(source.slice(start, end));
+const root = { key: 'dsh', path: '/skills', mutable: true, categories: [] };
+const skill = (name, provenance) => ({ name, provenance });
+const filteredRows = [
+  skill('one', { repo: 'team/tool', identity: 'github:team/tool', url: 'https://github.com/team/tool', kind: 'install', category: 'docs' }),
+  skill('two', { repo: 'team/tool', identity: 'gitlab:team/tool', url: 'https://gitlab.com/team/tool', kind: 'install', category: 'docs' }),
+  skill('unknown', null),
+].map(skill => ({ root, skill }));
+const h = (type, props, ...children) => ({ type, props: props || {}, children: children.flat(Infinity).filter(x => x != null && typeof x !== 'boolean') });
+const t = key => key;
+const make = new Function('filteredRows', 'h', 't', 'expanded', 'query', 'activeSource', 'filters', 'filterKey', 'renderSkill', 'foldChevron', 'sourceExtra', 'rootDisplayName', 'renderRootIcon', 'GithubMark16', 'countKey', 'setExpanded', grouping + '\nreturn { collectProvenanceRoots, renderProvenanceRepo, renderProvenanceRoot };');
+const ui = make(filteredRows, h, t, {}, 'search', '', {}, 'user', (root, skill) => h('skill', { name: skill.name }), () => null, () => null, () => 'DSH', () => null, () => null, key => key, () => {});
+const projectExpanded = {};
+const projectUI = make(filteredRows, h, t, projectExpanded, '', '', {}, 'project', (root, skill) => h('skill', { name: skill.name }), () => null, () => null, () => 'DSH', () => null, () => null, key => key, update => Object.assign(projectExpanded, update(projectExpanded)));
+const pg = projectUI.collectProvenanceRoots()[0];
+flattenEarly(projectUI.renderProvenanceRoot(pg, 'D:/first')).find(node => node.type === 'button').props.onClick();
+assert.equal(flattenEarly(projectUI.renderProvenanceRoot(pg, 'D:/second')).find(node => node.type === 'button').props['aria-expanded'], true, '项目来源折叠状态不能跨工作区串用');
+function flattenEarly(node) { return node && typeof node === 'object' ? [node, ...(node.children || []).flatMap(flattenEarly)] : []; }
+const groups = ui.collectProvenanceRoots();
+assert.equal(groups[0].repos.length, 3, 'same display name on different hosts must remain distinct repositories');
+const flatten = node => node && typeof node === 'object' ? [node, ...(node.children || []).flatMap(flatten)] : [];
+const github = groups[0].repos.find(group => group.rows.some(row => row.skill.name === 'one'));
+const gitlab = groups[0].repos.find(group => group.rows.some(row => row.skill.name === 'two'));
+const githubRendered = ui.renderProvenanceRepo(groups[0], github);
+const githubLink = flatten(githubRendered).find(node => node.type === 'a');
+assert.equal(githubLink?.props.href, 'https://github.com/team/tool');
+assert.equal(githubLink.props.target, '_blank');
+assert.match(githubLink.props.rel, /noopener/);
+assert.ok(flatten(githubRendered).some(node => node.type === 'button' && node.props['aria-expanded'] === true), 'repository toggle is a keyboard-operable button');
+assert.ok(flatten(githubRendered).filter(node => node.type === 'button').every(button => !flatten(button).some(node => node.type === 'a')), 'repository link is never inside a button');
+assert.equal(flatten(ui.renderProvenanceRepo(groups[0], gitlab)).find(node => node.type === 'a')?.props.href, 'https://gitlab.com/team/tool', 'links must use the supplied host');
+for (const url of ['javascript:alert(1)', '//evil.test/x', 'https://', null]) {
+  filteredRows[0].skill.provenance.url = url;
+  const group = ui.collectProvenanceRoots()[0];
+  const rendered = ui.renderProvenanceRepo(group, group.repos.find(repo => repo.rows.some(row => row.skill.name === 'one')));
+  assert.equal(flatten(rendered).some(node => node.type === 'a'), false, `invalid URL must not link: ${url}`);
+}
+const skillStart = source.indexOf('      function renderSkill(root:');
+const skillEnd = source.indexOf('      var rows =', skillStart);
+const extraStart = source.indexOf('      function sourceExtra(');
+const extraEnd = source.indexOf('      function AntdFolderClosed()', extraStart);
+const skillFns = stripTypeScriptTypes(source.slice(skillStart, skillEnd) + source.slice(extraStart, extraEnd));
+const makeSkill = new Function('env', `
+  const { h, t, filters } = env;
+  const isSkillEnabled = () => true, busy = false, allRoots = [], draggingRef = { current: null };
+  const moreIcon = () => null, SourceSelect = function SourceSelect() {}, SkillSwitch = function SkillSwitch() {};
+  const renderSkillStatusIcon = () => null, enableSwitch = () => h('switch', {}), renderLinkedNote = () => null, renderFallback = () => null;
+  const iconButton = (label) => h('button', { 'aria-label': label }), strokeIcon = () => null, canToggleSource = () => true;
+  ${skillFns}
+  return { renderSkill, sourceExtra };
+`);
+const repoUI = makeSkill({ h, t, filters: { group: 'repo' } });
+const classifiedRoot = { ...root, categories: [{ id: 'work', name: 'Work' }] };
+const row = repoUI.renderSkill(classifiedRoot, { name: 'one', categoryId: '', description: 'one' });
+const menu = flatten(row).find(node => node.props.label === 'btn.more');
+assert.ok(menu.props.options.some(option => option.value === 'detail'));
+assert.ok(menu.props.options.some(option => option.value === 'note'));
+assert.ok(menu.props.options.some(option => option.value === 'trash'));
+assert.equal(menu.props.options.some(option => option.value.startsWith('category:')), false, 'repository view does not offer category assignment');
+assert.equal(row.props.draggable, false, 'repository view cannot initiate drag');
+assert.equal(row.props.onDrop, undefined, 'repository view cannot accept drops');
+const extra = repoUI.sourceExtra(classifiedRoot, undefined, 'DSH');
+assert.equal(flatten(extra).some(node => node.props['aria-label'] === 'category.create'), false, 'repository view cannot create categories');
+assert.ok(flatten(extra).some(node => node.type?.name === 'SkillSwitch'), 'source toggle remains available');
+const fallback = groups[0].repos.find(group => group.fallback);
+const fallbackOnly = { ...groups[0], repos: [fallback], rows: fallback.rows, hasEvidence: false };
+assert.ok(flatten(ui.renderProvenanceRoot(fallbackOnly)).some(node => node.children.includes('group.unknownSource')), '来源目录完全无证据时也应标注来源未知');
+assert.ok(flatten(ui.renderProvenanceRepo(groups[0], fallback)).some(node => node.children.includes('group.unknownSource')), 'unknown provenance has its own label');
+assert.match(source, /"group\.unknownSource": "来源未知"/);
+assert.match(source, /"group\.unknownSource": "Unknown source"/);
+const rootOnly = { ...github, categories: [''], rows: [{ root, skill: skill('root-skill', { category: '' }) }] };
+assert.equal(flatten(ui.renderProvenanceRepo(groups[0], rootOnly)).some(node => node.props.className === 'dssm-prov-cat-title'), false, '只有根目录时不增加空目录层');
+assert.ok(flatten(ui.renderProvenanceRepo(groups[0], rootOnly)).some(node => node.type === 'skill' && node.props.name === 'root-skill'));
+assert.doesNotMatch(source.match(/"group\.hint": "([^"]+)"/)[1], /目录名后缀/, '来源说明不得把目录名后缀当作来源证据');
+const sourceUI = makeSkill({ h, t, filters: { group: '' } });
+const sourceRow = sourceUI.renderSkill(classifiedRoot, { name: 'one', description: 'one' });
+assert.equal(sourceRow.props.draggable, true, 'directory mode still allows drag');
+assert.equal(typeof sourceRow.props.onDrop, 'function');
+assert.ok(flatten(sourceRow).find(node => node.props.label === 'btn.more').props.options.some(option => option.value === 'category:work'), 'directory mode retains assignment');
+assert.ok(flatten(sourceUI.sourceExtra(classifiedRoot, undefined, 'DSH')).some(node => node.props['aria-label'] === 'category.create'), 'directory mode retains category creation');
+filteredRows.push({ root, skill: skill('identity-only', { identity: 'git:internal', repo: null, url: 'https://example.test/repo', kind: 'install', category: '' }) });
+const identityOnly = ui.collectProvenanceRoots()[0].repos.find(group => group.rows.some(row => row.skill.name === 'identity-only'));
+assert.equal(identityOnly.fallback, false, 'identity alone is known provenance');
+console.log('provenance UI identity, links and interaction tests passed');
