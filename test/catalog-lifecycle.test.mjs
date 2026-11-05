@@ -6,6 +6,7 @@ import { promises as fileSystem } from "node:fs";
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { createTestFetchBridge } from "./fixtures/test-fetch-server.mjs";
 
 const sandbox = await mkdtemp(join(process.env.TMPDIR || tmpdir(), "dssm-catalog-lifecycle-"));
 process.env.DSH_HOME = join(sandbox, "home");
@@ -27,12 +28,11 @@ globalThis.fetch = async (url, options) => {
   return Response.json({ files: [{ path: "SKILL.md", contents: `---\nname: ${installedName}\ndescription: 测试技能\n---\n正文\n` }] });
 };
 const { apply } = await import("../lib/index.js");
-let route;
-apply({ effect: fn => fn(), skills: { registerProvider() { return () => {}; } }, webStartup: { trustedHosts: [] },
-  webServer: { register(value) { if (value.kind === "prefix") route = value; return () => {}; } },
+const { connection, handler } = createTestFetchBridge();
+apply({ connection, effect: fn => fn(), skills: { registerProvider() { return () => {}; } },
   get(name) { if (name === "workspaceRegistry") return { list: () => [{ id: "one", title: "项目", path: workspace }] }; },
 });
-const server = createServer((req, res) => route.handler(req, res));
+const server = createServer(handler);
 await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
 const base = `http://127.0.0.1:${server.address().port}/api/michengai/dsh-skills-manager`;
 const post = async (path, body) => {

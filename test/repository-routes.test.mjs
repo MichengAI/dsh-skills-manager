@@ -6,6 +6,7 @@ import { access, mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { zipSync, strToU8 } from "fflate";
+import { createTestFetchBridge } from "./fixtures/test-fetch-server.mjs";
 const temporary = await mkdtemp(join(tmpdir(), "dssm-repo-http-"));
 process.env.DSH_HOME = join(temporary, "home");
 process.env.DSH_AGENTS_HOME = join(temporary, "agents");
@@ -25,14 +26,13 @@ globalThis.fetch = (url, options) => {
   return nativeFetch(url, options);
 };
 const { apply } = await import("../lib/index.js");
-let route;
+const { connection, handler } = createTestFetchBridge();
 apply({
+  connection,
   effect(register) { return register(); },
   skills: { registerProvider() { return () => {}; } },
-  webStartup: { trustedHosts: [] },
-  webServer: { register(value) { if (value.kind === "prefix") route = value; return () => {}; } },
 });
-const server = createServer((req, res) => route.handler(req, res));
+const server = createServer(handler);
 await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
 const api = `http://127.0.0.1:${server.address().port}/api/michengai/dsh-skills-manager/repositories`;
 const headers = { "content-type": "application/json", "x-dsh-skills-manager": "1" };
@@ -42,7 +42,7 @@ try {
   let outerStatus, outerPayload;
   const brokenResponse = new EventEmitter();
   Object.assign(brokenResponse, { writeHead(status) { outerStatus = status; }, end(body) { outerPayload = JSON.parse(body); } });
-  const handling = route.handler(brokenRequest, brokenResponse);
+  const handling = handler(brokenRequest, brokenResponse);
   brokenRequest.emit("error", Object.assign(new Error("业务读取失败"), { statusCode: 400, code: "error.workspace.unavailable", params: { path: "C:/missing", action: "restore" } }));
   await handling;
   assert.equal(outerStatus, 400);

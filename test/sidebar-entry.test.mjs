@@ -3,6 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createServer } from "node:http";
+import { createTestFetchBridge } from "./fixtures/test-fetch-server.mjs";
 
 const temporary = await mkdtemp(join(tmpdir(), "dssm-sidebar-test-"));
 process.env.DSH_HOME = join(temporary, "home");
@@ -36,20 +37,14 @@ try {
   );
 
   // 2. HTTP 路由测试
-  let route;
+  const { connection, handler } = createTestFetchBridge();
   apply({
+    connection,
     effect(fn) { return fn(); },
     skills: { registerProvider() { return () => {}; } },
-    webStartup: { trustedHosts: [] },
-    webServer: {
-      register(value) {
-        if (value.kind === "prefix") route = value;
-        return () => {};
-      },
-    },
   });
 
-  const server = createServer((req, res) => route.handler(req, res));
+  const server = createServer(handler);
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   const baseUrl = `http://127.0.0.1:${server.address().port}/api/michengai/dsh-skills-manager/sidebar-entry`;
   const headers = { "content-type": "application/json", "x-dsh-skills-manager": "1" };

@@ -79,13 +79,6 @@ export interface HostContext {
         };
         requestRejection?: (request: unknown) => number | undefined;
     };
-    webServer?: {
-        register: (route: {
-            kind: string;
-            path: string;
-            handler: (req: IncomingMessage, res: ServerResponse) => unknown;
-        }) => () => void;
-    };
     logger: {
         warn: (message: string) => void;
     };

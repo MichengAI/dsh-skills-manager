@@ -5,6 +5,7 @@ import { mkdtemp, mkdir, writeFile, readFile, rm } from "node:fs/promises";
 import { createServer } from "node:http";
 import { join, basename } from "node:path";
 import { tmpdir } from "node:os";
+import { createTestFetchBridge } from "./fixtures/test-fetch-server.mjs";
 
 import {
   userRoots,
@@ -343,16 +344,10 @@ try {
   await clearConfig();
 
   // ── HTTP 路由 ──
-  let route;
+  const { connection, handler } = createTestFetchBridge();
   let invalidated = 0;
   applyHost({
-    webServer: {
-      register(value) {
-        if (value && value.kind === "prefix") route = value;
-        return function () {};
-      },
-    },
-    webStartup: { trustedHosts: [] },
+    connection,
     skills: {
       registerProvider(register) {
         register({
@@ -368,7 +363,7 @@ try {
     emit() {},
     get() {},
   });
-  const server = createServer((req, res) => route.handler(req, res));
+  const server = createServer(handler);
   await new Promise((resolve, reject) => {
     server.once("error", reject);
     server.listen(0, "127.0.0.1", () => {

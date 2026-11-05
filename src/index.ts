@@ -840,73 +840,7 @@ function apply(ctx: HostContext, config?: PluginConfig) {
         }
       };
     }
-    // 兜底：无 connection 时自动通过 webServer 桥接 Fetch 路由（兼顾老测试和纯 webServer 环境）
-    let webServer: HostContext["webServer"] | undefined;
-    try {
-      webServer = ctx.webServer;
-    } catch {
-      // 真实 Cordis Context Proxy 在未 inject 且无该服务时抛错，安全捕获忽略
-    }
-    if (webServer?.register) {
-      const routeMap = new Map<string, ApiFetchRoute>();
-      for (const r of routes) routeMap.set(r.path, r);
-      return webServer.register({
-        kind: "prefix",
-        path: API_PREFIX,
-        handler: async (req, res) => {
-          const u = new URL(req.url!, "http://localhost");
-          const path = u.pathname.replace(/\/+$/, "");
-          const route = routeMap.get(path);
-          if (!route) {
-            json(res, 404, { ok: false, code: "error.proto.unknownAction", error: `unknown action: ${path}` });
-            return;
-          }
-          if (!route.methods.includes(req.method!)) {
-            json(res, 405, { ok: false, code: "error.proto.method", error: `method not allowed: ${req.method}` });
-            return;
-          }
-          const headers = new Headers();
-          for (const [k, v] of Object.entries(req.headers)) {
-            if (v !== undefined) {
-              if (Array.isArray(v)) for (const item of v) headers.append(k, item);
-              else headers.set(k, v);
-            }
-          }
-          try {
-            let bodyBuffer: Buffer | null = null;
-            if (req.method !== "GET" && req.method !== "HEAD") {
-              bodyBuffer = await new Promise<Buffer>((resolve, reject) => {
-                const chunks: Buffer[] = [];
-                req.on("data", (c) => chunks.push(c));
-                req.on("end", () => resolve(Buffer.concat(chunks)));
-                req.on("error", reject);
-              });
-            }
-            const fetchReq = new Request(u.toString(), {
-              method: req.method,
-              headers,
-              body: bodyBuffer && bodyBuffer.length > 0 ? new Uint8Array(bodyBuffer) : undefined,
-            });
-            const response = await route.fetch(fetchReq);
-            res.writeHead(response.status, Object.fromEntries(response.headers.entries()));
-            if (req.method === "HEAD") {
-              res.end();
-              return;
-            }
-            const responseBuf = Buffer.from(await response.arrayBuffer());
-            res.end(responseBuf);
-          } catch (caught) {
-            const e = caught as CodedError;
-            json(res, Number.isInteger(e && e.statusCode) ? e.statusCode! : 500, {
-              ok: false,
-              ...(e && typeof e.code === "string" ? { code: e.code } : {}),
-              ...(e && e.params && typeof e.params === "object" && !Array.isArray(e.params) ? { params: e.params } : {}),
-              error: String(e && e.message ? e.message : e),
-            });
-          }
-        },
-      });
-    }
+    ctx.logger?.warn?.("Skills Manager routes require authenticated connection.fetch");
     return () => {};
   }, "skills-manager: API routes");
 }

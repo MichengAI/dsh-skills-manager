@@ -18,6 +18,7 @@ import { basename, dirname, join, sep } from "node:path";
 import { tmpdir } from "node:os";
 import { zipSync, strToU8 } from "fflate";
 import { SkillRegistry } from "@deepseek-ai/dsh-skill";
+import { createTestFetchBridge } from "./fixtures/test-fetch-server.mjs";
 
 import {
   toKebab,
@@ -2858,27 +2859,12 @@ await makeSkill(
   "route-project-dsh",
   "---\nname: route-project-dsh\ndescription: Project DSH route skill.\n---\nProject DSH route body",
 );
-let route;
+const { connection, handler } = createTestFetchBridge();
 let invalidated = 0;
 const emitted = [];
 let registeredTool = null;
 applyHost({
-  webServer: {
-    register(value) {
-      route = value;
-      return function () {};
-    },
-  },
-  webStartup: {
-    trustedHosts: [
-      "dsh.ere.lan",
-      "dsh.fixed.lan:8443",
-      "192.168.50.10",
-      "attacker.example/path",
-    ],
-    host: "10.0.0.8",
-    publicUrl: "https://public.dsh.lan:8443/app",
-  },
+  connection,
   skills: {
     registerProvider(register) {
       register({
@@ -2922,7 +2908,7 @@ applyHost({
     }
   },
 });
-const server = createServer((req, res) => route.handler(req, res));
+const server = createServer(handler);
 await new Promise((resolve, reject) => {
   server.once("error", reject);
   server.listen(0, "127.0.0.1", () => {

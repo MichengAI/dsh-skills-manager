@@ -4,6 +4,7 @@ import { createServer } from "node:http";
 import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
+import { createTestFetchBridge } from "./fixtures/test-fetch-server.mjs";
 
 const temporary = await mkdtemp(join(tmpdir(), "dssm-ws-list-"));
 process.env.DSH_HOME = join(temporary, "home");
@@ -41,15 +42,14 @@ let registered = [
   { id: "d", title: "ghost", path: ghost },
   { id: "e", title: "api", path: subOnlyDir },
 ];
-let route;
+const { connection, handler } = createTestFetchBridge();
 apply({
+  connection,
   effect(register) { return register(); },
   skills: { registerProvider() { return () => {}; } },
-  webStartup: { trustedHosts: [] },
-  webServer: { register(value) { if (value.kind === "prefix") route = value; return () => {}; } },
   get(name) { return name === "workspaceRegistry" ? { list: () => registered } : undefined; },
 });
-const server = createServer((req, res) => route.handler(req, res));
+const server = createServer(handler);
 await new Promise((done) => server.listen(0, "127.0.0.1", done));
 const base = `http://127.0.0.1:${server.address().port}/api/michengai/dsh-skills-manager`;
 const headers = { "content-type": "application/json", "x-dsh-skills-manager": "1" };

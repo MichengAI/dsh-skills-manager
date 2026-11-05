@@ -3,6 +3,7 @@ import { mkdtemp, rm, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createServer } from "node:http";
+import { createTestFetchBridge } from "./fixtures/test-fetch-server.mjs";
 
 const temporary = await mkdtemp(join(tmpdir(), "dssm-update-test-"));
 process.env.DSH_HOME = join(temporary, "home");
@@ -36,28 +37,14 @@ try {
   );
 
   // 2. HTTP 路由测试
-  let prefixRoute;
-  let exactRoutes = new Map();
+  const { connection, handler } = createTestFetchBridge();
   apply({
+    connection,
     effect(fn) { return fn(); },
     skills: { registerProvider() { return () => {}; } },
-    webStartup: { trustedHosts: [] },
-    webServer: {
-      register(value) {
-        if (value.kind === "prefix") prefixRoute = value;
-        if (value.kind === "exact") exactRoutes.set(value.path, value);
-        return () => {};
-      },
-    },
   });
 
-  const server = createServer((req, res) => {
-    const url = new URL(req.url, "http://127.0.0.1");
-    if (exactRoutes.has(url.pathname)) {
-      return exactRoutes.get(url.pathname).handler(req, res);
-    }
-    return prefixRoute.handler(req, res);
-  });
+  const server = createServer(handler);
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   const baseUrl = `http://127.0.0.1:${server.address().port}/api/michengai/dsh-skills-manager/online-update`;
   const updateUrl = `http://127.0.0.1:${server.address().port}/api/michengai/dsh-skills-manager/update`;
@@ -128,28 +115,14 @@ try {
   }
 
   // 3. 宿主 config 传入 updater: false 场景（满足 Issue 50 VibeDev bundle patch）
-  let vibeExactRoutes = new Map();
-  let vibePrefixRoute;
+  const vibeBridge = createTestFetchBridge();
   apply({
+    connection: vibeBridge.connection,
     effect(fn) { return fn(); },
     skills: { registerProvider() { return () => {}; } },
-    webStartup: { trustedHosts: [] },
-    webServer: {
-      register(value) {
-        if (value.kind === "prefix") vibePrefixRoute = value;
-        if (value.kind === "exact") vibeExactRoutes.set(value.path, value);
-        return () => {};
-      },
-    },
   }, { updater: false });
 
-  const vibeServer = createServer((req, res) => {
-    const url = new URL(req.url, "http://127.0.0.1");
-    if (vibeExactRoutes.has(url.pathname)) {
-      return vibeExactRoutes.get(url.pathname).handler(req, res);
-    }
-    return vibePrefixRoute.handler(req, res);
-  });
+  const vibeServer = createServer(vibeBridge.handler);
   await new Promise((resolve) => vibeServer.listen(0, "127.0.0.1", resolve));
   const vibeBaseUrl = `http://127.0.0.1:${vibeServer.address().port}/api/michengai/dsh-skills-manager/online-update`;
   const vibeUpdateUrl = `http://127.0.0.1:${vibeServer.address().port}/api/michengai/dsh-skills-manager/update`;
