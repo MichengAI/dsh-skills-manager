@@ -57,9 +57,15 @@ interface Services {
             }>;
         };
     };
+    sandboxPolicy?: {
+        resolve?: (request?: { session?: unknown; mode?: string }) => { mode?: string; workspaceRoot?: string };
+    };
+    sessionProjections?: {
+        stateOf?: (session: unknown, key: string) => unknown;
+    };
 }
 export interface HostContext {
-    get?: <K extends keyof Services>(key: K) => Services[K] | undefined;
+    get?: (<K extends keyof Services>(key: K) => Services[K] | undefined) & ((key: string) => unknown);
     sessions?: Sessions;
     skills: Skills;
     connection?: {
@@ -91,7 +97,15 @@ export interface HostContext {
         }) => void): (() => void) | void;
         (event: 'tools/pre-execute', handler: (execution: {
             name: string;
+            agent?: unknown;
+            [key: string]: unknown;
         }, next: () => unknown) => unknown): (() => void) | void;
+    };
+    sandboxPolicy?: {
+        resolve?: (request?: { session?: unknown; mode?: string }) => { mode?: string; workspaceRoot?: string };
+    };
+    sessionProjections?: {
+        stateOf?: (session: unknown, key: string) => unknown;
     };
     tools?: {
         register: (tool: {

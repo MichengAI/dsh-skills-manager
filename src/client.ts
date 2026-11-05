@@ -226,7 +226,6 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
 .dssm-desc.dssm-desc-secondary{color:var(--dsw-alias-label-tertiary);font-size:12px;margin-top:2px}
 .dssm-prov-note{display:block;margin:0 0 6px 0}
 .dssm-prov-badge{flex:none;border:1px solid var(--dsw-alias-border-secondary,#e2e2e2);border-radius:999px;padding:0 6px;font-size:11px;line-height:16px;color:var(--dsw-alias-label-secondary,#666);white-space:nowrap}
-.dssm-prov-path{font-size:11px;color:var(--dsw-alias-label-tertiary,#999);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:320px}
 .dssm-prov-repo-link{border:0.5px solid var(--dsw-alias-border-l2,#494949);text-decoration:none}
 
 `;
@@ -1242,7 +1241,7 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
               h("span", { className: "dssm-cat-title" }, label),
               h("span", { className: "dssm-count" }, t(countKey("summary.group", repoGroup.rows.length), { count: repoGroup.rows.length })),
               h("span", { className: "dssm-prov-badge", title: t("group.hint") }, t("group.evidence." + repoGroup.kind))),
-            h("span", { className: "dssm-source-actions" }, repoGroup.url ? h("a", { className: "dssm-icon-action dssm-prov-repo-link", href: repoGroup.url, target: "_blank", rel: "noopener noreferrer", "aria-label": t("group.openRepo", { repo: repoGroup.repo || "" }), title: t("group.openRepo", { repo: repoGroup.repo || "" }), style: { width: 22, minWidth: 22, height: 22, padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center", borderRadius: "var(--dsw-radius-sm, 8px)" } }, strokeIcon("M12 9.5V13a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h3.5m4-1h3.5m0 0v3.5m0-3.5L7 10")) : null, repoGroup.repoPath ? h("span", { className: "dssm-prov-path", title: repoGroup.repoPath }, t("group.repoPath", { path: repoGroup.repoPath })) : null)),
+            repoGroup.url ? h("span", { className: "dssm-source-actions" }, h("a", { className: "dssm-icon-action dssm-prov-repo-link", href: repoGroup.url, target: "_blank", rel: "noopener noreferrer", "aria-label": t("group.openRepo", { repo: repoGroup.repo || "" }), title: t("group.openRepo", { repo: repoGroup.repo || "" }), style: { width: 22, minWidth: 22, height: 22, padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center", borderRadius: "var(--dsw-radius-sm, 8px)" } }, strokeIcon("M12 9.5V13a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h3.5m4-1h3.5m0 0v3.5m0-3.5L7 10"))) : null),
           body);
       }
       /** 第一层：来源目录本身，与默认视图保持同一套头部控件（新建分类 / 启停来源）。 */

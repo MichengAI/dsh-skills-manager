@@ -2,7 +2,6 @@
 import { open, stat } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type { InstallSource, RootView, SkillProvenance } from "./types.js";
-export type ProvenanceKind = "install" | "lock" | "meta" | "root";
 interface LockIndex { entries: Record<string, unknown> }
 const MAX_JSON_BYTES = 1024 * 1024;
 const MAX_CACHE_ENTRIES = 2048;

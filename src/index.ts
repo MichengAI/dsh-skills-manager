@@ -290,6 +290,45 @@ function registerAgentSkillProviders(ctx: HostContext, invalidators: Set<() => v
   };
 }
 
+/**
+ * 探测当前执行环境是否处于 danger-full-access 文件沙箱模式。
+ * 当宿主已明确放开完全文件访问权限时，创建技能写入全局目录无需弹窗二次审批，
+ * 同时避免在 approval=never（严格无人值守）模式下与宿主 fail-closed 策略产生死锁。
+ */
+function isDangerFullAccess(ctx: HostContext, exec?: { agent?: unknown }): boolean {
+  try {
+    const agent = exec?.agent as { session?: { header?: { cwd?: string; sandboxMode?: string; sandbox?: { mode?: string } }; id?: string }; ctx?: { get?: (name: string) => unknown; sandboxPolicy?: unknown } } | undefined;
+    const session = agent?.session;
+    const sandboxPolicy = (ctx.sandboxPolicy as { resolve?: (req: unknown) => { mode?: string } } | undefined)
+      || (typeof ctx.get === "function" ? (ctx.get("sandboxPolicy") as { resolve?: (req: unknown) => { mode?: string } } | undefined) : undefined)
+      || (agent?.ctx && typeof agent.ctx.get === "function" ? (agent.ctx.get("sandboxPolicy") as { resolve?: (req: unknown) => { mode?: string } } | undefined) : undefined)
+      || (agent?.ctx && (agent.ctx.sandboxPolicy as { resolve?: (req: unknown) => { mode?: string } } | undefined));
+
+    if (sandboxPolicy && typeof sandboxPolicy.resolve === "function") {
+      const resolved = sandboxPolicy.resolve(session ? { session } : {});
+      if (resolved?.mode === "danger-full-access") return true;
+    }
+
+    const sessionProjections = (ctx.sessionProjections as { stateOf?: (session: unknown, key: string) => unknown } | undefined)
+      || (typeof ctx.get === "function" ? (ctx.get("sessionProjections") as { stateOf?: (session: unknown, key: string) => unknown } | undefined) : undefined)
+      || (agent?.ctx && typeof agent.ctx.get === "function" ? (agent.ctx.get("sessionProjections") as { stateOf?: (session: unknown, key: string) => unknown } | undefined) : undefined);
+
+    if (session && sessionProjections && typeof sessionProjections.stateOf === "function") {
+      const mode = sessionProjections.stateOf(session, "sandboxMode");
+      if (mode === "danger-full-access") return true;
+    }
+
+    const header = session?.header;
+    if (header?.sandboxMode === "danger-full-access" || header?.sandbox?.mode === "danger-full-access") {
+      return true;
+    }
+
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 export interface PluginConfig {
   updater?: boolean;
   onlineUpdate?: boolean;
@@ -365,10 +404,27 @@ function apply(ctx: HostContext, config?: PluginConfig) {
         return { card: "generic", title: "Create DSH skill", kind: "edit", rawInput: args && args.name ? String(args.name) : undefined };
       },
     }), "skills-manager create_skill tool");
-    if (typeof ctx.on === "function") ctx.on("tools/pre-execute", (exec, next) => {
-      if (exec && exec.name === "create_skill") return Promise.resolve({ kind: "ask", reason: "Create a new skill under DSH_HOME/skills" });
-      return next();
-    });
+    if (typeof ctx.on === "function") {
+      const registerPreExecute = () => ctx.on!("tools/pre-execute", (exec, next) => {
+        if (exec && exec.name === "create_skill") {
+          if (isDangerFullAccess(ctx, exec)) return next();
+          return Promise.resolve({
+            kind: "ask",
+            reason: "Create a new skill under DSH_HOME/skills",
+            displayReason: {
+              en: "Create a new skill under DSH_HOME/skills",
+              zh: "在 DSH_HOME/skills 目录下创建新技能",
+            },
+          });
+        }
+        return next();
+      });
+      if (typeof ctx.effect === "function") {
+        ctx.effect(registerPreExecute, "skills-manager create_skill pre-execute guard");
+      } else {
+        registerPreExecute();
+      }
+    }
   }
 
   const API_PREFIX = "/api/michengai/dsh-skills-manager";
