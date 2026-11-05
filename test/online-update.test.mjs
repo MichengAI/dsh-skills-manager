@@ -126,7 +126,7 @@ try {
 
     // 不支持的方法 (PUT)
     const putRes = await fetch(baseUrl, { method: "PUT" });
-    assert.equal(putRes.status, 405);
+    assert.equal(putRes.status, 404);
   } finally {
     server.close();
   }

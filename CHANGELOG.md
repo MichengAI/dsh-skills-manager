@@ -2,11 +2,11 @@
 
 ## [1.2.32] - 2026-11-05
 
-### Security & Architecture
+### Security & Compatibility
 
 - **Require authenticated host connection for management routes** (PR #76):
   - Completely remove legacy raw HTTP fallback routes; privileged management APIs and plugin updater strictly require authenticated host services and fail-closed with a warning when absent, improving defense-in-depth.
-  - Clean up obsolete network code and unused type definitions.
+  - Enforce strict same-origin validation on plugin updates, improving overall runtime security.
 
 [中文文档](CHANGELOG.zh-CN.md)
 

@@ -16,32 +16,12 @@ export function createTestFetchBridge() {
     const u = new URL(req.url, "http://localhost");
     const path = u.pathname.replace(/\/+$/, "");
     const route = routes.find((r) => r.path === path);
-    if (!route) {
-      const payload = JSON.stringify({ ok: false, code: "error.proto.unknownAction", error: `unknown action: ${path}` });
+    if (!route || !route.methods.includes(req.method)) {
       res.writeHead(404, {
         "content-type": "application/json; charset=utf-8",
         "cache-control": "no-store",
-        "content-length": String(Buffer.byteLength(payload)),
       });
-      if (req.method === "HEAD") {
-        res.end();
-      } else {
-        res.end(payload);
-      }
-      return;
-    }
-    if (!route.methods.includes(req.method)) {
-      const payload = JSON.stringify({ ok: false, code: "error.proto.method", error: `method not allowed: ${req.method}` });
-      res.writeHead(405, {
-        "content-type": "application/json; charset=utf-8",
-        "cache-control": "no-store",
-        "content-length": String(Buffer.byteLength(payload)),
-      });
-      if (req.method === "HEAD") {
-        res.end();
-      } else {
-        res.end(payload);
-      }
+      res.end();
       return;
     }
     const headers = new Headers();

@@ -897,11 +897,11 @@ eq(
 );
 eq(
   translateError(mockT, {
-    code: "error.proto.forbiddenHost",
-    error: "forbidden host",
+    code: "error.proto.forbidden",
+    error: "forbidden",
   }),
-  "Forbidden request origin (invalid host)",
-  "translateError maps illegal Host to forbiddenHost",
+  "Forbidden mutation request (missing client marker)",
+  "translateError maps forbidden mutation request",
 );
 eq(
   translateError(mockT, {

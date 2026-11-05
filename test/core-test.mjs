@@ -3333,22 +3333,8 @@ try {
     "HEAD /state content-length matches the GET entity",
   );
   const headDisable = await fetch(api + "/disable", { method: "HEAD" });
-  eq(headDisable.status, 405, "HEAD on a mutation route returns 405");
-  eq(await headDisable.text(), "", "HEAD 405 has an empty body");
-  eq(
-    headDisable.headers.get("content-length"),
-    String(
-      Buffer.byteLength(
-        JSON.stringify({
-          ok: false,
-          code: "error.proto.method",
-          error: "method not allowed: HEAD",
-        }),
-      ),
-      "utf8",
-    ),
-    "HEAD 405 content-length matches the POST 405 payload shape",
-  );
+  eq(headDisable.status, 404, "HEAD on a mutation route returns 404");
+  eq(await headDisable.text(), "", "HEAD 404 has an empty body");
 
   const localhostStateResponse = await requestJson(api + "/state", "GET", {
     host: "localhost:" + address.port,
@@ -3523,12 +3509,7 @@ try {
   );
 
   const methodResponse = await fetch(api + "/disable", { method: "PUT" });
-  eq(methodResponse.status, 405, "unsupported method returns 405");
-  eq(
-    (await methodResponse.json()).code,
-    "error.proto.method",
-    "405 response carries the protocol error code",
-  );
+  eq(methodResponse.status, 404, "unsupported method returns 404");
 
   const invalidJsonResponse = await fetch(api + "/disable", {
     method: "POST",
@@ -3644,17 +3625,12 @@ try {
     (await resolveEntry(dshRoot, "safe-bar")) !== null,
     "HTTP traversal deletes leave skills unchanged",
   );
-  const unknownResponse = await fetch(api + "/unknown", {
+  const unknownResponse = await fetch(api + "/unknown-action", {
     method: "POST",
     headers: secureHeaders,
     body: "{}",
   });
   eq(unknownResponse.status, 404, "unknown mutation route returns 404");
-  eq(
-    (await unknownResponse.json()).code,
-    "error.proto.unknownAction",
-    "404 response carries the protocol error code",
-  );
 
   const concurrentResponses = await Promise.all(
     [1, 2].map(function () {
