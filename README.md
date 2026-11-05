@@ -19,8 +19,6 @@
 
 > DSH Skills Manager 是社区维护的 DeepSeek Harness（DSH）插件，并非 DeepSeek AI 官方产品。
 
-本文描述 **1.2.30**。已发布变更见[更新日志](CHANGELOG.zh-CN.md)。
-
 ## 功能概览
 
 把散落在本机和项目中的技能集中到 DSH，无需在多个 Agent 目录间来回查找。
