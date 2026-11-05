@@ -89,7 +89,7 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
         "scope.user": "全局技能", "scope.project": "项目技能", "scope.trash": "回收站", "scope.label": "技能管理视图", "scope.userHint": "跨项目可用。启停仅影响 DSH 中的调用。", "scope.projectHint": "按工作区查看项目技能。启停不修改其他 Agent 的源文件。", "project.empty": "还没有已登记的工作区。请先在侧栏添加工作区。", "project.noSkills": "已登记的工作区里还没有技能。", "workspace.unavailable": "目录不可用", "workspace.missing": "目录不存在", "workspace.unreadable": "无读取权限", "workspace.noSkills": "这个工作区还没有技能。", "workspace.loading": "正在读取…", "workspace.loadFailed": "读取失败：{error}", "workspace.listFailed": "无法读取工作区列表：{error}", "filter.status": "调用状态", "filter.statusAll": "全部状态", "status.shadowedBy": "被 {source} 中的同名技能覆盖", "status.fallback.user": "当前使用全局 {source} 副本。", "status.fallback.project": "当前使用项目 {source} 副本。", "root.copilot": "GitHub Copilot", "source.selectHint": "先选择一个来源，才能查看目录或关闭整个来源。关闭来源只影响 DSH 调用，不改文件。", "import.global": "导入技能", "category.batchAssigned": "已将 {count} 个技能添加到“{category}”。文件未移动。", "category.selectSkills": "添加技能到“{name}”", "category.noAvailableSkills": "没有可添加的技能", "category.addSkills": "添加技能", "root.dsh": "DSH", "root.agents": "公共 Agent", "root.ccswitch": "CC Switch", "root.projectDsh": "DSH", "root.projectAgents": "项目 Agent", "root.codex": "Codex", "root.claude": "Claude Code", "root.gemini": "Gemini", "root.opencode": "OpenCode", "root.cursor": "Cursor", "root.windsurf": "Windsurf", "root.windsurfUser": "Windsurf (用户目录)", "root.trae": "Trae", "root.traeCn": "Trae (国内版)", "root.openclaw": "OpenClaw", "root.clawdbot": "OpenClaw (旧目录)", "root.roo": "Roo", "root.codebuddy": "CodeBuddy", "root.workbuddy": "WorkBuddy", "root.qoder": "Qoder", "root.qoderCn": "Qoder CN CLI", "root.lingma": "Qoder CN", "root.antigravity": "Google Antigravity",
         "group.label": "分组方式", "group.bySource": "按来源目录", "group.byRepo": "按来源仓库",
         "group.hint": "在来源目录下按可核查的记录再分「仓库 → 仓库内目录」：安装记录 → 目录锁文件 → 技能元数据；没有记录的标为「来源未知」，不按目录名称猜测。",
-        "group.provenanceCount": "{repos} 个来源仓库 · {dirs} 个目录只有落点", "group.unknownSource": "来源未知", "group.repoRoot": "仓库根目录（未分目录）",
+        "group.provenanceCount": "{repos} 个来源仓库 · {unknown} 个技能来源未知", "group.unknownSource": "来源未知", "group.repoRoot": "仓库根目录（未分目录）",
         "group.evidence.install": "安装记录", "group.evidence.lock": "目录锁文件", "group.evidence.meta": "技能元数据", "group.evidence.root": "目录落点",
         "group.openRepo": "打开 {repo}", "group.noRepo": "没有可核查的仓库记录，按来源目录归类。"
       },
@@ -124,7 +124,7 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
         "scope.user": "Global skills", "scope.project": "Project skills", "scope.trash": "Trash", "scope.label": "Skill manager views", "scope.userHint": "Available across projects. Toggles only affect invocation in DSH.", "scope.projectHint": "View project skills by workspace. Toggles do not modify other agents’ source files.", "project.empty": "No registered workspaces yet. Add one in the sidebar first.", "project.noSkills": "Registered workspaces do not have skills yet.", "workspace.unavailable": "Directory unavailable", "workspace.missing": "Directory missing", "workspace.unreadable": "No read permission", "workspace.noSkills": "No skills in this workspace yet.", "workspace.loading": "Loading…", "workspace.loadFailed": "Failed to load: {error}", "workspace.listFailed": "Cannot read the workspace list: {error}", "filter.status": "Invocation status", "filter.statusAll": "All statuses", "status.shadowedBy": "Overridden by the same skill in {source}", "status.fallback.user": "Currently using the global {source} copy.", "status.fallback.project": "Currently using the project {source} copy.", "source.selectHint": "Select a source to view its directory or turn the whole source off. Turning a source off only affects invocation in DSH and does not change files.", "import.global": "Import skill", "category.batchAssigned": "Added {count} skills to “{category}”. Files were not moved.", "category.selectSkills": "Add skills to “{name}”", "category.noAvailableSkills": "No skills available to add", "category.addSkills": "Add skills", "root.dsh": "DSH skills", "root.agents": "Shared Agent", "root.ccswitch": "CC Switch", "root.projectDsh": "DSH skills", "root.projectAgents": "Project Agent", "root.codex": "Codex", "root.claude": "Claude Code", "root.gemini": "Gemini", "root.opencode": "OpenCode", "root.cursor": "Cursor", "root.copilot": "GitHub Copilot", "root.windsurf": "Windsurf", "root.windsurfUser": "Windsurf (User Home)", "root.trae": "Trae", "root.traeCn": "Trae CN", "root.openclaw": "OpenClaw", "root.clawdbot": "OpenClaw (Legacy)", "root.roo": "Roo", "root.codebuddy": "CodeBuddy", "root.workbuddy": "WorkBuddy", "root.qoder": "Qoder", "root.qoderCn": "Qoder CN CLI", "root.lingma": "Qoder CN", "root.antigravity": "Google Antigravity",
         "group.label": "Group by", "group.bySource": "Source directory", "group.byRepo": "Source repository",
         "group.hint": "Inside each source directory, verifiable records add a repository → directory hierarchy: install record → directory lock file → skill metadata; other sources are marked Unknown source. Directory names are not guessed.",
-        "group.provenanceCount": "{repos} repositories · {dirs} directories with fallback only", "group.unknownSource": "Unknown source", "group.repoRoot": "Repository root (no category)",
+        "group.provenanceCount": "{repos} repositories · {unknown} skills with unknown source", "group.unknownSource": "Unknown source", "group.repoRoot": "Repository root (no category)",
         "group.evidence.install": "Install record", "group.evidence.lock": "Directory lock file", "group.evidence.meta": "Skill metadata", "group.evidence.root": "Directory fallback",
         "group.openRepo": "Open {repo}", "group.noRepo": "No verifiable repository record; grouped by source directory."
       }
@@ -1269,14 +1269,18 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
         var rootGroups = collectProvenanceRoots();
         if (!rootGroups.length) return h("div", { className: "dssm-empty" }, query || filters.status ? t("empty.search") : t("empty.source"));
         var reposSeen: Record<string, boolean> = Object.create(null);
-        var dirCount = 0;
         rootGroups.forEach(function (group) {
-          if (!group.hasEvidence) dirCount++;
           group.repos.forEach(function (repoGroup) { if (!repoGroup.fallback) reposSeen[repoGroup.key] = true; });
         });
         var repoCount = Object.keys(reposSeen).length;
+        var unknownCount = 0;
+        rootGroups.forEach(function (group) {
+          group.repos.forEach(function (repoGroup) {
+            if (repoGroup.fallback) unknownCount += repoGroup.rows.length;
+          });
+        });
         return h("div", { className: "dssm-sources dssm-provenance" },
-          h("p", { className: "dssm-note dssm-prov-note" }, h("strong", null, t("group.provenanceCount", { repos: repoCount, dirs: dirCount })), " ", t("group.hint")),
+          h("p", { className: "dssm-note dssm-prov-note" }, h("strong", null, t("group.provenanceCount", { repos: repoCount, unknown: unknownCount })), " ", t("group.hint")),
           rootGroups.map(function (group) { return renderProvenanceRoot(group, workspacePath); }));
       }
       function renderList() {

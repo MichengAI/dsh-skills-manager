@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.2.31] - 2026-11-05
+
+### Added & Improvements
+
+- **Add "Group by source repository" view** (PR #69):
+  - Toggle between "Source directory" and "Source repository" directly in the skills management list.
+  - Automatically aggregates skills under each source directory into repositories and subdirectories using verified install records, lockfiles, and skill metadata.
+  - Automatically identifies platform brand icons (GitHub, GitLab, Gitee, and Git for self-hosted instances) matching native group action button styles.
+  - Extends skill search to match against repository names and in-repository category paths.
+- **Auto-approve skill creation in danger-full-access mode** (Issue #77):
+  - Skips redundant approval prompts when invoking the skill creation tool inside sessions configured for full file access, avoiding unexpected rejections in unattended mode.
+
+[中文文档](CHANGELOG.zh-CN.md)
+
 ## [1.2.30] - 2026-11-04
 
 ### Compatibility & Dependencies

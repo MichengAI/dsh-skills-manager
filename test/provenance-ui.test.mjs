@@ -5,7 +5,11 @@ import { stripTypeScriptTypes } from 'node:module';
 // Execute the actual grouping functions directly from source, without a bundle.
 const source = await readFile(new URL('../src/client.ts', import.meta.url), 'utf8');
 const h = (type, props, ...children) => ({ type, props: props || {}, children: children.flat(Infinity).filter(x => x != null && typeof x !== 'boolean') });
-const t = key => key;
+const tCalls = [];
+const t = (key, params) => {
+  if (params) tCalls.push({ key, params });
+  return key;
+};
 const brandStart = source.indexOf('    function resolveRepoBrand(');
 const brandEnd = source.indexOf('    function GithubMark16()', brandStart);
 assert.ok(brandStart >= 0 && brandEnd > brandStart, 'brand resolution functions are present');
@@ -48,6 +52,11 @@ const groups = ui.collectProvenanceRoots();
 const repoList = ui.renderProvenanceList();
 assert.ok(repoList.props.className.split(/\s+/).includes('dssm-sources'), '仓库视图的来源卡片应复用目录视图的间距容器');
 assert.match(source, /\.dssm-sources\{display:flex;flex-direction:column;gap:9px\}/, '两种视图使用同一来源间距规则');
+
+// 验证 group.provenanceCount 统计参数：2 个来源仓库（GitHub、GitLab）· 1 个来源未知（unknown 技能）
+const countEntry = tCalls.find(c => c.key === 'group.provenanceCount');
+assert.ok(countEntry, '必须调用 group.provenanceCount 进行统计');
+assert.deepEqual(countEntry.params, { repos: 2, unknown: 1 }, '准确统计来源仓库数与来源未知技能数');
 const flatten = node => node && typeof node === 'object' ? [node, ...(node.children || []).flatMap(flatten)] : [];
 const classes = node => String(node?.props?.className || '').split(/\s+/);
 

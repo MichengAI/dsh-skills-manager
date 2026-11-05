@@ -131,8 +131,6 @@ export interface SkillProvenance {
     category: string | null;
     /** 仓库内技能路径，如 skills/engineering/code-review。 */
     path: string | null;
-    /** 安装记录里的 ref/tag；锁文件与元数据没有。 */
-    ref: string | null;
 }
 export interface SkillView extends Omit<SkillEntry, 'docPath' | 'entryPath' | 'realDocPath' | 'realEntryPath' | 'linked'> {
     path: string;

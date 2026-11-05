@@ -101,8 +101,7 @@ function fromInstallSource(source: InstallSource): SkillProvenance | null {
   if (!info) return null;
   const skillPath = typeof source.path === "string" && source.path ? source.path : null;
   return { kind: "install", ...info, repo: source.owner && source.name ? `${source.owner}/${source.name}` : info.repo,
-    category: categoryOfRepoPath(skillPath, typeof source.subdirectory === "string" ? source.subdirectory : null), path: skillPath,
-    ref: typeof source.ref === "string" && source.ref ? source.ref : null };
+    category: categoryOfRepoPath(skillPath, typeof source.subdirectory === "string" ? source.subdirectory : null), path: skillPath };
 }
 function fromLockEntry(value: unknown): SkillProvenance | null {
   const entry = object(value);
@@ -110,14 +109,14 @@ function fromLockEntry(value: unknown): SkillProvenance | null {
   const info = sourceInfo(entry.source, entry.sourceType === "github");
   if (!info) return null;
   const path = typeof entry.skillPath === "string" && entry.skillPath ? entry.skillPath : null;
-  return { kind: "lock", ...info, category: categoryOfRepoPath(path), path, ref: null };
+  return { kind: "lock", ...info, category: categoryOfRepoPath(path), path };
 }
 async function fromMarketMeta(skillDir: string): Promise<SkillProvenance | null> {
   for (const name of ["_skillhub_meta.json", "_meta.json"]) {
     try {
       const metadata = object(await readJson(join(skillDir, name)));
       const info = sourceInfo(metadata?.source, metadata?.sourceType === "github");
-      if (info) return { kind: "meta", ...info, category: null, path: null, ref: null };
+      if (info) return { kind: "meta", ...info, category: null, path: null };
     } catch { /* 尝试下一证据 */ }
   }
   return null;
@@ -125,7 +124,7 @@ async function fromMarketMeta(skillDir: string): Promise<SkillProvenance | null>
 export interface ProvenanceInput {
   rootPath: string; skillPath: string; name: string; declaredName?: string; installSource?: InstallSource | null;
 }
-const unknown = (): SkillProvenance => ({ kind: "root", repo: null, identity: null, url: null, category: null, path: null, ref: null });
+const unknown = (): SkillProvenance => ({ kind: "root", repo: null, identity: null, url: null, category: null, path: null });
 export async function resolveProvenance(input: ProvenanceInput, lock: LockIndex | null): Promise<SkillProvenance> {
   if (input.installSource) {
     const installed = fromInstallSource(input.installSource);
