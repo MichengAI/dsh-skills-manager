@@ -23,7 +23,6 @@ import {
 } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createHash } from "node:crypto";
-import { zipSync } from "fflate";
 import assert from "node:assert/strict";
 
 import { supportedHosts as supported } from "./hosts.mjs";
@@ -75,11 +74,12 @@ async function seedRepositoryInstall(home) {
   const document = "---\nname: repo-slash\ndescription: Use when: the slash menu must list a repository install\n---\nREPO_SLASH_BODY\n";
   const documentBytes = Buffer.from(document);
   const documentHash = createHash("sha256").update(documentBytes).digest("hex");
-  const zip = Buffer.from(zipSync({ "repo-main/skills/repo-slash/SKILL.md": documentBytes }));
-  const commit = createHash("sha256").update(zip).digest("hex");
+  // 扫描快照就是检出目录：安装直接复用它，不再有整库归档缓存。
+  const commit = "a".repeat(40);
   const cache = join(home, "skills-manager", "repository-cache");
-  await mkdir(cache, { recursive: true });
-  await writeFile(join(cache, `${id}-${commit}.zip`), zip);
+  const checkout = join(cache, `${id}-${commit}`, "skills", "repo-slash");
+  await mkdir(checkout, { recursive: true });
+  await writeFile(join(checkout, "SKILL.md"), documentBytes);
   await writeFile(join(home, "skills-manager", "repositories.json"), JSON.stringify({
     version: 1,
     repositories: [{

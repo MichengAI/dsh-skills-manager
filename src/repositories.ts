@@ -3,12 +3,10 @@ import type { Archive, FileDigest, Repository, RepositoryInput, RepositorySkill,
 import { promises as fs } from "node:fs";
 import { join, resolve } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
-import { unzipSync } from "fflate";
 import { managerHomePath, resolveWorkspaceTarget, repositoryDestinations, trashRootPath, listTrash, restoreTrash as restoreSkillTrash, permanentlyDeleteTrash, parseSkillDoc, importUploadedSkill, deleteSkill, setSkillEnabled, readManagerState, state, createWorkspaceIndex, type indexRegisteredWorkspaces } from "./core.js";
 import { createRepositoryUpdater, fileIndex, signature, readSkillTree, repositoryInstallRoot, recordInstallRoot, selectInstallRecord } from "./repository-updates.js";
-import { parseGitUrl, fetchGitRepository, sparseFetchGitRepository, probeGitRemote, probeGitHubHttp } from "./repository-git.js";
+import { parseGitUrl, fetchGitRepository, probeGitRemote } from "./repository-git.js";
 
-const LIMIT = 32 << 20;
 const STATE_LIMIT = 16 << 20;
 const STATE_READ_LIMIT = 64 << 20;
 const hash = (bytes: string | Uint8Array) => createHash("sha256").update(bytes).digest("hex");
@@ -86,57 +84,8 @@ export function parseRepositoryInput(input: RepositoryInput = {}) {
   return parseGitUrl(input);
 }
 
-/** 解压前检查声明大小，解压后再检查实际大小和大小写路径冲突。 */
-export function decodeRepositoryArchive(bytes: Uint8Array) {
-  if (bytes.byteLength > LIMIT) throw failure("仓库归档超过 32 MiB", "error.repo.tooLarge");
-  let total = 0, count = 0;
-  const seen = new Set();
-  const archive = unzipSync(new Uint8Array(bytes), { filter(entry) {
-    safePath(entry.name.replace(/\/$/, ""));
-    const key = entry.name.toLowerCase().replace(/\/$/, "");
-    if (seen.has(key)) throw failure("仓库存在重复路径");
-    seen.add(key);
-    total += entry.originalSize;
-    if (++count > 10000 || entry.originalSize > LIMIT || total > 64 << 20) throw failure("仓库解压大小或文件数量超限");
-    return !entry.name.endsWith("/");
-  } });
-  const result: Archive = Object.create(null);
-  let root;
-  for (const [path, data] of Object.entries(archive)) {
-    const slash = path.indexOf("/");
-    if (slash < 1) throw failure("仓库归档路径无效");
-    const prefix = path.slice(0, slash);
-    if (root && root !== prefix) throw failure("仓库归档根目录不唯一");
-    root = prefix;
-    const relative = safePath(path.slice(slash + 1));
-    if (data.byteLength > LIMIT) throw failure("仓库文件过大");
-    result[relative] = data;
-  }
-  return result;
-}
-
-async function readResponse(response: Response, limit: number) {
-  if (!response.ok) throw Object.assign(failure(`仓库访问失败（HTTP ${response.status}），请稍后重试`, "error.repo.network"), { httpStatus: response.status });
-  if (Number(response.headers.get("content-length")) > limit) throw failure("仓库归档超过 32 MiB", "error.repo.tooLarge");
-  const reader = response.body?.getReader();
-  if (!reader) throw failure("仓库响应为空", "error.repo.network");
-  const chunks = []; let length = 0;
-  try {
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      length += value.length;
-      if (length > limit) throw failure("仓库归档超过 32 MiB", "error.repo.tooLarge");
-      chunks.push(value);
-    }
-  } finally { await reader.cancel(); }
-  return Buffer.concat(chunks, length);
-}
-
 export function createRepositoryManager({
-  fetchImpl = globalThis.fetch,
   gitFetch,
-  sparseFetch = sparseFetchGitRepository,
   probeRemote,
   maxRepositoryBytes: rawMaxBytes = 2 * 1024 * 1024 * 1024,
   maxTransientBytes: rawMaxTransientBytes,
@@ -145,9 +94,7 @@ export function createRepositoryManager({
   registeredWorkspaces,
   onWorkspaceIndexBuild,
 }: {
-  fetchImpl?: typeof fetch;
   gitFetch?: (repo: Repository, destinationDir: string, options?: { maxBytes?: number; maxTransientBytes?: number; timeoutMs?: number }) => Promise<{ commit: string }>;
-  sparseFetch?: (repo: Repository, destinationDir: string, options?: { maxBytes?: number; maxTransientBytes?: number; timeoutMs?: number }) => Promise<{ commit: string }>;
   probeRemote?: boolean;
   maxRepositoryBytes?: number;
   maxTransientBytes?: number;
@@ -159,8 +106,7 @@ export function createRepositoryManager({
   const maxRepositoryBytes = typeof rawMaxBytes === "number" && Number.isFinite(rawMaxBytes) && rawMaxBytes > 0 ? rawMaxBytes : 2 * 1024 * 1024 * 1024;
   const maxTransientBytes = typeof rawMaxTransientBytes === "number" && Number.isFinite(rawMaxTransientBytes) && rawMaxTransientBytes > 0 ? rawMaxTransientBytes : maxRepositoryBytes * 2.5;
   const gitTimeoutMs = typeof rawTimeoutMs === "number" && Number.isFinite(rawTimeoutMs) && rawTimeoutMs > 0 ? rawTimeoutMs : 900_000;
-  const isDefaultFetch = fetchImpl === globalThis.fetch;
-  const defaultProbe = probeRemote ?? isDefaultFetch;
+  const defaultProbe = probeRemote ?? true;
   const file = join(managerHomePath(), "repositories.json");
   let queue: Promise<unknown> = Promise.resolve();
   let catalogWarnings: Array<{ id: string; code: string; error: string }> = [];
@@ -215,15 +161,6 @@ export function createRepositoryManager({
     parseRepositoryInput({ url: repo.url || `${repo.owner}/${repo.name}`, ref: repo.ref, subdirectory: repo.subdirectory });
     return repo;
   }
-  async function request(url: string) {
-    try {
-      const response = await fetchImpl(url, { redirect: "error", signal: AbortSignal.timeout(60000), headers: { Accept: "application/zip", "User-Agent": "dsh-skills-manager" } });
-      return await readResponse(response, LIMIT);
-    } catch (caught) { const error = caught as CodedError;
-      if (typeof error.code === "string" && error.code.startsWith("error.repo.")) throw error;
-      throw failure("仓库网络请求失败，请检查网络后重试", "error.repo.network");
-    }
-  }
   async function cacheDirectory() {
     const dir = join(managerHomePath(), "repository-cache");
     if ((await fs.lstat(managerHomePath())).isSymbolicLink()) throw failure("缓存目录不能是链接");
@@ -231,20 +168,12 @@ export function createRepositoryManager({
     if ((await fs.lstat(dir)).isSymbolicLink()) throw failure("缓存目录不能是链接");
     return dir;
   }
-  async function cacheArchive(repo: Repository, bytes: Uint8Array) {
-    const version = hash(bytes), dir = await cacheDirectory();
-    const target = join(dir, `${repo.id}-${version}.zip`), temporary = join(dir, randomUUID() + ".tmp");
-    try { await fs.writeFile(temporary, bytes, { flag: "wx" }); await fs.rename(temporary, target); }
-    finally { await fs.rm(temporary, { force: true }); }
-    return version;
-  }
   async function pruneCache(repo: Repository) {
     const dir = await cacheDirectory();
     const keepDir = `${repo.id}-${repo.commit}`;
-    const keepZip = `${repo.id}-${repo.commit}.zip`;
     const now = Date.now();
     for (const name of await fs.readdir(dir)) {
-      if (name.startsWith(".stage-" + repo.id + "-") || (name.startsWith(repo.id + "-") && name !== keepDir && name !== keepZip)) {
+      if (name.startsWith(".stage-" + repo.id + "-") || (name.startsWith(repo.id + "-") && name !== keepDir)) {
         await fs.rm(join(dir, name), { recursive: true, force: true }).catch(() => undefined);
       } else if (name.startsWith(".stage-")) {
         try {
@@ -257,65 +186,31 @@ export function createRepositoryManager({
     }
   }
   async function download(repo: Repository, path?: string) {
+    // 扫描阶段已把技能目录检出到磁盘，安装直接复用，不再二次下载。
     const dir = await cacheDirectory();
     const repoDir = join(dir, `${repo.id}-${repo.commit}`);
-    const zipPath = join(dir, `${repo.id}-${repo.commit}.zip`);
-
-    // 优先检查 Git 检出目录缓存
-    try {
-      const dirInfo = await fs.lstat(repoDir);
-      if (dirInfo.isDirectory() && !dirInfo.isSymbolicLink()) {
-        const result: Archive = Object.create(null);
-        const targetBase = path ? join(repoDir, path) : repoDir;
-        const prefix = path ? `${path}/` : "";
-        async function readDir(curr: string, relPrefix = "") {
-          const items = await fs.readdir(curr, { withFileTypes: true });
-          for (const item of items) {
-            safePath(item.name);
-            const full = join(curr, item.name);
-            const rel = relPrefix ? `${relPrefix}/${item.name}` : item.name;
-            if (item.isDirectory()) {
-              await readDir(full, rel);
-            } else if (item.isFile()) {
-              const fileInfo = await fs.lstat(full);
-              if (fileInfo.isSymbolicLink() || fileInfo.size > 32 << 20) throw failure("仓库文件过大");
-              result[prefix + rel] = await fs.readFile(full);
-            }
-          }
-        }
-        await readDir(targetBase);
-        return result;
-      }
-    } catch (e: any) {
-      if (e.code && e.code.startsWith("error.repo.")) throw e;
-      if (e.code !== "ENOENT") throw e;
-    }
-
-    // 检查历史 ZIP 归档缓存
-    try {
-      const zipInfo = await fs.lstat(zipPath);
-      if (!zipInfo.isSymbolicLink() && zipInfo.isFile() && zipInfo.size <= LIMIT) {
-        const bytes = await fs.readFile(zipPath);
-        if (hash(bytes) === repo.commit) {
-          const archive = decodeRepositoryArchive(bytes);
-          if (!path) return archive;
-          const prefix = `${path}/`;
-          const filtered: Archive = Object.create(null);
-          for (const [k, v] of Object.entries(archive)) {
-            if (k.startsWith(prefix)) filtered[k] = v;
-          }
-          return filtered;
+    const info = await fs.lstat(repoDir).catch(() => null);
+    if (!info || !info.isDirectory() || info.isSymbolicLink()) throw failure("仓库缓存缺失或已失效，请刷新该仓库后重试");
+    const result: Archive = Object.create(null);
+    const targetBase = path ? join(repoDir, path) : repoDir;
+    const prefix = path ? `${path}/` : "";
+    async function readDir(curr: string, relPrefix = "") {
+      const items = await fs.readdir(curr, { withFileTypes: true });
+      for (const item of items) {
+        safePath(item.name);
+        const full = join(curr, item.name);
+        const rel = relPrefix ? `${relPrefix}/${item.name}` : item.name;
+        if (item.isDirectory()) {
+          await readDir(full, rel);
+        } else if (item.isFile()) {
+          const fileInfo = await fs.lstat(full);
+          if (fileInfo.isSymbolicLink() || fileInfo.size > 32 << 20) throw failure("仓库文件过大");
+          result[prefix + rel] = await fs.readFile(full);
         }
       }
-    } catch (e: any) {
-      if (e.code && e.code.startsWith("error.repo.")) throw e;
     }
-
-    // 兼容旧提交安装记录；新扫描只使用归档摘要缓存，不再访问REST接口。
-    if (/^[a-f0-9]{40}$/.test(repo.commit || "")) {
-      return decodeRepositoryArchive(await request(`https://codeload.github.com/${repo.owner}/${repo.name}/zip/${repo.commit}`));
-    }
-    throw failure("扫描缓存缺失或损坏，请重新检查更新后操作");
+    await readDir(targetBase);
+    return result;
   }
   async function scanSkillsFromDirectory(dir: string, subdirectory = "", repoName = ""): Promise<RepositorySkill[]> {
     const skills: RepositorySkill[] = [];
@@ -379,14 +274,6 @@ export function createRepositoryManager({
       });
     }
     return skills;
-  }
-  async function fetchBranch(repo: Repository): Promise<Buffer> {
-    const refs = repo.ref && repo.ref !== "HEAD" ? [`refs/heads/${repo.ref}`, `refs/tags/${repo.ref}`] : ["HEAD", "refs/heads/main", "refs/heads/master"];
-    for (let i = 0; i < refs.length; i++) {
-      try { return await request(`https://codeload.github.com/${repo.owner}/${repo.name}/zip/${refs[i].split("/").map(encodeURIComponent).join("/")}`); }
-      catch (caught) { const error = caught as CodedError; if (error.httpStatus !== 404 || i === refs.length - 1) throw error; }
-    }
-    throw failure("仓库分支不存在");
   }
   async function matches(record: InstallRecord, fingerprint = signature(record.files), registered = registeredWorkspaces?.(), indexed?: Awaited<ReturnType<typeof indexRegisteredWorkspaces>>) {
     try {
@@ -692,11 +579,8 @@ export function createRepositoryManager({
       const source = parseRepositoryInput(input);
       const shouldProbe = !gitFetch && defaultProbe && input.skipProbe !== true && process.env.DSH_SKILLS_MANAGER_SKIP_PROBE !== "1";
       if (shouldProbe) {
-        if (source.url) {
-          await probeGitRemote(source.url);
-        } else {
-          await probeGitHubHttp(source.owner, source.name, fetchImpl);
-        }
+        // 所有来源都走 Git：添加阶段就校验连通性，缺 Git 会直接提示安装。
+        await probeGitRemote(source.url || `https://github.com/${source.owner}/${source.name}.git`);
       }
       return serialize(async () => {
         const data = await read();
@@ -742,42 +626,10 @@ export function createRepositoryManager({
           const res = await gitFetch(repo, stageDir, { maxBytes: maxRepositoryBytes, maxTransientBytes, timeoutMs: gitTimeoutMs });
           commit = res.commit;
           skills = await scanSkillsFromDirectory(stageDir, repo.subdirectory, repo.name);
-        } else if (repo.url) {
+        } else {
           const res = await fetchGitRepository(repo, stageDir, { maxBytes: maxRepositoryBytes, maxTransientBytes, timeoutMs: gitTimeoutMs });
           commit = res.commit;
           skills = await scanSkillsFromDirectory(stageDir, repo.subdirectory, repo.name);
-        } else {
-          // GitHub 来源优先按需检出：只取技能目录，仓库首页图等无关内容不参与下载（Issue #79）。
-          let useArchive = false;
-          try {
-            const res = await sparseFetch(repo, stageDir, { maxBytes: maxRepositoryBytes, maxTransientBytes, timeoutMs: gitTimeoutMs });
-            commit = res.commit;
-            skills = await scanSkillsFromDirectory(stageDir, repo.subdirectory, repo.name);
-          } catch (caught) {
-            const error = caught as CodedError;
-            // 只有这台机器用不了 Git 检出时才回落归档；体积与配额错误直接交回用户，不能被另一种下载掩盖。
-            if (error.code !== "error.repo.noGit" && error.code !== "error.repo.network") throw error;
-            await fs.rm(stageDir, { recursive: true, force: true }).catch(() => undefined);
-            useArchive = true;
-          }
-          if (useArchive) {
-            const bytes = await fetchBranch(repo);
-            const entries = decodeRepositoryArchive(bytes);
-            for (const [path, b] of Object.entries(entries)) {
-              if (path !== "SKILL.md" && !path.endsWith("/SKILL.md")) continue;
-              const directory = path === "SKILL.md" ? "" : path.slice(0, -9);
-              if (repo.subdirectory && directory !== repo.subdirectory && !directory.startsWith(`${repo.subdirectory}/`)) continue;
-              if (b.length > 256 << 10 || skills.length >= 500 || skills.reduce((n, s) => n + Buffer.byteLength(s.body, "utf8"), 0) + b.length > 4 << 20) throw failure("仓库技能数量或说明长度超限");
-              const parsed = parseSkillDoc(Buffer.from(b).toString("utf8"));
-              const name = String(parsed.map.name || "");
-              const description = String(parsed.map.description || "");
-              const prefix = directory ? directory + "/" : "";
-              const files = fileIndex(Object.fromEntries(Object.entries(entries).filter(([p]) => p.startsWith(prefix)).map(([p, b]) => [p.slice(prefix.length), b])));
-              if (files.length > 1000) throw failure("技能文件数量超限");
-              skills.push({ path: directory, files, name: name || directory.split("/").pop() || repo.name, description, body: parsed.body.trim(), documentHash: hash(b), valid: parsed.hasFrontmatter && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name) && !/^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i.test(name) && name.length <= 100 && !!description });
-            }
-            commit = await cacheArchive(repo, bytes);
-          }
         }
       } catch (caught) {
         const error = caught as CodedError;

@@ -5,27 +5,39 @@ import { test } from "node:test";
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { zipSync, strToU8 } from "fflate";
+import { strToU8 } from "fflate";
 
 const sandbox = await mkdtemp(join(process.env.TMPDIR || tmpdir(), "dssm-catalog-state-"));
 process.env.DSH_HOME = join(sandbox, "home");
 process.env.DSH_AGENTS_HOME = join(sandbox, "agents");
 process.env.HOME = process.env.USERPROFILE = join(sandbox, "user");
+process.env.DSH_SKILLS_MANAGER_SKIP_PROBE = "1";
 const { createRepositoryManager } = await import("../lib/repositories.js");
 const { readManagerState } = await import("../lib/core.js");
 const initialPolicy = (await readManagerState()).state;
 const statePath = join(process.env.DSH_HOME, "skills-manager/repositories.json");
 const stored = async () => JSON.parse(await readFile(statePath, "utf8"));
 const document = strToU8("---\nname: actual-name\ndescription: 测试技能\n---\n正文\n");
+const repoDocument = "---\nname: actual-name\ndescription: 测试技能\n---\n正文\n";
+const writeTree = async (destinationDir, tree) => {
+  for (const [relative, body] of Object.entries(tree)) {
+    const target = join(destinationDir, relative);
+    await mkdir(join(target, ".."), { recursive: true });
+    await writeFile(target, body, "utf8");
+  }
+};
+// 检出桩：写出一棵技能目录树，替代真实 Git 与网络。
+const gitFetchFor = (tree) => async (_repo, destinationDir) => { await writeTree(destinationDir, tree); return { commit: "9".repeat(40) }; };
 
 try {
   await test("仓库下载不阻塞身份写入，刷新提交不覆盖并发身份", async () => {
     let release, start;
     const started = new Promise(resolve => { start = resolve; });
-    const manager = createRepositoryManager({ fetchImpl: async () => {
+    const manager = createRepositoryManager({ gitFetch: async (_repo, destinationDir) => {
       start();
       await new Promise(resolve => { release = resolve; });
-      return new Response(zipSync({ "repo-main/actual-name/SKILL.md": document }));
+      await writeTree(destinationDir, { "actual-name/SKILL.md": repoDocument });
+      return { commit: "9".repeat(40) };
     } });
     const repo = await manager.add({ url: "owner/concurrency" });
     const refreshing = manager.refresh({ id: repo.id });
@@ -84,7 +96,7 @@ try {
     assert.deepEqual((await stored()).catalogInstalls, preserved.slice(1), "无效 ID 不改写状态");
   });
   await test("仓库卸载保留目录回收身份，但不认领后来创建的同名替代品", async () => {
-    const manager = createRepositoryManager({ fetchImpl: async () => new Response(zipSync({ "repo-main/actual-name/SKILL.md": document })) });
+    const manager = createRepositoryManager({ gitFetch: gitFetchFor({ "actual-name/SKILL.md": repoDocument }) });
     const repo = await manager.add({ url: "owner/sibling" });
     await manager.refresh({ id: repo.id });
     await manager.install({ id: repo.id, path: "actual-name" });
@@ -102,9 +114,10 @@ try {
   await test("删除重建订阅后，旧下载结果不能覆盖新订阅", async () => {
     let start, release;
     const started = new Promise(resolve => { start = resolve; });
-    const manager = createRepositoryManager({ fetchImpl: async () => {
+    const manager = createRepositoryManager({ gitFetch: async (_repo, destinationDir) => {
       start(); await new Promise(resolve => { release = resolve; });
-      return new Response(zipSync({ "repo-main/actual-name/SKILL.md": document }));
+      await writeTree(destinationDir, { "actual-name/SKILL.md": repoDocument });
+      return { commit: "9".repeat(40) };
     } });
     const original = await manager.add({ url: "owner/recreated" });
     const refreshing = manager.refresh({ id: original.id });
@@ -145,7 +158,7 @@ try {
     assert.equal(listed.catalogUnknownIds.includes(id), false, "同一 ID 不能同时显示位置未知");
   });
   await test("仓库安装确认写入失败要留下警告，不能静默返回", async () => {
-    const manager = createRepositoryManager({ fetchImpl: async () => new Response(zipSync({ "repo-main/pending-warning/SKILL.md": strToU8("---\nname: pending-warning\ndescription: 测试技能\n---\n正文\n") })) });
+    const manager = createRepositoryManager({ gitFetch: gitFetchFor({ "pending-warning/SKILL.md": "---\nname: pending-warning\ndescription: 测试技能\n---\n正文\n" }) });
     const repo = await manager.add({ url: "owner/pending-warning" });
     await manager.refresh({ id: repo.id });
     await manager.install({ id: repo.id, path: "pending-warning" });

@@ -4,7 +4,7 @@ import { createServer } from "node:http";
 import { mkdtemp, mkdir, writeFile, readFile, rm, lstat } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
-import { zipSync, strToU8 } from "fflate";
+import { execFileSync } from "node:child_process";
 import { createTestFetchBridge } from "./fixtures/test-fetch-server.mjs";
 
 const temporary = await mkdtemp(join(tmpdir(), "dssm-ws-routes-"));
@@ -13,9 +13,13 @@ process.env.DSH_AGENTS_HOME = join(temporary, "agents");
 process.env.HOME = process.env.USERPROFILE = join(temporary, "user");
 process.env.DSH_SKILLS_MANAGER_SKIP_PROBE = "1";
 for (const key of ["CODEX", "CLAUDE", "GEMINI", "OPENCODE", "CURSOR", "COPILOT"]) process.env[`DSH_${key}_HOME`] = join(temporary, `configured-${key.toLowerCase()}`);
-const nativeFetch = globalThis.fetch;
-let download;
-globalThis.fetch = (url, options) => download && String(url).startsWith("https://codeload.github.com/") ? download() : nativeFetch(url, options);
+// 仓库来源用本机 Git 仓库夹具：检出走真实 git，全程不联网。
+const repoSource = join(temporary, "route-repo-source");
+const commitSource = (message) => {
+  execFileSync("git", ["add", "."], { cwd: repoSource, stdio: "ignore" });
+  execFileSync("git", ["commit", "-m", message], { cwd: repoSource, stdio: "ignore" });
+};
+await mkdir(join(repoSource, "demo"), { recursive: true });
 const { apply } = await import("../lib/index.js");
 
 const registered = join(temporary, "work", "registered");
@@ -165,8 +169,12 @@ try {
   assert.equal(response.status, 200, "同名只比较所选目录");
 
   // 7. 仓库安装：工作区只开放 DSH；不能和 Shared Agent 组合。
-  download = () => new Response(zipSync({ "root/demo/SKILL.md": strToU8(doc("route-repo")) }));
-  response = await post("repositories/add", { url: "example/ws-skills" });
+  await writeFile(join(repoSource, "demo", "SKILL.md"), doc("route-repo"), "utf8");
+  execFileSync("git", ["init"], { cwd: repoSource, stdio: "ignore" });
+  execFileSync("git", ["config", "user.name", "Test User"], { cwd: repoSource, stdio: "ignore" });
+  execFileSync("git", ["config", "user.email", "test@example.com"], { cwd: repoSource, stdio: "ignore" });
+  commitSource("v1");
+  response = await post("repositories/add", { url: repoSource });
   const id = (await response.json()).data.id;
   assert.equal((await post("repositories/refresh", { id })).status, 200);
   const missingWorkspace = join(temporary, "registered-but-missing");
@@ -209,7 +217,8 @@ try {
   assert.equal(copies?.length, 3, "列表独立投影用户和两个项目副本");
   assert.deepEqual(copies.map(item => [item.installedRoot, item.installedWorkspace ?? null]), [["dsh", resolve(registered)], ["dsh", resolve(other)], ["agents", null]]);
   assert.ok(copies.every(item => item.tracked && item.canUninstall && item.status === "installed" && !item.updateAvailable && !item.canRollback));
-  download = () => new Response(zipSync({ "root/demo/SKILL.md": strToU8(doc("route-repo") + "新版正文\n") }));
+  await writeFile(join(repoSource, "demo", "SKILL.md"), doc("route-repo") + "新版正文\n", "utf8");
+  commitSource("v2");
   assert.equal((await post("repositories/refresh", { id })).status, 200);
   const userPreview = (await (await post("repositories/preview", { id, path: "demo" })).json()).data;
   const projectPreview = (await (await post("repositories/preview", { id, path: "demo", workspace: other })).json()).data;
@@ -318,6 +327,5 @@ try {
   console.log("工作区路由：创建、上传、导入、仓库安装、登记校验与同名隔离均通过");
 } finally {
   server.close();
-  globalThis.fetch = nativeFetch;
   await rm(temporary, { recursive: true, force: true });
 }

@@ -2,10 +2,10 @@
 import assert from "node:assert/strict";
 import { createServer, request } from "node:http";
 import { EventEmitter } from "node:events";
-import { access, mkdtemp, rm } from "node:fs/promises";
+import { access, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { zipSync, strToU8 } from "fflate";
+import { execFileSync } from "node:child_process";
 import { createTestFetchBridge } from "./fixtures/test-fetch-server.mjs";
 const temporary = await mkdtemp(join(tmpdir(), "dssm-repo-http-"));
 process.env.DSH_HOME = join(temporary, "home");
@@ -15,16 +15,22 @@ process.env.DSH_CODEX_HOME = join(temporary, "configured-codex");
 process.env.DSH_CLAUDE_HOME = join(temporary, "configured-claude");
 process.env.DSH_SKILLS_MANAGER_SKIP_PROBE = "1";
 const nativeFetch = globalThis.fetch;
-let interceptedDownload;
 let interceptedSkillshSearch;
 let interceptedCatalog;
 globalThis.fetch = (url, options) => {
   const target = String(url);
   if (interceptedSkillshSearch && target.startsWith("https://skills.sh/api/search?")) return interceptedSkillshSearch(url, options);
   if (interceptedCatalog && (target.startsWith("https://clawhub.ai/api/v1/") || target.startsWith("https://skills.sh/api/download/"))) return interceptedCatalog(url, options);
-  if (interceptedDownload && target.startsWith("https://codeload.github.com/")) return interceptedDownload();
   return nativeFetch(url, options);
 };
+const repoSource = join(temporary, "http-demo-source");
+await mkdir(join(repoSource, "demo"), { recursive: true });
+await writeFile(join(repoSource, "demo", "SKILL.md"), "---\nname: http-demo\ndescription: HTTP test skill\n---\nInstructions\n", "utf8");
+execFileSync("git", ["init"], { cwd: repoSource, stdio: "ignore" });
+execFileSync("git", ["config", "user.name", "Test User"], { cwd: repoSource, stdio: "ignore" });
+execFileSync("git", ["config", "user.email", "test@example.com"], { cwd: repoSource, stdio: "ignore" });
+execFileSync("git", ["add", "."], { cwd: repoSource, stdio: "ignore" });
+execFileSync("git", ["commit", "-m", "v1"], { cwd: repoSource, stdio: "ignore" });
 const { apply } = await import("../lib/index.js");
 const { connection, handler } = createTestFetchBridge();
 apply({
@@ -103,14 +109,19 @@ try {
     assert.equal((await fetch(api + "/" + action, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" })).status, 403);
     assert.equal((await fetch(api + "/" + action, { method: "POST", headers: { ...headers, Origin: "https://evil.example" }, body: "{}" })).status, 403);
   }
-  const add = await fetch(api + "/add", { method: "POST", headers, body: JSON.stringify({ url: "example/skills" }) });
+  const add = await fetch(api + "/add", { method: "POST", headers, body: JSON.stringify({ url: repoSource }) });
   assert.equal(add.status, 200);
   const id = (await add.json()).data.id;
   const originalFetch = nativeFetch;
-  let releaseDownload, downloadStarted, timeout;
-  const started = new Promise(resolve => { downloadStarted = resolve; });
-  interceptedDownload = () => new Promise(resolve => { releaseDownload = () => resolve(new Response("", { status: 403 })); downloadStarted(); });
-  const refreshing = originalFetch(api + "/refresh", { method: "POST", headers, body: JSON.stringify({ id }) });
+  let timeout;
+  // 慢检出：Git 远端只接受连接不回包，刷新会一直挂在下载阶段。
+  const hangServer = createServer(() => {});
+  await new Promise((resolve) => hangServer.listen(0, "127.0.0.1", resolve));
+  const hangUrl = `http://127.0.0.1:${hangServer.address().port}/hang.git`;
+  const slowAdd = await fetch(api + "/add", { method: "POST", headers, body: JSON.stringify({ url: hangUrl }) });
+  const slowId = (await slowAdd.json()).data.id;
+  const started = new Promise(resolve => setTimeout(resolve, 300));
+  const refreshing = originalFetch(api + "/refresh", { method: "POST", headers, body: JSON.stringify({ id: slowId }) });
   try {
     await started;
     const localResponse = await Promise.race([
@@ -130,10 +141,10 @@ try {
       new Promise((_, reject) => { timeout = setTimeout(() => reject(new Error('Ordinary restore waited behind repository download')), 2000); }),
     ]);
     assert.equal(restored.status, 200, 'ordinary restore bypasses the repository queue');
-  } finally { clearTimeout(timeout); releaseDownload?.(); await refreshing; interceptedDownload = undefined; }
+  } finally { clearTimeout(timeout); hangServer.closeAllConnections?.(); hangServer.close(); await refreshing; }
+  await fetch(api + "/remove", { method: "POST", headers, body: JSON.stringify({ id: slowId }) });
   assert.equal((await (await fetch(api)).json()).data.repositories.length, 1);
   assert.equal((await fetch(api + "/install", { method: "POST", headers, body: JSON.stringify({ id, path: "../escape" }) })).status, 400);
-  interceptedDownload = () => new Response(zipSync({ "root/demo/SKILL.md": strToU8("---\nname: http-demo\ndescription: HTTP test skill\n---\nInstructions\n") }));
   const post = (action, payload) => fetch(api + '/' + action, { method: 'POST', headers, body: JSON.stringify(payload) });
   assert.equal((await post('refresh', { id })).status, 200);
   assert.equal((await post('install', { id, path: 'demo', root: '../escape' })).status, 400);
@@ -159,7 +170,6 @@ try {
     assert.equal(await access(join(process.env["DSH_" + key.toUpperCase() + "_HOME"], "skills")).then(() => true, () => false), false);
   }
   assert.equal((await post('install', { id, path: 'demo', root: join(process.env.DSH_CLAUDE_HOME, 'skills') })).status, 400, 'arbitrary paths are not installation keys');
-  interceptedDownload = undefined;
   assert.equal((await fetch(api + "/remove", { method: "POST", headers, body: JSON.stringify({ id }) })).status, 200);
   assert.equal((await (await fetch(api)).json()).data.repositories.length, 0);
   console.log("仓库 HTTP 接口、HEAD、跨站与写请求保护测试通过");

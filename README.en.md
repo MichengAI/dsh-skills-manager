@@ -159,7 +159,7 @@ The DeepSeek Harness loader enforces strict identifier policies:
 
 - The header **Check for updates** updates the plugin itself; repository **Refresh** checks subscribed skill contents without replacing local files.
 - Repository installation can target user DSH skills, Shared Agent (`~/.agents/skills`, overridable via `DSH_AGENTS_HOME`), or `<project>/.dsh/skills` for registered workspaces. Unsafe paths and external agent roots (Codex, Claude) are locked against writes.
-- GitHub repositories are fetched on demand: only directories containing `SKILL.md` are downloaded, so README images and other unrelated assets are skipped (a subdirectory narrows the scope further). Without a usable local Git the plugin falls back to the full archive, capped at 32 MiB.
+- All repository sources are fetched through Git on demand: only directories containing `SKILL.md` are downloaded, so README images and other unrelated assets are skipped (a subdirectory narrows the scope further). Without a usable local Git, repositories cannot be added and the plugin asks you to install Git.
 - Local edits are detected and require explicit confirmation before overwriting; backup history is preserved for rollback.
 
 ## Supported Agent directories

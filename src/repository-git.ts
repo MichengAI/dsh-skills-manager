@@ -168,6 +168,8 @@ export interface GitFetchOptions {
   maxTransientBytes?: number;
   timeoutMs?: number;
   gitBinary?: string;
+  /** 磁盘预检下限；默认取配额与 256 MiB 的较小值，测试可注入以便覆盖空间不足分支。 */
+  diskPreflightBytes?: number;
 }
 
 export async function getDirectorySize(dir: string): Promise<number> {
@@ -242,6 +244,8 @@ interface RunGitOptions {
   gitBinary?: string;
   /** 通过标准输入传给 Git 的整段文本；规则条目很多时避免超出 Windows 命令行长度上限。 */
   input?: string;
+  /** 下载或检出期间盯住暂存目录体积，超出配额立刻终止子进程，不等下载完再判断。 */
+  quota?: { dir: string; limit: number };
 }
 
 function runGit(
@@ -295,6 +299,24 @@ function runGit(
       child.stdin.end(options.input);
     }
 
+    // 边下边量：配额是硬上限，超了就地终止，避免先写满磁盘再报错。
+    let measuring = false;
+    const quota = options.quota;
+    const watchdog = quota
+      ? setInterval(() => {
+          if (measuring || killed) return;
+          measuring = true;
+          getDirectorySize(quota.dir).then((size) => {
+            measuring = false;
+            if (killed || size <= quota.limit) return;
+            killed = true;
+            killProcessTree(child);
+            reject(failure("仓库临时下载体积过大（包含 Git 历史对象）", "error.repo.transientTooLarge", { limit: quota.limit, actual: size }));
+          }, () => { measuring = false; });
+        }, 800)
+      : undefined;
+    const stopWatchdog = () => { if (watchdog) clearInterval(watchdog); };
+
     child.stdout.on("data", (chunk) => {
       stdout += chunk;
     });
@@ -304,12 +326,14 @@ function runGit(
 
     const timer = setTimeout(() => {
       killed = true;
+      stopWatchdog();
       killProcessTree(child);
       reject(failure("Git 请求超时，请检查网络后重试", "error.repo.network"));
     }, timeoutMs);
 
     child.on("error", (err: unknown) => {
       clearTimeout(timer);
+      stopWatchdog();
       if (killed) return;
       const code = (err as { code?: string })?.code;
       if (code === "ENOENT") {
@@ -321,6 +345,7 @@ function runGit(
 
     child.on("close", (code) => {
       clearTimeout(timer);
+      stopWatchdog();
       if (killed) return;
       if (code === 0) resolve({ stdout, stderr });
       else reject(mapGitError(stderr || stdout));
@@ -352,99 +377,9 @@ export async function probeGitRemote(
     await runGit(["ls-remote", "--heads", "-q", "--", repoUrl], process.cwd(), { timeoutMs, gitBinary });
   } catch (caught) {
     const err = caught as CodedError;
+    // 保留缺 Git 的专用错误码：这台机器没装 Git 时必须提示安装，而不是说仓库不存在。
+    if (err?.code === "error.repo.noGit") throw err;
     throw failure(err.message || "仓库无法访问或不存在，请检查地址或权限", "error.repo.network");
-  }
-}
-
-export async function probeGitHubHttp(
-  owner: string,
-  name: string,
-  fetchImpl: typeof fetch = globalThis.fetch,
-  timeoutMs = 15_000
-): Promise<void> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const res = await fetchImpl(`https://github.com/${owner}/${name}`, {
-      method: "HEAD",
-      redirect: "manual",
-      signal: controller.signal,
-      headers: { "User-Agent": "Mozilla/5.0" }
-    });
-    if (res.status === 404) {
-      throw failure("仓库无法访问或不存在，请检查地址或权限", "error.repo.network");
-    }
-  } catch (caught: any) {
-    if (caught && caught.code === "error.repo.network") throw caught;
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-export async function fetchGitRepository(
-  repo: RepositorySource,
-  destinationDir: string,
-  options: GitFetchOptions = {}
-): Promise<{ commit: string }> {
-  const maxBytes = options.maxBytes ?? 2 * 1024 * 1024 * 1024;
-  const maxTransientBytes = options.maxTransientBytes ?? (maxBytes * 2.5);
-  const timeoutMs = options.timeoutMs ?? 900_000;
-  const deadline = Date.now() + timeoutMs;
-  const gitBinary = options.gitBinary || "git";
-  const remainingTimeout = () => {
-    const remain = deadline - Date.now();
-    if (remain <= 0) throw failure("Git 请求超时，请检查网络后重试", "error.repo.network");
-    return remain;
-  };
-  const repoUrl = repo.url || `https://github.com/${repo.owner}/${repo.name}.git`;
-  const ref = repo.ref && repo.ref !== "HEAD" ? repo.ref : "HEAD";
-
-  await fs.mkdir(destinationDir, { recursive: true });
-
-  try {
-    await runGit(["init", "-q"], destinationDir, { timeoutMs: remainingTimeout(), gitBinary });
-    const refsToTry = ref === "HEAD" ? ["HEAD"] : [`refs/heads/${ref}`, `refs/tags/${ref}`, ref];
-    let fetched = false;
-    let lastError: unknown;
-
-    for (const r of refsToTry) {
-      try {
-        await runGit(["fetch", "--progress", "--depth", "1", "--no-tags", "--", repoUrl, r], destinationDir, { timeoutMs: remainingTimeout(), gitBinary });
-        fetched = true;
-        break;
-      } catch (err) {
-        lastError = err;
-        if (r === refsToTry[refsToTry.length - 1]) {
-          try {
-            await runGit(["fetch", "--progress", "--no-tags", "--", repoUrl, r], destinationDir, { timeoutMs: remainingTimeout(), gitBinary });
-            fetched = true;
-          } catch {
-            throw err;
-          }
-        }
-      }
-    }
-    if (!fetched) throw lastError || failure("Git 分支或标签不存在", "error.repo.network");
-
-    await runGit(["checkout", "-q", "FETCH_HEAD"], destinationDir, { timeoutMs: remainingTimeout(), gitBinary });
-    const { stdout: commitOut } = await runGit(["rev-parse", "FETCH_HEAD^{commit}"], destinationDir, { timeoutMs: remainingTimeout(), gitBinary });
-    const commit = commitOut.trim();
-
-    const rawSize = await getDirectorySize(destinationDir);
-    if (rawSize > maxTransientBytes) {
-      throw failure("仓库临时下载体积过大（包含 Git 历史对象）", "error.repo.transientTooLarge", { limit: maxTransientBytes, actual: rawSize });
-    }
-
-    await rmWithRetry(join(destinationDir, ".git"));
-    const totalSize = await getDirectorySize(destinationDir);
-    if (totalSize > maxBytes) {
-      throw failure("仓库超过大小限制", "error.repo.tooLarge", { limit: maxBytes, actual: totalSize });
-    }
-
-    return { commit };
-  } catch (err) {
-    await rmWithRetry(destinationDir).catch(() => undefined);
-    throw err;
   }
 }
 
@@ -504,7 +439,47 @@ async function clearSparseCheckout(destinationDir: string, options: RunGitOption
  * 先取提交与目录树，再只把技能目录写进工作树，仓库首页图之类的无关内容不参与下载。
  * 服务端不支持过滤、或本地 Git 过老时，逐级退化为浅克隆与完整检出。
  */
-export async function sparseFetchGitRepository(
+/** 磁盘预检的固定下限：配额再大，也要留出足够余量再开跑。 */
+const DISK_PREFLIGHT_BYTES = 256 << 20;
+
+function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes < 0) return String(bytes);
+  const units = ["B", "KiB", "MiB", "GiB"];
+  let value = bytes, unit = 0;
+  while (value >= 1024 && unit < units.length - 1) { value /= 1024; unit += 1; }
+  return `${unit === 0 || value >= 10 ? Math.round(value) : value.toFixed(1)} ${units[unit]}`;
+}
+
+/** statfs 不可用的平台跳过预检，不因此阻断仓库功能。 */
+async function ensureDiskSpace(dir: string, requiredBytes: number): Promise<void> {
+  let free: number;
+  try {
+    const stats = await fs.statfs(dir);
+    free = Number(stats.bavail) * Number(stats.bsize);
+  } catch {
+    return;
+  }
+  if (!Number.isFinite(free) || free >= requiredBytes) return;
+  throw failure(`磁盘剩余空间不足（剩余 ${formatBytes(free)}，至少需要 ${formatBytes(requiredBytes)}）`, "error.repo.disk", { available: free, required: requiredBytes });
+}
+
+/** 目录树自带大小，只有 blob 已在本地时才可读；部分克隆下 `-l` 会触发逐个拉取，不能走这条路。 */
+async function sumTreeBlobBytes(destinationDir: string, revision: string, options: RunGitOptions & { timeoutMs: number }): Promise<number> {
+  const { stdout } = await runGit(["ls-tree", "-r", "-l", "-z", "--", revision], destinationDir, options);
+  let total = 0;
+  for (const record of stdout.split("\u0000")) {
+    const size = /^\d{6} blob [0-9a-f]{40,64}\s+(\d+)\t/.exec(record);
+    if (size) total += Number(size[1]);
+  }
+  return total;
+}
+
+/**
+ * 统一的按需检出：先取提交与目录树，再只把技能目录写进工作树，
+ * 仓库首页图之类的无关内容不参与下载；服务端不支持过滤、或本地 Git 过老时逐级退化为浅克隆与完整检出。
+ * 配额在下载过程中就生效：超出临时配额立刻终止 git，而不是下载完再比较。
+ */
+export async function fetchGitRepository(
   repo: RepositorySource,
   destinationDir: string,
   options: GitFetchOptions = {}
@@ -517,12 +492,14 @@ export async function sparseFetchGitRepository(
   const remainingTimeout = () => {
     const remain = deadline - Date.now();
     if (remain <= 0) throw failure("Git 请求超时，请检查网络后重试", "error.repo.network");
-    return { timeoutMs: remain, gitBinary };
+    return { timeoutMs: remain, gitBinary, quota: { dir: destinationDir, limit: maxTransientBytes } };
   };
   const repoUrl = repo.url || `https://github.com/${repo.owner}/${repo.name}.git`;
   const ref = repo.ref && repo.ref !== "HEAD" ? repo.ref : "HEAD";
 
   await fs.mkdir(destinationDir, { recursive: true });
+  // 配额是硬上限，先确认磁盘放得下再开跑，避免把盘写满后才报「体积过大」。
+  await ensureDiskSpace(destinationDir, options.diskPreflightBytes ?? Math.min(maxTransientBytes, DISK_PREFLIGHT_BYTES));
 
   try {
     await runGit(["init", "-q"], destinationDir, remainingTimeout());
@@ -531,12 +508,14 @@ export async function sparseFetchGitRepository(
 
     const refsToTry = ref === "HEAD" ? ["HEAD"] : [`refs/heads/${ref}`, `refs/tags/${ref}`, ref];
     let fetched = false;
+    let filtered = false;
     let lastError: unknown;
 
     for (const r of refsToTry) {
       try {
         await runGit(["fetch", "--progress", "--depth", "1", "--no-tags", "--filter=blob:none", "--", "origin", r], destinationDir, remainingTimeout());
         fetched = true;
+        filtered = true;
         break;
       } catch (err) {
         lastError = err;
@@ -562,6 +541,12 @@ export async function sparseFetchGitRepository(
     const { stdout: commitOut } = await runGit(["rev-parse", "FETCH_HEAD^{commit}"], destinationDir, remainingTimeout());
     const commit = commitOut.trim();
 
+    // 没命中过滤时 blob 已全在本地，可以在写工作树之前就把超限仓库挡掉。
+    if (!filtered) {
+      const bytes = await sumTreeBlobBytes(destinationDir, "FETCH_HEAD", remainingTimeout());
+      if (bytes > maxBytes) throw failure("仓库超过大小限制", "error.repo.tooLarge", { limit: maxBytes, actual: bytes });
+    }
+
     const patterns = skillCheckoutPatterns(await listTreePaths(destinationDir, "FETCH_HEAD", remainingTimeout()), repo.subdirectory);
     if (patterns) {
       try {
@@ -569,9 +554,8 @@ export async function sparseFetchGitRepository(
         await runGit(["sparse-checkout", "set", "--no-cone", "--stdin"], destinationDir, { ...remainingTimeout(), input: `${patterns.join("\n")}\n` });
       } catch (err) {
         const code = (err as CodedError)?.code;
-        // Git 本身不可用（缺命令、网络断了）必须交回上层决定是否回落归档。
-        if (code === "error.repo.noGit" || code === "error.repo.network") throw err;
-        // 只是 Git 过老不认识稀疏检出：清掉半写的规则，退回完整检出，不能让本来可用的仓库变坏。
+        // Git 本身不可用必须原样上抛；只是不认识稀疏检出则清掉半写规则，退回完整检出。
+        if (code === "error.repo.noGit" || code === "error.repo.network" || code === "error.repo.transientTooLarge") throw err;
         await clearSparseCheckout(destinationDir, remainingTimeout());
       }
     }

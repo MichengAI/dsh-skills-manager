@@ -1,32 +1,42 @@
-// 使用确定的网络响应与隔离目录，验证仓库来源、安装和失败边界。
+// 使用确定性的 Git 检出桩与隔离目录，验证仓库来源、安装和失败边界。
 import assert from "node:assert/strict";
 import { mkdtemp, mkdir, readFile, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { zipSync, strToU8 } from "fflate";
+import { dirname, join } from "node:path";
 import { promises as fileSystem } from "node:fs";
 
 const sandbox = await mkdtemp(join(tmpdir(), "dssm-repository-test-"));
 process.env.DSH_HOME = join(sandbox, "home");
 process.env.USERPROFILE = join(sandbox, "user");
-const { parseRepositoryInput, decodeRepositoryArchive, createRepositoryManager } = await import("../lib/repositories.js");
+const { parseRepositoryInput, createRepositoryManager } = await import("../lib/repositories.js");
 const { installationSourceKey } = await import("../lib/repository-updates.js");
-let sha = "a".repeat(40);
-const doc = (name, description = "测试技能") => strToU8(`---\nname: ${name}\ndescription: ${description}\n---\n技能正文\n`);
-// 本套用例锁定「无 Git 环境」的归档语义；GitHub 来源的按需检出分支在 git-repository.test.mjs 覆盖。
-const noGitSparse = async () => { throw Object.assign(new Error("未检测到 Git 命令行工具，请先安装 Git 后重试"), { code: "error.repo.noGit" }); };
-let archive = zipSync({ "repo-main/skills/pdf/SKILL.md": doc("pdf", "Use when: reviewing files"), "repo-main/skills/pdf/references/help.txt": strToU8("参考资料"), "repo-main/skills/docx/SKILL.md": doc("docx") });
-let broken = false;
-const requested = [];
-const fetchImpl = async (url, options) => {
-  requested.push(url);
-  assert.equal(options.redirect, "error", "不跟随网络重定向");
-  if (broken === "timeout") throw new DOMException("请求超时", "TimeoutError");
-  if (broken) return new Response("", { status: 403 });
-  if (url.startsWith("https://codeload.github.com/")) return new Response(archive);
-  if (url.includes("/commits/")) return Response.json({ sha });
-  return Response.json({ default_branch: "main", private: false });
+
+const doc = (name, description = "测试技能", extra = "") => `---\nname: ${name}\ndescription: ${description}\n${extra}---\n技能正文\n`;
+const defaultTree = () => ({
+  "skills/pdf/SKILL.md": doc("pdf", "Use when: reviewing files"),
+  "skills/pdf/references/help.txt": "参考资料",
+  "skills/docx/SKILL.md": doc("docx"),
+});
+let tree = defaultTree();
+let commit = "a".repeat(40);
+let broken = null;
+let fetchCalls = 0;
+const materialize = async (destinationDir, content) => {
+  for (const [relative, body] of Object.entries(content)) {
+    const target = join(destinationDir, relative);
+    await mkdir(dirname(target), { recursive: true });
+    await writeFile(target, body, "utf8");
+  }
 };
+// 检出桩：写出一棵确定的技能目录树，替代真实 Git 与网络。
+const gitFetch = async (_repo, destinationDir) => {
+  fetchCalls += 1;
+  if (broken === "timeout") throw Object.assign(new Error("Git 请求超时，请检查网络后重试"), { code: "error.repo.network" });
+  if (broken) throw Object.assign(new Error("无法连接到 Git 仓库，请检查网络或加速地址"), { code: "error.repo.network" });
+  await materialize(destinationDir, tree);
+  return { commit };
+};
+
 try {
   assert.deepEqual(parseRepositoryInput({ url: "https://github.com/Example/Skills/tree/main/skills" }), { owner: "example", name: "skills", ref: "main", subdirectory: "skills" });
   assert.equal(parseRepositoryInput({ url: "https://github.com/Example/Skills/tree/main/skills", ref: "", subdirectory: "" }).subdirectory, "skills", "表单留空保留地址携带的子目录");
@@ -35,24 +45,23 @@ try {
     assert.throws(() => parseRepositoryInput({ url }), /仓库|路径/);
   }
   for (const subdirectory of ["../skills", "C:/skills", "skills/CON", "skills/a.", "skills\\pdf"]) assert.throws(() => parseRepositoryInput({ url: "a/b", subdirectory }));
-  assert.throws(() => decodeRepositoryArchive(zipSync({ "root/../escape/SKILL.md": doc("escape") })), /路径/);
-  assert.throws(() => decodeRepositoryArchive(zipSync({ "root/A.txt": strToU8("a"), "root/a.txt": strToU8("b") })), /重复/);
-  assert.throws(() => decodeRepositoryArchive(new Uint8Array((32 << 20) + 1)), error => error.code === "error.repo.tooLarge", "超大仓库使用专用双语错误码");
-  const manager = createRepositoryManager({ fetchImpl, sparseFetch: noGitSparse });
+
+  const manager = createRepositoryManager({ gitFetch });
   const added = await manager.add({ url: "example/skills", subdirectory: "skills" });
   await assert.rejects(manager.add({ url: "https://github.com/example/skills", subdirectory: "skills" }), /已添加/);
   assert.equal((await manager.list()).repositories.length, 1);
   await manager.refresh({ id: added.id });
   let list = await manager.list();
   assert.equal(list.repositories[0].skills.length, 2);
-  assert.match(list.repositories[0].commit, /^[a-f0-9]{64}$/, "归档以内容摘要锁定，不查询提交API");
+  assert.match(list.repositories[0].commit, /^[a-f0-9]{40}$/, "扫描版本以 Git 提交锁定，不再有归档摘要");
   assert.equal(list.repositories[0].skills.find((s) => s.name === "pdf").status, "available");
   assert.equal((await manager.detail({ id: added.id, path: "skills/pdf" })).body, "技能正文");
-  const originalArchive = archive;
-  archive = zipSync({ "repo-main/skills/pdf/SKILL.md": doc("impostor") });
-  const requestsBeforeInstall = requested.length;
+
+  tree = { "skills/pdf/SKILL.md": doc("impostor") };
+  const callsBeforeInstall = fetchCalls;
   const installed = await manager.install({ id: added.id, path: "skills/pdf" });
-  assert.equal(requested.length, requestsBeforeInstall, "安装复用已验证缓存，不重新下载移动中的分支");
+  assert.equal(fetchCalls, callsBeforeInstall, "安装复用已验证的检出目录，不重新下载移动中的分支");
+  tree = defaultTree();
   const enabledPolicy = JSON.parse(await readFile(join(process.env.DSH_HOME, "skills-manager/state.json"), "utf8"));
   assert.ok(enabledPolicy.enabledSkills.dsh.includes("pdf"), "仓库安装写入显式启用策略，而不是只在界面上显示为开启");
   const { listProviderCandidates, state: currentManagerState } = await import("../lib/core.js");
@@ -64,12 +73,14 @@ try {
   assert.equal(installedSkillView?.enabled, true, "安装后的常规技能处于开启状态");
   assert.equal(installedSkillView?.effectiveModelInvocable, true, "安装后的常规技能允许模型调用");
   assert.equal(installedSkillView?.effectiveUserInvocable, true, "安装后的常规技能允许用户调用");
-  archive = originalArchive;
-  const restartManager = createRepositoryManager({ fetchImpl: async () => { throw new Error("不应请求网络"); }, sparseFetch: noGitSparse });
-  const cacheFile = join(process.env.DSH_HOME, "skills-manager/repository-cache", `${added.id}-${list.repositories[0].commit}.zip`);
-  await writeFile(cacheFile, "损坏缓存", "utf8");
-  await assert.rejects(restartManager.install({ id: added.id, path: "skills/docx" }), /缓存/, "重启后读取缓存仍检查摘要");
-  await writeFile(cacheFile, originalArchive);
+
+  const offlineFetch = async () => { throw new Error("不应请求网络"); };
+  const restartManager = createRepositoryManager({ gitFetch: offlineFetch });
+  // 检出目录被清掉时必须给出可操作的错误，而不是退回整库下载。
+  const checkoutDir = join(process.env.DSH_HOME, "skills-manager/repository-cache", `${added.id}-${list.repositories[0].commit}`);
+  await rm(checkoutDir, { recursive: true, force: true });
+  await assert.rejects(restartManager.install({ id: added.id, path: "skills/docx" }), /缓存/, "检出目录缺失时提示重新刷新，不回落下载");
+  await manager.refresh({ id: added.id });
   const originalRename = fileSystem.rename;
   fileSystem.rename = async (from, to) => {
     if (to.endsWith("repositories.json")) {
@@ -108,8 +119,9 @@ try {
   assert.equal(missingCopy.installedRoot, null);
   await manager.install({ id: added.id, path: "skills/pdf" });
   await assert.rejects(manager.install({ id: added.id, path: "skills/pdf" }), /同名|安装/);
-  sha = "b".repeat(40);
-  archive = zipSync({ "repo-main/skills/pdf/SKILL.md": doc("pdf", "Use when: reviewing files"), "repo-main/skills/pdf/references/help.txt": strToU8("新版资料"), "repo-main/skills/docx/SKILL.md": doc("docx") });
+
+  commit = "b".repeat(40);
+  tree = { ...defaultTree(), "skills/pdf/references/help.txt": "新版资料" };
   await manager.refresh({ id: added.id });
   assert.equal((await manager.list()).repositories[0].skills.find(s => s.name === "pdf").status, "update", "资源变化也提示更新");
   const preview = await manager.preview({ id: added.id, path: "skills/pdf" });
@@ -136,11 +148,11 @@ try {
   await rm(join(process.env.DSH_HOME, "skills/pdf/extra.txt"));
   const clean = await manager.preview({ id: added.id, path: "skills/pdf" });
   broken = true;
-  const requestsBeforeUpdate = requested.length;
+  const callsBeforeUpdate = fetchCalls;
   await manager.update({ id: added.id, path: "skills/pdf", token: clean.token });
-  assert.equal(requested.length, requestsBeforeUpdate, "离线更新复用扫描缓存");
-  broken = false;
-  sha = "c".repeat(40);
+  assert.equal(fetchCalls, callsBeforeUpdate, "离线更新复用扫描缓存");
+  broken = null;
+  commit = "c".repeat(40);
   await manager.refresh({ id: added.id });
   assert.equal((await manager.list()).repositories[0].skills.find(s => s.name === "pdf").status, "installed", "仅提交变化不提示更新");
   await writeFile(join(process.env.DSH_HOME, "skills/pdf/SKILL.md"), "用户本地修改", "utf8");
@@ -154,7 +166,7 @@ try {
   assert.equal(list.repositories[0].error.code, "error.repo.network");
   broken = "timeout";
   assert.equal((await manager.refresh({ id: added.id })).error.code, "error.repo.network", "数字错误码不会导致二次异常");
-  broken = false;
+  broken = null;
   await assert.rejects(manager.install({ id: added.id, path: "../escape" }), /技能/);
   await manager.remove({ id: added.id });
   assert.equal((await manager.sources())[installationSourceKey(join(process.env.DSH_HOME, "skills"), "pdf")].owner, "example", "移除订阅保留安装来源");
@@ -162,12 +174,9 @@ try {
   assert.equal(await readFile(join(process.env.DSH_HOME, "skills/pdf/SKILL.md"), "utf8"), "用户本地修改", "移除仓库不删除已安装技能");
 
   // 回归测试：通过仓库安装包含 disable-model-invocation: true 的技能，权限不被提权 (#51)
-  const repoWithRestricted = zipSync({
-    "repo-main/skills/restricted/SKILL.md": Buffer.from("---\nname: restricted\ndescription: Only for user.\ndisable-model-invocation: true\n---\nRestricted body"),
-  });
+  const restrictedTree = { "skills/restricted/SKILL.md": doc("restricted", "Only for user.", "disable-model-invocation: true\n") };
   const restrictedManager = createRepositoryManager({
-    fetchImpl: async () => new Response(repoWithRestricted),
-    sparseFetch: noGitSparse,
+    gitFetch: async (_repo, destinationDir) => { await materialize(destinationDir, restrictedTree); return { commit: "e".repeat(40) }; },
   });
   const restrictedRepo = await restrictedManager.add({ url: "example/restricted", subdirectory: "skills" });
   await restrictedManager.refresh({ id: restrictedRepo.id });
@@ -177,19 +186,19 @@ try {
   assert.equal(restrictedView?.enabled, true, "受限技能安装后总闸处于开启状态");
   assert.equal(restrictedView?.effectiveModelInvocable, false, "受限技能模型不可调用，未被管理器提权 (#51)");
   assert.equal(restrictedView?.effectiveUserInvocable, true, "受限技能斜杠命令正常允许调用");
+
+  // 分支/标签选择原样传给检出层，不再有归档分支回退
+  const seenRefs = [];
+  const refManager = createRepositoryManager({
+    gitFetch: async (repo, destinationDir) => { seenRefs.push(repo.ref); await materialize(destinationDir, defaultTree()); return { commit: "f".repeat(40) }; },
+  });
+  const taggedRepo = await refManager.add({ url: "example/tagged", ref: "v1" });
+  assert.equal((await refManager.refresh({ id: taggedRepo.id })).error, null);
+  assert.deepEqual(seenRefs, ["v1"], "分支与标签由检出层解析，管理器不做多分支回退");
+
   const concurrent = await Promise.allSettled([manager.add({ url: "a/concurrent" }), manager.add({ url: "a/concurrent" })]);
   assert.equal(concurrent.filter((r) => r.status === "fulfilled").length, 1, "并发添加不会丢失状态或创建重复来源");
-  assert.ok(requested.every(url => url.startsWith("https://codeload.github.com/")), "不消耗GitHub REST API额度");
-  const branchRequests = [];
-  const branchManager = createRepositoryManager({ fetchImpl: async url => { branchRequests.push(url); return url.includes("/refs/heads/") ? new Response("", { status: 404 }) : new Response(archive); }, sparseFetch: noGitSparse });
-  const tagged = await branchManager.add({ url: "example/tagged", ref: "v1" });
-  assert.equal((await branchManager.refresh({ id: tagged.id })).error, null);
-  assert.equal(branchRequests.length, 2);
-  assert.ok(branchRequests[1].endsWith("/refs/tags/v1"), "分支404才尝试同名标签");
-  const deniedRequests = [];
-  const denied = createRepositoryManager({ fetchImpl: async url => { deniedRequests.push(url); return new Response("", { status: 403 }); }, sparseFetch: noGitSparse });
-  await denied.refresh({ id: tagged.id });
-  assert.equal(deniedRequests.length, 1, "403不盲目重试其他分支");
+
   await mkdir(join(process.env.DSH_HOME, "skills-manager"), { recursive: true });
   await writeFile(join(process.env.DSH_HOME, "skills-manager/repositories.json"), JSON.stringify({ version: 1, repositories: [], installs: [null] }), "utf8");
   await assert.rejects(manager.add({ url: "a/b" }), /状态/, "结构损坏的来源记录同样拒绝覆盖");
@@ -204,7 +213,7 @@ try {
   await writeFile(join(process.env.DSH_HOME, "skills-manager/repositories.json"), "坏数据", "utf8");
   await assert.rejects(manager.add({ url: "a/b" }), /状态/);
   assert.equal(await readFile(join(process.env.DSH_HOME, "skills-manager/repositories.json"), "utf8"), "坏数据", "损坏状态不能被覆盖");
-  console.log("仓库来源、归档校验、安装、冲突、持久化与失败保护测试通过");
+  console.log("仓库来源、Git 检出复用、安装、冲突、持久化与失败保护测试通过");
 } finally {
   await rm(sandbox, { recursive: true, force: true });
 }

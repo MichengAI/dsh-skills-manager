@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { promises as fs } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { zipSync, strToU8 } from "fflate";
+import { strToU8 } from "fflate";
 
 const sandbox = await fs.mkdtemp(join(await fs.realpath(tmpdir()), "dssm-targets-"));
 process.env.DSH_HOME = join(sandbox, "dsh");
@@ -15,18 +15,28 @@ const { createRepositoryManager } = await import("../lib/repositories.js");
 const { installationSourceKey } = await import("../lib/repository-updates.js");
 const { userRoots, repositoryDestinations, state, listTrash, permanentlyDeleteTrash, deleteSkill, importUploadedSkill } = await import("../lib/core.js");
 const doc = name => strToU8(`---\nname: ${name}\ndescription: Test install destinations\n---\nTest instructions\n`);
-let archive;
-const snapshot = text => zipSync({
-  "root/shared/SKILL.md": doc("shared-demo"), "root/shared/resources/help.txt": strToU8(text),
-  "root/default/SKILL.md": doc("default-demo"), "root/blocked/SKILL.md": doc("blocked-demo"),
-  "root/concurrent/SKILL.md": doc("concurrent-demo"),
+let tree;
+let commitId = "1".repeat(40);
+const snapshot = text => ({
+  "shared/SKILL.md": doc("shared-demo"), "shared/resources/help.txt": strToU8(text),
+  "default/SKILL.md": doc("default-demo"), "blocked/SKILL.md": doc("blocked-demo"),
+  "concurrent/SKILL.md": doc("concurrent-demo"),
   ...Object.fromEntries(userRoots().flatMap(({ key }) => [
-    [`root/locations/${key}/SKILL.md`, doc(`location-${key}`)],
-    [`root/locations/${key}/resources/help.txt`, strToU8(text)],
+    [`locations/${key}/SKILL.md`, doc(`location-${key}`)],
+    [`locations/${key}/resources/help.txt`, strToU8(text)],
   ])),
 });
-archive = snapshot("v1");
-const manager = createRepositoryManager({ fetchImpl: async () => new Response(archive) });
+tree = snapshot("v1");
+// 检出桩：把当前快照写成目录树，替代真实 Git 与网络。
+const gitFetch = async (_repo, destinationDir) => {
+  for (const [relative, body] of Object.entries(tree)) {
+    const target = join(destinationDir, relative);
+    await fs.mkdir(join(target, ".."), { recursive: true });
+    await fs.writeFile(target, body);
+  }
+  return { commit: commitId };
+};
+const manager = createRepositoryManager({ gitFetch });
 const restoreTrash = id => manager.restoreTrash(id);
 const root = key => userRoots().find(item => item.key === key);
 const exists = path => fs.lstat(path).then(() => true, () => false);
@@ -68,7 +78,7 @@ try {
   await restoreTrash(genericDeleted.id);
   assert.equal(await exists(join(root("agents").path, "generic-demo/SKILL.md")), true);
 
-  archive = snapshot("v2");
+  tree = snapshot("v2"); commitId = "2".repeat(40);
   await manager.refresh({ id: repo.id });
   assert.equal((await skill("shared-demo")).status, "update");
   assert.equal((await skill("shared-demo")).canUninstall, true);
@@ -162,7 +172,7 @@ try {
   for (const destination of destinations) {
     const key = destination.key, path = `locations/${key}`, name = `location-${key}`;
     const installedPath = join(destination.path, name);
-    archive = snapshot('v1'); await manager.refresh({ id: repo.id });
+    tree = snapshot('v1'); commitId = "3".repeat(40); await manager.refresh({ id: repo.id });
     const installed = await manager.install({ id: repo.id, path, root: key });
     assert.equal(installed.root, destination.path);
     assert.equal((await skill(name)).installedRoot, key);
@@ -172,7 +182,7 @@ try {
       assert.equal(externalRoot.mutable, false, "其他 Agent 来源仍只读");
       assert.equal((await deleteSkill(externalRoot, name)).code, "error.root.readonly");
     }
-    archive = snapshot('v2'); await manager.refresh({ id: repo.id });
+    tree = snapshot('v2'); commitId = "4".repeat(40); await manager.refresh({ id: repo.id });
     const preview = await manager.preview({ id: repo.id, path });
     await manager.update({ id: repo.id, path, root: key, token: preview.token });
     assert.equal(await fs.readFile(join(installedPath, 'resources/help.txt'), 'utf8'), 'v2');

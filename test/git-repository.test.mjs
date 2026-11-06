@@ -1,6 +1,6 @@
 // 验证支持多种 Git 托管平台（Gitee、GitLab 等）、加速代理地址及 Git 获取与大小限制。
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, writeFile, readFile, rm, readdir, utimes } from "node:fs/promises";
+import { mkdtemp, mkdir, writeFile, readFile, rm, readdir, stat, utimes } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
@@ -12,7 +12,7 @@ process.env.DSH_HOME = join(sandbox, "home");
 process.env.USERPROFILE = join(sandbox, "user");
 
 try {
-  const { parseGitUrl, fetchGitRepository, sparseFetchGitRepository, skillCheckoutPatterns, probeGitRemote, probeGitHubHttp } = await import("../lib/repository-git.js");
+  const { parseGitUrl, fetchGitRepository, skillCheckoutPatterns, probeGitRemote } = await import("../lib/repository-git.js");
   const { parseRepositoryInput, createRepositoryManager } = await import("../lib/repositories.js");
   const { installationSourceKey } = await import("../lib/repository-updates.js");
 
@@ -140,15 +140,18 @@ try {
   const cacheAfterRemove = await readdir(cacheDir);
   assert.ok(!cacheAfterRemove.some((name) => name.startsWith(addedGitee.id)), "移除后磁盘上的快照缓存已清理");
 
-  // 4. probeGitHubHttp 单元测试（200放行、404拦截、网络异常宽容）
-  await probeGitHubHttp("valid-owner", "valid-repo", async () => ({ status: 200 }));
+  // 4. probeGitRemote：所有来源都用 git ls-remote 校验，缺 Git 时给出专用错误码
+  await probeGitRemote(remoteDir);
   await assert.rejects(
-    probeGitHubHttp("invalid-owner", "invalid-repo", async () => ({ status: 404 })),
+    probeGitRemote(join(sandbox, "non-existent-remote-for-probe")),
     (err) => err.code === "error.repo.network",
-    "GitHub 简写返回 404 时必须抛出 error.repo.network"
+    "不存在的仓库必须抛出 error.repo.network"
   );
-  // 网络超时或 500 不硬阻断
-  await probeGitHubHttp("err-owner", "err-repo", async () => { throw new Error("fetch failed"); });
+  await assert.rejects(
+    probeGitRemote(remoteDir, { gitBinary: join(sandbox, "no-such-git-binary") }),
+    (err) => err.code === "error.repo.noGit",
+    "缺少 Git 时探测直接抛出 error.repo.noGit"
+  );
 
   // 5. 并发 stage 目录隔离测试：pruneCache 不得清理其他仓库在途的 .stage- 目录
   await mkdir(cacheDir, { recursive: true });
@@ -188,22 +191,12 @@ try {
     "解压后最终体积超出 maxBytes 时抛出 error.repo.tooLarge"
   );
 
-  // 7. add 锁外网络探测并发测试：探测期间不阻塞其他只读请求
-  const slowFetch = async (url) => {
-    if (String(url).includes("slow-owner")) {
-      await new Promise((r) => setTimeout(r, 140));
-      return { status: 200 };
-    }
-    return { status: 200 };
-  };
-  const asyncManager = createRepositoryManager({ fetchImpl: slowFetch, probeRemote: true });
-  const start = Date.now();
-  const slowAddPromise = asyncManager.add({ url: "slow-owner/slow-repo" });
-  const listDuringProbe = await asyncManager.list();
-  const listDuration = Date.now() - start;
-  assert.ok(listDuration < 100, `探测期间读取列表不应被阻塞，耗时: ${listDuration}ms`);
-  const slowAdded = await slowAddPromise;
-  assert.equal(slowAdded.name, "slow-repo");
+  // 7. 添加阶段的探测走 git ls-remote：无效来源在写入订阅前就被拦下
+  await assert.rejects(
+    createRepositoryManager({ probeRemote: true }).add({ url: join(sandbox, "missing-repo-for-add") }),
+    (err) => err.code === "error.repo.network",
+    "添加无效仓库时在探测阶段直接失败"
+  );
 
   // 8. 共享 Deadline 递减测试：单次尝试耗尽总预算后立即终止，不进行重试累加
   const hangingServer = http.createServer((req, res) => {});
@@ -272,7 +265,7 @@ try {
   }
 
   const sparseDest = join(sandbox, "sparse-target");
-  const sparseFetchRes = await sparseFetchGitRepository(
+  const sparseFetchRes = await fetchGitRepository(
     { owner: "local", name: "sparse-remote-repo", ref: "", subdirectory: "", url: sparseRemoteDir },
     sparseDest,
     { maxBytes: 10 * 1024 * 1024 }
@@ -286,7 +279,7 @@ try {
 
   // 子目录限定：只检出范围内的技能
   const sparseSubDest = join(sandbox, "sparse-subdir-target");
-  await sparseFetchGitRepository(
+  await fetchGitRepository(
     { owner: "local", name: "sparse-remote-repo", ref: "", subdirectory: "skills/beta", url: sparseRemoteDir },
     sparseSubDest,
     {}
@@ -296,7 +289,7 @@ try {
   // 配额防御沿用 Git 路径口径：超限时给出专用错误码
   const sparseTinyDest = join(sandbox, "sparse-tiny-target");
   await assert.rejects(
-    sparseFetchGitRepository({ owner: "local", name: "sparse-remote-repo", ref: "", subdirectory: "", url: sparseRemoteDir }, sparseTinyDest, { maxBytes: 8 }),
+    fetchGitRepository({ owner: "local", name: "sparse-remote-repo", ref: "", subdirectory: "", url: sparseRemoteDir }, sparseTinyDest, { maxBytes: 8 }),
     (err) => err.code === "error.repo.tooLarge" || err.code === "error.repo.transientTooLarge",
     "稀疏检出仍受 maxBytes 配额约束"
   );
@@ -312,50 +305,61 @@ try {
   execFileSync("git", ["add", "."], { cwd: rootSkillDir, stdio: "ignore" });
   execFileSync("git", ["commit", "-m", "root skill"], { cwd: rootSkillDir, stdio: "ignore" });
   const rootSkillDest = join(sandbox, "root-skill-target");
-  await sparseFetchGitRepository({ owner: "local", name: "root-skill-repo", ref: "", subdirectory: "", url: rootSkillDir }, rootSkillDest, {});
+  await fetchGitRepository({ owner: "local", name: "root-skill-repo", ref: "", subdirectory: "", url: rootSkillDir }, rootSkillDest, {});
   assert.deepEqual(await listFiles(rootSkillDest), ["SKILL.md", "references/guide.md"], "根级技能不启用稀疏检出，整库文件都要落地");
 
-  // 10. 管理器分支：GitHub 来源优先稀疏检出，无 Git 才回落归档
-  const sparseOnlyManager = createRepositoryManager({
-    fetchImpl: async () => { throw new Error("稀疏检出成功时不应请求归档"); },
-    sparseFetch: async (_repo, destinationDir) => {
-      await mkdir(join(destinationDir, "skills/sparse-skill"), { recursive: true });
-      await writeFile(join(destinationDir, "skills/sparse-skill/SKILL.md"), "---\nname: sparse-skill\ndescription: 稀疏技能\n---\n正文\n", "utf8");
-      await writeFile(join(destinationDir, "skills/sparse-skill/asset.txt"), "稀疏资源", "utf8");
+  // 10. 磁盘预检：空间明显不足时在开跑前拒绝，不写盘也不联网
+  await assert.rejects(
+    fetchGitRepository(
+      { owner: "local", name: "sparse-remote-repo", ref: "", subdirectory: "", url: sparseRemoteDir },
+      join(sandbox, "disk-preflight-target"),
+      { diskPreflightBytes: Number.MAX_SAFE_INTEGER }
+    ),
+    (err) => err.code === "error.repo.disk" && /磁盘剩余空间不足/.test(err.message),
+    "磁盘预检不足时抛出 error.repo.disk"
+  );
+
+  // 11. 提前中止：配额在下载过程中生效，超限时不把技能目录写出来
+  const earlyStopDest = join(sandbox, "early-stop-target");
+  await assert.rejects(
+    fetchGitRepository(
+      { owner: "local", name: "sparse-remote-repo", ref: "", subdirectory: "", url: sparseRemoteDir },
+      earlyStopDest,
+      { maxBytes: 8, maxTransientBytes: 8 }
+    ),
+    (err) => err.code === "error.repo.tooLarge" || err.code === "error.repo.transientTooLarge",
+    "超出配额时必须在检出前中止"
+  );
+  assert.equal(await stat(earlyStopDest).then(() => true, () => false), false, "中止后不保留半成品暂存目录");
+
+  // 12. 管理器单一路径：Git 失败直接上抛，不再回落归档下载
+  const singlePathManager = createRepositoryManager({
+    gitFetch: async (_repo, destinationDir) => {
+      await mkdir(join(destinationDir, "skills/single-skill"), { recursive: true });
+      await writeFile(join(destinationDir, "skills/single-skill/SKILL.md"), "---\nname: single-skill\ndescription: 单路径技能\n---\n正文\n", "utf8");
+      await writeFile(join(destinationDir, "skills/single-skill/asset.txt"), "单路径资源", "utf8");
       return { commit: "d".repeat(40) };
     },
   });
-  const sparseRepo = await sparseOnlyManager.add({ url: "example/sparse-repo", skipProbe: true });
-  const sparseRefreshed = await sparseOnlyManager.refresh({ id: sparseRepo.id });
-  assert.equal(sparseRefreshed.error, null, "稀疏检出成功时不应留下仓库错误");
-  assert.equal(sparseRefreshed.commit, "d".repeat(40), "GitHub 来源以提交 SHA 锁定扫描版本");
-  assert.equal(sparseRefreshed.skills.length, 1);
-  const sparseInstalled = await sparseOnlyManager.install({ id: sparseRepo.id, path: "skills/sparse-skill" });
-  assert.equal(sparseInstalled.name, "sparse-skill");
+  const singleRepo = await singlePathManager.add({ url: "example/single-path-repo", skipProbe: true });
+  const singleRefreshed = await singlePathManager.refresh({ id: singleRepo.id });
+  assert.equal(singleRefreshed.error, null, "Git 检出成功时不应留下仓库错误");
+  assert.equal(singleRefreshed.commit, "d".repeat(40), "扫描版本以提交锁定");
+  assert.equal(singleRefreshed.skills.length, 1);
+  const singleInstalled = await singlePathManager.install({ id: singleRepo.id, path: "skills/single-skill" });
+  assert.equal(singleInstalled.name, "single-skill");
   assert.equal(
-    await readFile(join(process.env.DSH_HOME, "skills/sparse-skill/asset.txt"), "utf8"),
-    "稀疏资源",
-    "安装直接复用稀疏检出目录，不再整库下载"
+    await readFile(join(process.env.DSH_HOME, "skills/single-skill/asset.txt"), "utf8"),
+    "单路径资源",
+    "安装直接复用检出目录，不再整库下载"
   );
 
-  const archiveRequests = [];
-  const fallbackManager = createRepositoryManager({
-    fetchImpl: async (url) => { archiveRequests.push(url); return new Response(zipSync({ "r/skills/pdf/SKILL.md": strToU8("---\nname: pdf\ndescription: 归档技能\n---\n正文\n") })); },
-    sparseFetch: async () => { throw Object.assign(new Error("未检测到 Git 命令行工具，请先安装 Git 后重试"), { code: "error.repo.noGit" }); },
+  const noGitManager = createRepositoryManager({
+    gitFetch: async () => { throw Object.assign(new Error("未检测到 Git 命令行工具，请先安装 Git 后重试"), { code: "error.repo.noGit" }); },
   });
-  const fallbackRepo = await fallbackManager.add({ url: "example/fallback-repo", skipProbe: true });
-  const fallbackRefreshed = await fallbackManager.refresh({ id: fallbackRepo.id });
-  assert.match(fallbackRefreshed.commit, /^[a-f0-9]{64}$/, "缺少 Git 时回落归档并以内容摘要锁定");
-  assert.equal(fallbackRefreshed.skills.length, 1, "回落归档后仍能列出技能");
-  assert.ok(archiveRequests.some((url) => url.startsWith("https://codeload.github.com/")), "回落路径请求 codeload 归档");
-
-  const hardFailManager = createRepositoryManager({
-    fetchImpl: async () => { throw new Error("配额超限不应改走归档下载"); },
-    sparseFetch: async () => { throw Object.assign(new Error("仓库超过大小限制"), { code: "error.repo.tooLarge" }); },
-  });
-  const hardFailRepo = await hardFailManager.add({ url: "example/hard-fail-repo", skipProbe: true });
-  const hardFailRefresh = await hardFailManager.refresh({ id: hardFailRepo.id });
-  assert.equal(hardFailRefresh.error?.code, "error.repo.tooLarge", "体积配额错误不能被归档回落掩盖成另一个错误");
+  const noGitRepo = await noGitManager.add({ url: "example/no-git-repo", skipProbe: true });
+  const noGitRefresh = await noGitManager.refresh({ id: noGitRepo.id });
+  assert.equal(noGitRefresh.error?.code, "error.repo.noGit", "缺少 Git 时直接报专用错误，单一路径无回落");
 
   console.log("Git 仓库地址解析、Git 检出、稀疏检出、配额防御与端到端管理测试通过");
 } finally {
