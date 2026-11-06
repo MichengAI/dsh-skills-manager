@@ -2989,7 +2989,9 @@ export async function deleteSkill(root: RootInput, name: string, log?: Log, opti
   const id = options.repositoryTrash?.id || options.catalogTrash?.id || `${Date.now()}-${randomUUID()}`;
   if (!/^\d+-[a-f0-9-]{36}$/.test(id)) throw codedError("回收站条目编号非法", "error.trash.invalid", { id });
   const trashRoot = trashRootPath();
-  const stage = join(trashRoot, `.stage-${randomUUID()}`);
+  const stage = options.trashDirect
+    ? join(trashRoot, id)
+    : join(trashRoot, `.stage-${randomUUID()}`);
   const finalPath = join(trashRoot, id);
   const moved = [];
   await fs.mkdir(stage, { recursive: true });
@@ -3023,12 +3025,14 @@ export async function deleteSkill(root: RootInput, name: string, log?: Log, opti
       `${JSON.stringify(metadata, null, 2)}\n`,
       "utf8",
     );
-    const published = await publishTrashStage(
-      stage,
-      finalPath,
-      metadata,
-      options.renameOptions,
-    );
+    const published = options.trashDirect
+      ? { fallback: false, cleanupError: null }
+      : await publishTrashStage(
+        stage,
+        finalPath,
+        metadata,
+        options.renameOptions,
+      );
     if (published.cleanupError && log)
       log(
         "trash-stage-warning",
@@ -4454,3 +4458,4 @@ type SourceAnalysis = ({kind: "none"} & Diagnostic) | ({kind: "single"; skillFil
 type MetadataEntry = DiscoveredEntry & {name: string; providerRank?: number; policyAliases?: {rootKey: string; name: string}[]};
 interface MetadataScan {exists: boolean; entries: MetadataEntry[]; truncated?: boolean}
 interface TrashMetadata { id: string; name: string; deletedAt: string; repository?: {id: string; path: string}; catalog?: string[]; root?: {key: string; scope: string; label: string; localeKey?: string; projectRoot?: string; projectName?: string; kind?: string}; entries: string[] }
+

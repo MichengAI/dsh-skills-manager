@@ -625,9 +625,25 @@ function apply(ctx: HostContext, config?: PluginConfig) {
       fetch: (req) => handlePost(req, (b) => repositories.install(b, registeredWorkspacePaths(ctx)), { isRepo: true, afterSuccess: afterWrite }),
     },
     {
+      path: `${API_PREFIX}/repositories/installMany`,
+      methods: ["POST"],
+      fetch: (req) => handlePost(req, (b) => repositories.installMany(b, registeredWorkspacePaths(ctx)), { isRepo: true, afterSuccess: afterWrite }),
+    },
+    {
       path: `${API_PREFIX}/repositories/uninstall`,
       methods: ["POST"],
       fetch: (req) => handlePost(req, (b) => repositories.uninstall(b), { isRepo: true, afterSuccess: afterWrite }),
+    },
+    {
+      path: `${API_PREFIX}/repositories/uninstallMany`,
+      methods: ["POST"],
+      fetch: (req) => handlePost(req, (b) => repositories.uninstallMany(b as { items?: Array<{ id?: unknown; path?: unknown; root?: unknown; workspace?: unknown }> }, registeredWorkspacePaths(ctx)), { isRepo: true, afterSuccess: afterWrite }),
+    },
+    {
+      // 只读轮询：批量安装/卸载执行期间的实时计数，不进入 serialize 队列。
+      path: `${API_PREFIX}/repositories/progress`,
+      methods: ["POST"],
+      fetch: (req) => handlePost(req, async () => repositories.progress(), { queued: false }),
     },
     {
       path: `${API_PREFIX}/repositories/preview`,
@@ -635,9 +651,19 @@ function apply(ctx: HostContext, config?: PluginConfig) {
       fetch: (req) => handlePost(req, (b) => repositories.preview(b), { isRepo: true }),
     },
     {
+      path: `${API_PREFIX}/repositories/previewMany`,
+      methods: ["POST"],
+      fetch: (req) => handlePost(req, (b) => repositories.previewMany(b as { items?: Array<{ id?: unknown; path?: unknown; root?: unknown; workspace?: unknown; rollback?: unknown }> }), { isRepo: true }),
+    },
+    {
       path: `${API_PREFIX}/repositories/update`,
       methods: ["POST"],
       fetch: (req) => handlePost(req, (b) => repositories.update(b), { isRepo: true, afterSuccess: afterWrite }),
+    },
+    {
+      path: `${API_PREFIX}/repositories/updateMany`,
+      methods: ["POST"],
+      fetch: (req) => handlePost(req, (b) => repositories.updateMany(b as { items?: Array<{ id?: unknown; path?: unknown; root?: unknown; workspace?: unknown; rollback?: unknown; token?: unknown; overwrite?: unknown }> }), { isRepo: true, afterSuccess: afterWrite }),
     },
     {
       path: `${API_PREFIX}/repositories/rollback`,

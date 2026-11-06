@@ -310,6 +310,8 @@ export interface MutationOptions extends ScopeOptions {
     repositoryRestore?: boolean;
     root?: RootInput;
     renameOptions?: RenameOptions;
+    /** 回收站条目直接以最终编号命名，跳过 stage→final 的二次改名（批量卸载用）。 */
+    trashDirect?: boolean;
     conflict?: string;
     dryRun?: boolean;
     /** 内部安装事务在文件复制前持久化意图，不接受请求体回调。 */
