@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.2.35] - 2026-11-06
+
+### Behavior Changes
+
+- **Skill repositories are fetched on demand, and size limits apply while downloading**:
+  - every repository source now downloads only the skill directories, so README images and other unrelated assets no longer count; this requires Git on the machine, and adding a repository asks you to install Git when it is missing;
+  - size limits take effect during the transfer: free disk space is checked first, and an oversized repository stops immediately with the real limit and the actual size instead of failing after the download;
+  - installing reuses the already scanned checkout, so nothing is downloaded twice;
+  - upgrade note: the first install from a repository added before this version shows "repository cache missing or expired, refresh the repository and retry" — one refresh migrates it.
+
+[中文文档](CHANGELOG.zh-CN.md)
+
 ## [1.2.34] - 2026-11-06
 
 ### Improvements
