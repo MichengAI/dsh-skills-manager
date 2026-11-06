@@ -212,6 +212,46 @@ export function createRepositoryManager({
     await readDir(targetBase);
     return result;
   }
+  // 安装只读扫描阶段留下的本地检出；缓存缺失要求刷新，绝不在这里重新拉取仓库。
+  async function preparedEntries(repo: Repository, skill: RepositorySkill, path: string) {
+    const archive = await download(repo, path), prefix = path ? `${path}/` : "";
+    const document = archive[prefix + "SKILL.md"];
+    if (!document || hash(document) !== skill.documentHash) throw failure("仓库技能内容与扫描版本不一致，请重新刷新");
+    const entries = Object.entries(archive).filter(([p]) => p.startsWith(prefix)).map(([p, bytes]) => ({ path: p.slice(prefix.length), data: Buffer.from(bytes).toString("base64") }));
+    if (!entries.some((e) => e.path === "SKILL.md")) throw failure("仓库技能内容已失效");
+    return entries;
+  }
+  /**
+   * 安装成功后清理“同版本”的回收站副本：同一位置同名且内容与刚安装版本完全一致的卸载记录不再有恢复价值；
+   * 内容不同的记录（旧版本）保留，供用户随时恢复。
+   */
+  async function pruneRedundantTrash(root: { key?: string; projectRoot?: string }, name: string, entries: Array<{ path: string; data: string }>, log?: Log) {
+    await pruneRedundantTrashMany([{ root, name, entries }], log);
+  }
+  /**
+   * 批量版本的回收站同版本清理：只做一次 listTrash() 全扫，把多个安装任务的清理合并进同一遍；
+   * 单条版本委托本函数，语义与逐条调用完全一致。
+   */
+  async function pruneRedundantTrashMany(tasks: Array<{ root?: { key?: string; projectRoot?: string }; name: string; entries: Array<{ path: string; data: string }> }>, log?: Log) {
+    if (!tasks.length) return;
+    try {
+      const targets = tasks.map((task) => ({ ...task, installed: signature(fileIndex(Object.fromEntries(task.entries.map((entry) => [entry.path, Buffer.from(entry.data, "base64")])))) }));
+      for (const metadata of await listTrash()) {
+        const match = targets.find((task) => metadata.name === task.name
+          && (metadata.root?.key || "") === (task.root?.key || "")
+          && (metadata.root?.projectRoot || "") === (task.root?.projectRoot || ""));
+        if (!match) continue;
+        const skillName = metadata.entries?.includes(match.name) ? match.name : metadata.entries?.[0];
+        if (!skillName) continue;
+        let trashSignature: string;
+        try { trashSignature = signature(fileIndex(await readSkillTree(join(trashRootPath(), metadata.id, skillName)))); }
+        catch { continue; }
+        if (trashSignature === match.installed) await permanentlyDeleteTrash(metadata.id, log);
+      }
+    } catch {
+      // 清理是尽力而为：失败时保留回收站条目，不影响本次安装结果。
+    }
+  }
   async function scanSkillsFromDirectory(dir: string, subdirectory = "", repoName = ""): Promise<RepositorySkill[]> {
     const skills: RepositorySkill[] = [];
     const entries: Array<{ relPath: string; isDir: boolean }> = [];
@@ -451,7 +491,10 @@ export function createRepositoryManager({
     }, false);
   }
   const refreshVersions = new Map<string, number>();
+  // 批量安装/卸载执行期间的实时计数：客户端轮询 progress() 显示「已处理/总数」。
+  let batchProgress: { op: "install" | "uninstall"; index: number; total: number } | null = null;
   return {
+    progress: () => batchProgress,
     installCatalog: (id: string, pack: import("./types.js").UploadInput, target: { root?: unknown; workspace?: string } = {}) => serialize(async () => {
       const location = await catalogLocation(target);
       const root = await recordInstallRoot(location, requestIndex().registered, await indexedFor(location));
@@ -716,7 +759,7 @@ export function createRepositoryManager({
       await write(data);
       try {
         await recordInstallRoot(record, index.registered, await indexedFor(record));
-        const result = await deleteSkill(root, record.name, log, { repositoryEntryOnly: true, repositoryTrash: { id: trashId, repository: { id, path } }, ...(catalog.length ? { catalogTrash: { id: trashId, ids: catalog.map(item => item.id) } } : {}) });
+        const result = await deleteSkill(root, record.name, log, { trashDirect: true, repositoryEntryOnly: true, repositoryTrash: { id: trashId, repository: { id, path } }, ...(catalog.length ? { catalogTrash: { id: trashId, ids: catalog.map(item => item.id) } } : {}) });
         if ("ok" in result && result.ok === false) throw failure(result.error, typeof result.code === "string" ? result.code : "error.repo.invalid", result.params);
         return result;
       } catch (error) {
@@ -727,6 +770,140 @@ export function createRepositoryManager({
         }
         throw error;
       }
+    }),
+    // 批量安装：同一队列、一次状态扫描、一次状态写入；单项失败不中断其余项。
+    installMany: (input: { items?: Array<{ id?: unknown; path?: unknown }>; root?: unknown; workspace?: string }, registered?: string[]) => serialize(async () => {
+      const rawItems = Array.isArray(input?.items) ? input.items : [];
+      if (!rawItems.length) throw failure("批量安装项为空", "error.repo.empty");
+      if (rawItems.length > 100) throw failure("批量安装项超过上限（最多 100 项）", "error.repo.tooMany");
+      let root: any, workspaceRoot: string | undefined;
+      if (input.workspace !== undefined) {
+        if (input.root !== undefined && input.root !== "dsh") throw failure("工作区只能安装到项目 DSH skills");
+        const target = await resolveWorkspaceTarget(input.workspace, registered);
+        if ("ok" in target && target.ok === false) throw failure(target.error, target.code, target.params);
+        root = (target as { root: any }).root;
+        workspaceRoot = root.projectRoot;
+      } else root = await recordInstallRoot({ root: input.root });
+      const data = await read();
+      const sameTarget = (await state({ projectCwds: workspaceRoot ? [workspaceRoot] : [] })).roots.filter(item => workspaceRoot ? item.projectRoot === workspaceRoot && item.kind === "project-dsh" : item.scope !== "project");
+      const taken = new Set<string>();
+      for (const item of sameTarget) for (const entry of item.skills || []) {
+        taken.add(entry.name.toLowerCase());
+        if (entry.declaredName) taken.add(entry.declaredName.toLowerCase());
+      }
+      type BulkInstallResult = { id: string; path: string; name?: string; ok: boolean; error?: string; code?: string; params?: unknown };
+      const results: BulkInstallResult[] = new Array(rawItems.length);
+      const prepared: Array<{ slot: number; id: string; path: string; name: string; record: InstallRecord; entries: Array<{ path: string; data: string }> }> = [];
+      const pruneTasks: Array<{ root: any; name: string; entries: Array<{ path: string; data: string }> }> = [];
+      const seen = new Set<string>();
+      for (const [slot, raw] of rawItems.entries()) {
+        const id = typeof raw?.id === "string" ? raw.id : "";
+        const path = typeof raw?.path === "string" ? raw.path : "";
+        const duplicate = JSON.stringify([id, path]);
+        if (seen.has(duplicate)) { results[slot] = { id, path, ok: false, error: "重复的安装项", code: "error.repo.duplicate" }; continue; }
+        seen.add(duplicate);
+        try {
+          const repo = repository(data, id);
+          const skill = repo.skills.find((s) => s.path === path);
+          if (!skill || !skill.valid) throw failure("技能不存在或格式无效");
+          const lowered = skill.name.toLowerCase();
+          if (taken.has(lowered)) throw failure("同名技能已存在，不会覆盖本地文件", "error.repo.conflict");
+          const entries = await preparedEntries(repo, skill, path);
+          const record: InstallRecord = { id, path, root: workspaceRoot ? "dsh" : root.key, ...(workspaceRoot ? { workspace: workspaceRoot } : {}), source: { owner: repo.owner, name: repo.name, ref: repo.ref, subdirectory: repo.subdirectory, ...(repo.url ? { url: repo.url } : {}) }, name: skill.name, commit: repo.commit, complete: false, files: entries.map((e) => ({ path: e.path, hash: hash(Buffer.from(e.data, "base64")) })) };
+          data.installs = data.installs.filter((i) => !(i.name === skill.name && (i.workspace ?? null) === (workspaceRoot ?? null) && (i.root || "dsh") === (workspaceRoot ? "dsh" : root.key)));
+          data.installs.push(record);
+          prepared.push({ slot, id, path, name: skill.name, record, entries });
+          taken.add(lowered);
+        } catch (caught) { const error = caught as CodedError;
+          results[slot] = { id, path, ok: false, error: error.message, code: String(error.code || "error.repo.invalid"), params: error.params };
+        }
+      }
+      if (prepared.length) await write(data);
+      const progress = (batchProgress = { op: "install" as const, index: 0, total: prepared.length });
+      try {
+      if (prepared.length) await recordInstallRoot({ root: input.root, workspace: workspaceRoot }, registered);
+      for (const item of prepared) {
+        progress.index += 1;
+        let copied = false;
+        try {
+          const result = await importUploadedSkill({ name: item.name, entries: item.entries }, log, { conflict: "skip", root });
+          if (result.ok === false || !result.imported?.length) throw failure(result.error || "技能安装失败或遇到同名冲突", typeof result.code === "string" ? result.code : "error.repo.conflict", result.params);
+          copied = true;
+          const enabled = await setSkillEnabled(root, item.name, true, log);
+          if (enabled && typeof enabled === "object" && "ok" in enabled && enabled.ok === false) throw failure(enabled.error || "技能启用状态无法写入", typeof enabled.code === "string" ? enabled.code : "error.repo.enableState", enabled.params);
+          item.record.complete = true;
+          pruneTasks.push({ root, name: item.name, entries: item.entries });
+          results[item.slot] = { id: item.id, path: item.path, name: item.name, ok: true };
+        } catch (caught) { const error = caught as CodedError;
+          data.installs = data.installs.filter((record) => record !== item.record);
+          try { await write(data); }
+          catch { throw failure("安装未完成且来源记录无法撤销，请恢复磁盘写入后检查技能目录", "error.repo.installState"); }
+          if (copied) await fs.rm(join(root.path, item.name), { recursive: true, force: true }).catch(() => undefined);
+          results[item.slot] = { id: item.id, path: item.path, name: item.name, ok: false, error: error.message, code: String(error.code || "error.repo.invalid"), params: error.params };
+        }
+      }
+      await pruneRedundantTrashMany(pruneTasks, log);
+      } finally { batchProgress = null; }
+      if (prepared.length) await write(data);
+      return { results };
+    }),
+    // 批量卸载：同一队列、一次状态写入与逐项回收站移动；单项失败不中断其余项。
+    uninstallMany: (input: { items?: Array<{ id?: unknown; path?: unknown; root?: unknown; workspace?: unknown }> }, registered?: string[]) => serialize(async () => {
+      const rawItems = Array.isArray(input?.items) ? input.items : [];
+      if (!rawItems.length) throw failure("批量卸载项为空", "error.repo.empty");
+      if (rawItems.length > 100) throw failure("批量卸载项超过上限（最多 100 项）", "error.repo.tooMany");
+      const data = await read();
+      const index = requestIndex();
+      type BulkUninstallResult = { id: string; path: string; root?: string; workspace?: string; ok: boolean; error?: string; code?: string; params?: unknown };
+      const results: BulkUninstallResult[] = new Array(rawItems.length);
+      const prepared: Array<{ slot: number; id: string; path: string; record: InstallRecord; root: any; fingerprint: string; trashId: string; catalog: ReturnType<typeof catalogCopies> }> = [];
+      const seen = new Set<string>();
+      for (const [slot, raw] of rawItems.entries()) {
+        const id = typeof raw?.id === "string" ? raw.id : "";
+        const entryPath = typeof raw?.path === "string" ? raw.path : "";
+        let rootKey: string | undefined;
+        let workspaceKey: string | undefined;
+        const duplicate = JSON.stringify([id, entryPath, raw?.root ?? null, typeof raw?.workspace === "string" ? raw.workspace : null]);
+        if (seen.has(duplicate)) { results[slot] = { id, path: entryPath, ok: false, error: "重复的卸载项", code: "error.repo.duplicate" }; continue; }
+        seen.add(duplicate);
+        try {
+          const request = { id, path: entryPath, ...(raw?.root !== undefined ? { root: raw.root as SkillRequest["root"] } : {}), ...(typeof raw?.workspace === "string" ? { workspace: raw.workspace } : {}) };
+          const record = await selectInstallRecord(data.installs, request, index.registered, "没有可追溯的安装记录，不能卸载");
+          rootKey = record.root || "dsh";
+          workspaceKey = record.workspace;
+          const root = await recordInstallRoot(record, index.registered, await indexedFor(record));
+          const fingerprint = signature(fileIndex(await readSkillTree(join(root.path, record.name))));
+          const trashId = `${Date.now()}-${randomUUID()}`;
+          // 先把写授权退役到本次回收站 id，再移动副本；单条失败时按指纹回滚授权。
+          record.trashId = trashId;
+          const catalog = catalogCopies(data, root, record.name);
+          for (const item of catalog) item.trashId = trashId;
+          prepared.push({ slot, id, path: entryPath, record, root, fingerprint, trashId, catalog });
+        } catch (caught) { const error = caught as CodedError;
+          results[slot] = { id, path: entryPath, ...(rootKey ? { root: rootKey } : {}), ...(workspaceKey ? { workspace: workspaceKey } : {}), ok: false, error: error.message, code: String(error.code || "error.repo.invalid"), params: error.params };
+        }
+      }
+      if (prepared.length) await write(data);
+      const progress = (batchProgress = { op: "uninstall" as const, index: 0, total: prepared.length });
+      try {
+      for (const item of prepared) {
+        progress.index += 1;
+        try {
+          await recordInstallRoot(item.record, index.registered, await indexedFor(item.record));
+          const result = await deleteSkill(item.root, item.record.name, log, { trashDirect: true, repositoryEntryOnly: true, repositoryTrash: { id: item.trashId, repository: { id: item.id, path: item.path } }, ...(item.catalog.length ? { catalogTrash: { id: item.trashId, ids: item.catalog.map(entry => entry.id) } } : {}) });
+          if ("ok" in result && result.ok === false) throw failure(result.error, typeof result.code === "string" ? result.code : "error.repo.invalid", result.params);
+          results[item.slot] = { id: item.id, path: item.path, root: item.record.root || "dsh", ...(item.record.workspace ? { workspace: item.record.workspace } : {}), ok: true };
+        } catch (caught) { const error = caught as CodedError;
+          if (await matches(item.record, item.fingerprint)) {
+            delete item.record.trashId;
+            for (const entry of item.catalog) delete entry.trashId;
+            await write(data);
+          }
+          results[item.slot] = { id: item.id, path: item.path, ...(item.record.root ? { root: item.record.root } : {}), ...(item.record.workspace ? { workspace: item.record.workspace } : {}), ok: false, error: error.message, code: String(error.code || "error.repo.invalid"), params: error.params };
+        }
+      }
+      } finally { batchProgress = null; }
+      return { results };
     }),
     install: ({ id, path, root: requestedRoot, workspace }: SkillRequest, registered?: string[]) => serialize(async () => {
       // 工作区只开放项目 DSH，不能与 Shared Agent 组合；路径必须来自宿主登记列表。
@@ -747,11 +924,7 @@ export function createRepositoryManager({
       const lowered = skill.name.toLowerCase();
       const sameTarget = (await state({ projectCwds: workspaceRoot ? [workspaceRoot] : [] })).roots.filter(item => workspaceRoot ? item.projectRoot === workspaceRoot && item.kind === "project-dsh" : item.scope !== "project");
       if (sameTarget.some(item => (item.skills || []).some(entry => entry.name.toLowerCase() === lowered || entry.declaredName?.toLowerCase() === lowered))) throw failure("同名技能已存在，不会覆盖本地文件", "error.repo.conflict");
-      const archive = await download(repo, path), prefix = path ? `${path}/` : "";
-      const document = archive[prefix + "SKILL.md"];
-      if (!document || hash(document) !== skill.documentHash) throw failure("仓库技能内容与扫描版本不一致，请重新刷新");
-      const entries = Object.entries(archive).filter(([p]) => p.startsWith(prefix)).map(([p, bytes]) => ({ path: p.slice(prefix.length), data: Buffer.from(bytes).toString("base64") }));
-      if (!entries.some((e) => e.path === "SKILL.md")) throw failure("仓库技能内容已失效");
+      const entries = await preparedEntries(repo, skill, path);
       // 同名记录只替换同一位置：用户级按 root 区分 DSH 与 Shared Agent，工作区按项目根区分。
             // 另一处的安装或回收记录必须保留，否则恢复时会丢失仓库来源。
             data.installs = data.installs.filter((i) => !(i.name === skill.name && (i.workspace ?? null) === (workspaceRoot ?? null) && (i.root || "dsh") === (workspaceRoot ? "dsh" : root.key)));
@@ -777,7 +950,11 @@ export function createRepositoryManager({
       record.complete = true;
       try { await write(data); }
       catch { throw failure("技能文件已安装但来源状态未确认，请恢复磁盘写入后重新打开仓库页", "error.repo.installState"); }
+      await pruneRedundantTrash(root, skill.name, entries, log);
       return { name: skill.name, commit: repo.commit, root: root.path };
     }),
   };
 }
+
+
+

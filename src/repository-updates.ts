@@ -87,8 +87,8 @@ function changesBetween(before: FileDigest[], after: FileDigest[]) {
 
 /** 注入现有仓库存储与串行队列，避免更新和安装互相覆盖状态。 */
 export function createRepositoryUpdater({ read, write, repository, download, serialize, parseRepositoryInput, registeredWorkspaces, onWorkspaceIndexBuild }: RepositoryDependencies) {
-  async function prepare(input: SkillRequest, includeArchive = false) {
-    const { id, path } = input, data = await read();
+  async function prepare(input: SkillRequest, includeArchive = false, sharedData?: Awaited<ReturnType<typeof read>>) {
+    const { id, path } = input, data = sharedData ?? await read();
     const registered = registeredWorkspaces?.();
     const record = await selectInstallRecord(data.installs, input, registered, "没有可追溯的安装记录，不能在线更新");
     const target = join((await recordInstallRoot(record, registered)).path, record.name);
@@ -113,8 +113,8 @@ export function createRepositoryUpdater({ read, write, repository, download, ser
     const token = hash(JSON.stringify({ id, path, root: record.root || "dsh", workspace: record.workspace ?? null, commit, current, next, rollback: input.rollback === true }));
     return { data, record, target, entries, next, current, token, commit, localModified: signature(current) !== signature(record.files), changes: changesBetween(current, next) };
   }
-  async function replace(input: SkillRequest, rollback = false) {
-    const plan = await prepare({ ...input, rollback }, true);
+  async function replace(input: SkillRequest, rollback = false, sharedData?: Awaited<ReturnType<typeof read>>) {
+    const plan = await prepare({ ...input, rollback }, true, sharedData);
     if (typeof input.token !== "string" || input.token !== plan.token) throw failure("文件或版本已变化，请重新预览");
     if (plan.localModified && input.overwrite !== true) throw failure("存在本地修改，请确认备份后替换", "error.repo.modified");
     const { data, record, target, entries } = plan;
@@ -164,10 +164,64 @@ export function createRepositoryUpdater({ read, write, repository, download, ser
     }
     return result;
   }
+  type BulkUpdateItem = { id?: unknown; path?: unknown; root?: unknown; workspace?: unknown; rollback?: unknown; token?: unknown; overwrite?: unknown };
+  type BulkPreviewResult = { id: string; path: string; rollback?: boolean; ok: boolean; token?: string; commit?: string | null; localModified?: boolean; changes?: ReturnType<typeof changesBetween>; error?: string; code?: string; params?: unknown };
+  type BulkReplaceResult = { id: string; path: string; rollback?: boolean; ok: boolean; name?: string; commit?: string | null; error?: string; code?: string; params?: unknown };
+  /** 校验批量更新入参：非空、≤100，逐项按请求顺序返回，重复项直接给明确错误码。 */
+  function bulkItems(input: { items?: BulkUpdateItem[] }, emptyLabel: string) {
+    const rawItems = Array.isArray(input?.items) ? input.items : [];
+    if (!rawItems.length) throw failure(`${emptyLabel}项为空`, "error.repo.empty");
+    if (rawItems.length > 100) throw failure(`${emptyLabel}项超过上限（最多 100 项）`, "error.repo.tooMany");
+    return rawItems as Array<Record<string, unknown>>;
+  }
   return {
     sources,
     preview: (input: SkillRequest) => serialize(async () => { const p = await prepare(input); return { token: p.token, commit: p.commit, localModified: p.localModified, changes: p.changes, rollback: input.rollback === true }; }),
     update: (input: SkillRequest) => serialize(() => replace(input)),
     rollback: (input: SkillRequest) => serialize(() => replace(input, true)),
+    // 批量预览：一次状态读取、一次返回全部 token；结果按请求顺序（结果[slot] 对应 items[slot]）。
+    previewMany: (input: { items?: BulkUpdateItem[] }) => serialize(async () => {
+      const rawItems = bulkItems(input, "批量预览");
+      const data = await read();
+      const results: BulkPreviewResult[] = new Array(rawItems.length);
+      const seen = new Set<string>();
+      for (const [slot, raw] of rawItems.entries()) {
+        const id = typeof raw.id === "string" ? raw.id : "";
+        const path = typeof raw.path === "string" ? raw.path : "";
+        const rollback = raw.rollback === true;
+        const duplicate = JSON.stringify([id, path, raw.root ?? null, typeof raw.workspace === "string" ? raw.workspace : null, rollback]);
+        if (seen.has(duplicate)) { results[slot] = { id, path, rollback, ok: false, error: "重复的更新项", code: "error.repo.duplicate" }; continue; }
+        seen.add(duplicate);
+        try {
+          const plan = await prepare({ ...(raw as unknown as SkillRequest), rollback }, false, data);
+          results[slot] = { id, path, rollback, ok: true, token: plan.token, commit: plan.commit, localModified: plan.localModified, changes: plan.changes };
+        } catch (caught) { const error = caught as CodedError;
+          results[slot] = { id, path, rollback, ok: false, error: error.message, code: String(error.code || "error.repo.invalid"), params: error.params };
+        }
+      }
+      return { results };
+    }),
+    // 批量替换：共享同一份状态数据（单项互不重叠，见去重键），逐项复用单技能 replace 的备份/回滚事务并各自写盘。
+    updateMany: (input: { items?: BulkUpdateItem[] }) => serialize(async () => {
+      const rawItems = bulkItems(input, "批量更新");
+      const data = await read();
+      const results: BulkReplaceResult[] = new Array(rawItems.length);
+      const seen = new Set<string>();
+      for (const [slot, raw] of rawItems.entries()) {
+        const id = typeof raw.id === "string" ? raw.id : "";
+        const path = typeof raw.path === "string" ? raw.path : "";
+        const rollback = raw.rollback === true;
+        const duplicate = JSON.stringify([id, path, raw.root ?? null, typeof raw.workspace === "string" ? raw.workspace : null, rollback]);
+        if (seen.has(duplicate)) { results[slot] = { id, path, rollback, ok: false, error: "重复的更新项", code: "error.repo.duplicate" }; continue; }
+        seen.add(duplicate);
+        try {
+          const outcome = await replace({ ...(raw as unknown as SkillRequest), rollback }, rollback, data);
+          results[slot] = { id, path, rollback, ok: true, name: outcome.name, commit: outcome.commit };
+        } catch (caught) { const error = caught as CodedError;
+          results[slot] = { id, path, rollback, ok: false, error: error.message, code: String(error.code || "error.repo.invalid"), params: error.params };
+        }
+      }
+      return { results };
+    }),
   };
 }
