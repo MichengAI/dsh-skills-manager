@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.2.34] - 2026-11-06
+
+### Improvements
+
+- **Load large skill repositories without size-limit errors** (Issue #79):
+  - GitHub repositories are now fetched on demand: only directories containing `SKILL.md` are downloaded, so README screenshots and other unrelated assets no longer count against the size limit (the reported 235 MiB repository now transfers about 20 MiB while listing all 177 skills);
+  - Repository scanning and installation are no longer capped by the old 32 MiB archive limit; when no usable local Git is available, the plugin falls back to the previous full-archive download;
+  - The snapshot version badge now shows the Git commit of GitHub repositories.
+
+[中文文档](CHANGELOG.zh-CN.md)
+
 ## [1.2.33] - 2026-11-05
 
 ### Improvements
