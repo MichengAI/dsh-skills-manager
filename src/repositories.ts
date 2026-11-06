@@ -6,7 +6,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { unzipSync } from "fflate";
 import { managerHomePath, resolveWorkspaceTarget, repositoryDestinations, trashRootPath, listTrash, restoreTrash as restoreSkillTrash, permanentlyDeleteTrash, parseSkillDoc, importUploadedSkill, deleteSkill, setSkillEnabled, readManagerState, state, createWorkspaceIndex, type indexRegisteredWorkspaces } from "./core.js";
 import { createRepositoryUpdater, fileIndex, signature, readSkillTree, repositoryInstallRoot, recordInstallRoot, selectInstallRecord } from "./repository-updates.js";
-import { parseGitUrl, fetchGitRepository, probeGitRemote, probeGitHubHttp } from "./repository-git.js";
+import { parseGitUrl, fetchGitRepository, sparseFetchGitRepository, probeGitRemote, probeGitHubHttp } from "./repository-git.js";
 
 const LIMIT = 32 << 20;
 const STATE_LIMIT = 16 << 20;
@@ -136,6 +136,7 @@ async function readResponse(response: Response, limit: number) {
 export function createRepositoryManager({
   fetchImpl = globalThis.fetch,
   gitFetch,
+  sparseFetch = sparseFetchGitRepository,
   probeRemote,
   maxRepositoryBytes: rawMaxBytes = 2 * 1024 * 1024 * 1024,
   maxTransientBytes: rawMaxTransientBytes,
@@ -146,6 +147,7 @@ export function createRepositoryManager({
 }: {
   fetchImpl?: typeof fetch;
   gitFetch?: (repo: Repository, destinationDir: string, options?: { maxBytes?: number; maxTransientBytes?: number; timeoutMs?: number }) => Promise<{ commit: string }>;
+  sparseFetch?: (repo: Repository, destinationDir: string, options?: { maxBytes?: number; maxTransientBytes?: number; timeoutMs?: number }) => Promise<{ commit: string }>;
   probeRemote?: boolean;
   maxRepositoryBytes?: number;
   maxTransientBytes?: number;
@@ -745,22 +747,37 @@ export function createRepositoryManager({
           commit = res.commit;
           skills = await scanSkillsFromDirectory(stageDir, repo.subdirectory, repo.name);
         } else {
-          const bytes = await fetchBranch(repo);
-          const entries = decodeRepositoryArchive(bytes);
-          for (const [path, b] of Object.entries(entries)) {
-            if (path !== "SKILL.md" && !path.endsWith("/SKILL.md")) continue;
-            const directory = path === "SKILL.md" ? "" : path.slice(0, -9);
-            if (repo.subdirectory && directory !== repo.subdirectory && !directory.startsWith(`${repo.subdirectory}/`)) continue;
-            if (b.length > 256 << 10 || skills.length >= 500 || skills.reduce((n, s) => n + Buffer.byteLength(s.body, "utf8"), 0) + b.length > 4 << 20) throw failure("仓库技能数量或说明长度超限");
-            const parsed = parseSkillDoc(Buffer.from(b).toString("utf8"));
-            const name = String(parsed.map.name || "");
-            const description = String(parsed.map.description || "");
-            const prefix = directory ? directory + "/" : "";
-            const files = fileIndex(Object.fromEntries(Object.entries(entries).filter(([p]) => p.startsWith(prefix)).map(([p, b]) => [p.slice(prefix.length), b])));
-            if (files.length > 1000) throw failure("技能文件数量超限");
-            skills.push({ path: directory, files, name: name || directory.split("/").pop() || repo.name, description, body: parsed.body.trim(), documentHash: hash(b), valid: parsed.hasFrontmatter && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name) && !/^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i.test(name) && name.length <= 100 && !!description });
+          // GitHub 来源优先按需检出：只取技能目录，仓库首页图等无关内容不参与下载（Issue #79）。
+          let useArchive = false;
+          try {
+            const res = await sparseFetch(repo, stageDir, { maxBytes: maxRepositoryBytes, maxTransientBytes, timeoutMs: gitTimeoutMs });
+            commit = res.commit;
+            skills = await scanSkillsFromDirectory(stageDir, repo.subdirectory, repo.name);
+          } catch (caught) {
+            const error = caught as CodedError;
+            // 只有这台机器用不了 Git 检出时才回落归档；体积与配额错误直接交回用户，不能被另一种下载掩盖。
+            if (error.code !== "error.repo.noGit" && error.code !== "error.repo.network") throw error;
+            await fs.rm(stageDir, { recursive: true, force: true }).catch(() => undefined);
+            useArchive = true;
           }
-          commit = await cacheArchive(repo, bytes);
+          if (useArchive) {
+            const bytes = await fetchBranch(repo);
+            const entries = decodeRepositoryArchive(bytes);
+            for (const [path, b] of Object.entries(entries)) {
+              if (path !== "SKILL.md" && !path.endsWith("/SKILL.md")) continue;
+              const directory = path === "SKILL.md" ? "" : path.slice(0, -9);
+              if (repo.subdirectory && directory !== repo.subdirectory && !directory.startsWith(`${repo.subdirectory}/`)) continue;
+              if (b.length > 256 << 10 || skills.length >= 500 || skills.reduce((n, s) => n + Buffer.byteLength(s.body, "utf8"), 0) + b.length > 4 << 20) throw failure("仓库技能数量或说明长度超限");
+              const parsed = parseSkillDoc(Buffer.from(b).toString("utf8"));
+              const name = String(parsed.map.name || "");
+              const description = String(parsed.map.description || "");
+              const prefix = directory ? directory + "/" : "";
+              const files = fileIndex(Object.fromEntries(Object.entries(entries).filter(([p]) => p.startsWith(prefix)).map(([p, b]) => [p.slice(prefix.length), b])));
+              if (files.length > 1000) throw failure("技能文件数量超限");
+              skills.push({ path: directory, files, name: name || directory.split("/").pop() || repo.name, description, body: parsed.body.trim(), documentHash: hash(b), valid: parsed.hasFrontmatter && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name) && !/^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i.test(name) && name.length <= 100 && !!description });
+            }
+            commit = await cacheArchive(repo, bytes);
+          }
         }
       } catch (caught) {
         const error = caught as CodedError;

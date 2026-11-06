@@ -4,6 +4,7 @@ import { mkdtemp, mkdir, writeFile, readFile, rm, readdir, utimes } from "node:f
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
+import { zipSync, strToU8 } from "fflate";
 import http from "node:http";
 
 const sandbox = await mkdtemp(join(tmpdir(), "dssm-git-repo-test-"));
@@ -11,7 +12,7 @@ process.env.DSH_HOME = join(sandbox, "home");
 process.env.USERPROFILE = join(sandbox, "user");
 
 try {
-  const { parseGitUrl, fetchGitRepository, probeGitRemote, probeGitHubHttp } = await import("../lib/repository-git.js");
+  const { parseGitUrl, fetchGitRepository, sparseFetchGitRepository, skillCheckoutPatterns, probeGitRemote, probeGitHubHttp } = await import("../lib/repository-git.js");
   const { parseRepositoryInput, createRepositoryManager } = await import("../lib/repositories.js");
   const { installationSourceKey } = await import("../lib/repository-updates.js");
 
@@ -226,7 +227,137 @@ try {
     hangingServer.close();
   }
 
-  console.log("Git 仓库地址解析、Git 检出、配额防御与端到端管理测试通过");
+  // 9. 稀疏检出（Issue #79）：GitHub 仓库只下载技能目录，README 封面图等无关内容不参与传输
+  assert.deepEqual(
+    skillCheckoutPatterns(["README.md", "docs/a.png", "skills/pdf/SKILL.md", "skills/pdf/a.txt", "skills/docx/x/SKILL.md", "skills/pdf/sub/b.txt"]),
+    ["/skills/docx/x/**", "/skills/pdf/**"],
+    "每个技能目录生成一条根锚定规则，嵌套技能目录由父规则覆盖"
+  );
+  assert.deepEqual(skillCheckoutPatterns(["skills/a/SKILL.md", "skills/a/inner/SKILL.md"]), ["/skills/a/**"], "祖先规则已覆盖的嵌套技能不重复出规则");
+  assert.equal(skillCheckoutPatterns(["SKILL.md", "docs/a.png", "skills/pdf/SKILL.md"]), null, "根级技能需要整库文件，不启用稀疏检出");
+  assert.deepEqual(skillCheckoutPatterns(["skills/pdf/SKILL.md", "other/x/SKILL.md"], "skills"), ["/skills/pdf/**"], "子目录筛选只保留范围内的技能目录");
+  assert.deepEqual(skillCheckoutPatterns(["skills/we[ir]d/SKILL.md"]), ["/skills/we\\[ir\\]d/**"], "通配字符必须转义，避免仓库内目录名改写规则");
+  assert.deepEqual(skillCheckoutPatterns(["README.md", "docs/a.png"]), ["/.dsh-skills-manager-empty/**"], "无技能仓库检出空工作树，不下载整库");
+  assert.throws(() => skillCheckoutPatterns(["skills/../x/SKILL.md"]), /路径/, "不安全路径不得变成检出规则");
+
+  const sparseRemoteDir = join(sandbox, "sparse-remote-repo");
+  await mkdir(join(sparseRemoteDir, "skills/alpha"), { recursive: true });
+  await mkdir(join(sparseRemoteDir, "skills/beta/nested"), { recursive: true });
+  await mkdir(join(sparseRemoteDir, "skills/we[ir]d"), { recursive: true });
+  await mkdir(join(sparseRemoteDir, "docs"), { recursive: true });
+  execFileSync("git", ["init"], { cwd: sparseRemoteDir, stdio: "ignore" });
+  execFileSync("git", ["config", "user.name", "Test User"], { cwd: sparseRemoteDir, stdio: "ignore" });
+  execFileSync("git", ["config", "user.email", "test@example.com"], { cwd: sparseRemoteDir, stdio: "ignore" });
+  await writeFile(join(sparseRemoteDir, "skills/alpha/SKILL.md"), skillDoc, "utf8");
+  await writeFile(join(sparseRemoteDir, "skills/alpha/reference.txt"), "稀疏资源", "utf8");
+  await writeFile(join(sparseRemoteDir, "skills/beta/nested/SKILL.md"), "---\nname: beta-nested\ndescription: 嵌套技能\n---\n正文\n", "utf8");
+  await writeFile(join(sparseRemoteDir, "skills/we[ir]d/SKILL.md"), "---\nname: weird\ndescription: 通配名技能\n---\n正文\n", "utf8");
+  await writeFile(join(sparseRemoteDir, "docs/k-dense-web.gif"), "整段仓库封面动图占位".repeat(64), "utf8");
+  await writeFile(join(sparseRemoteDir, "README.md"), "# 仓库首页", "utf8");
+  execFileSync("git", ["add", "."], { cwd: sparseRemoteDir, stdio: "ignore" });
+  execFileSync("git", ["commit", "-m", "sparse fixture"], { cwd: sparseRemoteDir, stdio: "ignore" });
+  const sparseSha = execFileSync("git", ["rev-parse", "HEAD"], { cwd: sparseRemoteDir, encoding: "utf8" }).trim();
+
+  async function listFiles(dir) {
+    const found = [];
+    async function walk(current, prefix = "") {
+      for (const entry of await readdir(current, { withFileTypes: true })) {
+        const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
+        if (entry.isDirectory()) await walk(join(current, entry.name), rel);
+        else found.push(rel);
+      }
+    }
+    await walk(dir);
+    return found.sort();
+  }
+
+  const sparseDest = join(sandbox, "sparse-target");
+  const sparseFetchRes = await sparseFetchGitRepository(
+    { owner: "local", name: "sparse-remote-repo", ref: "", subdirectory: "", url: sparseRemoteDir },
+    sparseDest,
+    { maxBytes: 10 * 1024 * 1024 }
+  );
+  assert.equal(sparseFetchRes.commit, sparseSha, "稀疏检出返回提交 SHA");
+  assert.deepEqual(
+    await listFiles(sparseDest),
+    ["skills/alpha/SKILL.md", "skills/alpha/reference.txt", "skills/beta/nested/SKILL.md", "skills/we[ir]d/SKILL.md"],
+    "只检出技能目录内容，README 与仓库图片不落地"
+  );
+
+  // 子目录限定：只检出范围内的技能
+  const sparseSubDest = join(sandbox, "sparse-subdir-target");
+  await sparseFetchGitRepository(
+    { owner: "local", name: "sparse-remote-repo", ref: "", subdirectory: "skills/beta", url: sparseRemoteDir },
+    sparseSubDest,
+    {}
+  );
+  assert.deepEqual(await listFiles(sparseSubDest), ["skills/beta/nested/SKILL.md"], "子目录外的技能不参与检出");
+
+  // 配额防御沿用 Git 路径口径：超限时给出专用错误码
+  const sparseTinyDest = join(sandbox, "sparse-tiny-target");
+  await assert.rejects(
+    sparseFetchGitRepository({ owner: "local", name: "sparse-remote-repo", ref: "", subdirectory: "", url: sparseRemoteDir }, sparseTinyDest, { maxBytes: 8 }),
+    (err) => err.code === "error.repo.tooLarge" || err.code === "error.repo.transientTooLarge",
+    "稀疏检出仍受 maxBytes 配额约束"
+  );
+
+  // 根级 SKILL.md 的仓库必须完整检出，不能把 README 之类的资源漏掉
+  const rootSkillDir = join(sandbox, "root-skill-repo");
+  await mkdir(join(rootSkillDir, "references"), { recursive: true });
+  execFileSync("git", ["init"], { cwd: rootSkillDir, stdio: "ignore" });
+  execFileSync("git", ["config", "user.name", "Test User"], { cwd: rootSkillDir, stdio: "ignore" });
+  execFileSync("git", ["config", "user.email", "test@example.com"], { cwd: rootSkillDir, stdio: "ignore" });
+  await writeFile(join(rootSkillDir, "SKILL.md"), "---\nname: root-skill\ndescription: 根级技能\n---\n正文\n", "utf8");
+  await writeFile(join(rootSkillDir, "references/guide.md"), "整库资源", "utf8");
+  execFileSync("git", ["add", "."], { cwd: rootSkillDir, stdio: "ignore" });
+  execFileSync("git", ["commit", "-m", "root skill"], { cwd: rootSkillDir, stdio: "ignore" });
+  const rootSkillDest = join(sandbox, "root-skill-target");
+  await sparseFetchGitRepository({ owner: "local", name: "root-skill-repo", ref: "", subdirectory: "", url: rootSkillDir }, rootSkillDest, {});
+  assert.deepEqual(await listFiles(rootSkillDest), ["SKILL.md", "references/guide.md"], "根级技能不启用稀疏检出，整库文件都要落地");
+
+  // 10. 管理器分支：GitHub 来源优先稀疏检出，无 Git 才回落归档
+  const sparseOnlyManager = createRepositoryManager({
+    fetchImpl: async () => { throw new Error("稀疏检出成功时不应请求归档"); },
+    sparseFetch: async (_repo, destinationDir) => {
+      await mkdir(join(destinationDir, "skills/sparse-skill"), { recursive: true });
+      await writeFile(join(destinationDir, "skills/sparse-skill/SKILL.md"), "---\nname: sparse-skill\ndescription: 稀疏技能\n---\n正文\n", "utf8");
+      await writeFile(join(destinationDir, "skills/sparse-skill/asset.txt"), "稀疏资源", "utf8");
+      return { commit: "d".repeat(40) };
+    },
+  });
+  const sparseRepo = await sparseOnlyManager.add({ url: "example/sparse-repo", skipProbe: true });
+  const sparseRefreshed = await sparseOnlyManager.refresh({ id: sparseRepo.id });
+  assert.equal(sparseRefreshed.error, null, "稀疏检出成功时不应留下仓库错误");
+  assert.equal(sparseRefreshed.commit, "d".repeat(40), "GitHub 来源以提交 SHA 锁定扫描版本");
+  assert.equal(sparseRefreshed.skills.length, 1);
+  const sparseInstalled = await sparseOnlyManager.install({ id: sparseRepo.id, path: "skills/sparse-skill" });
+  assert.equal(sparseInstalled.name, "sparse-skill");
+  assert.equal(
+    await readFile(join(process.env.DSH_HOME, "skills/sparse-skill/asset.txt"), "utf8"),
+    "稀疏资源",
+    "安装直接复用稀疏检出目录，不再整库下载"
+  );
+
+  const archiveRequests = [];
+  const fallbackManager = createRepositoryManager({
+    fetchImpl: async (url) => { archiveRequests.push(url); return new Response(zipSync({ "r/skills/pdf/SKILL.md": strToU8("---\nname: pdf\ndescription: 归档技能\n---\n正文\n") })); },
+    sparseFetch: async () => { throw Object.assign(new Error("未检测到 Git 命令行工具，请先安装 Git 后重试"), { code: "error.repo.noGit" }); },
+  });
+  const fallbackRepo = await fallbackManager.add({ url: "example/fallback-repo", skipProbe: true });
+  const fallbackRefreshed = await fallbackManager.refresh({ id: fallbackRepo.id });
+  assert.match(fallbackRefreshed.commit, /^[a-f0-9]{64}$/, "缺少 Git 时回落归档并以内容摘要锁定");
+  assert.equal(fallbackRefreshed.skills.length, 1, "回落归档后仍能列出技能");
+  assert.ok(archiveRequests.some((url) => url.startsWith("https://codeload.github.com/")), "回落路径请求 codeload 归档");
+
+  const hardFailManager = createRepositoryManager({
+    fetchImpl: async () => { throw new Error("配额超限不应改走归档下载"); },
+    sparseFetch: async () => { throw Object.assign(new Error("仓库超过大小限制"), { code: "error.repo.tooLarge" }); },
+  });
+  const hardFailRepo = await hardFailManager.add({ url: "example/hard-fail-repo", skipProbe: true });
+  const hardFailRefresh = await hardFailManager.refresh({ id: hardFailRepo.id });
+  assert.equal(hardFailRefresh.error?.code, "error.repo.tooLarge", "体积配额错误不能被归档回落掩盖成另一个错误");
+
+  console.log("Git 仓库地址解析、Git 检出、稀疏检出、配额防御与端到端管理测试通过");
 } finally {
   // Windows 上超时分支用异步 taskkill 收尾，git 子进程退出前仍占着 deadline-test 目录，
   // 单次 rm 会撞 EBUSY；重试几次即可，否则整个沙箱会残留在 %TEMP%。

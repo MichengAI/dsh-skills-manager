@@ -13,6 +13,8 @@ const { parseRepositoryInput, decodeRepositoryArchive, createRepositoryManager }
 const { installationSourceKey } = await import("../lib/repository-updates.js");
 let sha = "a".repeat(40);
 const doc = (name, description = "测试技能") => strToU8(`---\nname: ${name}\ndescription: ${description}\n---\n技能正文\n`);
+// 本套用例锁定「无 Git 环境」的归档语义；GitHub 来源的按需检出分支在 git-repository.test.mjs 覆盖。
+const noGitSparse = async () => { throw Object.assign(new Error("未检测到 Git 命令行工具，请先安装 Git 后重试"), { code: "error.repo.noGit" }); };
 let archive = zipSync({ "repo-main/skills/pdf/SKILL.md": doc("pdf", "Use when: reviewing files"), "repo-main/skills/pdf/references/help.txt": strToU8("参考资料"), "repo-main/skills/docx/SKILL.md": doc("docx") });
 let broken = false;
 const requested = [];
@@ -36,7 +38,7 @@ try {
   assert.throws(() => decodeRepositoryArchive(zipSync({ "root/../escape/SKILL.md": doc("escape") })), /路径/);
   assert.throws(() => decodeRepositoryArchive(zipSync({ "root/A.txt": strToU8("a"), "root/a.txt": strToU8("b") })), /重复/);
   assert.throws(() => decodeRepositoryArchive(new Uint8Array((32 << 20) + 1)), error => error.code === "error.repo.tooLarge", "超大仓库使用专用双语错误码");
-  const manager = createRepositoryManager({ fetchImpl });
+  const manager = createRepositoryManager({ fetchImpl, sparseFetch: noGitSparse });
   const added = await manager.add({ url: "example/skills", subdirectory: "skills" });
   await assert.rejects(manager.add({ url: "https://github.com/example/skills", subdirectory: "skills" }), /已添加/);
   assert.equal((await manager.list()).repositories.length, 1);
@@ -63,7 +65,7 @@ try {
   assert.equal(installedSkillView?.effectiveModelInvocable, true, "安装后的常规技能允许模型调用");
   assert.equal(installedSkillView?.effectiveUserInvocable, true, "安装后的常规技能允许用户调用");
   archive = originalArchive;
-  const restartManager = createRepositoryManager({ fetchImpl: async () => { throw new Error("不应请求网络"); } });
+  const restartManager = createRepositoryManager({ fetchImpl: async () => { throw new Error("不应请求网络"); }, sparseFetch: noGitSparse });
   const cacheFile = join(process.env.DSH_HOME, "skills-manager/repository-cache", `${added.id}-${list.repositories[0].commit}.zip`);
   await writeFile(cacheFile, "损坏缓存", "utf8");
   await assert.rejects(restartManager.install({ id: added.id, path: "skills/docx" }), /缓存/, "重启后读取缓存仍检查摘要");
@@ -165,6 +167,7 @@ try {
   });
   const restrictedManager = createRepositoryManager({
     fetchImpl: async () => new Response(repoWithRestricted),
+    sparseFetch: noGitSparse,
   });
   const restrictedRepo = await restrictedManager.add({ url: "example/restricted", subdirectory: "skills" });
   await restrictedManager.refresh({ id: restrictedRepo.id });
@@ -178,13 +181,13 @@ try {
   assert.equal(concurrent.filter((r) => r.status === "fulfilled").length, 1, "并发添加不会丢失状态或创建重复来源");
   assert.ok(requested.every(url => url.startsWith("https://codeload.github.com/")), "不消耗GitHub REST API额度");
   const branchRequests = [];
-  const branchManager = createRepositoryManager({ fetchImpl: async url => { branchRequests.push(url); return url.includes("/refs/heads/") ? new Response("", { status: 404 }) : new Response(archive); } });
+  const branchManager = createRepositoryManager({ fetchImpl: async url => { branchRequests.push(url); return url.includes("/refs/heads/") ? new Response("", { status: 404 }) : new Response(archive); }, sparseFetch: noGitSparse });
   const tagged = await branchManager.add({ url: "example/tagged", ref: "v1" });
   assert.equal((await branchManager.refresh({ id: tagged.id })).error, null);
   assert.equal(branchRequests.length, 2);
   assert.ok(branchRequests[1].endsWith("/refs/tags/v1"), "分支404才尝试同名标签");
   const deniedRequests = [];
-  const denied = createRepositoryManager({ fetchImpl: async url => { deniedRequests.push(url); return new Response("", { status: 403 }); } });
+  const denied = createRepositoryManager({ fetchImpl: async url => { deniedRequests.push(url); return new Response("", { status: 403 }); }, sparseFetch: noGitSparse });
   await denied.refresh({ id: tagged.id });
   assert.equal(deniedRequests.length, 1, "403不盲目重试其他分支");
   await mkdir(join(process.env.DSH_HOME, "skills-manager"), { recursive: true });
