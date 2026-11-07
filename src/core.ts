@@ -2961,8 +2961,20 @@ async function restoreRootDefinition(metadata: TrashMetadata, options: MutationO
   return checkedWritableRootDefinition(root);
 }
 
+// 用对象身份保存仅限本进程的一次性凭据，绝不写入持久化状态。
+const safeDeleteFailures = new WeakSet<object>();
+export function isSafeDeleteFailure(value: unknown): boolean {
+  return typeof value === "object" && value !== null && safeDeleteFailures.delete(value);
+}
+
 /** 把用户或活动项目的 DSH 根中的单个技能移入 manager-owned 回收站。 */
 export async function deleteSkill(root: RootInput, name: string, log?: Log, options: MutationOptions = {}) {
+  const result = await deleteSkillImpl(root, name, log, options);
+  if ("ok" in result && result.ok === false) safeDeleteFailures.add(result);
+  return result;
+}
+
+async function deleteSkillImpl(root: RootInput, name: string, log?: Log, options: MutationOptions = {}) {
   const definition = await checkedWritableRootDefinition(root);
   if (definition && definition.ok === false) return definition;
   if (!definition) return readonlyError("delete");
@@ -2989,24 +3001,29 @@ export async function deleteSkill(root: RootInput, name: string, log?: Log, opti
   const id = options.repositoryTrash?.id || options.catalogTrash?.id || `${Date.now()}-${randomUUID()}`;
   if (!/^\d+-[a-f0-9-]{36}$/.test(id)) throw codedError("回收站条目编号非法", "error.trash.invalid", { id });
   const trashRoot = trashRootPath();
-  const stage = join(trashRoot, `.stage-${randomUUID()}`);
+  const stage = join(trashRoot, `.stage-${options.repositoryTrash ? id : randomUUID()}`);
   const finalPath = join(trashRoot, id);
   const moved = [];
+  let cleanupUncertain = false;
+  let inFlight: string | undefined;
   await fs.mkdir(stage, { recursive: true });
   try {
     for (const target of targets) {
       const destination = join(stage, target.fileName);
+      inFlight = destination;
       const transferred = await movePathWithFallback(
         target.path,
         destination,
         options.renameOptions,
       );
+      moved.push({ ...target, destination });
+      inFlight = undefined;
+      if (transferred.cleanupError) cleanupUncertain = true;
       if (transferred.cleanupError && log)
         log(
           "trash-source-warning",
           `技能已跨盘移入回收站，但源盘隐藏副本等待后续清理: ${transferred.quarantine}（${transferred.cleanupError.message || transferred.cleanupError}）`,
         );
-      moved.push({ ...target, destination });
     }
     const metadata = {
       version: 2,
@@ -3024,11 +3041,11 @@ export async function deleteSkill(root: RootInput, name: string, log?: Log, opti
       "utf8",
     );
     const published = await publishTrashStage(
-      stage,
-      finalPath,
-      metadata,
-      options.renameOptions,
-    );
+        stage,
+        finalPath,
+        metadata,
+        options.renameOptions,
+      );
     if (published.cleanupError && log)
       log(
         "trash-stage-warning",
@@ -3040,11 +3057,12 @@ export async function deleteSkill(root: RootInput, name: string, log?: Log, opti
     const rollbackFailures = [];
     for (const item of moved.reverse()) {
       try {
-        await movePathWithFallback(
+        const restored = await movePathWithFallback(
           item.destination,
           item.path,
           options.renameOptions,
         );
+        if (restored.cleanupError) cleanupUncertain = true;
       } catch (caught) { const rollbackError = caught as CodedError;
         rollbackFailures.push({
           path: item.destination,
@@ -3064,7 +3082,17 @@ export async function deleteSkill(root: RootInput, name: string, log?: Log, opti
         { path: stage, error: causeText },
       );
     }
-    await fs.rm(stage, { recursive: true, force: true }).catch(() => undefined);
+    try {
+      // 移动中途失败时源文件可能已丢失，此时不得签发安全回滚凭据。
+      for (const target of targets) if (!await lstatOrNull(target.path)) cleanupUncertain = true;
+      if (inFlight && await lstatOrNull(inFlight)) cleanupUncertain = true;
+      if (!cleanupUncertain) await fs.rm(stage, { recursive: true, force: true });
+    } catch { cleanupUncertain = true; }
+    if (!cleanupUncertain) {
+      const receipt = Object.assign(new Error(error?.message || String(error)), error);
+      safeDeleteFailures.add(receipt);
+      throw receipt;
+    }
     throw error;
   }
 }

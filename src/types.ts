@@ -234,6 +234,7 @@ export interface InstallRecord {
     complete: boolean;
     /** Retired ownership: retained only for explicit Trash restore. */
     trashId?: string;
+    uninstallFingerprint?: string;
     restoreFingerprint?: string;
     files: FileDigest[];
     source?: RepositorySource;

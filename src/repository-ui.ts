@@ -1,4 +1,4 @@
-type RepositoryAction = "add" | "remove" | "refresh" | "detail" | "install" | "uninstall" | "preview" | "update" | "rollback";
+type RepositoryAction = "add" | "remove" | "refresh" | "detail" | "install" | "installMany" | "uninstall" | "uninstallMany" | "preview" | "previewMany" | "update" | "updateMany" | "rollback" | "progress";
 import type * as React from 'react';
 import type { ApiCall, ApiRoutes, Translate, ModalProps, SourceSelectProps } from './client-types.js';
 import type { DestinationKit, DestinationValue } from './destination-types.js';
@@ -12,9 +12,17 @@ type Feedback = {error?: boolean; payload?: unknown; key?: string; name?: string
 type InstallRoot = RepositoryRoot;
 type Installation = Feedback & CopyTarget & {id: string; path: string; pending?: boolean; action?: 'install' | 'uninstall'};
 type CatalogCopy = { id: string; name: string; installedRoot: RepositoryRoot; installedWorkspace?: string; canUninstall?: boolean };
-type RepoModal = {type: 'add' | 'manage'} | {type: 'remove'; repo: RepoView} | {type: 'install' | 'uninstall'; repo: RepoView; skill: RepoSkill; copy?: RepoCopy} | {type: 'detail'; repo: RepoView; detail?: ApiRoutes['/repositories/detail']; loading?: boolean; failed?: boolean} | {type: 'catalog-detail'; detail?: ApiRoutes['/catalog/detail']; loading?: boolean; failed?: boolean} | {type: 'catalog-install'; target: CatalogTarget} | {type: 'catalog-uninstall'; copy: CatalogCopy} | {type: 'review' | 'rollback'; repo: RepoView; skill: RepoSkill; copy: RepoCopy; detail: ApiRoutes['/repositories/preview']};
+type RepoModal = {type: 'add' | 'manage'} | {type: 'remove'; repo: RepoView} | {type: 'install' | 'uninstall'; repo: RepoView; skill: RepoSkill; copy?: RepoCopy} | {type: 'detail'; repo: RepoView; detail?: ApiRoutes['/repositories/detail']; loading?: boolean; failed?: boolean} | {type: 'catalog-detail'; detail?: ApiRoutes['/catalog/detail']; loading?: boolean; failed?: boolean} | {type: 'catalog-install'; target: CatalogTarget} | {type: 'catalog-uninstall'; copy: CatalogCopy} | {type: 'review' | 'rollback'; repo: RepoView; skill: RepoSkill; copy: RepoCopy; detail: ApiRoutes['/repositories/preview']} | {type: 'bulk-review'} | {type: 'bulk-done'};
+type BulkKind = 'install' | 'copy';
+type BulkBucket = PreviewBucket | 'available' | 'uninstallable' | 'rollbackable' | 'unavailable' | 'error';
+type BulkItem = { key: string; kind: BulkKind; repo: RepoView; skill: RepoSkill; copy?: RepoCopy; token?: string; bucket: BulkBucket; error?: unknown };
+type BulkPolicy = { localModified: 'skip' | 'overwrite' };
+type BulkResult = { key: string; label: string; detail: string; status: BatchStatus; error?: unknown; reason?: string };
+type BulkState = { op: BatchOp; phase: 'preflight' | 'running' | 'done'; items: BulkItem[]; results: BulkResult[]; index: number; policy: BulkPolicy };
 interface Dependencies {react: typeof React; Modal: React.ComponentType<ModalProps>; Input: React.ComponentType<any> & { TextArea: React.ComponentType<any> }; Button: React.ComponentType<any>; SourceSelect: React.ComponentType<SourceSelectProps>; destination: DestinationKit; api: ApiCall; headers: Record<string, string>; translateError: (t: Translate, error: unknown) => string; getLocale?: () => string | undefined; IconLoading?: React.ComponentType<any>; IconRefresh?: React.ComponentType<any>;}
 import type { CodedError } from "./types.js";
+import { classifyPreview, runSequential } from "./repository-batch.ts";
+import type { BatchOp, BatchOutcome, BatchStatus, PreviewBucket } from "./repository-batch.ts";
 // 仓库页复用宿主技能面板组件；只在进入页签时读取本地目录缓存。
 export const repositoryLocales = {
   zh: {
@@ -39,6 +47,16 @@ export const repositoryLocales = {
     "repo.remove": "移除仓库", "repo.removeHint": "仅移除仓库订阅，已安装的技能会保留。", "repo.removeConfirm": "确认移除", "repo.cancel": "取消", "repo.close": "关闭", "repo.loading": "处理中…", "repo.success": "操作完成", "repo.installHint": "技能可能包含脚本，请先查看说明并确认信任来源。安装会保留资源文件，不会执行脚本。", "repo.commit": "扫描版本", "repo.notScanned": "尚未扫描", "repo.updated": "上次刷新", "repo.copyBody": "复制正文", "repo.copied": "已复制", "repo.copyFailed": "复制失败",
     "error.repo.tooLarge": "仓库超过大小限制，请选择较小的技能仓库。", "error.repo.transientTooLarge": "仓库临时下载体积过大（包含 Git 历史对象），请选择较小的技能仓库。", "error.repo.disk": "磁盘剩余空间不足，无法检出该仓库。请清理磁盘空间后重试。", "error.repo.noGit": "未检测到 Git 命令行工具，请先安装 Git 后重试。", "error.repo.installState": "技能文件已保留，但来源状态未确认。请恢复磁盘写入后重新打开仓库页，系统会校验文件并恢复记录。", "error.repo.capacity": "安装来源状态超过 16 MiB。请先清理不需要的回收记录或旧身份，仍有效的安装副本会保留。",
     "error.repo.invalid": "仓库地址、路径或内容无效，请检查输入及仓库大小。", "error.repo.network": "仓库访问失败，请检查网络或稍后重试。上次列表已保留。", "error.repo.state": "仓库状态文件损坏或无法读取，请保留文件并修复后重试。", "error.repo.conflict": "同名技能已存在或安装失败，本地文件未被覆盖。", "error.repo.enableState": "技能文件已撤销，但启用状态无法写入。请恢复磁盘写入后重试安装。",
+    "error.repo.empty": "批量操作没有可处理的项目。", "error.repo.tooMany": "单次批量操作最多 100 项，请减少选择。", "error.repo.duplicate": "批量操作包含重复项目。", "repo.bulk.limit": "单次操作最多 100 项，请减少选择。", "repo.bulk.scope": "操作包含所有已选项目，包括筛选隐藏的项目。",
+    "repo.bulk.toolbar": "批量操作", "repo.bulk.selected": "已选 {count} 项", "repo.bulk.install": "安装 {count}", "repo.bulk.update": "检查更新 {count}", "repo.bulk.uninstall": "卸载 {count}", "repo.bulk.rollback": "恢复上一版 {count}", "repo.bulk.selectRepo": "全选 {name} 中的技能", "repo.bulk.selectRepoShort": "全选", "repo.bulk.clear": "清除选择",
+    "repo.bulk.selectSkill": "选择技能 {name}", "repo.bulk.selectCopy": "选择 {name} 的位置 {target}", "repo.bulk.checkingAll": "正在预检 {total} 项…", "repo.bulk.replacing": "正在批量替换技能文件…", "repo.bulk.progress": "正在执行 {index}/{total}…",
+    "repo.bulk.preflightTitle": "批量预检", "repo.bulk.preflightHint": "预检不会修改文件。执行时按顺序逐个处理，单项失败不会影响其余项。", "repo.bulk.blockingHint": "批量操作进行中，请勿关闭窗口或刷新页面。", "repo.bulk.failed": "操作失败", "repo.bulk.installingCount": "安装中 {index}/{total}", "repo.bulk.uninstallingCount": "卸载中 {index}/{total}", "repo.bulk.noUpdates": "没有可更新的技能（已检查 {total} 项）",
+    "repo.bulk.installTitle": "批量安装 {count} 个技能", "repo.bulk.updateTitle": "批量更新 {count} 个技能", "repo.bulk.uninstallTitle": "批量卸载 {count} 个技能", "repo.bulk.rollbackTitle": "批量恢复 {count} 个技能",
+    "repo.bulk.bucket.available": "可安装", "repo.bulk.bucket.updatable": "可更新", "repo.bulk.bucket.rollbackable": "可恢复", "repo.bulk.bucket.unchanged": "无变化", "repo.bulk.bucket.localModified": "本地已修改", "repo.bulk.bucket.uninstallable": "可卸载", "repo.bulk.bucket.unavailable": "位置不可用", "repo.bulk.bucket.error": "预检失败",
+    "repo.bulk.policyConflict": "遇到同名冲突或失败时停止整批", "repo.bulk.policyLocalModified": "本地已修改项：备份后覆盖", "repo.bulk.apply": "开始执行", "repo.bulk.executable": "将执行 {count} 项，跳过 {skipped} 项",
+    "repo.bulk.doneTitle": "批量结果", "repo.bulk.result": "批量完成：成功 {ok} · 失败 {failed} · 跳过 {skipped} · 未执行 {notRun}", "repo.bulk.retry": "重试失败项", "repo.bulk.refreshWarning": "批量操作已完成，但列表刷新失败；请手动刷新确认。",
+    "repo.bulk.status.ok": "成功", "repo.bulk.status.failed": "失败", "repo.bulk.status.skipped": "跳过", "repo.bulk.status.notRun": "未执行",
+    "repo.bulk.reason.conflict": "同名冲突", "repo.bulk.reason.unchanged": "无变化", "repo.bulk.reason.localModified": "本地已修改", "repo.bulk.reason.unavailable": "位置不可用", "repo.bulk.reason.error": "预检失败",
   },
   en: {
     "repo.catalog.unknownLocation": "Location unknown",
@@ -62,6 +80,16 @@ export const repositoryLocales = {
     "repo.remove": "Remove repository", "repo.removeHint": "This removes the subscription only. Installed skills are kept.", "repo.removeConfirm": "Confirm removal", "repo.cancel": "Cancel", "repo.close": "Close", "repo.loading": "Working…", "repo.success": "Completed", "repo.installHint": "Skills may include scripts. Read the instructions and trust the source before installing. Resources are copied; scripts are not executed.", "repo.commit": "Snapshot version", "repo.notScanned": "Not scanned yet", "repo.updated": "Last refreshed", "repo.copyBody": "Copy body", "repo.copied": "Copied", "repo.copyFailed": "Copy failed",
     "error.repo.tooLarge": "Repository exceeds size limit. Choose a smaller repository.", "error.repo.transientTooLarge": "Repository transient download size exceeds limit (including Git objects). Choose a smaller repository.", "error.repo.disk": "Not enough free disk space to check out this repository. Free up space and retry.", "error.repo.noGit": "Git command-line tool not found. Please install Git and retry.", "error.repo.installState": "Skill files were preserved but source tracking could not be saved. Restore disk write access and reopen Repositories to verify files and recover the record.", "error.repo.capacity": "Source tracking exceeds 16 MiB. Remove unneeded Trash records or legacy identities first. Active installation copies are kept.",
     "error.repo.invalid": "Invalid repository URL, path or contents. Check the input and repository size.", "error.repo.network": "Repository request failed. Check your connection or retry later. The previous catalog was kept.", "error.repo.state": "Repository state is corrupt or unreadable. Preserve the file and repair it before retrying.", "error.repo.conflict": "A skill with this name exists or installation failed. Local files were not overwritten.", "error.repo.enableState": "The copied skill was removed because its enabled state could not be saved. Restore disk write access and install again.",
+    "error.repo.empty": "No items to process.", "error.repo.tooMany": "A batch can contain at most 100 items. Reduce the selection.", "error.repo.duplicate": "The batch contains a duplicate item.", "repo.bulk.limit": "A batch can contain at most 100 items. Reduce the selection.", "repo.bulk.scope": "Actions include all selected items, including those hidden by filters.",
+    "repo.bulk.toolbar": "Bulk actions", "repo.bulk.selected": "{count} selected", "repo.bulk.install": "Install {count}", "repo.bulk.update": "Check updates {count}", "repo.bulk.uninstall": "Uninstall {count}", "repo.bulk.rollback": "Restore previous {count}", "repo.bulk.selectRepo": "Select all skills in {name}", "repo.bulk.selectRepoShort": "Select all", "repo.bulk.clear": "Clear selection",
+    "repo.bulk.selectSkill": "Select skill {name}", "repo.bulk.selectCopy": "Select location {target} for {name}", "repo.bulk.checkingAll": "Preflighting {total} items…", "repo.bulk.replacing": "Replacing skill files…", "repo.bulk.progress": "Running {index}/{total}…",
+    "repo.bulk.preflightTitle": "Bulk preflight", "repo.bulk.preflightHint": "Preflight only reads state and changes nothing. Items run one by one; a failed item does not stop the rest.", "repo.bulk.blockingHint": "The batch is running. Keep this window open and do not refresh.", "repo.bulk.failed": "Operation failed", "repo.bulk.installingCount": "Installing {index}/{total}", "repo.bulk.uninstallingCount": "Uninstalling {index}/{total}", "repo.bulk.noUpdates": "No updates available (checked {total})",
+    "repo.bulk.installTitle": "Install {count} skills", "repo.bulk.updateTitle": "Update {count} skills", "repo.bulk.uninstallTitle": "Uninstall {count} skills", "repo.bulk.rollbackTitle": "Restore {count} skills",
+    "repo.bulk.bucket.available": "Installable", "repo.bulk.bucket.updatable": "Updatable", "repo.bulk.bucket.rollbackable": "Restorable", "repo.bulk.bucket.unchanged": "No changes", "repo.bulk.bucket.localModified": "Locally modified", "repo.bulk.bucket.uninstallable": "Uninstallable", "repo.bulk.bucket.unavailable": "Location unavailable", "repo.bulk.bucket.error": "Preflight failed",
+    "repo.bulk.policyConflict": "Stop the batch on a name conflict or failure", "repo.bulk.policyLocalModified": "Locally modified items: back up and overwrite", "repo.bulk.apply": "Run batch", "repo.bulk.executable": "{count} will run, {skipped} will be skipped",
+    "repo.bulk.doneTitle": "Bulk results", "repo.bulk.result": "Batch finished: {ok} succeeded · {failed} failed · {skipped} skipped · {notRun} not run", "repo.bulk.retry": "Retry failed items", "repo.bulk.refreshWarning": "The batch finished but the list refresh failed. Refresh manually to confirm.",
+    "repo.bulk.status.ok": "Done", "repo.bulk.status.failed": "Failed", "repo.bulk.status.skipped": "Skipped", "repo.bulk.status.notRun": "Not run",
+    "repo.bulk.reason.conflict": "Name conflict", "repo.bulk.reason.unchanged": "No changes", "repo.bulk.reason.localModified": "Locally modified", "repo.bulk.reason.unavailable": "Location unavailable", "repo.bulk.reason.error": "Preflight failed",
   },
 };
 
@@ -79,6 +107,31 @@ const CSS = `
 .dssm-btn-danger:not(:disabled){color:var(--dsw-alias-state-error-primary,#ef7272)}
 .dssm-status-badge{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:var(--dsw-radius-sm,8px)}
 .dssm-repo-row .dssm-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;font-weight:650;color:var(--dsw-alias-label-primary,#eeeeee)}.dssm-repo-row{display:flex;flex-direction:column;gap:6px;padding:11px 13px;border-top:0.5px solid var(--dsw-alias-border-l1,#3a3a3a);background:transparent}.dssm-repo-head{display:flex;align-items:center;gap:8px;min-width:0;flex-wrap:nowrap}.dssm-repo-actions{display:flex;align-items:center;gap:8px;flex:none;flex-wrap:nowrap}.dssm-repo-actions button{flex:none}.dssm-repo-actions .dssm-repo-copy-actions{gap:8px;margin-left:0}.dssm-repo-main{flex:1;min-width:0}.dssm-repo-main>.dssm-repo-metadata{margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dssm-repo-description{margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--dsw-alias-label-tertiary,#a0a0a0);font-size:12px;line-height:18px}.dssm-repo-copies{display:flex;flex-direction:column;gap:2px;min-width:0}.dssm-repo-copy{display:flex;align-items:center;gap:8px;min-width:0;padding:0;border:0;background:transparent}.dssm-repo-copy .dssm-repo-metadata{font-size:12px;line-height:18px}.dssm-repo-copy-actions{display:flex;align-items:center;gap:8px;margin-left:auto;flex:none}.dssm-repo-spinner{display:inline-flex;align-items:center;justify-content:center;animation:dssm-spin .8s linear infinite;transform-origin:center;flex:none}.dssm-icon-action .dssm-repo-spinner{margin:0}button:not(.dssm-icon-action) .dssm-repo-spinner{margin-right:6px}@keyframes dssm-spin{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.dssm-repo-spinner{animation:none}}.dssm-repo-commit-badge{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,\"Liberation Mono\",\"Courier New\",monospace;font-size:11px;line-height:16px;padding:1px 6px;border-radius:var(--dsw-radius-xs,4px);background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-secondary,#b9b9b9);border:0.5px solid var(--dsw-alias-border-l1,#3a3a3a);margin-left:12px;white-space:nowrap;user-select:all}.dssm-repo-panel{display:flex;flex-direction:column;gap:12px;min-width:0}.dssm-repo-panel .dssm-desc{margin:0}.dssm-repo-metadata{font-size:11px;color:var(--dsw-alias-label-tertiary,#a0a0a0);overflow-wrap:anywhere}.dssm-repo-panel .dssm-source{flex-shrink:0;overflow:hidden;border:0.5px solid var(--dsw-alias-border-l2,#494949);border-radius:var(--dsw-radius-xl,20px);background:transparent}.dssm-repo-panel .dssm-source-title{font-size:14px;font-weight:650;overflow-wrap:anywhere;display:inline-flex;align-items:center;gap:7px}.dssm-repo-panel .dssm-source-brand{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;flex-shrink:0;color:var(--dsw-alias-label-secondary,#b9b9b9)}.dssm-repo-panel .dssm-source-brand svg{width:16px;height:16px;display:block}.dssm-repo-panel .dssm-source-path{min-width:0;margin-left:auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--dsw-alias-label-tertiary,#a0a0a0);font-size:11px}.dssm-repo-panel .dssm-count{padding:1px 6px;border-radius:999px;corner-shape:round;background:var(--dsw-alias-bg-layer-2,rgba(255,255,255,0.08));font-size:11px;color:var(--dsw-alias-label-secondary,#b9b9b9)}.dssm-repo-manage-row{flex-direction:row;align-items:center;justify-content:space-between;gap:12px}.dssm-repo-manage-row .dssm-repo-main{flex:1}.dssm-repo-manage-row .dssm-repo-actions{margin-left:auto}.dssm-repo-manage-row .dssm-repo-actions button{width:auto;flex:none}.dssm-repo-head .dssm-repo-actions{gap:8px}.dssm-repo-actions>.dssm-repo-copy-actions{display:contents}.dssm-icon-action{width:22px;min-width:22px;height:22px;padding:0;border-radius:var(--dsw-radius-sm,8px);background:transparent;color:var(--dsw-alias-label-secondary,#b9b9b9);border-color:var(--dsw-alias-border-l2,#494949)}.dssm-icon-action:not(:disabled):not(.dssm-icon-danger):hover{color:var(--dsw-alias-link,#4176e6)!important;border-color:var(--dsw-alias-link,#4176e6)!important}.dssm-icon-action.dssm-icon-danger{color:var(--dsw-alias-state-error-primary,#ef7272);border-color:var(--dsw-alias-state-error-primary,#ef7272)}.dssm-repo-copies{display:flex;flex-direction:column;gap:4px;width:100%;margin-top:2px}.dssm-repo-copy{display:flex;align-items:center;gap:8px;width:100%;min-width:0;box-sizing:border-box;padding:4px 4px 4px 8px;border-radius:var(--dsw-radius-md,12px);background:var(--dsw-alias-bg-layer-1,rgba(255,255,255,0.04))}.dssm-repo-copy .dssm-repo-metadata{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dssm-repo-copy .dssm-repo-copy-actions{margin-left:0}.dssm-repo-copy .dssm-icon-action.dssm-icon-danger{border-color:var(--dsw-alias-border-l2,#494949)}.dssm-repo-copy .dssm-icon-action.dssm-icon-danger:not(:disabled):hover{color:var(--dsw-alias-state-error-primary,#ef7272)!important;border-color:var(--dsw-alias-state-error-primary,#ef7272)!important}.dssm-repo-copy .dssm-repo-metadata{display:flex;align-items:center;min-width:0;flex:1;overflow:hidden;white-space:nowrap}.dssm-location-lead{flex:0 1 auto;max-width:50%;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dssm-location-path{margin-left:auto;min-width:0;max-width:50%;flex:0 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right}`;
+
+/** 批量选择与结果矩阵的样式；与主样式分开，避免影响其他面板。 */
+const BULK_CSS = `
+.dssm-bulk-check{flex:none;width:14px;height:14px;margin:0;accent-color:var(--dsw-alias-state-success-primary,#51b976);cursor:pointer}
+.dssm-bulk-check:disabled{cursor:not-allowed;opacity:.5}
+.dssm-bulk-repo{display:inline-flex;align-items:center;gap:5px;flex:none;font-size:12px;color:var(--dsw-alias-label-secondary,#b9b9b9);cursor:pointer;user-select:none;white-space:nowrap}
+.dssm-bulk-repo:hover{color:var(--dsw-alias-label-primary,#eeeeee)}
+.dssm-bulk-bar{display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:8px 10px;border:0.5px solid var(--dsw-alias-border-l2,#494949);border-radius:var(--dsw-radius-md,10px);background:var(--dsw-alias-bg-layer-1,transparent);margin:0 0 10px}
+.dssm-bulk-count{font-size:12px;color:var(--dsw-alias-label-secondary,#b9b9b9);margin-right:4px}
+.dssm-bulk-bar button{flex:none}
+.dssm-bulk-summary{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:6px}
+.dssm-bulk-summary li{font-size:12px;padding:2px 8px;border-radius:var(--dsw-radius-xs,4px);background:var(--dsw-alias-interactive-bg-hover,transparent);color:var(--dsw-alias-label-secondary,#b9b9b9)}
+.dssm-bulk-policy{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--dsw-alias-label-secondary,#b9b9b9);margin:6px 0;cursor:pointer}
+.dssm-bulk-results{display:flex;flex-direction:column;gap:4px;max-height:260px;overflow:auto;margin:6px 0;padding:0;list-style:none}
+.dssm-bulk-results li{display:flex;align-items:flex-start;flex-wrap:wrap;min-width:0;overflow-wrap:anywhere;gap:8px;font-size:12px;padding:4px 6px;border-radius:var(--dsw-radius-xs,4px);background:var(--dsw-alias-interactive-bg-hover,transparent)}
+.dssm-bulk-results .dssm-bulk-status{flex:none;font-weight:600}
+.dssm-bulk-results .dssm-bulk-status.ok{color:var(--dsw-alias-state-success-primary,#51b976)}
+.dssm-bulk-results .dssm-bulk-status.failed{color:var(--dsw-alias-state-error-primary,#ef7272)}
+.dssm-bulk-results .dssm-bulk-detail{margin-left:auto;min-width:0;overflow-wrap:anywhere;color:var(--dsw-alias-label-tertiary,#a0a0a0);max-width:50%}
+.dssm-bulk-results .dssm-bulk-name,.dssm-bulk-results .dssm-bulk-reason{min-width:0;overflow-wrap:anywhere}
+.dssm-bulk-progress{display:flex;align-items:center;gap:8px;margin:8px 0 2px}
+.dssm-bulk-progress-track{flex:1;height:6px;border-radius:999px;background:var(--dsw-alias-interactive-bg-hover,#333);overflow:hidden}
+.dssm-bulk-progress-bar{height:100%;border-radius:999px;background:var(--dsw-alias-state-success-primary,#51b976);transition:width .2s ease}
+.dssm-bulk-progress-text{font-size:12px;color:var(--dsw-alias-label-secondary,#b9b9b9);white-space:nowrap}
+`;
 
 /** 返回动作区与内容区，使现有标题、页签顺序保持不变。 */
 
@@ -157,6 +210,19 @@ export function createRepositoryUI({ react, Modal, Input, Button, SourceSelect, 
     const [status, setStatus] = react.useState("");
     const [expanded, setExpanded] = react.useState<Record<string, boolean>>({});
     const [modal, setModal] = react.useState<RepoModal | null>(null);
+    const [selectedKeys, setSelectedKeysInternal] = react.useState<Record<string, true>>(() => {
+      // 批量勾选随会话持久化：刷新页面后不丢失；存储不可用时静默降级为内存态。
+      try { const stored = sessionStorage.getItem("dssm-bulk-selection"); return stored ? JSON.parse(stored) as Record<string, true> : {}; } catch { return {}; }
+    });
+    function setSelectedKeys(next: Record<string, true> | ((prev: Record<string, true>) => Record<string, true>)) {
+      setSelectedKeysInternal(prev => {
+        const value = typeof next === "function" ? next(prev) : next;
+        try { sessionStorage.setItem("dssm-bulk-selection", JSON.stringify(value)); } catch { /* 忽略配额/隐私模式失败 */ }
+        return value;
+      });
+    }
+    const [bulk, setBulk] = react.useState<BulkState | null>(null);
+    const [bulkPolicy, setBulkPolicy] = react.useState<BulkPolicy>({ localModified: 'skip' });
     const [destination, setDestination] = react.useState<DestinationValue>(defaultDestination());
     const [workspaces, setWorkspaces] = react.useState<WorkspaceRow[]>([]);
     const [subsource, setSubsource] = react.useState<'github' | 'skillsh' | 'clawhub'>('github');
@@ -206,6 +272,7 @@ export function createRepositoryUI({ react, Modal, Input, Button, SourceSelect, 
         const roots = (data.installRoots || []).filter(root => root.key === "dsh" || root.key === "agents");
         setRepos(data.repositories || []); setInstallRoots(roots); setCatalogInstallIds(data.catalogInstalls || []); setCatalogCopies(data.catalogCopies || []);
         setCatalogUnknownIds(data.catalogUnknownIds || []); setCatalogWarnings(data.catalogWarnings || []);
+        pruneSelection(data.repositories || []);
         if (destination.scope === 'user' && !roots.some(root => root.key === destination.location && root.available))
           setDestination({ ...destination, location: roots.find(root => root.available)?.key || 'dsh' });
         // 工作区列表只读登记信息，失败不影响仓库列表本身。
@@ -261,6 +328,26 @@ export function createRepositoryUI({ react, Modal, Input, Button, SourceSelect, 
       return copies.slice().sort((left, right) => Number(!!left.installedWorkspace) - Number(!!right.installedWorkspace));
     }
     function copiesOf(skill: RepoSkill): RepoCopy[] { return sortCopies((skill.installations ?? (skill.installedRoot ? [skill] : [])).filter(copy => copy.tracked === true)); }
+    function installKey(repo: RepoView, skill: RepoSkill) { return 'install\u0001' + repo.id + '\u0001' + skill.path; }
+    function copyKey(repo: RepoView, skill: RepoSkill, copy: RepoCopy) { return 'copy\u0001' + repo.id + '\u0001' + skill.path + '\u0001' + (copy.installedRoot || '') + '\u0001' + (copy.installedWorkspace || ''); }
+    function toggleSelected(key: string) {
+      setSelectedKeys(prev => { const next = { ...prev }; if (next[key]) delete next[key]; else next[key] = true; return next; });
+    }
+    function clearSelection() { setSelectedKeys({}); }
+    function pruneSelection(next: RepoView[]) {
+      if (!next.length) return;
+      setSelectedKeys(prev => {
+        const valid: Record<string, true> = {};
+        for (const repo of next) for (const skill of repo.skills) {
+          if (skill.status === 'available') valid[installKey(repo, skill)] = true;
+          for (const copy of copiesOf(skill)) valid[copyKey(repo, skill, copy)] = true;
+        }
+        const kept: Record<string, true> = {};
+        let changed = false;
+        for (const key of Object.keys(prev)) { if (valid[key]) kept[key] = true; else changed = true; }
+        return changed ? kept : prev;
+      });
+    }
     function message(error: unknown) {
       const item = error as Diagnostic & {message?: string};
       const translated = translateError(t, error) || item.message || String(error);
@@ -453,7 +540,7 @@ export function createRepositoryUI({ react, Modal, Input, Button, SourceSelect, 
     function selectSubsource(next: 'github' | 'skillsh' | 'clawhub') {
       setModal(null);
       setSubsource(next);
-
+      clearSelection();
     }
     function catalogNearBottom(node: HTMLElement) {
       const rect = node.getBoundingClientRect();
@@ -654,9 +741,11 @@ export function createRepositoryUI({ react, Modal, Input, Button, SourceSelect, 
         pending ? h(LoadingIconComponent, { size: 14, className: "dssm-repo-spinner" }) : null, t(pending ? "repo.refreshing" : "repo.refresh"));
     }
     function isBusyModal(m: RepoModal | null) {
-      return !!m && (m.type === "install" || m.type === "uninstall" || m.type === "catalog-install" || m.type === "catalog-uninstall" || m.type === "review" || m.type === "rollback");
+      if (!m) return false;
+      if (m.type === "bulk-review") return bulk?.phase === "running";
+      return m.type === "install" || m.type === "uninstall" || m.type === "catalog-install" || m.type === "catalog-uninstall" || m.type === "review" || m.type === "rollback";
     }
-    function close() { if (locked.current && isBusyModal(modal)) return; setCopyState("idle"); setModal(null); }
+    function close() { if (locked.current && isBusyModal(modal)) return; setCopyState("idle"); if (modal && (modal.type === "bulk-review" || modal.type === "bulk-done")) setBulk(null); setModal(null); }
     function openInstallation(type: 'install' | 'uninstall', repo: RepoView, skill: RepoSkill, copy?: RepoCopy) {
       if (locked.current || type === 'uninstall' && (!copy || !copy.canUninstall || !copyTarget(copy))) return;
       setFeedback(null); setModal({ type, repo, skill, copy });
@@ -712,6 +801,190 @@ export function createRepositoryUI({ react, Modal, Input, Button, SourceSelect, 
         setInstallation({ ...target, key }); setFeedback({ key }); setModal(null);
         if (onInstalled) await onInstalled();
       });
+    }
+    function destinationLabel() {
+      if (destination.scope === 'user') return installedDestination(destination.location);
+      const row = workspaces.find(item => item.registeredPaths.includes(destination.workspace) || item.projectRoot === destination.workspace);
+      return (row ? row.name : t('repo.scope.project')) + ' · .dsh/skills';
+    }
+    function bucketLabel(bucket: BulkBucket) { const suffix = bucket === 'local-modified' ? 'localModified' : bucket; return t('repo.bulk.bucket.' + suffix); }
+    function bucketCounts(items: BulkItem[]) {
+      const counts: Record<string, number> = {};
+      for (const item of items) counts[item.bucket] = (counts[item.bucket] || 0) + 1;
+      return counts;
+    }
+    function bulkSkipReason(item: BulkItem, op: BatchOp, policy: BulkPolicy): string | null {
+      if (item.bucket === 'error') return 'error';
+      if (op === 'install') return item.bucket === 'available' ? null : 'conflict';
+      if (op === 'uninstall') return item.bucket === 'uninstallable' ? null : 'unavailable';
+      if (item.bucket === 'updatable' || item.bucket === 'rollbackable') return null;
+      if (item.bucket === 'unchanged') return 'unchanged';
+      if (item.bucket === 'local-modified') return policy.localModified === 'overwrite' ? null : 'localModified';
+      return 'unavailable';
+    }
+    function bulkExecutableCount(state: BulkState) {
+      return state.items.filter(item => bulkSkipReason(item, state.op, state.policy) === null).length;
+    }
+    function scheduleBulk(op: BatchOp, items: BulkItem[]) {
+      setBulk({ op, phase: 'preflight', items, results: [], index: 0, policy: bulkPolicy });
+      setModal({ type: 'bulk-review' });
+    }
+    function openBulkInstall(picked: Array<{ repo: RepoView; skill: RepoSkill }> = selection.installs) {
+      const items: BulkItem[] = picked.filter(item => item.skill.status === 'available')
+        .map(item => ({ key: installKey(item.repo, item.skill), kind: 'install' as const, repo: item.repo, skill: item.skill, bucket: 'available' as BulkBucket }));
+      if (items.length && items.length <= 100) scheduleBulk('install', items);
+    }
+    function openBulkCopies(op: 'update' | 'uninstall' | 'rollback', picked = selection.copies) {
+      const items: BulkItem[] = [];
+      for (const item of picked) {
+        const copy = item.copy;
+        if (!copyTarget(copy)) continue;
+        if (op === 'update' && !copy.tracked) continue;
+        if (op === 'uninstall' && !copy.canUninstall) continue;
+        if (op === 'rollback' && !copy.canRollback) continue;
+        items.push({ key: copyKey(item.repo, item.skill, copy), kind: 'copy', repo: item.repo, skill: item.skill, copy, bucket: op === 'uninstall' ? 'uninstallable' : 'available' });
+      }
+      return preflightBulk(op, items);
+    }
+    function preflightBulk(op: 'update' | 'uninstall' | 'rollback', rawItems: BulkItem[]) {
+      if (!rawItems.length || rawItems.length > 100) return;
+      const items = op === 'uninstall' ? rawItems.map(item => ({ ...item, bucket: 'uninstallable' as BulkBucket })) : rawItems;
+      if (op === 'uninstall') { scheduleBulk(op, items); return; }
+      return perform(async () => {
+        // 一次 previewMany 拿回全部预检结果：格式校验在本地先做（拿不到 scope 的直接标 unavailable）。
+        const checked: BulkItem[] = new Array(items.length);
+        const slots: number[] = new Array(items.length);
+        const requests: Array<{ item: BulkItem; scope: NonNullable<CopyTarget>; rollback: boolean }> = [];
+        for (let index = 0; index < items.length; index++) {
+          const item = items[index];
+          const scope = copyTarget(item.copy!);
+          if (!scope) { checked[index] = { ...item, bucket: 'unavailable' }; continue; }
+          slots[index] = requests.length;
+          requests.push({ item, scope, rollback: op === 'rollback' });
+        }
+        if (requests.length) {
+          if (mounted.current) setFeedback({ key: 'repo.bulk.checkingAll', params: { total: requests.length } });
+          try {
+            const body = await post('previewMany', { items: requests.map(entry => ({ id: entry.item.repo.id, path: entry.item.skill.path, ...entry.scope, rollback: entry.rollback })) });
+            const results = body && Array.isArray((body as { results?: unknown[] }).results) ? (body as { results: Array<{ id: string; path: string; rollback?: boolean; ok: boolean; token?: string; commit?: string | null; localModified?: boolean; changes?: unknown; error?: string; code?: string; params?: unknown }> }).results : [];
+            for (let index = 0; index < items.length; index++) {
+              if (checked[index]) continue;
+              const entry = requests[slots[index]];
+              const result = results[slots[index]];
+              if (!result || !result.ok) {
+                checked[index] = { ...entry.item, bucket: 'error', error: Object.assign(new Error(result?.error || t('repo.bulk.failed')), { code: result?.code || 'error.repo.invalid', params: result?.params }) };
+                continue;
+              }
+              const classified = classifyPreview(result as unknown as ApiRoutes['/repositories/preview']);
+              checked[index] = { ...entry.item, token: result.token, bucket: entry.rollback && classified === 'updatable' ? 'rollbackable' : classified };
+            }
+          } catch (caught) {
+            for (let index = 0; index < items.length; index++) { if (!checked[index]) checked[index] = { ...items[index], bucket: 'error', error: caught }; }
+          }
+        }
+        if (!mounted.current) return;
+        if (op === 'update' && checked.every(item => item.bucket === 'unchanged')) {
+          // 没有可更新的技能时不弹窗，直接在反馈条说明结果。
+          setFeedback({ key: 'repo.bulk.noUpdates', params: { total: checked.length } });
+          return;
+        }
+        setFeedback(null);
+        scheduleBulk(op, checked);
+      }, false, true);
+    }
+    async function applyBulk() {
+      const state = bulk;
+      if (!state || state.phase !== 'preflight' || locked.current) return;
+      const items = state.items;
+      // 执行期间保持预检弹窗并锁定关闭，避免用户干预仍在进行的批量操作。
+      setBulk({ ...state, phase: 'running', index: 0 });
+      const task = perform(async () => {
+        const outcomes = new Map<string, BatchOutcome>();
+        const runnable: BulkItem[] = [];
+        for (const item of items) {
+          const reason = bulkSkipReason(item, state.op, state.policy);
+          if (reason === 'error') { outcomes.set(item.key, { status: 'failed', error: item.error }); continue; }
+          if (reason) { outcomes.set(item.key, { status: 'skipped', reason }); continue; }
+          runnable.push(item);
+        }
+        const scope = state.op === 'install' ? destinationPayload(destination) : null;
+        if (state.op === 'install' && runnable.length && scope) {
+          // 批量安装一次请求完成：服务端只做一次状态扫描与状态写入，不再逐项重启。
+          try {
+            const body = await post('installMany', { items: runnable.map(item => ({ id: item.repo.id, path: item.skill.path })), ...scope });
+            const results = body && Array.isArray((body as { results?: unknown[] }).results) ? (body as { results: Array<{ id: string; path: string; ok: boolean; error?: string; code?: string; params?: unknown }> }).results : [];
+            const byKey = new Map<string, { ok: boolean; error?: string; code?: string; params?: unknown }>();
+            for (const result of results) byKey.set('install\u0001' + result.id + '\u0001' + result.path, result);
+            for (const item of runnable) {
+              const result = byKey.get(item.key);
+              if (!result) outcomes.set(item.key, { status: 'failed', error: Object.assign(new Error(t('repo.bulk.failed')), { code: 'error.repo.invalid' }) });
+              else if (result.ok) outcomes.set(item.key, { status: 'ok' });
+              else outcomes.set(item.key, { status: 'failed', error: Object.assign(new Error(result.error || t('repo.bulk.failed')), { code: result.code, params: result.params }) });
+            }
+          } catch (caught) {
+            for (const item of runnable) outcomes.set(item.key, { status: 'failed', error: caught });
+          }
+        } else if (state.op === 'uninstall' && runnable.length) {
+          // 批量卸载一次请求完成：服务端只做一次状态扫描与状态写入，逐项移入回收站。
+          try {
+            const body = await post('uninstallMany', { items: runnable.map(item => ({ id: item.repo.id, path: item.skill.path, ...(item.copy?.installedRoot ? { root: item.copy.installedRoot } : {}), ...(item.copy?.installedWorkspace ? { workspace: item.copy.installedWorkspace } : {}) })) });
+            const results = body && Array.isArray((body as { results?: unknown[] }).results) ? (body as { results: Array<{ id: string; path: string; root?: string; workspace?: string; ok: boolean; error?: string; code?: string; params?: unknown }> }).results : [];
+            const leftover = results.slice();
+            const byKey = new Map<string, { ok: boolean; error?: string; code?: string; params?: unknown }>();
+            for (const result of results) byKey.set('copy\u0001' + result.id + '\u0001' + result.path + '\u0001' + (result.root || '') + '\u0001' + (result.workspace || ''), result);
+            for (const item of runnable) {
+              let result = byKey.get(item.key);
+              if (!result) {
+                const fallback = leftover.findIndex(candidate => candidate.id === item.repo.id && candidate.path === item.skill.path);
+                if (fallback >= 0) { result = leftover[fallback]; leftover.splice(fallback, 1); }
+              }
+              if (!result) outcomes.set(item.key, { status: 'failed', error: Object.assign(new Error(t('repo.bulk.failed')), { code: 'error.repo.invalid' }) });
+              else if (result.ok) outcomes.set(item.key, { status: 'ok' });
+              else outcomes.set(item.key, { status: 'failed', error: Object.assign(new Error(result.error || t('repo.bulk.failed')), { code: result.code, params: result.params }) });
+            }
+          } catch (caught) {
+            for (const item of runnable) outcomes.set(item.key, { status: 'failed', error: caught });
+          }
+        } else if (runnable.length) {
+          // 批量更新/回滚一次请求完成：服务端逐项复用单技能 replace 事务（token/备份/回滚逻辑不变），结果按请求顺序返回。
+          try {
+            const body = await post('updateMany', { items: runnable.map(item => ({ id: item.repo.id, path: item.skill.path, ...(copyTarget(item.copy!) || {}), rollback: state.op === 'rollback', token: item.token, overwrite: item.bucket === 'local-modified' && state.policy.localModified === 'overwrite' })) });
+            const results = body && Array.isArray((body as { results?: unknown[] }).results) ? (body as { results: Array<{ id: string; path: string; ok: boolean; error?: string; code?: string; params?: unknown }> }).results : [];
+            for (let index = 0; index < runnable.length; index++) {
+              const item = runnable[index];
+              const result = results[index];
+              if (!result) outcomes.set(item.key, { status: 'failed', error: Object.assign(new Error(t('repo.bulk.failed')), { code: 'error.repo.invalid' }) });
+              else if (result.ok) outcomes.set(item.key, { status: 'ok' });
+              else outcomes.set(item.key, { status: 'failed', error: Object.assign(new Error(result.error || t('repo.bulk.failed')), { code: result.code, params: result.params }) });
+            }
+          } catch (caught) {
+            for (const item of runnable) outcomes.set(item.key, { status: 'failed', error: caught });
+          }
+        }
+        const mapped: BulkResult[] = items.map(item => {
+          const outcome = outcomes.get(item.key) || { status: 'notRun' as const };
+          return { key: item.key, label: item.skill.name, detail: item.copy ? locationLabel(item.copy) : destinationLabel(), status: outcome.status, error: outcome.error, reason: outcome.reason };
+        });
+        if (!mounted.current) return;
+        const refreshed = await Promise.allSettled([load(), Promise.resolve().then(() => onInstalled?.())]);
+        if (!mounted.current) return;
+        setBulk({ ...state, phase: 'done', results: mapped, index: items.length });
+        setModal({ type: 'bulk-done' });
+        // 结果摘要已显示在结果弹窗中，页面反馈条只保留刷新失败提示，避免同一摘要出现两次。
+        setFeedback(refreshed.some(result => result.status === 'rejected') ? { key: 'repo.bulk.refreshWarning' } : null);
+      }, false);
+      return task;
+    }
+    function retryBulk() {
+      const state = bulk;
+      if (!state || state.phase !== 'done') return;
+      const failed = new Set(state.results.filter(item => item.status === 'failed').map(item => item.key));
+      const items = state.items.filter(item => failed.has(item.key));
+      if (!items.length) return;
+      const op = state.op;
+      setBulk(null); setModal(null);
+      if (op === 'install') { openBulkInstall(items.map(item => ({ repo: item.repo, skill: item.skill }))); return; }
+      return preflightBulk(op as 'update' | 'uninstall' | 'rollback', items.map(item => ({ ...item, token: undefined, bucket: 'available' as BulkBucket, error: undefined })));
     }
     function toolbarIconButton(key: string, iconD: string, action: () => unknown) {
       return h(PrimitiveButton, {
@@ -771,6 +1044,17 @@ export function createRepositoryUI({ react, Modal, Input, Button, SourceSelect, 
       button("repo.add", () => { setFeedback(null); setForm({ url: "", ref: "", subdirectory: "" }); setModal({ type: "add" }); }, false),
       button("repo.manage", () => { setFeedback(null); setModal({ type: "manage" }); }));
     const visibleRepos = repos.filter((r) => !source || r.id === source);
+    const selection = (() => {
+      const installs: Array<{ repo: RepoView; skill: RepoSkill }> = [];
+      const copies: Array<{ repo: RepoView; skill: RepoSkill; copy: RepoCopy }> = [];
+      for (const repo of repos) for (const skill of repo.skills) {
+        if (selectedKeys[installKey(repo, skill)]) installs.push({ repo, skill });
+        for (const copy of copiesOf(skill)) if (selectedKeys[copyKey(repo, skill, copy)]) copies.push({ repo, skill, copy });
+      }
+      return { installs, copies };
+    })();
+    const selectionCount = selection.installs.length + selection.copies.length;
+
     function renderCopyActions(repo: RepoView, skill: RepoSkill, copy: RepoCopy) {
       const target = copyTarget(copy);
       const pending = installation?.id === repo.id && installation.path === skill.path && installation.pending && target && installation.root === target.root && installation.workspace === target.workspace;
@@ -781,7 +1065,9 @@ export function createRepositoryUI({ react, Modal, Input, Button, SourceSelect, 
     }
     function renderCopy(repo: RepoView, skill: RepoSkill, copy: RepoCopy) {
       const target = copyTarget(copy);
+      const key = copyKey(repo, skill, copy);
       return h("div", { className: "dssm-repo-copy", key: JSON.stringify([copy.installedRoot, copy.installedWorkspace || ""]) },
+              h("input", { type: "checkbox", className: "dssm-bulk-check", checked: !!selectedKeys[key], disabled: busy || !target, "aria-label": t("repo.bulk.selectCopy", { name: skill.name, target: locationLabel(copy) }), onChange: () => toggleSelected(key) }),
               renderLocation(copy),
               renderCopyActions(repo, skill, copy),
               !target ? h("div", { className: "dssm-note", role: "status" }, t("repo.destinationUnavailable")) : null);
@@ -790,11 +1076,39 @@ export function createRepositoryUI({ react, Modal, Input, Button, SourceSelect, 
       const search = query.trim().toLowerCase();
       const skills = repo.skills.filter((s) => (!status || s.status === status) && (!search || `${s.name} ${s.description} ${repo.owner}/${repo.name}`.toLowerCase().includes(search)));
       const open = expanded[repo.id] === undefined ? !!search || !!status : expanded[repo.id];
+      const bulkKeys: string[] = [];
+      for (const skill of skills) {
+        const skillCopies = copiesOf(skill);
+        const selectable = skillCopies.filter(copy => copyTarget(copy));
+        if (selectable.length) { for (const copy of selectable) bulkKeys.push(copyKey(repo, skill, copy)); }
+        else if (!skillCopies.length && skill.status === 'available') bulkKeys.push(installKey(repo, skill));
+      }
+      const repoAllSelected = bulkKeys.length > 0 && bulkKeys.every(key => selectedKeys[key]);
+      const toggleRepoSelection = () => setSelectedKeys(prev => {
+        const next = { ...prev };
+        if (repoAllSelected) for (const key of bulkKeys) delete next[key];
+        else for (const key of bulkKeys) next[key] = true;
+        return next;
+      });
       const body = open ? (skills.length ? skills.map((skill) => {
         const copies = copiesOf(skill);
         const singleCopy = copies.length === 1 ? copies[0] : undefined;
+        const selectableCopies = copies.filter(copy => copyTarget(copy));
+        const skillKeys = selectableCopies.map(copy => copyKey(repo, skill, copy));
+        const skillSelected = copies.length ? skillKeys.length > 0 && skillKeys.every(key => selectedKeys[key]) : !!selectedKeys[installKey(repo, skill)];
+        const skillSelectable = copies.length ? skillKeys.length > 0 : skill.status === "available";
+        const toggleSkill = () => {
+          if (!copies.length) { toggleSelected(installKey(repo, skill)); return; }
+          setSelectedKeys(prev => {
+            const next = { ...prev };
+            if (skillSelected) for (const key of skillKeys) delete next[key];
+            else for (const key of skillKeys) next[key] = true;
+            return next;
+          });
+        };
         return h("div", { key: skill.path, className: "dssm-repo-row" },
           h("div", { className: "dssm-repo-head" },
+            h("input", { type: "checkbox", className: "dssm-bulk-check", checked: skillSelected, disabled: busy || !skillSelectable, "aria-label": t("repo.bulk.selectSkill", { name: skill.name }), onChange: toggleSkill }),
             h("div", { className: "dssm-repo-main" }, h("div", { className: "dssm-name" }, skill.name), h("div", { className: "dssm-repo-description", title: skill.description }, skill.description),
                           singleCopy && !copyTarget(singleCopy) ? h("div", { className: "dssm-note", role: "status" }, t("repo.destinationUnavailable")) : null,
                           installation?.id === repo.id && installation.path === skill.path ? h("div", { className: "dssm-note" + (installation.error ? " dssm-error" : ""), role: installation.error ? "alert" : "status", "aria-live": "polite" }, feedbackText(installation)) : null),
@@ -812,6 +1126,9 @@ export function createRepositoryUI({ react, Modal, Input, Button, SourceSelect, 
               h("span", { className: "dssm-count" }, skills.length),
               h("span", { className: "dssm-source-path", title: repo.owner + "/" + repo.name }, [repo.ref || t("repo.defaultBranchLabel"), repo.subdirectory].filter(Boolean).join(" · ") || (repo.owner + "/" + repo.name))
             )),
+            h("label", { className: "dssm-bulk-repo", title: t("repo.bulk.selectRepo", { name: repo.owner + "/" + repo.name }) },
+              h("input", { type: "checkbox", className: "dssm-bulk-check", checked: repoAllSelected, disabled: busy || !bulkKeys.length, "aria-label": t("repo.bulk.selectRepo", { name: repo.owner + "/" + repo.name }), onChange: toggleRepoSelection }),
+              h("span", { className: "dssm-bulk-repo-label" }, t("repo.bulk.selectRepoShort"))),
             h("span", { className: "dssm-repo-commit-badge", title: repo.commit || t("repo.notScanned") }, repo.commit ? repo.commit.slice(0, 7) : t("repo.notScanned"))),
           open ? h("div", { className: "dssm-source-body", role: "region" }, body) : null),
         repo.error ? h("div", { className: "dssm-feedback dssm-error", role: "alert" }, message(repo.error)) : null);
@@ -853,6 +1170,51 @@ export function createRepositoryUI({ react, Modal, Input, Button, SourceSelect, 
                 busy ? h("div", { role: "status" }, t("repo.updateProgress")) : null, feedbackNode);
               footer = h(react.Fragment, null, button("repo.cancel", close), button(modal.detail.localModified ? "repo.overwrite" : modal.type === "rollback" ? "repo.confirmRollback" : "repo.confirmUpdate", update, false, !modal.detail.changes.length || !copyTarget(modal.copy)));
             }
+      if (modal.type === "bulk-review" && bulk) {
+        const state = bulk;
+        const running = state.phase === "running";
+        const counts = bucketCounts(state.items);
+        const executable = bulkExecutableCount(state);
+        const kickoffDisabled = !executable || busy || (state.op === "install" && !destinationReady(destination, workspaces, installRoots));
+        const progressText = state.op === "install" ? t("repo.installing") : state.op === "uninstall" ? t("repo.uninstalling") : t("repo.bulk.replacing");
+        description = t("repo.bulk.preflightHint");
+        body = h("div", { className: "dssm-repo-panel", "aria-busy": busy || running },
+          h("div", { className: "dssm-name" }, t("repo.bulk." + state.op + "Title", { count: state.items.length })),
+          running ? h("div", { role: "status", "aria-live": "polite", className: "dssm-bulk-progress" },
+            h(LoadingIconComponent, { size: 14, className: "dssm-repo-spinner" }),
+            h("span", { className: "dssm-bulk-progress-text" }, progressText)) : null,
+          running ? h("p", { className: "dssm-note" }, t("repo.bulk.blockingHint")) : null,
+          h("ul", { className: "dssm-bulk-summary" }, Object.keys(counts).map(bucket => h("li", { key: bucket }, bucketLabel(bucket as BulkBucket) + " · " + counts[bucket]))),
+          h("ul", { className: "dssm-bulk-results" }, state.items.map(item => h("li", { key: item.key },
+            h("span", { className: "dssm-bulk-name" }, item.skill.name),
+            h("span", { className: "dssm-bulk-detail" }, item.repo.owner + "/" + item.repo.name + " · " + item.skill.path + (item.copy ? " · " + locationLabel(item.copy) : "")),
+            h("span", { className: "dssm-bulk-reason" }, bucketLabel(item.bucket)),
+            item.error ? h("span", { className: "dssm-bulk-reason" }, message(item.error)) : null))),
+          state.op === "install" ? h(DestinationPicker, { t, value: destination, disabled: busy || running, allowAgents: true, workspaces, userDestinations: installRoots,
+            onChange: (next: Partial<DestinationValue>) => { if (!locked.current && !running) setDestination({ ...destination, ...next }); } }) : null,
+          state.op === "install" ? h("p", { className: "dssm-note" }, t("repo.installHint")) : null,
+          counts["local-modified"] ? h("label", { className: "dssm-bulk-policy" },
+            h("input", { type: "checkbox", className: "dssm-bulk-check", checked: state.policy.localModified === "overwrite", disabled: busy || running,
+              onChange: (e: { target: { checked: boolean } }) => { const policy = { ...state.policy, localModified: e.target.checked ? "overwrite" as const : "skip" as const }; setBulkPolicy(policy); setBulk(prev => prev ? { ...prev, policy } : prev); } }),
+            t("repo.bulk.policyLocalModified")) : null,
+          running ? null : h("p", { className: "dssm-note", role: "status" }, t("repo.bulk.executable", { count: executable, skipped: state.items.length - executable })),
+          feedbackNode);
+        footer = running ? null : h(react.Fragment, null, button("repo.cancel", close), button("repo.bulk.apply", applyBulk, false, kickoffDisabled));
+      }
+      if (modal.type === "bulk-done" && bulk) {
+        const state = bulk;
+        const summary: Record<BatchStatus, number> = { ok: 0, failed: 0, skipped: 0, notRun: 0 };
+        for (const result of state.results) summary[result.status]++;
+        body = h("div", { className: "dssm-repo-panel" },
+          h("div", { className: "dssm-name" }, t("repo.bulk.result", { ...summary })),
+          h("ul", { className: "dssm-bulk-results" }, state.results.map(result => h("li", { key: result.key },
+            h("span", { className: "dssm-bulk-status " + result.status }, t("repo.bulk.status." + result.status)),
+            h("span", { className: "dssm-bulk-name" }, result.label),
+            h("span", { className: "dssm-bulk-detail", title: result.detail }, result.detail),
+            result.reason ? h("span", { className: "dssm-bulk-reason" }, t("repo.bulk.reason." + result.reason)) : null,
+            result.error ? h("span", { className: "dssm-bulk-reason", title: message(result.error) }, message(result.error)) : null))))
+        footer = h(react.Fragment, null, button("repo.close", close), state.results.some(item => item.status === "failed") ? button("repo.bulk.retry", retryBulk, true) : null);
+      }
       if (modal.type === "add") body = h("form", { className: "dssm-form", onSubmit: (e: React.FormEvent<HTMLFormElement>) => { e.preventDefault(); if (!form.url.trim()) return; perform(async () => { const repo = await post("add", form); await refreshRepo(repo.id); setModal(null); }); } },
         [["url", "repo.url", t("repo.urlPlaceholder")], ["ref", "repo.ref", t("repo.defaultBranch")], ["subdirectory", "repo.directory", t("repo.directoryHint")]].map(([key, label, placeholder]) => h("label", { className: "dssm-field", key }, h("span", { className: "dssm-label" }, t(label)), h(Input, { "aria-label": t(label), value: form[key], placeholder, maxLength: key === "url" ? 2048 : 512, required: key === "url", disabled: busy, onChange: (e: { target: { value: string } }) => setForm({ ...form, [key]: e.target.value }) }))),
         feedbackNode, h("div", { className: "dssm-modal-actions" }, button("repo.cancel", close), button("repo.save", () => { if (form.url.trim()) perform(async () => { const repo = await post("add", form); await refreshRepo(repo.id); setModal(null); }); }, false, !form.url.trim())));
@@ -917,7 +1279,7 @@ export function createRepositoryUI({ react, Modal, Input, Button, SourceSelect, 
         );
       }
       if (modal.type === "detail" && !modal.detail) body = h("div", { role: "status", className: "dssm-repo-panel" }, modal.loading ? t("repo.detailLoading") : null, modal.failed ? feedbackNode : null);
-      dialog = h(Modal, { className: (modal.type === "detail" || modal.type === "catalog-detail") ? "dssm-modal-wide" : undefined, title: t("repo." + (modal.type === "catalog-detail" ? "detail" : modal.type === "catalog-install" ? "install" : modal.type === "catalog-uninstall" ? "uninstall" : modal.type === "remove" ? "remove" : modal.type)), description, footer, closeLabel: t("repo.close"), onClose: close }, body);
+      dialog = h(Modal, { className: (modal.type === "detail" || modal.type === "catalog-detail" || modal.type === "bulk-review" || modal.type === "bulk-done") ? "dssm-modal-wide" : undefined, title: modal.type === "bulk-review" ? t("repo.bulk.preflightTitle") : modal.type === "bulk-done" ? t("repo.bulk.doneTitle") : t("repo." + (modal.type === "catalog-detail" ? "detail" : modal.type === "catalog-install" ? "install" : modal.type === "catalog-uninstall" ? "uninstall" : modal.type === "remove" ? "remove" : modal.type)), description, footer, closeLabel: t("repo.close"), onClose: close }, body);
     }
 
     function catalogInstalled(id: string) { return catalogInstallIds.includes(id) || catalogCopiesOf(id).length > 0; }
@@ -1026,7 +1388,7 @@ export function createRepositoryUI({ react, Modal, Input, Button, SourceSelect, 
     );
 
     const filtersRow = subsource === "github" ? h("div", { className: "dssm-filters" },
-        h("div", { className: "dssm-source-filter" }, select("repo.all", source, setSource, repos.map((r) => [r.id, r.owner + "/" + r.name]))),
+        h("div", { className: "dssm-source-filter" }, select("repo.all", source, (value) => { setSource(value); }, repos.map((r) => [r.id, r.owner + "/" + r.name]))),
         h("div", { className: "dssm-status-filter" }, select("repo.states", status, (value) => { setStatus(value); setExpanded({}); }, ["available", "installed", "update", "conflict", "invalid"].map((s) => [s, t("repo." + s)]))),
         h(Input, { className: "dssm-search", allowClear: true, "aria-label": t("repo.search"), placeholder: t("repo.search"), value: query, onChange: (e: { target: { value: string } }) => { setQuery(e.target.value); setExpanded({}); } }),
         repositoryFilterActions()
@@ -1039,13 +1401,33 @@ export function createRepositoryUI({ react, Modal, Input, Button, SourceSelect, 
               h(Input, { className: "dssm-search", allowClear: true, maxLength: 100, "aria-label": t("repo.catalog.searchSkillsh"), placeholder: t("repo.catalog.searchSkillsh"), value: skillshQuery, onChange: (e: { target: { value: string } }) => updateSkillshQuery(e.target.value) })
             ) : null;
 
-    const content = h("div", { key: "repositories", id: "dssm-scope-panel", role: "tabpanel", "aria-labelledby": "dssm-tab-repositories", className: "dssm-repo-panel", "aria-busy": busy }, h("style", null, CSS),
+    const bulkProgress = bulk && bulk.phase === 'running' ? h('div', { className: 'dssm-note', role: 'status', 'aria-live': 'polite' }, bulk.op === 'install' ? t('repo.installing') : bulk.op === 'uninstall' ? t('repo.uninstalling') : t('repo.bulk.replacing')) : null;
+    const bulkEligible = {
+      install: selection.installs.filter(item => item.skill.status === 'available').length,
+      update: selection.copies.filter(item => item.copy.tracked && copyTarget(item.copy)).length,
+      uninstall: selection.copies.filter(item => item.copy.canUninstall && copyTarget(item.copy)).length,
+      rollback: selection.copies.filter(item => item.copy.canRollback && copyTarget(item.copy)).length,
+    };
+    const bulkDisabled = busy || (!!bulk && bulk.phase === 'running');
+    const bulkBar = subsource === 'github' && selectionCount > 0 ? h('div', { className: 'dssm-bulk-bar', role: 'toolbar', 'aria-label': t('repo.bulk.toolbar') },
+      h('span', { className: 'dssm-bulk-count' }, t('repo.bulk.selected', { count: selectionCount })),
+      h('span', { className: 'dssm-bulk-count' }, t('repo.bulk.scope')),
+      Object.values(bulkEligible).some(count => count > 100) ? h('span', { role: 'alert' }, t('repo.bulk.limit')) : null,
+      selection.installs.length ? h(PrimitiveButton, { variant: 'outline', size: 'sm', disabled: bulkDisabled || !bulkEligible.install || bulkEligible.install > 100, onClick: () => openBulkInstall() }, t('repo.bulk.install', { count: bulkEligible.install })) : null,
+      selection.copies.length ? h(PrimitiveButton, { variant: 'outline', size: 'sm', disabled: bulkDisabled || !bulkEligible.update || bulkEligible.update > 100, onClick: () => openBulkCopies('update') }, t('repo.bulk.update', { count: bulkEligible.update })) : null,
+      selection.copies.length ? h(PrimitiveButton, { variant: 'outline', size: 'sm', disabled: bulkDisabled || !bulkEligible.uninstall || bulkEligible.uninstall > 100, onClick: () => openBulkCopies('uninstall') }, t('repo.bulk.uninstall', { count: bulkEligible.uninstall })) : null,
+      selection.copies.length ? h(PrimitiveButton, { variant: 'outline', size: 'sm', disabled: bulkDisabled || !bulkEligible.rollback || bulkEligible.rollback > 100, onClick: () => openBulkCopies('rollback') }, t('repo.bulk.rollback', { count: bulkEligible.rollback })) : null,
+      h(PrimitiveButton, { variant: 'ghost', size: 'sm', disabled: busy, onClick: clearSelection }, t('repo.bulk.clear'))
+    ) : null;
+
+    const content = h("div", { key: "repositories", id: "dssm-scope-panel", role: "tabpanel", "aria-labelledby": "dssm-tab-repositories", className: "dssm-repo-panel", "aria-busy": busy }, h("style", null, CSS + BULK_CSS),
       subsourceToolbar,
       subsource === "github" ? h("p", { className: "dssm-desc" }, t("repo.hint")) : subsource === "clawhub" && !catalogQuery.trim() ? h("p", { className: "dssm-desc" }, t("repo.subsource.catalogNote")) : null,
       filtersRow,
+      bulkBar,
       catalogUnknownIds.length ? h("div", { className: "dssm-note", role: "status" }, t("repo.catalog.unknownHint")) : null,
       catalogWarnings.map(warning => h("div", { key: warning.id, className: "dssm-feedback dssm-error", role: "alert" }, warning.id + " · " + message(warning))),
-      feedbackNode, !modal ? refreshProgress : null, busy && !refreshing ? h("div", { className: "dssm-note", role: "status" }, t("repo.loading")) : null,
+      feedbackNode, bulkProgress, !modal ? refreshProgress : null, busy && !refreshing ? h("div", { className: "dssm-note", role: "status" }, t("repo.loading")) : null,
       subsource === "github" ? (repos.length ? groups : h("div", { className: "dssm-empty" }, t("repo.empty"))) :
         subsource === "skillsh" ? skillshView : catalogQuery.trim() ? clawhubSearchView : catalogView,
       h("p", { className: "dssm-note" }, t("repo.footer")), dialog);
