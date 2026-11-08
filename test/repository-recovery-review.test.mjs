@@ -246,3 +246,33 @@ test('a failed rollback still surfaces the original delete error', async () => {
   await fs.rm(itemRoot, { recursive: true, force: true });
   await fs.writeFile(statePath, JSON.stringify(before));
 });
+
+test('each request re-parses the state instead of reusing the previous parse', async () => {
+  const readFile = fs.readFile;
+  let stateReads = 0;
+  fs.readFile = async (path, ...rest) => {
+    if (path === statePath) stateReads += 1;
+    return readFile(path, ...rest);
+  };
+  try { await manager.list(); await manager.list(); } finally { fs.readFile = readFile; }
+  assert.equal(stateReads, 4, `两次请求应各自解析两次，实际 ${stateReads}（缓存越界会变少）`);
+});
+
+test('a failed state write leaves no dirty parse for the next request', async () => {
+  const rename = fs.rename;
+  fs.rename = async (from, to) => {
+    if (to === statePath) throw Object.assign(new Error('injected write failure'), { code: 'EIO' });
+    return rename(from, to);
+  };
+  try { await assert.rejects(manager.forgetCatalogInstall({ legacyId: 'skillsh:owner/stale' })); }
+  finally { fs.rename = rename; }
+
+  const readFile = fs.readFile;
+  let stateReads = 0;
+  fs.readFile = async (path, ...rest) => {
+    if (path === statePath) stateReads += 1;
+    return readFile(path, ...rest);
+  };
+  try { await manager.list(); } finally { fs.readFile = readFile; }
+  assert.equal(stateReads, 2, `写失败后下一次请求必须重新读盘，实际 ${stateReads}`);
+});

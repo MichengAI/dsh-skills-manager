@@ -79,8 +79,9 @@ function validateStoredState(input: unknown): asserts input is RepositoryState {
     }
   }
   if (value.pendingTrashDeletes !== undefined) {
-    // 每个事务会触发若干次 lstat；条数必须有上限，不能只靠 64 MiB 读取限制兜底。
-    if (!Array.isArray(value.pendingTrashDeletes) || value.pendingTrashDeletes.length > 64) throw failure("永久删除事务无效");
+    // 每个事务会触发若干次 lstat，条数必须有上限；但上限过低会让磁盘故障期间
+    // 累积的事务把整份状态判为损坏、连页面都打不开，所以放宽到 256 同时仍是有界的。
+    if (!Array.isArray(value.pendingTrashDeletes) || value.pendingTrashDeletes.length > 256) throw failure("永久删除事务无效");
     const ids = new Set<string>();
     for (const pending of value.pendingTrashDeletes) {
       if (!pending || typeof pending.id !== "string" || !/^\d+-[a-f0-9-]{36}$/.test(pending.id) || ids.has(pending.id) || !Array.isArray(pending.installs) || !Array.isArray(pending.catalogInstalls) || !pending.installs.length && !pending.catalogInstalls.length) throw failure("永久删除事务无效");
@@ -123,7 +124,7 @@ export function createRepositoryManager({
   let queue: Promise<unknown> = Promise.resolve();
   let catalogWarnings: Array<{ id: string; code: string; error: string }> = [];
   let activeIndex: ReturnType<typeof createWorkspaceIndex> | undefined;
-  const serialize = <T>(task: () => T | Promise<T>, recover = true, recoverDeletes = true): Promise<T> => { const run = async () => { const index = createWorkspaceIndex(registeredWorkspaces?.(), { onBuild: onWorkspaceIndexBuild }); const previous = activeIndex; activeIndex = index; try { if (recoverDeletes) await recoverTrashDeletes(await preloadedState()); if (recover) await recoverPending(await preloadedState()); return await task(); } finally { activeIndex = previous; } }; const next = queue.then(run, run); queue = next.catch(() => {}); return next; };
+  const serialize = <T>(task: () => T | Promise<T>, recover = true, recoverDeletes = true): Promise<T> => { const run = async () => { stateCache = undefined; const index = createWorkspaceIndex(registeredWorkspaces?.(), { onBuild: onWorkspaceIndexBuild }); const previous = activeIndex; activeIndex = index; try { if (recoverDeletes) await recoverTrashDeletes(await preloadedState()); if (recover) await recoverPending(await preloadedState()); return await task(); } finally { activeIndex = previous; } }; const next = queue.then(run, run); queue = next.catch(() => {}); return next; };
   function requestIndex() { return activeIndex ?? createWorkspaceIndex(registeredWorkspaces?.(), { onBuild: onWorkspaceIndexBuild }); }
   async function indexedFor(record: { workspace?: string }) { return record.workspace === undefined ? undefined : requestIndex().load(); }
   async function read(): Promise<RepositoryState> {
@@ -175,8 +176,9 @@ export function createRepositoryManager({
     try { return (await fs.lstat(file)).size; } catch { return 0; }
   }
   // 同一次 serialize 内复用同一次解析：恢复流程与任务体都要读状态，重复解析在
-  // 接近 16 MiB 时是每请求上百毫秒。写盘后立即失效，避免拿到旧快照。
-  // 缓存只在一次 serialize 内有效；跨实例并发写本就不在支持范围内。
+  // 接近 16 MiB 时是每请求上百毫秒。
+  // 作用域严格是一次请求：run 开始时清空、每次写盘后清空。否则写失败留下的
+  // 脏对象会被下一次请求当成真实状态复用，恢复重试就被静默吞掉了。
   let stateGeneration = 0;
   let stateCache: { generation: number; value: RepositoryState } | undefined;
   async function preloadedState(): Promise<RepositoryState> {
