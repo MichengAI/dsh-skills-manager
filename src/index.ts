@@ -639,12 +639,7 @@ function apply(ctx: HostContext, config?: PluginConfig) {
       methods: ["POST"],
       fetch: (req) => handlePost(req, (b) => repositories.uninstallMany(b as { items?: Array<{ id?: unknown; path?: unknown; root?: unknown; workspace?: unknown }> }, registeredWorkspacePaths(ctx)), { isRepo: true, afterSuccess: afterWrite }),
     },
-    {
-      // 只读轮询：批量安装/卸载执行期间的实时计数，不进入 serialize 队列。
-      path: `${API_PREFIX}/repositories/progress`,
-      methods: ["POST"],
-      fetch: (req) => handlePost(req, async () => repositories.progress(), { queued: false }),
-    },
+
     {
       path: `${API_PREFIX}/repositories/preview`,
       methods: ["POST"],

@@ -1,4 +1,4 @@
-type RepositoryAction = "add" | "remove" | "refresh" | "detail" | "install" | "installMany" | "uninstall" | "uninstallMany" | "preview" | "previewMany" | "update" | "updateMany" | "rollback" | "progress";
+type RepositoryAction = "add" | "remove" | "refresh" | "detail" | "install" | "installMany" | "uninstall" | "uninstallMany" | "preview" | "previewMany" | "update" | "updateMany" | "rollback";
 import type * as React from 'react';
 import type { ApiCall, ApiRoutes, Translate, ModalProps, SourceSelectProps } from './client-types.js';
 import type { DestinationKit, DestinationValue } from './destination-types.js';
@@ -19,9 +19,9 @@ type BulkItem = { key: string; kind: BulkKind; repo: RepoView; skill: RepoSkill;
 type BulkPolicy = { localModified: 'skip' | 'overwrite' };
 type BulkResult = { key: string; label: string; detail: string; status: BatchStatus; error?: unknown; reason?: string };
 type BulkState = { op: BatchOp; phase: 'preflight' | 'running' | 'done'; items: BulkItem[]; results: BulkResult[]; index: number; policy: BulkPolicy };
-interface Dependencies {react: typeof React; Modal: React.ComponentType<ModalProps>; Input: React.ComponentType<any> & { TextArea: React.ComponentType<any> }; Button: React.ComponentType<any>; SourceSelect: React.ComponentType<SourceSelectProps>; destination: DestinationKit; api: ApiCall; headers: Record<string, string>; translateError: (t: Translate, error: unknown) => string; getLocale?: () => string | undefined; IconLoading?: React.ComponentType<any>; IconRefresh?: React.ComponentType<any>;}
+interface Dependencies {react: typeof React; Modal: React.ComponentType<ModalProps>; Input: React.ComponentType<any> & { TextArea: React.ComponentType<any> }; Button: React.ComponentType<any>; Checkbox: React.ComponentType<{ checked: boolean; onChange: (next: boolean) => void; label: string; disabled?: boolean; className?: string }>; SourceSelect: React.ComponentType<SourceSelectProps>; destination: DestinationKit; api: ApiCall; headers: Record<string, string>; translateError: (t: Translate, error: unknown) => string; getLocale?: () => string | undefined; IconLoading?: React.ComponentType<any>; IconRefresh?: React.ComponentType<any>;}
 import type { CodedError } from "./types.js";
-import { classifyPreview, runSequential } from "./repository-batch.ts";
+import { classifyPreview } from "./repository-batch.ts";
 import type { BatchOp, BatchOutcome, BatchStatus, PreviewBucket } from "./repository-batch.ts";
 // 仓库页复用宿主技能面板组件；只在进入页签时读取本地目录缓存。
 export const repositoryLocales = {
@@ -49,11 +49,11 @@ export const repositoryLocales = {
     "error.repo.invalid": "仓库地址、路径或内容无效，请检查输入及仓库大小。", "error.repo.network": "仓库访问失败，请检查网络或稍后重试。上次列表已保留。", "error.repo.state": "仓库状态文件损坏或无法读取，请保留文件并修复后重试。", "error.repo.conflict": "同名技能已存在或安装失败，本地文件未被覆盖。", "error.repo.enableState": "技能文件已撤销，但启用状态无法写入。请恢复磁盘写入后重试安装。",
     "error.repo.empty": "批量操作没有可处理的项目。", "error.repo.tooMany": "单次批量操作最多 100 项，请减少选择。", "error.repo.duplicate": "批量操作包含重复项目。", "repo.bulk.limit": "单次操作最多 100 项，请减少选择。", "repo.bulk.scope": "操作包含所有已选项目，包括筛选隐藏的项目。",
     "repo.bulk.toolbar": "批量操作", "repo.bulk.selected": "已选 {count} 项", "repo.bulk.install": "安装 {count}", "repo.bulk.update": "检查更新 {count}", "repo.bulk.uninstall": "卸载 {count}", "repo.bulk.rollback": "恢复上一版 {count}", "repo.bulk.selectRepo": "全选 {name} 中的技能", "repo.bulk.selectRepoShort": "全选", "repo.bulk.clear": "清除选择",
-    "repo.bulk.selectSkill": "选择技能 {name}", "repo.bulk.selectCopy": "选择 {name} 的位置 {target}", "repo.bulk.checkingAll": "正在预检 {total} 项…", "repo.bulk.replacing": "正在批量替换技能文件…", "repo.bulk.progress": "正在执行 {index}/{total}…",
+    "repo.bulk.selectSkill": "选择技能 {name}", "repo.bulk.selectCopy": "选择 {name} 的位置 {target}", "repo.bulk.checkingAll": "正在预检 {total} 项…", "repo.bulk.replacing": "正在批量替换技能文件…",
     "repo.bulk.preflightTitle": "批量预检", "repo.bulk.preflightHint": "预检不会修改文件。执行时按顺序逐个处理，单项失败不会影响其余项。", "repo.bulk.blockingHint": "批量操作进行中，请勿关闭窗口或刷新页面。", "repo.bulk.failed": "操作失败", "repo.bulk.installingCount": "安装中 {index}/{total}", "repo.bulk.uninstallingCount": "卸载中 {index}/{total}", "repo.bulk.noUpdates": "没有可更新的技能（已检查 {total} 项）",
     "repo.bulk.installTitle": "批量安装 {count} 个技能", "repo.bulk.updateTitle": "批量更新 {count} 个技能", "repo.bulk.uninstallTitle": "批量卸载 {count} 个技能", "repo.bulk.rollbackTitle": "批量恢复 {count} 个技能",
     "repo.bulk.bucket.available": "可安装", "repo.bulk.bucket.updatable": "可更新", "repo.bulk.bucket.rollbackable": "可恢复", "repo.bulk.bucket.unchanged": "无变化", "repo.bulk.bucket.localModified": "本地已修改", "repo.bulk.bucket.uninstallable": "可卸载", "repo.bulk.bucket.unavailable": "位置不可用", "repo.bulk.bucket.error": "预检失败",
-    "repo.bulk.policyConflict": "遇到同名冲突或失败时停止整批", "repo.bulk.policyLocalModified": "本地已修改项：备份后覆盖", "repo.bulk.apply": "开始执行", "repo.bulk.executable": "将执行 {count} 项，跳过 {skipped} 项",
+    "repo.bulk.policyLocalModified": "本地已修改项：备份后覆盖", "repo.bulk.apply": "开始执行", "repo.bulk.executable": "将执行 {count} 项，跳过 {skipped} 项",
     "repo.bulk.doneTitle": "批量结果", "repo.bulk.result": "批量完成：成功 {ok} · 失败 {failed} · 跳过 {skipped} · 未执行 {notRun}", "repo.bulk.retry": "重试失败项", "repo.bulk.refreshWarning": "批量操作已完成，但列表刷新失败；请手动刷新确认。",
     "repo.bulk.status.ok": "成功", "repo.bulk.status.failed": "失败", "repo.bulk.status.skipped": "跳过", "repo.bulk.status.notRun": "未执行",
     "repo.bulk.reason.conflict": "同名冲突", "repo.bulk.reason.unchanged": "无变化", "repo.bulk.reason.localModified": "本地已修改", "repo.bulk.reason.unavailable": "位置不可用", "repo.bulk.reason.error": "预检失败",
@@ -82,11 +82,11 @@ export const repositoryLocales = {
     "error.repo.invalid": "Invalid repository URL, path or contents. Check the input and repository size.", "error.repo.network": "Repository request failed. Check your connection or retry later. The previous catalog was kept.", "error.repo.state": "Repository state is corrupt or unreadable. Preserve the file and repair it before retrying.", "error.repo.conflict": "A skill with this name exists or installation failed. Local files were not overwritten.", "error.repo.enableState": "The copied skill was removed because its enabled state could not be saved. Restore disk write access and install again.",
     "error.repo.empty": "No items to process.", "error.repo.tooMany": "A batch can contain at most 100 items. Reduce the selection.", "error.repo.duplicate": "The batch contains a duplicate item.", "repo.bulk.limit": "A batch can contain at most 100 items. Reduce the selection.", "repo.bulk.scope": "Actions include all selected items, including those hidden by filters.",
     "repo.bulk.toolbar": "Bulk actions", "repo.bulk.selected": "{count} selected", "repo.bulk.install": "Install {count}", "repo.bulk.update": "Check updates {count}", "repo.bulk.uninstall": "Uninstall {count}", "repo.bulk.rollback": "Restore previous {count}", "repo.bulk.selectRepo": "Select all skills in {name}", "repo.bulk.selectRepoShort": "Select all", "repo.bulk.clear": "Clear selection",
-    "repo.bulk.selectSkill": "Select skill {name}", "repo.bulk.selectCopy": "Select location {target} for {name}", "repo.bulk.checkingAll": "Preflighting {total} items…", "repo.bulk.replacing": "Replacing skill files…", "repo.bulk.progress": "Running {index}/{total}…",
+    "repo.bulk.selectSkill": "Select skill {name}", "repo.bulk.selectCopy": "Select location {target} for {name}", "repo.bulk.checkingAll": "Preflighting {total} items…", "repo.bulk.replacing": "Replacing skill files…",
     "repo.bulk.preflightTitle": "Bulk preflight", "repo.bulk.preflightHint": "Preflight only reads state and changes nothing. Items run one by one; a failed item does not stop the rest.", "repo.bulk.blockingHint": "The batch is running. Keep this window open and do not refresh.", "repo.bulk.failed": "Operation failed", "repo.bulk.installingCount": "Installing {index}/{total}", "repo.bulk.uninstallingCount": "Uninstalling {index}/{total}", "repo.bulk.noUpdates": "No updates available (checked {total})",
     "repo.bulk.installTitle": "Install {count} skills", "repo.bulk.updateTitle": "Update {count} skills", "repo.bulk.uninstallTitle": "Uninstall {count} skills", "repo.bulk.rollbackTitle": "Restore {count} skills",
     "repo.bulk.bucket.available": "Installable", "repo.bulk.bucket.updatable": "Updatable", "repo.bulk.bucket.rollbackable": "Restorable", "repo.bulk.bucket.unchanged": "No changes", "repo.bulk.bucket.localModified": "Locally modified", "repo.bulk.bucket.uninstallable": "Uninstallable", "repo.bulk.bucket.unavailable": "Location unavailable", "repo.bulk.bucket.error": "Preflight failed",
-    "repo.bulk.policyConflict": "Stop the batch on a name conflict or failure", "repo.bulk.policyLocalModified": "Locally modified items: back up and overwrite", "repo.bulk.apply": "Run batch", "repo.bulk.executable": "{count} will run, {skipped} will be skipped",
+    "repo.bulk.policyLocalModified": "Locally modified items: back up and overwrite", "repo.bulk.apply": "Run batch", "repo.bulk.executable": "{count} will run, {skipped} will be skipped",
     "repo.bulk.doneTitle": "Bulk results", "repo.bulk.result": "Batch finished: {ok} succeeded · {failed} failed · {skipped} skipped · {notRun} not run", "repo.bulk.retry": "Retry failed items", "repo.bulk.refreshWarning": "The batch finished but the list refresh failed. Refresh manually to confirm.",
     "repo.bulk.status.ok": "Done", "repo.bulk.status.failed": "Failed", "repo.bulk.status.skipped": "Skipped", "repo.bulk.status.notRun": "Not run",
     "repo.bulk.reason.conflict": "Name conflict", "repo.bulk.reason.unchanged": "No changes", "repo.bulk.reason.localModified": "Locally modified", "repo.bulk.reason.unavailable": "Location unavailable", "repo.bulk.reason.error": "Preflight failed",
@@ -110,9 +110,11 @@ const CSS = `
 
 /** 批量选择与结果矩阵的样式；与主样式分开，避免影响其他面板。 */
 const BULK_CSS = `
-.dssm-bulk-check{flex:none;width:14px;height:14px;margin:0;accent-color:var(--dsw-alias-state-success-primary,#51b976);cursor:pointer}
-.dssm-bulk-check:disabled{cursor:not-allowed;opacity:.5}
-.dssm-bulk-repo{display:inline-flex;align-items:center;gap:5px;flex:none;font-size:12px;color:var(--dsw-alias-label-secondary,#b9b9b9);cursor:pointer;user-select:none;white-space:nowrap}
+.dssm-bulk-check{flex:none;gap:0!important;font-size:0;line-height:0}
+/* 视觉隐藏宿主标签，但保留其无障碍名称；font-size 归零用于兼容 DOM 结构不同的旧宿主。 */
+.dssm-bulk-check>span,.dssm-bulk-check>span *{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+.dssm-bulk-repo{display:inline-flex;align-items:center;gap:5px;flex:none;font-size:12px;color:var(--dsw-alias-label-secondary,#b9b9b9);user-select:none;white-space:nowrap}
 .dssm-bulk-repo:hover{color:var(--dsw-alias-label-primary,#eeeeee)}
 .dssm-bulk-bar{display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:8px 10px;border:0.5px solid var(--dsw-alias-border-l2,#494949);border-radius:var(--dsw-radius-md,10px);background:var(--dsw-alias-bg-layer-1,transparent);margin:0 0 10px}
 .dssm-bulk-count{font-size:12px;color:var(--dsw-alias-label-secondary,#b9b9b9);margin-right:4px}
@@ -128,8 +130,8 @@ const BULK_CSS = `
 .dssm-bulk-results .dssm-bulk-detail{margin-left:auto;min-width:0;overflow-wrap:anywhere;color:var(--dsw-alias-label-tertiary,#a0a0a0);max-width:50%}
 .dssm-bulk-results .dssm-bulk-name,.dssm-bulk-results .dssm-bulk-reason{min-width:0;overflow-wrap:anywhere}
 .dssm-bulk-progress{display:flex;align-items:center;gap:8px;margin:8px 0 2px}
-.dssm-bulk-progress-track{flex:1;height:6px;border-radius:999px;background:var(--dsw-alias-interactive-bg-hover,#333);overflow:hidden}
-.dssm-bulk-progress-bar{height:100%;border-radius:999px;background:var(--dsw-alias-state-success-primary,#51b976);transition:width .2s ease}
+
+
 .dssm-bulk-progress-text{font-size:12px;color:var(--dsw-alias-label-secondary,#b9b9b9);white-space:nowrap}
 `;
 
@@ -175,7 +177,7 @@ type ClawHubApiSearchResult = {
 };
 type ClawHubApiSearchResponse = { results?: ClawHubApiSearchResult[] };
 
-export function createRepositoryUI({ react, Modal, Input, Button, SourceSelect, destination, api, headers, translateError, getLocale, IconLoading, IconRefresh }: Dependencies) {
+export function createRepositoryUI({ react, Modal, Input, Button, Checkbox, SourceSelect, destination, api, headers, translateError, getLocale, IconLoading, IconRefresh }: Dependencies) {
   const h = react.createElement;
   const LoadingIconComponent = IconLoading || function FallbackLoadingIcon(props: { size?: number; className?: string }) {
     const size = props?.size || 14;
@@ -1067,7 +1069,7 @@ export function createRepositoryUI({ react, Modal, Input, Button, SourceSelect, 
       const target = copyTarget(copy);
       const key = copyKey(repo, skill, copy);
       return h("div", { className: "dssm-repo-copy", key: JSON.stringify([copy.installedRoot, copy.installedWorkspace || ""]) },
-              h("input", { type: "checkbox", className: "dssm-bulk-check", checked: !!selectedKeys[key], disabled: busy || !target, "aria-label": t("repo.bulk.selectCopy", { name: skill.name, target: locationLabel(copy) }), onChange: () => toggleSelected(key) }),
+              h(Checkbox, { className: "dssm-bulk-check", checked: !!selectedKeys[key], disabled: busy || !target, label: t("repo.bulk.selectCopy", { name: skill.name, target: locationLabel(copy) }), onChange: () => toggleSelected(key) }),
               renderLocation(copy),
               renderCopyActions(repo, skill, copy),
               !target ? h("div", { className: "dssm-note", role: "status" }, t("repo.destinationUnavailable")) : null);
@@ -1108,7 +1110,7 @@ export function createRepositoryUI({ react, Modal, Input, Button, SourceSelect, 
         };
         return h("div", { key: skill.path, className: "dssm-repo-row" },
           h("div", { className: "dssm-repo-head" },
-            h("input", { type: "checkbox", className: "dssm-bulk-check", checked: skillSelected, disabled: busy || !skillSelectable, "aria-label": t("repo.bulk.selectSkill", { name: skill.name }), onChange: toggleSkill }),
+            h(Checkbox, { className: "dssm-bulk-check", checked: skillSelected, disabled: busy || !skillSelectable, label: t("repo.bulk.selectSkill", { name: skill.name }), onChange: toggleSkill }),
             h("div", { className: "dssm-repo-main" }, h("div", { className: "dssm-name" }, skill.name), h("div", { className: "dssm-repo-description", title: skill.description }, skill.description),
                           singleCopy && !copyTarget(singleCopy) ? h("div", { className: "dssm-note", role: "status" }, t("repo.destinationUnavailable")) : null,
                           installation?.id === repo.id && installation.path === skill.path ? h("div", { className: "dssm-note" + (installation.error ? " dssm-error" : ""), role: installation.error ? "alert" : "status", "aria-live": "polite" }, feedbackText(installation)) : null),
@@ -1126,9 +1128,8 @@ export function createRepositoryUI({ react, Modal, Input, Button, SourceSelect, 
               h("span", { className: "dssm-count" }, skills.length),
               h("span", { className: "dssm-source-path", title: repo.owner + "/" + repo.name }, [repo.ref || t("repo.defaultBranchLabel"), repo.subdirectory].filter(Boolean).join(" · ") || (repo.owner + "/" + repo.name))
             )),
-            h("label", { className: "dssm-bulk-repo", title: t("repo.bulk.selectRepo", { name: repo.owner + "/" + repo.name }) },
-              h("input", { type: "checkbox", className: "dssm-bulk-check", checked: repoAllSelected, disabled: busy || !bulkKeys.length, "aria-label": t("repo.bulk.selectRepo", { name: repo.owner + "/" + repo.name }), onChange: toggleRepoSelection }),
-              h("span", { className: "dssm-bulk-repo-label" }, t("repo.bulk.selectRepoShort"))),
+            h("div", { className: "dssm-bulk-repo", role: "group", "aria-label": t("repo.bulk.selectRepo", { name: repo.owner + "/" + repo.name }) },
+              h(Checkbox, { checked: repoAllSelected, disabled: busy || !bulkKeys.length, label: t("repo.bulk.selectRepoShort"), onChange: toggleRepoSelection })),
             h("span", { className: "dssm-repo-commit-badge", title: repo.commit || t("repo.notScanned") }, repo.commit ? repo.commit.slice(0, 7) : t("repo.notScanned"))),
           open ? h("div", { className: "dssm-source-body", role: "region" }, body) : null),
         repo.error ? h("div", { className: "dssm-feedback dssm-error", role: "alert" }, message(repo.error)) : null);
@@ -1193,10 +1194,8 @@ export function createRepositoryUI({ react, Modal, Input, Button, SourceSelect, 
           state.op === "install" ? h(DestinationPicker, { t, value: destination, disabled: busy || running, allowAgents: true, workspaces, userDestinations: installRoots,
             onChange: (next: Partial<DestinationValue>) => { if (!locked.current && !running) setDestination({ ...destination, ...next }); } }) : null,
           state.op === "install" ? h("p", { className: "dssm-note" }, t("repo.installHint")) : null,
-          counts["local-modified"] ? h("label", { className: "dssm-bulk-policy" },
-            h("input", { type: "checkbox", className: "dssm-bulk-check", checked: state.policy.localModified === "overwrite", disabled: busy || running,
-              onChange: (e: { target: { checked: boolean } }) => { const policy = { ...state.policy, localModified: e.target.checked ? "overwrite" as const : "skip" as const }; setBulkPolicy(policy); setBulk(prev => prev ? { ...prev, policy } : prev); } }),
-            t("repo.bulk.policyLocalModified")) : null,
+          counts["local-modified"] ? h(Checkbox, { className: "dssm-bulk-policy", checked: state.policy.localModified === "overwrite", disabled: busy || running,
+              label: t("repo.bulk.policyLocalModified"), onChange: (checked: boolean) => { const policy = { ...state.policy, localModified: checked ? "overwrite" as const : "skip" as const }; setBulkPolicy(policy); setBulk(prev => prev ? { ...prev, policy } : prev); } }) : null,
           running ? null : h("p", { className: "dssm-note", role: "status" }, t("repo.bulk.executable", { count: executable, skipped: state.items.length - executable })),
           feedbackNode);
         footer = running ? null : h(react.Fragment, null, button("repo.cancel", close), button("repo.bulk.apply", applyBulk, false, kickoffDisabled));

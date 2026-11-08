@@ -1,4 +1,4 @@
-import type { Archive, FileDigest, Repository, RepositoryInput, RepositorySkill, RepositoryState, InstallRecord, CatalogInstallRecord, Serialize, SkillRequest, Log, CodedError, MutationOptions, SkillRoot } from "./types.js";
+import type { Archive, FileDigest, Repository, RepositoryInput, RepositorySkill, RepositoryState, InstallRecord, CatalogInstallRecord, SkillRequest, Log, CodedError, MutationOptions, SkillRoot } from "./types.js";
 // 公开 GitHub 仓库目录：直连归档下载服务、固定内容快照安装，不执行仓库代码。
 import { promises as fs } from "node:fs";
 import { join, resolve } from "node:path";
@@ -78,6 +78,16 @@ function validateStoredState(input: unknown): asserts input is RepositoryState {
       }
     }
   }
+  if (value.pendingTrashDeletes !== undefined) {
+    if (!Array.isArray(value.pendingTrashDeletes)) throw failure("永久删除事务无效");
+    const ids = new Set<string>();
+    for (const pending of value.pendingTrashDeletes) {
+      if (!pending || typeof pending.id !== "string" || !/^\d+-[a-f0-9-]{36}$/.test(pending.id) || ids.has(pending.id) || !Array.isArray(pending.installs) || !Array.isArray(pending.catalogInstalls) || !pending.installs.length && !pending.catalogInstalls.length) throw failure("永久删除事务无效");
+      ids.add(pending.id);
+      if ([...pending.installs, ...pending.catalogInstalls].some(record => !record || record.trashId !== pending.id) || value.installs.some(record => record.trashId === pending.id) || value.catalogInstalls?.some(record => typeof record !== "string" && record.trashId === pending.id)) throw failure("永久删除事务身份无效");
+      validateStoredState({ version: 1, repositories: [], installs: pending.installs, catalogInstalls: pending.catalogInstalls });
+    }
+  }
 }
 
 /** 解析公开 Git 仓库地址；含斜杠的分支通过独立 ref 字段提供。 */
@@ -112,7 +122,7 @@ export function createRepositoryManager({
   let queue: Promise<unknown> = Promise.resolve();
   let catalogWarnings: Array<{ id: string; code: string; error: string }> = [];
   let activeIndex: ReturnType<typeof createWorkspaceIndex> | undefined;
-  const serialize: Serialize = (task, recover = true) => { const run = async () => { const index = createWorkspaceIndex(registeredWorkspaces?.(), { onBuild: onWorkspaceIndexBuild }); const previous = activeIndex; activeIndex = index; try { if (recover) await recoverPending(); return await task(); } finally { activeIndex = previous; } }; const next = queue.then(run, run); queue = next.catch(() => {}); return next; };
+  const serialize = <T>(task: () => T | Promise<T>, recover = true, recoverDeletes = true): Promise<T> => { const run = async () => { const index = createWorkspaceIndex(registeredWorkspaces?.(), { onBuild: onWorkspaceIndexBuild }); const previous = activeIndex; activeIndex = index; try { if (recoverDeletes) await recoverTrashDeletes(); if (recover) await recoverPending(); return await task(); } finally { activeIndex = previous; } }; const next = queue.then(run, run); queue = next.catch(() => {}); return next; };
   function requestIndex() { return activeIndex ?? createWorkspaceIndex(registeredWorkspaces?.(), { onBuild: onWorkspaceIndexBuild }); }
   async function indexedFor(record: { workspace?: string }) { return record.workspace === undefined ? undefined : requestIndex().load(); }
   async function read(): Promise<RepositoryState> {
@@ -138,12 +148,18 @@ export function createRepositoryManager({
       throw failure("仓库状态文件损坏或无法读取，请保留文件并修复后重试", "error.repo.state");
     }
   }
-  async function write(value: RepositoryState, allowShrink = false) {
+  async function write(value: RepositoryState, allowShrink = false, deleteCommit?: RepositoryState, compact = false) {
     validateStoredState(value);
-    const text = JSON.stringify(value, null, 2);
+    // 只有永久删除事务用紧凑格式腾出临时空间。其他清理路径必须保持缩进，
+    // 否则「压缩后必然变小」会让 16 MiB 闸门对它们形同虚设。
+    const indent = compact ? undefined : 2;
+    const text = JSON.stringify(value, null, indent);
     const bytes = Buffer.byteLength(text, "utf8");
-    // 16 MiB 只阻止继续增大。已经超限时，删除旧身份或回收记录必须允许写回更小的文件。
-    if (bytes > STATE_READ_LIMIT || bytes > STATE_LIMIT && !(allowShrink && bytes < await currentStateBytes())) throw failure("安装来源状态超过 16 MiB。请先清理不需要的回收记录或旧身份，仍有效的安装副本会保留。", "error.repo.capacity");
+    const currentBytes = allowShrink ? await currentStateBytes() : 0;
+    // The prepared delete can grow briefly, but only if its exact commit shrinks
+    // the pre-transaction file; the hard read limit still applies to both writes.
+    const commitBytes = deleteCommit ? Buffer.byteLength(JSON.stringify(deleteCommit, null, indent), "utf8") : Infinity;
+    if (bytes > STATE_READ_LIMIT || bytes > STATE_LIMIT && !(allowShrink && (bytes < currentBytes || deleteCommit && commitBytes < currentBytes))) throw failure("安装来源状态超过 16 MiB。请先清理不需要的回收记录或旧身份，仍有效的安装副本会保留。", "error.repo.capacity");
     await fs.mkdir(managerHomePath(), { recursive: true });
     if ((await fs.lstat(managerHomePath())).isSymbolicLink()) throw failure("仓库状态目录不能是链接");
     const temporary = `${file}.${randomUUID()}.tmp`;
@@ -295,7 +311,25 @@ export function createRepositoryManager({
   }
   async function absentTrashPath(path: string) {
     try { await fs.lstat(path); return false; }
-    catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return true; throw error; }
+    catch (error) { return (error as NodeJS.ErrnoException).code === "ENOENT"; }
+  }
+  async function presentPath(path: string) {
+    try { await fs.lstat(path); return true; } catch { return false; }
+  }
+  async function recoverTrashDeletes() {
+    const data = await read();
+    if (!data.pendingTrashDeletes?.length) return;
+    for (const pending of data.pendingTrashDeletes) {
+      let exists: boolean;
+      try { await fs.lstat(join(trashRootPath(), pending.id)); exists = true; }
+      catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; exists = false; }
+      if (exists) {
+        data.installs.push(...pending.installs);
+        (data.catalogInstalls ||= []).push(...pending.catalogInstalls);
+      }
+    }
+    delete data.pendingTrashDeletes;
+    await write(data, true, undefined, true);
   }
   async function hasRestoreReceipt(record: InstallRecord | CatalogInstallRecord) {
     try {
@@ -315,7 +349,8 @@ export function createRepositoryManager({
     const registered = requestIndex().registered;
     for (const record of data.installs.filter(item => item.trashId && item.uninstallFingerprint && !item.restoreFingerprint)) {
       const id = record.trashId!;
-      if (await absentTrashPath(join(trashRootPath(), id)) && await absentTrashPath(join(trashRootPath(), `.stage-${id}`)) && await matches(record, record.uninstallFingerprint, registered, await indexedFor(record))) {
+      const occupied = data.installs.some(other => other !== record && !other.trashId && (other.root || "dsh") === (record.root || "dsh") && (other.workspace ?? null) === (record.workspace ?? null) && other.name.toLowerCase() === record.name.toLowerCase());
+      if (!occupied && await absentTrashPath(join(trashRootPath(), id)) && await absentTrashPath(join(trashRootPath(), `.stage-${id}`)) && await matches(record, record.uninstallFingerprint, registered, await indexedFor(record))) {
         delete record.trashId; delete record.uninstallFingerprint;
         for (const item of catalogRecords(data).filter(item => item.trashId === id)) delete item.trashId;
         recovered = true; recoveredInstallIds.push(`${record.id}:${record.path}`);
@@ -450,7 +485,6 @@ export function createRepositoryManager({
     return catalogRecords(data).filter(record => record.root && !record.trashId && locationKey(record) === locationKey(target));
   }
   async function restoreCatalogTrash(id: string, options: MutationOptions) {
-    return serialize(async () => {
       const metadata = (await listTrash()).find(item => item.id === id);
       const data = await read();
       const records = catalogRecords(data).filter(record => record.trashId === id && metadata?.catalog?.includes(record.id));
@@ -470,13 +504,9 @@ export function createRepositoryManager({
       catch { throw failure("技能已恢复，目录身份等待校验；恢复磁盘写入后重新打开发现页", "error.repo.installState"); }
       await fs.rm(join(trashRootPath(), `.restored-${id}`), { recursive: true, force: true });
       return result;
-    }, false);
   }
   const refreshVersions = new Map<string, number>();
-  // 批量安装/卸载执行期间的实时计数：客户端轮询 progress() 显示「已处理/总数」。
-  let batchProgress: { op: "install" | "uninstall"; index: number; total: number } | null = null;
   return {
-    progress: () => batchProgress,
     installCatalog: (id: string, pack: import("./types.js").UploadInput, target: { root?: unknown; workspace?: string } = {}) => serialize(async () => {
       const location = await catalogLocation(target);
       const root = await recordInstallRoot(location, requestIndex().registered, await indexedFor(location));
@@ -551,25 +581,36 @@ export function createRepositoryManager({
     }, false),
     permanentlyDeleteTrash: (id: string) => serialize(async () => {
       const data = await read();
-      const before = data.catalogInstalls || [];
-      const next = before.filter(record => typeof record === "string" || record.trashId !== id);
-      if (next.length !== before.length) {
-        data.catalogInstalls = next;
-        await write(data, true);
+      const installs = data.installs.filter(record => record.trashId === id);
+      const catalogInstalls = catalogRecords(data).filter(record => record.trashId === id);
+      const hasIdentity = installs.length > 0 || catalogInstalls.length > 0;
+      if (hasIdentity) {
+        // 不覆盖其他实例已登记的事务，否则它们退回的身份会丢失。
+        data.pendingTrashDeletes = [...(data.pendingTrashDeletes || []).filter(pending => pending.id !== id), { id, installs, catalogInstalls }];
+        data.installs = data.installs.filter(record => record.trashId !== id);
+        data.catalogInstalls = (data.catalogInstalls || []).filter(record => typeof record === "string" || record.trashId !== id);
+        const afterCommit = data.pendingTrashDeletes.filter(pending => pending.id !== id);
+        const commit: RepositoryState = { ...data, pendingTrashDeletes: afterCommit };
+        if (!afterCommit.length) delete commit.pendingTrashDeletes;
+        await write(data, true, commit, true);
       }
-      try {
-        const result = await permanentlyDeleteTrash(id, log);
-        if ("ok" in result && result.ok === false) {
-          data.catalogInstalls = before;
-          if (next.length !== before.length) await write(data, true);
-          return result;
-        }
-        return result;
-      } catch (error) {
-        data.catalogInstalls = before;
-        if (next.length !== before.length) await write(data, true);
+      let result: Awaited<ReturnType<typeof permanentlyDeleteTrash>>;
+      try { result = await permanentlyDeleteTrash(id, log); }
+      catch (error) {
+        if (hasIdentity) await recoverTrashDeletes();
         throw error;
       }
+      if ("ok" in result && result.ok === false) {
+        if (hasIdentity) await recoverTrashDeletes();
+        return result;
+      }
+      if (hasIdentity) {
+        const remaining = data.pendingTrashDeletes!.filter(pending => pending.id !== id);
+        if (remaining.length) data.pendingTrashDeletes = remaining;
+        else delete data.pendingTrashDeletes;
+        await write(data, true, undefined, true);
+      }
+      return result;
     }, false),
     rememberCatalogInstall: (id: string, name: string, target: { root?: unknown; workspace?: string } = {}) => serialize(async () => {
       const location = await catalogLocation(target);
@@ -694,14 +735,13 @@ export function createRepositoryManager({
       if (!skill) throw failure("技能不在仓库列表中");
       return { ...skill, commit: repo.commit };
     },
-    restoreTrash: async (id: string, options: MutationOptions = {}) => {
+    restoreTrash: (id: string, options: MutationOptions = {}) => serialize(async () => {
       const metadata = (await listTrash()).find(item => item.id === id);
-      // 普通回收条目不依赖仓库状态；有目录身份时经统一事务恢复。
+      // Ordinary trash remains restorable even if repository state is corrupt.
+      // Provenance-bearing entries must recover pending deletes under the lock first.
+      if (!metadata?.repository && !metadata?.catalog?.length) return restoreSkillTrash(id, log, options);
+      await recoverTrashDeletes();
       if (metadata?.catalog?.length && !metadata.repository) return restoreCatalogTrash(id, options);
-      if (!metadata?.repository) return restoreSkillTrash(id, log, options);
-      return serialize(async () => {
-        const metadata = (await listTrash()).find(item => item.id === id);
-        if (!metadata?.repository) return restoreSkillTrash(id, log, options);
         const data = await read();
         const record = data.installs.find(item => item.trashId === id && item.id === metadata.repository!.id && item.path === metadata.repository!.path);
         if (!record) return restoreSkillTrash(id, log, options);
@@ -723,8 +763,7 @@ export function createRepositoryManager({
         catch { throw failure("技能已恢复，来源状态等待校验；恢复磁盘写入后重新打开仓库页", "error.repo.installState"); }
         await fs.rm(join(trashRootPath(), `.restored-${id}`), { recursive: true, force: true }).catch(() => undefined);
         return result;
-      }, false);
-    },
+    }, false, false),
     uninstall: (input: SkillRequest) => serialize(async () => {
       const { id, path } = input;
       const data = await read();
@@ -736,6 +775,7 @@ export function createRepositoryManager({
       // Retire write authorization before moving the copy. History belongs to
       // this Trash id, never to a future same-name external installation.
       record.trashId = trashId;
+      record.uninstallFingerprint = fingerprint;
       const catalog = catalogCopies(data, root, record.name);
       for (const item of catalog) item.trashId = trashId;
       await write(data);
@@ -745,8 +785,8 @@ export function createRepositoryManager({
         if ("ok" in result && result.ok === false) throw failure(result.error, typeof result.code === "string" ? result.code : "error.repo.invalid", result.params);
         return result;
       } catch (error) {
-        if (await matches(record, fingerprint)) {
-          delete record.trashId;
+        if (isSafeDeleteFailure(error) && await absentTrashPath(join(trashRootPath(), trashId)) && await absentTrashPath(join(trashRootPath(), `.stage-${trashId}`)) && await matches(record, fingerprint)) {
+          delete record.trashId; delete record.uninstallFingerprint;
           for (const item of catalog) delete item.trashId;
           await write(data);
         }
@@ -800,11 +840,8 @@ export function createRepositoryManager({
         }
       }
       if (prepared.length) await write(data);
-      const progress = (batchProgress = { op: "install" as const, index: 0, total: prepared.length });
-      try {
       if (prepared.length) await recordInstallRoot({ root: input.root, workspace: workspaceRoot }, registered);
       for (const item of prepared) {
-        progress.index += 1;
         let copied = false;
         try {
           const result = await importUploadedSkill({ name: item.name, entries: item.entries }, log, { conflict: "skip", root });
@@ -822,7 +859,6 @@ export function createRepositoryManager({
           results[item.slot] = { id: item.id, path: item.path, name: item.name, ok: false, error: error.message, code: String(error.code || "error.repo.invalid"), params: error.params };
         }
       }
-      } finally { batchProgress = null; }
       if (prepared.length) {
         try { await write(data); }
         catch { throw failure("技能文件已安装但来源状态未确认，请恢复磁盘写入后重新打开仓库页", "error.repo.installState"); }
@@ -866,10 +902,7 @@ export function createRepositoryManager({
           results[slot] = { id, path: entryPath, ...(rootKey ? { root: rootKey } : {}), ...(workspaceKey ? { workspace: workspaceKey } : {}), ok: false, error: error.message, code: String(error.code || "error.repo.invalid"), params: error.params };
         }
       }
-      const progress = (batchProgress = { op: "uninstall" as const, index: 0, total: prepared.length });
-      try {
       for (const item of prepared) {
-        progress.index += 1;
         try {
           item.record.trashId = item.trashId;
           item.record.uninstallFingerprint = item.fingerprint;
@@ -884,7 +917,7 @@ export function createRepositoryManager({
           if ("ok" in result && result.ok === false) throw result;
           results[item.slot] = { id: item.id, path: item.path, root: item.record.root || "dsh", ...(item.record.workspace ? { workspace: item.record.workspace } : {}), ok: true };
         } catch (caught) { const error = caught as CodedError;
-          if (item.record.trashId && isSafeDeleteFailure(caught) && await absentTrashPath(join(trashRootPath(), `.stage-${item.trashId}`)) && await absentTrashPath(join(trashRootPath(), item.trashId)) && !await absentTrashPath(join(item.root.path, item.record.name))) {
+          if (item.record.trashId && isSafeDeleteFailure(caught) && await absentTrashPath(join(trashRootPath(), `.stage-${item.trashId}`)) && await absentTrashPath(join(trashRootPath(), item.trashId)) && await presentPath(join(item.root.path, item.record.name))) {
             delete item.record.trashId;
             delete item.record.uninstallFingerprint;
             for (const entry of item.catalog) delete entry.trashId;
@@ -893,7 +926,6 @@ export function createRepositoryManager({
           results[item.slot] = { id: item.id, path: item.path, ...(item.record.root ? { root: item.record.root } : {}), ...(item.record.workspace ? { workspace: item.record.workspace } : {}), ok: false, error: error.message || (caught as { error?: string })?.error, code: String(error.code || "error.repo.invalid"), params: error.params };
         }
       }
-      } finally { batchProgress = null; }
       return { results };
     }),
     install: ({ id, path, root: requestedRoot, workspace }: SkillRequest, registered?: string[]) => serialize(async () => {

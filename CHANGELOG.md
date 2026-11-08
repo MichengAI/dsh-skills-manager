@@ -1,5 +1,22 @@
 # Changelog
 
+## [Unreleased]
+
+### New Features
+
+- **Bulk operations for skill repositories**: select several entries and install, check for updates, update, restore the previous version, or uninstall in one run. A preflight shows what will run and what will be skipped, and each item reports success, failure, skip, or not run.
+- **The batch scope is explicit**: items hidden by filters stay selected, and the header states it.
+
+### Behavior Changes
+
+- **Reinstalling after a permanent delete no longer creates duplicate records**: the same skill used to come back as two source records, which then failed with "install record is ambiguous, choose a location"; there is now always exactly one.
+- **An interrupted uninstall recovers on its own**: if a single uninstall fails midway, reopening the repository page confirms the files and restores the source record instead of leaving a dangling trash entry.
+- **Batch runs no longer show a possibly wrong progress percentage**: the current phase is shown instead, so concurrent windows cannot interfere.
+- **Select-all uses a short label**: long repository names no longer push the header out. Checkboxes now use host controls, so keyboard and screen-reader behavior matches the rest of DSH.
+
+[中文](CHANGELOG.zh-CN.md)
+
+
 ## [1.2.35] - 2026-11-06
 
 ### Behavior Changes

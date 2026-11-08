@@ -59,6 +59,7 @@ try {
     if (id === "@deepseek-ai/dsh-client-ui-primitives") {
       return {
         Button: (props) => react.createElement("button", props, props.children),
+        Checkbox: (props) => react.createElement("label", { className: props.className }, react.createElement("input", { type: "checkbox", checked: props.checked }), react.createElement("span", null, props.label)),
         Input: (props) => react.createElement("span", { className: props.className }, react.createElement("input", props)),
         Modal: (props) => props.open ? react.createElement("div", { role: "dialog", title: props.title }, props.children, props.footer) : null,
         Menu: (props) => react.createElement("div", { "data-menu-open": props.open }, props.anchor, props.open ? props.items?.map(it => react.createElement("button", { key: it.id, onClick: () => props.onSelect(it.id) }, it.label)) : null),
@@ -153,6 +154,11 @@ try {
   const addModal = find(node => node.props?.title === t("category.selectSkills", { name: "工作" }));
   assert.ok(addModal, "能弹出选择归类弹窗");
   assert.ok(nodes(addModal).some(node => node.props.className === "dssm-batch-item" && textOf(node).includes("loose")), "可选列表中包含未归类的 loose 技能");
+  const looseBox = () => nodes(addModal).find(node => node.props?.className === "dssm-batch-check");
+  assert.ok(looseBox(), "可选列表使用宿主复选框而非原生 input");
+  assert.equal(typeof looseBox().type, "function", "复选框来自宿主原语");
+  assert.equal(looseBox().props.checked, false);
+  assert.ok(looseBox().props.label.includes("loose"), "复选框带可读名称");
 
   // 勾选 loose
   const looseItem = nodes(addModal).find(node => node.props.className === "dssm-batch-item" && textOf(node).includes("loose"));
@@ -160,6 +166,7 @@ try {
   render();
   let addModalAfterCheck = find(node => node.props?.title === t("category.selectSkills", { name: "工作" }));
   assert.ok(nodes(addModalAfterCheck).some(node => node.props.className === "dssm-batch-item selected"), "选中项展示激活态");
+  assert.equal(nodes(addModalAfterCheck).find(node => node.props?.className === "dssm-batch-check").props.checked, true, "选中后复选框同步勾选");
 
   // 关闭弹窗
   nodes(addModalAfterCheck).find(node => node.children?.includes(t("btn.cancel")) && node.props?.onClick).props.onClick();

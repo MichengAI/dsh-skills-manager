@@ -262,6 +262,7 @@ export interface RepositoryState {
     repositories: Repository[];
     installs: InstallRecord[];
     catalogInstalls?: (CatalogInstallRecord | string)[];
+    pendingTrashDeletes?: { id: string; installs: InstallRecord[]; catalogInstalls: CatalogInstallRecord[] }[];
 }
 export interface RepositoryInput {
     url?: string;

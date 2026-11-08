@@ -140,7 +140,7 @@ const Collapse = (props) => {
       open ? item.children : null);
   }));
 };
-const useUI = createRepositoryUI({ react, Modal: "modal", Input, Button, Collapse, SourceSelect: OfficialSelect, destination: createDestinationKit({ react, SourceSelect: OfficialSelect, translateError: (_t, error) => error.error || error.message }), api, headers: {}, getLocale: () => hostLocale, translateError: (_t, e) => e.code === "error.repo.invalid" ? "已翻译的仓库错误" : e.error || e.message });
+const useUI = createRepositoryUI({ react, Modal: "modal", Input, Button, Checkbox: "host-checkbox", Collapse, SourceSelect: OfficialSelect, destination: createDestinationKit({ react, SourceSelect: OfficialSelect, translateError: (_t, error) => error.error || error.message }), api, headers: {}, getLocale: () => hostLocale, translateError: (_t, e) => e.code === "error.repo.invalid" ? "已翻译的仓库错误" : e.error || e.message });
 let languagePrefix = "";
 const rootTranslations = { "root.codex": "Codex", "root.claude": "Claude", "root.windsurf-user": "Windsurf User" };
 const t = (key) => key === "format.locale" ? "zh-CN" : languagePrefix + (rootTranslations[key] || key);
