@@ -66,7 +66,9 @@ export function createSourceSelect(react: typeof React) {
             disabled: props.disabled,
             className: props.icon ? "dssm-icon-action" : undefined,
             style: props.icon ? { width: 22, minWidth: 22, height: 22, padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center", borderRadius: "var(--dsw-radius-sm, 8px)" } : undefined,
-            "aria-label": props.label,
+            "aria-label": props.ariaLabel || props.label,
+            "aria-haspopup": "menu",
+            "aria-expanded": open,
             title: props.label,
             onClick: function () {
               if (!props.disabled) setOpen(function (prev) { return !prev; });
@@ -79,7 +81,7 @@ export function createSourceSelect(react: typeof React) {
     }
 
     const selectedOption = props.options.find(function (opt) { return !opt.type && opt.value === props.value; });
-    const currentText = selectedOption ? selectedOption.label : props.label;
+    const currentText = props.text !== undefined ? props.text : (selectedOption ? selectedOption.label : props.label);
 
     return h("div", { className: "dssm-menu-select-wrap" },
       h(Menu, {
@@ -99,7 +101,7 @@ export function createSourceSelect(react: typeof React) {
           variant: "outline",
           size: "sm",
           role: "combobox",
-          "aria-label": props.ariaLabel || props.label,
+          "aria-label": props.label,
           "aria-expanded": open,
           disabled: props.disabled,
           className: "dssm-menu-select-trigger" + (open ? " is-open" : ""),

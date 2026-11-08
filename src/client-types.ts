@@ -73,6 +73,7 @@ export interface SourceSelectProps {
     value?: string;
     values?: readonly string[];
     label: string;
+    text?: React.ReactNode;
     ariaLabel?: string;
     disabled?: boolean;
     action?: boolean;

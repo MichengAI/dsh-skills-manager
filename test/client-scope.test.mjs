@@ -94,7 +94,7 @@ try {
   function nodes(node = tree) {
     if (!node || typeof node !== "object" || Array.isArray(node)) return [];
     // 筛选业务测试只驱动受控值；官方菜单交互由专用测试与真实浏览器验证。
-    if (typeof node.type === "function" && Array.isArray(node.props?.options) && node.props.label && node.props.onChange) {
+    if (typeof node.type === "function" && Array.isArray(node.props?.options) && node.props.label && node.props.onChange && !node.props.action) {
       return [{
         type: "select-fixture",
         props: {
@@ -102,15 +102,28 @@ try {
           label: node.props.label,
           options: node.props.options,
           disabled: node.props.disabled,
+          onChange: (event) => node.props.onChange(event?.target ? event.target.value : event)
+        },
+        children: []
+      }];
+    }
+    if (typeof node.type === "function" && node.props?.action) {
+      return [{
+        type: "action-button-fixture",
+        props: {
+          "aria-label": node.props.ariaLabel || node.props.label,
+          title: node.props.label,
+          disabled: node.props.disabled,
           icon: node.props.icon,
+          options: node.props.options,
           style: { width: 22 },
           variant: "outline",
-          className: "dssm-icon-action",
+          className: node.props.icon ? "dssm-icon-action" : undefined,
           onClick: (actionId) => {
             if (typeof actionId === "string") node.props.onChange(actionId);
-            else node.props.onChange(node.props.options[0]?.value || "");
+            else node.props.onChange(node.props.options?.[0]?.value || "");
           },
-          onChange: (event) => node.props.onChange(event?.target ? event.target.value : event)
+          onChange: (event) => node.props.onChange(event?.target ? event.target.value : event),
         },
         children: []
       }];
@@ -217,7 +230,7 @@ try {
   assert.equal(find((node) => node.props.className === "dssm-trash-count"), undefined, "空回收站不显示数量徽标");
   tab("全局技能");
   assert.deepEqual(rows(), ["global-two"], "经过回收站仍保留全局筛选");
-  const create = find((node) => node.props["aria-label"] === t("btn.create"));
+  const create = find((node) => node.props["aria-label"] === t("btn.add") || node.props["aria-label"] === t("btn.create"));
   assert.equal(create.props.disabled, false, "全局页可创建技能");
   create.props.onClick(); await new Promise((resolve) => setImmediate(resolve)); render();
   assert.ok(find((node) => node.props["aria-label"] === t("dest.scope")), "创建弹窗使用共用的范围选择器");

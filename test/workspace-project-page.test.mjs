@@ -107,7 +107,7 @@ try {
   }
   function nodes(node = tree) {
     if (!node || typeof node !== "object" || Array.isArray(node)) return [];
-    if (typeof node.type === "function" && Array.isArray(node.props?.options) && node.props.label && node.props.onChange) {
+    if (typeof node.type === "function" && Array.isArray(node.props?.options) && node.props.label && node.props.onChange && !node.props.action) {
       return [{
         type: "select-fixture",
         props: {
@@ -116,16 +116,28 @@ try {
           value: node.props.value,
           options: node.props.options,
           disabled: node.props.disabled,
+          onChange: (event) => node.props.onChange(event?.target ? event.target.value : event)
+        },
+        children: []
+      }];
+    }
+    if (typeof node.type === "function" && node.props?.action) {
+      return [{
+        type: "action-button-fixture",
+        props: {
+          "aria-label": node.props.ariaLabel || node.props.label,
+          title: node.props.label,
+          disabled: node.props.disabled,
           icon: node.props.icon,
+          options: node.props.options,
           style: { width: 22 },
           variant: "outline",
-          className: "dssm-icon-action",
-          title: node.props.label,
+          className: node.props.icon ? "dssm-icon-action" : undefined,
           onClick: (actionId) => {
             if (typeof actionId === "string") node.props.onChange(actionId);
-            else node.props.onChange(node.props.options[0]?.value || "");
+            else node.props.onChange(node.props.options?.[0]?.value || "");
           },
-          onChange: (event) => node.props.onChange(event?.target ? event.target.value : event)
+          onChange: (event) => node.props.onChange(event?.target ? event.target.value : event),
         },
         children: []
       }];
@@ -165,7 +177,7 @@ try {
     assert.equal(action.props.variant, "outline", "工具栏图标按钮与技能行同为带框样式");
     assert.equal(action.props.className, "dssm-icon-action", "工具栏图标按钮复用技能行边框样式");
   }
-  const createAction = nodes(globalActions).find(node => node.props["aria-label"] === t("btn.create"));
+  const createAction = nodes(globalActions).find(node => node.props["aria-label"] === t("btn.add") || node.props["aria-label"] === t("btn.create"));
   assert.equal(createAction.props.style.backgroundColor, undefined, "搜索旁的创建按钮不覆盖主题背景色");
   assert.equal(createAction.props.style.color, undefined, "搜索旁的按钮不内联强调色");
   await tab("项目技能");
@@ -375,7 +387,7 @@ try {
   holdLists = true;
   const pendingStart = listResponses.length;
   await refreshProjects();
-  find(node => node.props["aria-label"] === t("btn.create") && node.props.onClick).props.onClick();
+  find(node => (node.props["aria-label"] === t("btn.add") || node.props["aria-label"] === t("btn.create")) && node.props.onClick).props.onClick();
   await settle();
   assert.equal(listResponses.length, pendingStart + 2);
   listResponses[pendingStart + 1].resolve({ ok: true, json: async () => ({ ok: true, data: { items: workspaces.slice() } }) });

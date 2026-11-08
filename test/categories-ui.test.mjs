@@ -83,7 +83,7 @@ try {
   }
   function nodes(node = tree) {
     if (!node || typeof node !== "object" || Array.isArray(node)) return [];
-    if (typeof node.type === "function" && Array.isArray(node.props?.options) && node.props.label && node.props.onChange) {
+    if (typeof node.type === "function" && Array.isArray(node.props?.options) && node.props.label && node.props.onChange && !node.props.action) {
       return [{
         type: "select-fixture",
         props: {
@@ -91,15 +91,28 @@ try {
           label: node.props.label,
           options: node.props.options,
           disabled: node.props.disabled,
+          onChange: (event) => node.props.onChange(event?.target ? event.target.value : event)
+        },
+        children: []
+      }];
+    }
+    if (typeof node.type === "function" && node.props?.action) {
+      return [{
+        type: "action-button-fixture",
+        props: {
+          "aria-label": node.props.ariaLabel || node.props.label,
+          title: node.props.label,
+          disabled: node.props.disabled,
           icon: node.props.icon,
+          options: node.props.options,
           style: { width: 22 },
           variant: "outline",
-          className: "dssm-icon-action",
+          className: node.props.icon ? "dssm-icon-action" : undefined,
           onClick: (actionId) => {
             if (typeof actionId === "string") node.props.onChange(actionId);
-            else node.props.onChange(node.props.options[0]?.value || "");
+            else node.props.onChange(node.props.options?.[0]?.value || "");
           },
-          onChange: (event) => node.props.onChange(event?.target ? event.target.value : event)
+          onChange: (event) => node.props.onChange(event?.target ? event.target.value : event),
         },
         children: []
       }];
@@ -320,7 +333,7 @@ try {
   assert.deepEqual(modalFailures, [], "分类创建/重命名/删除均携带原工作区登记路径");
 
   await tab("全局技能");
-  find((node) => node.props["aria-label"] === t("btn.create")).props.onClick();
+  find((node) => node.props["aria-label"] === t("btn.add") || node.props["aria-label"] === t("btn.create")).props.onClick();
   await settle();
   find((node) => node.props["aria-label"] === t("dest.scope")).props.onChange("workspace");
   render();
