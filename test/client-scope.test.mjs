@@ -94,7 +94,27 @@ try {
   function nodes(node = tree) {
     if (!node || typeof node !== "object" || Array.isArray(node)) return [];
     // 筛选业务测试只驱动受控值；官方菜单交互由专用测试与真实浏览器验证。
-    if (typeof node.type === "function" && Array.isArray(node.props?.options) && node.props.label && node.props.onChange) return [{ type: "select-fixture", props: { "aria-label": node.props.label, options: node.props.options, onChange: (event) => node.props.onChange(event?.target ? event.target.value : event) }, children: [] }];
+    if (typeof node.type === "function" && Array.isArray(node.props?.options) && node.props.label && node.props.onChange) {
+      return [{
+        type: "select-fixture",
+        props: {
+          "aria-label": node.props.ariaLabel || node.props.label,
+          label: node.props.label,
+          options: node.props.options,
+          disabled: node.props.disabled,
+          icon: node.props.icon,
+          style: { width: 22 },
+          variant: "outline",
+          className: "dssm-icon-action",
+          onClick: (actionId) => {
+            if (typeof actionId === "string") node.props.onChange(actionId);
+            else node.props.onChange(node.props.options[0]?.value || "");
+          },
+          onChange: (event) => node.props.onChange(event?.target ? event.target.value : event)
+        },
+        children: []
+      }];
+    }
     if (node.type?.name === "SkillSwitch" || node.props?.closeLabel || (typeof node.type === "function" && node.props && "on" in node.props && typeof node.props.label === "string")) return nodes(node.type({ ...node.props, children: node.children }));
     // 目标选择器是普通函数组件：渲染出它的子树，才能断言其中的控件。
     if (typeof node.type === "function" && node.props && "userDestinations" in node.props) return nodes(node.type(node.props));
@@ -105,6 +125,7 @@ try {
       linkedNodes(node.props?.actions, nested);
       linkedNodes(node.props?.title, nested);
       linkedNodes(node.props?.description, nested);
+      linkedNodes(node.props?.anchor, nested);
       if (Array.isArray(node.props?.items)) node.props.items.forEach((item) => { linkedNodes(item?.label, nested); linkedNodes(item?.extra, nested); linkedNodes(item?.children, nested); });
     }
     return [node, ...nested.flatMap((child) => nodes(child))];
@@ -300,7 +321,7 @@ try {
   assert.equal(groups().some((node) => node.props["data-source-key"] === "claude"), false, "默认缺失且无技能的外部来源在列表中隐藏");
 
   // 顶栏提供来源目录管理按钮，供首次配置尚未在列表中出现的外部来源
-  const manageBtn = find((node) => node.props["aria-label"] === t("rootPath.manage"));
+  const manageBtn = find((node) => node.props["aria-label"] === t("rootPath.manage")) || find((node) => node.props.options?.some((o) => o.value === "root-path" || String(o.label).includes(t("rootPath.manage"))));
   assert.ok(manageBtn, "顶栏提供来源目录配置入口");
 
   const editPath = nodes(customGroup).find((node) => String(node.props["aria-label"] || "").startsWith(t("rootPath.edit")));
@@ -316,7 +337,8 @@ try {
   assert.deepEqual(toggleRequest.body, { key: "codex", path: "D:/skills/codex" }, "未修改直接保存提交当前自定义路径");
 
   // 重新打开弹窗，测试来源切换下拉
-  manageBtn.props.onClick(); render();
+  const reopenManage = find((node) => node.props.options?.some((o) => o.value === "root-path"));
+  reopenManage.props.onClick("root-path"); render();
   assert.ok(find((node) => node.props["aria-label"] === t("rootPath.source")), "弹窗提供来源选择器");
   const sourceSelect = find((node) => node.props["aria-label"] === t("rootPath.source"));
   sourceSelect.props.onChange("claude"); render();
@@ -344,8 +366,8 @@ try {
   render();
 
   // 重新打开弹窗测试自定义来源表单顺序与移除登记保留弹窗
-  const currentManageBtn = find((node) => node.props["aria-label"] === t("rootPath.manage"));
-  currentManageBtn.props.onClick(); render();
+  const currentManageBtn = find((node) => node.props["aria-label"] === t("rootPath.manage")) || find((node) => node.props.options?.some((o) => o.value === "root-path"));
+  currentManageBtn.props.onClick("root-path"); render();
   assert.ok(find((node) => node.props["aria-label"] === t("rootPath.source")), "重新打开改目录弹窗");
 
   // 表单顺序：先显示名，后技能目录

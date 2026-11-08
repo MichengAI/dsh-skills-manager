@@ -107,13 +107,35 @@ try {
   }
   function nodes(node = tree) {
     if (!node || typeof node !== "object" || Array.isArray(node)) return [];
-    if (typeof node.type === "function" && Array.isArray(node.props?.options) && node.props.label && node.props.onChange) return [{ type: "select-fixture", props: { "aria-label": node.props.label, value: node.props.value, disabled: node.props.disabled, options: node.props.options, onChange: (event) => node.props.onChange(event.target.value) }, children: [] }];
+    if (typeof node.type === "function" && Array.isArray(node.props?.options) && node.props.label && node.props.onChange) {
+      return [{
+        type: "select-fixture",
+        props: {
+          "aria-label": node.props.ariaLabel || node.props.label,
+          label: node.props.label,
+          value: node.props.value,
+          options: node.props.options,
+          disabled: node.props.disabled,
+          icon: node.props.icon,
+          style: { width: 22 },
+          variant: "outline",
+          className: "dssm-icon-action",
+          title: node.props.label,
+          onClick: (actionId) => {
+            if (typeof actionId === "string") node.props.onChange(actionId);
+            else node.props.onChange(node.props.options[0]?.value || "");
+          },
+          onChange: (event) => node.props.onChange(event?.target ? event.target.value : event)
+        },
+        children: []
+      }];
+    }
     if (node.type?.name === "SkillSwitch" || node.props?.closeLabel || (typeof node.type === "function" && node.props && "on" in node.props && typeof node.props.label === "string")) return nodes(node.type({ ...node.props, children: node.children }));
     // 目标选择器是普通函数组件：渲染出它的子树，才能断言其中的控件。
     if (typeof node.type === "function" && node.props && "userDestinations" in node.props) return nodes(node.type(node.props));
     const nested = linkedNodes(node.children);
     if (typeof node.type === "function") {
-      for (const key of ["header", "extra", "actions", "title", "description"]) linkedNodes(node.props?.[key], nested);
+      for (const key of ["header", "extra", "actions", "title", "description", "anchor"]) linkedNodes(node.props?.[key], nested);
       if (Array.isArray(node.props?.items)) node.props.items.forEach((item) => { linkedNodes(item?.label, nested); linkedNodes(item?.extra, nested); linkedNodes(item?.children, nested); });
     }
     return [node, ...nested.flatMap((child) => nodes(child))];

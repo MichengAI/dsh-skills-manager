@@ -1343,12 +1343,54 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
         };
       });
       var tabs = h(SegmentedTabs, { key: "tabs", className: "dssm-scope-tabs", label: t("scope.label"), value: scope, onChange: function (next: string) { setScope(next); if (next === "project" || next === "trash") loadWorkspaces(next === "project"); if (next === "trash") refresh(true); }, items: tabItems });
-      var skillControls = [ scope === "project" ? null : h("div", { key: "summary", className: "dssm-summary" }, [["total", "summary.total"], ["enabled", "summary.enabled"], ["disabled", "summary.disabled"], ["invalid", "summary.invalid"]].map(function (item) { return h("div", { key: item[1], className: "dssm-stat" }, h("strong", null, summary[item[0]]), t(countKey(item[1], summary[item[0]]), { count: summary[item[0]] }).replace(String(summary[item[0]]), "")); })), h("div", { key: "filters", className: "dssm-filters" }, scope === "project" ? null : h("div", { className: "dssm-source-filter" }, h(SourceSelect, { value: activeSource, label: t("filter.source"), options: options, onChange: setSource })), h("div", { className: "dssm-group-filter" }, h(SourceSelect, { value: filters.group || "", label: t("group.label"), options: [{ value: "", label: t("group.bySource") }, { value: "repo", label: t("group.byRepo") }], onChange: function (value) { updateFilter("group", value); } })), h("div", { className: "dssm-status-filter" }, h(SourceSelect, { value: filters.status, label: t("filter.status"), options: [{ value: "", label: t("filter.statusAll") }].concat(["enabled", "disabled", "shadowed", "invalid"].map(function (value) { return { value: value, label: t("status." + value) }; })), onChange: function (value) { updateFilter("status", value); } })), scope === "project" ? h("div", { className: "dssm-project-filter" }, h(SourceSelect, { value: selectedWorkspace, label: t("filter.workspace"), disabled: workspaceList.loading || !workspaceRows.length, options: workspaceRows.map(function (row) { return { value: workspacePath(row), label: row.name + (!row.available ? " · " + (row.errorCode === "ENOENT" || row.errorCode === "ENOTDIR" ? t("workspace.missing") : (row.errorCode === "EACCES" || row.errorCode === "EPERM" ? t("workspace.unreadable") : t("workspace.unavailable"))) : "") + (workspaceRows.filter(function (other) { return other.name === row.name; }).length > 1 ? " · " + workspacePath(row) : ""), disabled: !row.available || !workspacePath(row) }; }), onChange: selectWorkspace })) : null, h(Input, { className: "dssm-search", allowClear: true, value: query, "aria-label": t("search"), placeholder: t("search.placeholder"), onChange: function (e) { setQuery(e.target.value); } }),
+      var statusOptions = [
+        { type: "label" as const, label: t("group.label") },
+        { value: "group:", label: t("group.bySource") },
+        { value: "group:repo", label: t("group.byRepo") },
+        { type: "separator" as const },
+        { type: "label" as const, label: t("filter.status") },
+        { value: "status:", label: t("filter.statusAll") },
+        { value: "status:enabled", label: t("status.enabled") },
+        { value: "status:disabled", label: t("status.disabled") },
+        { value: "status:shadowed", label: t("status.shadowed") },
+        { value: "status:invalid", label: t("status.invalid") },
+      ];
+      var statusText = filters.status ? t("status." + filters.status) : t("filter.statusAll");
+      var statusGroupLabel = filters.group === "repo" ? statusText + " · " + t("group.byRepo") : statusText;
+
+      function onStatusGroupChange(val: string) {
+        if (val.startsWith("group:")) {
+          updateFilter("group", val.slice(6));
+        } else if (val.startsWith("status:")) {
+          updateFilter("status", val.slice(7));
+        }
+      }
+
+      var addMenuOptions = [
+        { value: "create", label: t("btn.create") + "…" },
+        { value: "import", label: t("import.global") + "…" },
+      ];
+      if (scope === "user") {
+        addMenuOptions.push({ value: "root-path", label: t("rootPath.manage") + "…" });
+      }
+
+      function onAddAction(actionVal: string) {
+        if (actionVal === "create") openCreate();
+        else if (actionVal === "import") openImport();
+        else if (actionVal === "root-path") openRootPathPicker();
+      }
+
+      var skillControls = [ scope === "project" ? null : h("div", { key: "summary", className: "dssm-summary" }, [["total", "summary.total"], ["enabled", "summary.enabled"], ["disabled", "summary.disabled"], ["invalid", "summary.invalid"]].map(function (item) { return h("div", { key: item[1], className: "dssm-stat" }, h("strong", null, summary[item[0]]), t(countKey(item[1], summary[item[0]]), { count: summary[item[0]] }).replace(String(summary[item[0]]), "")); })), h("div", { key: "filters", className: "dssm-filters" }, scope === "project" ? null : h("div", { className: "dssm-source-filter" }, h(SourceSelect, { value: activeSource, label: t("filter.source"), options: options, onChange: setSource })), h("div", { className: "dssm-status-filter" }, h(SourceSelect, { values: ["group:" + (filters.group || ""), "status:" + (filters.status || "")], label: statusGroupLabel, ariaLabel: t("filter.status"), options: statusOptions, onChange: onStatusGroupChange })), scope === "project" ? h("div", { className: "dssm-project-filter" }, h(SourceSelect, { value: selectedWorkspace, label: t("filter.workspace"), disabled: workspaceList.loading || !workspaceRows.length, options: workspaceRows.map(function (row) { return { value: workspacePath(row), label: row.name + (!row.available ? " · " + (row.errorCode === "ENOENT" || row.errorCode === "ENOTDIR" ? t("workspace.missing") : (row.errorCode === "EACCES" || row.errorCode === "EPERM" ? t("workspace.unreadable") : t("workspace.unavailable"))) : "") + (workspaceRows.filter(function (other) { return other.name === row.name; }).length > 1 ? " · " + workspacePath(row) : ""), disabled: !row.available || !workspacePath(row) }; }), onChange: selectWorkspace })) : null, h(Input, { className: "dssm-search", allowClear: true, value: query, "aria-label": t("search"), placeholder: t("search.placeholder"), onChange: function (e) { setQuery(e.target.value); } }),
         scope !== "trash" ? h("div", { className: "dssm-filter-actions" },
           filterActionButton(t("btn.refresh"), strokeIcon("M13.5 8A5.5 5.5 0 118 2.5c2.3 0 4.3 1.4 5.1 3.5m.4-3.5v3.5H10"), function () { refresh(false); if (scope === "project") refreshWorkspaceDetails(); }, busy || snapshot.loading),
-          filterActionButton(t("btn.create"), strokeIcon("M8 2.5v11M2.5 8h11"), openCreate, busy, t("btn.create") + "…"),
-          filterActionButton(t("import.global"), strokeIcon("M2.5 10.5v2a1 1 0 001 1h9a1 1 0 001-1v-2M8 2.5v7M5 5.5l3-3 3 3"), openImport, busy),
-          scope === "user" ? filterActionButton(t("rootPath.manage"), strokeIcon("M2.5 4.5h3l1.3 1.5h6.7v6h-11z"), openRootPathPicker, busy, t("rootPath.manage") + "…") : null
+          h(SourceSelect, {
+            action: true,
+            icon: strokeIcon("M8 2.5v11M2.5 8h11"),
+            label: t("btn.create"),
+            disabled: busy,
+            options: addMenuOptions,
+            onChange: onAddAction,
+          })
         ) : null)];
       var content: React.ReactNode[] = ([h("style", { key: "css" }, CSS), h("div", { key: "head", className: "dssm-head" }, h("div", { className: "dssm-title-block" }, h("div", { className: "dssm-title-row" }, h("h2", { className: "dssm-title" }, t("title")), h("div", { className: "dssm-feedback-links" }, h(PrimitiveButton, { variant: "outline", size: "sm", "aria-label": t("link.project"), icon: h(GithubMark16), onClick: function () { window.open("https://github.com/MichengAI/dsh-skills-manager", "_blank", "noreferrer"); } }, t("link.project")), h(PrimitiveButton, { variant: "outline", size: "sm", "aria-label": t("link.feedback"), icon: h(FeedbackIcon), onClick: function () { window.open("https://github.com/MichengAI/dsh-skills-manager/issues", "_blank", "noreferrer"); } }, t("link.feedback")))), h("p", { className: "dssm-desc" }, t("desc")))), tabs] as React.ReactNode[]).concat(scope === "trash" || scope === "repositories" ? [] : skillControls, [result && modal !== "import" ? h("div", { key: "result", className: "dssm-feedback" + (result.warning ? " dssm-warning" : result.ok ? "" : " dssm-error") }, result.text) : null], (data.warnings || []).map(function (warning, index) { return h("div", { key: "warning-" + index, className: "dssm-feedback dssm-warning", role: "alert" }, translateError(t, warning)); }), [snapshot.error ? h("div", { key: "error", className: "dssm-feedback dssm-error" }, snapshot.error) : null, scope === "repositories" ? repositoryUI.content : snapshot.loading && !snapshot.data ? h("div", { key: "loading", className: "dssm-empty" }, t("loading")) : scope === "trash" ? renderTrash() : renderList()]);
 

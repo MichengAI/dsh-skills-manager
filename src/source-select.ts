@@ -26,9 +26,22 @@ export function createSourceSelect(react: typeof React) {
     }, [open]);
 
     const items = react.useMemo<readonly MenuEntry[]>(function () {
-      return props.options.map(function (opt) {
+      return props.options.map(function (opt, idx) {
+        if (opt.type === "separator") {
+          return {
+            type: "separator",
+            id: opt.value || ("sep-" + idx),
+          };
+        }
+        if (opt.type === "label") {
+          return {
+            type: "label",
+            id: opt.value || ("lbl-" + idx),
+            text: typeof opt.label === "string" ? opt.label : "",
+          };
+        }
         return {
-          id: opt.value,
+          id: opt.value || "",
           label: opt.label,
           disabled: opt.disabled,
           danger: opt.danger,
@@ -65,7 +78,7 @@ export function createSourceSelect(react: typeof React) {
       );
     }
 
-    const selectedOption = props.options.find(function (opt) { return opt.value === props.value; });
+    const selectedOption = props.options.find(function (opt) { return !opt.type && opt.value === props.value; });
     const currentText = selectedOption ? selectedOption.label : props.label;
 
     return h("div", { className: "dssm-menu-select-wrap" },
@@ -77,6 +90,7 @@ export function createSourceSelect(react: typeof React) {
           setOpen(false);
         },
         selectedId: props.value,
+        selectedIds: props.values,
         align: "start",
         portal: true,
         dense: true,
@@ -85,7 +99,7 @@ export function createSourceSelect(react: typeof React) {
           variant: "outline",
           size: "sm",
           role: "combobox",
-          "aria-label": props.label,
+          "aria-label": props.ariaLabel || props.label,
           "aria-expanded": open,
           disabled: props.disabled,
           className: "dssm-menu-select-trigger" + (open ? " is-open" : ""),

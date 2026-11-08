@@ -61,18 +61,23 @@ export interface ModalProps {
     className?: string;
     contentClassName?: string;
 }
+export interface SourceSelectOption {
+    value?: string;
+    label?: React.ReactNode;
+    disabled?: boolean;
+    danger?: boolean;
+    type?: "label" | "separator";
+}
+
 export interface SourceSelectProps {
     value?: string;
+    values?: readonly string[];
     label: string;
+    ariaLabel?: string;
     disabled?: boolean;
     action?: boolean;
     icon?: React.ReactNode;
-    options: {
-        value: string;
-        label: React.ReactNode;
-        disabled?: boolean;
-        danger?: boolean;
-    }[];
+    options: SourceSelectOption[];
     onChange: (value: string) => void;
 }
 export interface SessionSnapshot {

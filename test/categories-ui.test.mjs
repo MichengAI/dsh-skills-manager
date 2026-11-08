@@ -83,7 +83,27 @@ try {
   }
   function nodes(node = tree) {
     if (!node || typeof node !== "object" || Array.isArray(node)) return [];
-    if (typeof node.type === "function" && Array.isArray(node.props?.options) && node.props.label && node.props.onChange) return [{ type: "select-fixture", props: { "aria-label": node.props.label, options: node.props.options, onChange: (event) => node.props.onChange(event?.target ? event.target.value : event) }, children: [] }];
+    if (typeof node.type === "function" && Array.isArray(node.props?.options) && node.props.label && node.props.onChange) {
+      return [{
+        type: "select-fixture",
+        props: {
+          "aria-label": node.props.ariaLabel || node.props.label,
+          label: node.props.label,
+          options: node.props.options,
+          disabled: node.props.disabled,
+          icon: node.props.icon,
+          style: { width: 22 },
+          variant: "outline",
+          className: "dssm-icon-action",
+          onClick: (actionId) => {
+            if (typeof actionId === "string") node.props.onChange(actionId);
+            else node.props.onChange(node.props.options[0]?.value || "");
+          },
+          onChange: (event) => node.props.onChange(event?.target ? event.target.value : event)
+        },
+        children: []
+      }];
+    }
     if (node.type?.name === "SkillSwitch" || node.props?.closeLabel || (typeof node.type === "function" && node.props && "on" in node.props && typeof node.props.label === "string")) return nodes(node.type({ ...node.props, children: node.children }));
     if (typeof node.type === "function" && node.props && "userDestinations" in node.props) return nodes(node.type(node.props));
     const nested = linkedNodes(node.children);
