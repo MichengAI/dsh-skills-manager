@@ -14,6 +14,9 @@
 - **A state file that already exceeds 16 MiB can still shrink by deleting trash entries**: the write was rejected before, which made the size limit a dead end.
 - **An interrupted uninstall recovers on its own**: if a single uninstall fails midway, reopening the repository page confirms the files and restores the source record instead of leaving a dangling trash entry.
 - **Batch runs no longer show a possibly wrong progress percentage**: the current phase is shown instead, so concurrent windows cannot interfere. The internal `POST /repositories/progress` endpoint was removed with it, so any external script calling it now gets a 404.
+- **A failed batch uninstall no longer certifies an edited copy as installed**: when files change during the move, that copy now shows as untracked (conflicting) and is claimed again automatically once the files match the install record, so both entry points agree about the same failure.
+- **Clearing the repository list also clears the selection**: removing the last repository no longer leaves a stale selected count or a persisted selection that comes back later.
+- **"Retry failed items" says so when nothing is left to retry**: it no longer does nothing silently when the state changed.
 - **Select-all uses a short label**: long repository names no longer push the header out. Checkboxes now use host controls, so keyboard and screen-reader behavior matches the rest of DSH.
 
 [中文](CHANGELOG.zh-CN.md)

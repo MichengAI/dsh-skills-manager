@@ -334,11 +334,12 @@ export function createRepositoryManager({
   // 卸载失败后能否撤销退役身份：只在「安全回滚凭据 + 回收站与暂存目录都没留下 +
   // 磁盘内容仍与卸载意图逐字节一致」三条同时成立时才允许。单条与批量卸载共用同一判据，
   // 否则移动失败期间被并发修改的目录会被凭「目录存在」certified 成已安装。
-  async function deleteRolledBack(error: unknown, trashId: string, record: InstallRecord, fingerprint: string) {
+  async function deleteRolledBack(error: unknown, trashId: string, record: InstallRecord, fingerprint: string, indexed?: Awaited<ReturnType<typeof indexRegisteredWorkspaces>>) {
     if (!isSafeDeleteFailure(error)) return false;
     if (!await absentTrashPath(join(trashRootPath(), trashId))) return false;
     if (!await absentTrashPath(join(trashRootPath(), `.stage-${trashId}`))) return false;
-    return matches(record, fingerprint);
+    // 传入已建好的工作区索引，避免批量失败时每个失败项都重扫一遍登记目录。
+    return matches(record, fingerprint, registeredWorkspaces?.(), indexed);
   }
   async function recoverTrashDeletes(loaded?: RepositoryState) {
     const data = loaded ?? await read();
@@ -817,7 +818,7 @@ export function createRepositoryManager({
         if ("ok" in result && result.ok === false) throw failure(result.error, typeof result.code === "string" ? result.code : "error.repo.invalid", result.params);
         return result;
       } catch (error) {
-        if (await deleteRolledBack(error, trashId, record, fingerprint)) {
+        if (await deleteRolledBack(error, trashId, record, fingerprint, await indexedFor(record))) {
           delete record.trashId; delete record.uninstallFingerprint;
           for (const item of catalog) delete item.trashId;
           await write(data);
@@ -949,7 +950,7 @@ export function createRepositoryManager({
           if ("ok" in result && result.ok === false) throw result;
           results[item.slot] = { id: item.id, path: item.path, root: item.record.root || "dsh", ...(item.record.workspace ? { workspace: item.record.workspace } : {}), ok: true };
         } catch (caught) { const error = caught as CodedError;
-          if (item.record.trashId && await deleteRolledBack(caught, item.record.trashId, item.record, item.fingerprint)) {
+          if (item.record.trashId && await deleteRolledBack(caught, item.record.trashId, item.record, item.fingerprint, await indexedFor(item.record))) {
             delete item.record.trashId;
             delete item.record.uninstallFingerprint;
             for (const entry of item.catalog) delete entry.trashId;
