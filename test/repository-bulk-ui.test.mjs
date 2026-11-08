@@ -12,7 +12,9 @@ function harness(skills, { locale = 'en', owner = 'o', name = 'repo' } = {}) {
   };
   const calls = [];
   let handler = async () => ({});
-  const api = async (path, options) => { calls.push({path, body: options?.body && JSON.parse(options.body)}); if (path === '/repositories') return { repositories: [{id:'r',owner,name,skills}], installRoots:[{key:'dsh',available:true,path:'/skills'}] }; if (path === '/workspaces') return {items:[]}; return handler(path, options); };
+  // reposSnapshot 可在用例中途更换（例如仓库被清空），用于验证选择清理。
+  let reposSnapshot = null;
+  const api = async (path, options) => { calls.push({path, body: options?.body && JSON.parse(options.body)}); if (path === '/repositories') return reposSnapshot ? reposSnapshot() : { repositories: [{id:'r',owner,name,skills}], installRoots:[{key:'dsh',available:true,path:'/skills'}] }; if (path === '/workspaces') return {items:[]}; return handler(path, options); };
   const Input = Object.assign(function Input(){}, { TextArea: 'textarea' });
   const Button = 'host-button', Modal = 'modal', SourceSelect = 'select', Checkbox = 'host-checkbox';
   const t = (key, args = {}) => Object.entries(args).reduce((s,[k,v]) => s.replaceAll(`{${k}}`,String(v)), repositoryLocales[locale][key] || key);
@@ -25,7 +27,7 @@ function harness(skills, { locale = 'en', owner = 'o', name = 'repo' } = {}) {
   const find = f => all().find(f);
   const byText = s => find(n => n.type===Button && n.children.includes(s));
   const search=()=>find(n=>n.type===Input && n.props['aria-label']===t('repo.search'));
-  return {settle,render,find,all,byText,search,calls,t, setHandler:fn=>handler=fn, setInstalled:fn=>installed=fn, unmount:()=>cleanup.forEach(f=>f?.())};
+  return {settle,render,find,all,byText,search,calls,t, setHandler:fn=>handler=fn, setInstalled:fn=>installed=fn, setRepos:fn=>reposSnapshot=fn, unmount:()=>cleanup.forEach(f=>f?.())};
 }
 const skill = name => ({path:name,name,description:name,status:'available',installedRoot:null});
 const copySkill = name => ({...skill(name),status:'installed',installations:[{installedRoot:'dsh',tracked:true,canUninstall:true,canRollback:true}]});
@@ -196,4 +198,43 @@ test('update preflight failures are not reported as no updates', async () => {
 
 test('batch error codes have localized messages', () => {
   for (const locale of [repositoryLocales.zh, repositoryLocales.en]) for (const code of ['error.repo.empty','error.repo.tooMany','error.repo.duplicate']) assert.ok(locale[code], code);
+});
+
+test('clearing the repository list drops the selection instead of keeping stale keys', async () => {
+  const store = new Map();
+  globalThis.sessionStorage = {
+    getItem: key => (store.has(key) ? store.get(key) : null),
+    setItem: (key, value) => { store.set(key, String(value)); },
+    removeItem: key => { store.delete(key); },
+  };
+  try {
+    const h = harness([skill('alpha')]); await h.settle();
+    await selectAll(h);
+    assert.ok(h.byText('Install 1'), '选择生效后才可能出现批量栏');
+    const stored = () => JSON.parse(store.get('dssm-bulk-selection') || '{}');
+    assert.equal(stored()['install\u0001r\u0001alpha'], true, '选择随会话持久化');
+    // 仓库被移除后重新加载：陈旧键必须被清掉，否则会残留无法执行的计数。
+    h.setRepos(() => ({ repositories: [], installRoots: [{ key: 'dsh', available: true, path: '/skills' }] }));
+    const refreshButton = h.find(n => n.props?.['aria-label'] === h.t('repo.refresh') && typeof n.props.onClick === 'function');
+    assert.ok(refreshButton, '仓库刷新按钮可点击');
+    refreshButton.props.onClick();
+    await h.settle();
+    assert.equal(h.byText('Install 1'), undefined, '选择必须随仓库清空而消失');
+    assert.deepEqual(stored(), {}, '持久化的陈旧选择也要清空');
+  } finally { delete globalThis.sessionStorage; }
+});
+
+test('retry reports when the failed items can no longer be retried', async () => {
+  const skills = [skill('alpha')];
+  const h = harness(skills);
+  h.setHandler(async path => path.endsWith('/installMany') ? { results: [{ id: 'r', path: 'alpha', ok: false, error: 'boom', code: 'error.repo.conflict' }] } : {});
+  await h.settle(); await selectAll(h);
+  h.byText('Install 1').props.onClick(); await h.settle();
+  h.byText('Run batch').props.onClick(); await h.settle();
+  assert.ok(h.byText('Retry failed items'), '失败项结果显示重试入口');
+  // 失败项在同一次加载里已不再可安装（例如已被别处装上），重试不得静默什么都不做。
+  skills[0].status = 'installed';
+  h.byText('Retry failed items').props.onClick(); await h.settle();
+  assert.equal(h.find(n => n.type === 'modal'), undefined, '无可重试项时不弹预检');
+  assert.ok(h.all().some(n => n.children.includes(h.t('repo.bulk.nothingToRetry'))), '必须给出「已不可重试」的提示');
 });
