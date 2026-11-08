@@ -65,3 +65,36 @@ test('oversized transaction rollback preserves provenance after filesystem failu
   await fs.writeFile(statePath, JSON.stringify(recovered));
   assert.notEqual((await manager.permanentlyDeleteTrash(id)).ok, false);
 });
+
+// 跨实例/跨进程的 read-modify-write 没有互斥（已知边界，本仓库不做跨进程锁）。
+// 这里锁定的是「即便发生穿插，本实例的事务仍会收口、被删身份不会复活」；
+// 另一实例这次写入是否幸存不在保证范围内，改天真要加锁时这条注释就是入口。
+test('interleaved write from another instance neither blocks nor revives our delete', async () => {
+  const id = await trashOne();
+  const target = join(trashRootPath(), id);
+  const rm = fs.rm;
+  let enteredResolve, releaseResolve;
+  const entered = new Promise(resolve => { enteredResolve = resolve; });
+  const release = new Promise(resolve => { releaseResolve = resolve; });
+  fs.rm = async (path, options) => {
+    if (path === target) { enteredResolve(); await release; }
+    return rm(path, options);
+  };
+  let deletion, otherSurvived;
+  try {
+    deletion = manager.permanentlyDeleteTrash(id);
+    await entered;
+    await createRepositoryManager({ probeRemote: false }).add({ url: 'example/interleave' });
+    releaseResolve();
+    await deletion;
+  } finally {
+    releaseResolve(); fs.rm = rm;
+    if (deletion) await deletion.catch(() => {});
+  }
+  const state = await read();
+  otherSurvived = state.repositories.some(x => x.name === 'interleave');
+  assert.equal(state.pendingTrashDeletes, undefined, '发起删除的实例必须完成自己的事务');
+  assert.ok(!state.installs.some(x => x.trashId === id), '被删身份不得复活');
+  assert.ok(!(await listTrash()).some(x => x.id === id), '回收项不得残留');
+  console.log(JSON.stringify({ otherInstanceWriteSurvived: otherSurvived }));
+});

@@ -79,7 +79,8 @@ function validateStoredState(input: unknown): asserts input is RepositoryState {
     }
   }
   if (value.pendingTrashDeletes !== undefined) {
-    if (!Array.isArray(value.pendingTrashDeletes)) throw failure("永久删除事务无效");
+    // 每个事务会触发若干次 lstat；条数必须有上限，不能只靠 64 MiB 读取限制兜底。
+    if (!Array.isArray(value.pendingTrashDeletes) || value.pendingTrashDeletes.length > 64) throw failure("永久删除事务无效");
     const ids = new Set<string>();
     for (const pending of value.pendingTrashDeletes) {
       if (!pending || typeof pending.id !== "string" || !/^\d+-[a-f0-9-]{36}$/.test(pending.id) || ids.has(pending.id) || !Array.isArray(pending.installs) || !Array.isArray(pending.catalogInstalls) || !pending.installs.length && !pending.catalogInstalls.length) throw failure("永久删除事务无效");
@@ -122,7 +123,7 @@ export function createRepositoryManager({
   let queue: Promise<unknown> = Promise.resolve();
   let catalogWarnings: Array<{ id: string; code: string; error: string }> = [];
   let activeIndex: ReturnType<typeof createWorkspaceIndex> | undefined;
-  const serialize = <T>(task: () => T | Promise<T>, recover = true, recoverDeletes = true): Promise<T> => { const run = async () => { const index = createWorkspaceIndex(registeredWorkspaces?.(), { onBuild: onWorkspaceIndexBuild }); const previous = activeIndex; activeIndex = index; try { if (recoverDeletes) await recoverTrashDeletes(); if (recover) await recoverPending(); return await task(); } finally { activeIndex = previous; } }; const next = queue.then(run, run); queue = next.catch(() => {}); return next; };
+  const serialize = <T>(task: () => T | Promise<T>, recover = true, recoverDeletes = true): Promise<T> => { const run = async () => { const index = createWorkspaceIndex(registeredWorkspaces?.(), { onBuild: onWorkspaceIndexBuild }); const previous = activeIndex; activeIndex = index; try { if (recoverDeletes) await recoverTrashDeletes(await preloadedState()); if (recover) await recoverPending(await preloadedState()); return await task(); } finally { activeIndex = previous; } }; const next = queue.then(run, run); queue = next.catch(() => {}); return next; };
   function requestIndex() { return activeIndex ?? createWorkspaceIndex(registeredWorkspaces?.(), { onBuild: onWorkspaceIndexBuild }); }
   async function indexedFor(record: { workspace?: string }) { return record.workspace === undefined ? undefined : requestIndex().load(); }
   async function read(): Promise<RepositoryState> {
@@ -166,10 +167,23 @@ export function createRepositoryManager({
     try {
       await fs.writeFile(temporary, text, { encoding: "utf8", flag: "wx" });
       await fs.rename(temporary, file);
+      stateGeneration += 1;
+      stateCache = undefined;
     } finally { await fs.rm(temporary, { force: true }); }
   }
   async function currentStateBytes() {
     try { return (await fs.lstat(file)).size; } catch { return 0; }
+  }
+  // 同一次 serialize 内复用同一次解析：恢复流程与任务体都要读状态，重复解析在
+  // 接近 16 MiB 时是每请求上百毫秒。写盘后立即失效，避免拿到旧快照。
+  // 缓存只在一次 serialize 内有效；跨实例并发写本就不在支持范围内。
+  let stateGeneration = 0;
+  let stateCache: { generation: number; value: RepositoryState } | undefined;
+  async function preloadedState(): Promise<RepositoryState> {
+    if (stateCache && stateCache.generation === stateGeneration) return stateCache.value;
+    const value = await read();
+    stateCache = { generation: stateGeneration, value };
+    return value;
   }
   function repository(data: RepositoryState, id: string) {
     const repo = data.repositories.find((r) => r.id === id);
@@ -316,8 +330,8 @@ export function createRepositoryManager({
   async function presentPath(path: string) {
     try { await fs.lstat(path); return true; } catch { return false; }
   }
-  async function recoverTrashDeletes() {
-    const data = await read();
+  async function recoverTrashDeletes(loaded?: RepositoryState) {
+    const data = loaded ?? await read();
     if (!data.pendingTrashDeletes?.length) return;
     for (const pending of data.pendingTrashDeletes) {
       let exists: boolean;
@@ -340,9 +354,9 @@ export function createRepositoryManager({
       return metadata.id === record.trashId && metadata.name === record.name && (record.workspace ? metadata.root?.scope === "project" && metadata.root.projectRoot === record.workspace : metadata.root?.scope === "user" && metadata.root.key === (record.root || "dsh")) && ("path" in record ? metadata.repository?.id === record.id && metadata.repository.path === record.path : Array.isArray(metadata.catalog) && metadata.catalog.includes(record.id)) && metadata.entries?.length === 1 && metadata.entries[0] === record.name;
     } catch { return false; }
   }
-  async function recoverPending() {
+  async function recoverPending(loaded?: RepositoryState) {
     catalogWarnings = [];
-    const data = await read(); let recovered = false;
+    const data = loaded ?? await read(); let recovered = false;
     const recoveredCatalogIds: string[] = [];
     const recoveredInstallIds: string[] = [];
     const restoredIds: string[] = [];
@@ -594,14 +608,22 @@ export function createRepositoryManager({
         if (!afterCommit.length) delete commit.pendingTrashDeletes;
         await write(data, true, commit, true);
       }
+      // 回滚失败不能顶替真正的失败原因：附在 cause 上，让调用方仍看到原始错误。
+      const rollback = async (original: unknown) => {
+        if (!hasIdentity) return;
+        try { await recoverTrashDeletes(); }
+        catch (rollbackError) {
+          throw new Error(`永久删除失败，且来源身份回滚未完成；请恢复磁盘写入后重试。原始错误：${(original as Error)?.message ?? original}`, { cause: rollbackError });
+        }
+      };
       let result: Awaited<ReturnType<typeof permanentlyDeleteTrash>>;
       try { result = await permanentlyDeleteTrash(id, log); }
       catch (error) {
-        if (hasIdentity) await recoverTrashDeletes();
+        await rollback(error);
         throw error;
       }
       if ("ok" in result && result.ok === false) {
-        if (hasIdentity) await recoverTrashDeletes();
+        await rollback(result.error);
         return result;
       }
       if (hasIdentity) {

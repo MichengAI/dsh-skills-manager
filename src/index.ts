@@ -639,7 +639,6 @@ function apply(ctx: HostContext, config?: PluginConfig) {
       methods: ["POST"],
       fetch: (req) => handlePost(req, (b) => repositories.uninstallMany(b as { items?: Array<{ id?: unknown; path?: unknown; root?: unknown; workspace?: unknown }> }, registeredWorkspacePaths(ctx)), { isRepo: true, afterSuccess: afterWrite }),
     },
-
     {
       path: `${API_PREFIX}/repositories/preview`,
       methods: ["POST"],

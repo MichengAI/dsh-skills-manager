@@ -195,3 +195,54 @@ test('non-delete cleanup keeps the state file indented', async () => {
   assert.ok(/\n\s{2}"/.test(text), '非删除事务的清理写入必须保持缩进，避免压缩绕过容量闸门');
   assert.ok(!text.includes('skillsh:owner/legacy'));
 });
+
+test('one request parses the state file at most twice', async () => {
+  const readFile = fs.readFile;
+  let stateReads = 0;
+  fs.readFile = async (path, ...rest) => {
+    if (path === statePath) stateReads += 1;
+    return readFile(path, ...rest);
+  };
+  try { await manager.list(); } finally { fs.readFile = readFile; }
+  assert.ok(stateReads <= 2, `预读+任务体最多两次解析，实际 ${stateReads}`);
+});
+
+test('a failed rollback still surfaces the original delete error', async () => {
+  // 自建夹具，不依赖前面用例留下的状态。
+  const id = '666-33333333-3333-4333-8333-333333333333';
+  const itemRoot = join(trashRootPath(), id);
+  await fs.mkdir(join(itemRoot, 'alpha'), { recursive: true });
+  await fs.writeFile(join(itemRoot, 'metadata.json'), JSON.stringify({ id, name: 'alpha', deletedAt: new Date().toISOString(), entries: ['alpha'] }));
+  await fs.writeFile(join(itemRoot, 'alpha', 'SKILL.md'), 'fixture');
+  const before = await read();
+  const template = before.installs[0];
+  assert.ok(template, '前置状态应已有安装记录');
+  const record = { ...template, name: 'alpha', path: 'alpha', trashId: id, uninstallFingerprint: 'a'.repeat(64) };
+  await fs.writeFile(statePath, JSON.stringify({ ...before, installs: [...before.installs, record] }));
+
+  const rm = fs.rm, rename = fs.rename;
+  fs.rm = async (path, options) => {
+    if (path === itemRoot) throw Object.assign(new Error('injected delete failure'), { code: 'EIO' });
+    return rm(path, options);
+  };
+  fs.rename = async (from, to) => {
+    if (to === statePath) {
+      const candidate = JSON.parse(await fs.readFile(from, 'utf8'));
+      // 准备事务的写入放行，回滚写入失败：原始删除错误不能被它盖掉。
+      if (!candidate.pendingTrashDeletes?.length) throw new Error('injected rollback failure');
+    }
+    return rename(from, to);
+  };
+  try {
+    await assert.rejects(manager.permanentlyDeleteTrash(id), error => {
+      assert.match(String(error.message), /来源身份回滚未完成/);
+      assert.match(String(error.message), /injected delete failure/, '必须保留原始失败原因');
+      assert.match(String(error.cause?.message || ''), /injected rollback failure/);
+      return true;
+    });
+  } finally { fs.rm = rm; fs.rename = rename; }
+
+  // 收尾：还原夹具，避免污染后续用例。
+  await fs.rm(itemRoot, { recursive: true, force: true });
+  await fs.writeFile(statePath, JSON.stringify(before));
+});

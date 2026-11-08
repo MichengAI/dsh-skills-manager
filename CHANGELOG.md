@@ -5,13 +5,15 @@
 ### New Features
 
 - **Bulk operations for skill repositories**: select several entries and install, check for updates, update, restore the previous version, or uninstall in one run. A preflight shows what will run and what will be skipped, and each item reports success, failure, skip, or not run.
-- **The batch scope is explicit**: items hidden by filters stay selected, and the header states it.
+- **The batch scope is spelled out in the header**: items hidden by filters stay selected, and the header says so before you run anything.
 
 ### Behavior Changes
 
 - **Reinstalling after a permanent delete no longer creates duplicate records**: the same skill used to come back as two source records, which then failed with "install record is ambiguous, choose a location"; there is now always exactly one.
+- **A failed permanent delete keeps both the backup and the source record**: if writing provenance or removing the files fails, the trash entry stays and its source record is kept, so you can still restore or retry instead of being left with missing files and a stale record.
+- **A state file that already exceeds 16 MiB can still shrink by deleting trash entries**: the write was rejected before, which made the size limit a dead end.
 - **An interrupted uninstall recovers on its own**: if a single uninstall fails midway, reopening the repository page confirms the files and restores the source record instead of leaving a dangling trash entry.
-- **Batch runs no longer show a possibly wrong progress percentage**: the current phase is shown instead, so concurrent windows cannot interfere.
+- **Batch runs no longer show a possibly wrong progress percentage**: the current phase is shown instead, so concurrent windows cannot interfere. The internal `POST /repositories/progress` endpoint was removed with it, so any external script calling it now gets a 404.
 - **Select-all uses a short label**: long repository names no longer push the header out. Checkboxes now use host controls, so keyboard and screen-reader behavior matches the rest of DSH.
 
 [中文](CHANGELOG.zh-CN.md)
