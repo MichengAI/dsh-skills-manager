@@ -63,7 +63,7 @@ test('batch update write failure cannot leak failed record into next success', a
   assert.equal(saved.installs.find(x => x.name === 'beta').commit, 'b'.repeat(40));
 });
 
-test('failed bulk move preserves a concurrent edit and restores source tracking', async () => {
+test('failed bulk move preserves a concurrent edit without certifying it, then recovers once files match', async () => {
   const rename = fs.rename;
   const edited = doc('beta', 'user edit');
   let injected = false;
@@ -80,16 +80,21 @@ test('failed bulk move preserves a concurrent edit and restores source tracking'
     assert.equal(injected, true);
     assert.deepEqual(result.results.map(x => x.ok), [true, false]);
     assert.equal(await fs.readFile(file('beta'), 'utf8'), edited);
-    const before = (await state()).installs.find(x => x.name === 'beta' && x.complete);
-    if (before.trashId) {
-      await assert.rejects(fs.lstat(join(trashRootPath(), before.trashId)), { code: 'ENOENT' });
-      await assert.rejects(fs.lstat(join(trashRootPath(), `.stage-${before.trashId}`)), { code: 'ENOENT' });
-    }
+    // 回滚后磁盘内容已不同于卸载意图，不得凭「目录存在」把记录恢复成已安装。
+    const held = (await state()).installs.find(x => x.name === 'beta' && x.complete);
+    assert.ok(held.trashId, '内容不一致时必须保留退役身份');
+    await assert.rejects(fs.lstat(join(trashRootPath(), held.trashId)), { code: 'ENOENT' });
+    await assert.rejects(fs.lstat(join(trashRootPath(), `.stage-${held.trashId}`)), { code: 'ENOENT' });
     await manager.list();
-    const saved = (await state()).installs.find(x => x.name === 'beta' && x.complete);
-    assert.equal(saved.trashId, undefined);
-    assert.equal(saved.id, repo.id);
-    assert.equal(saved.path, 'beta');
+    assert.equal((await state()).installs.find(x => x.name === 'beta' && x.complete).trashId, held.trashId, '内容不一致时恢复流程也不得撤销退役');
+
+    // 内容回到卸载意图一致后，恢复流程才允许把来源记录还原。
+    await fs.writeFile(file('beta'), doc('beta', 'new'));
+    await manager.list();
+    const restored = (await state()).installs.find(x => x.name === 'beta' && x.complete);
+    assert.equal(restored.trashId, undefined);
+    assert.equal(restored.id, repo.id);
+    assert.equal(restored.path, 'beta');
   } finally {
     fs.rename = rename;
     await fs.writeFile(file('beta'), doc('beta', 'new'));
@@ -242,27 +247,28 @@ test('deleteSkill does not certify failed rollback or failed stage cleanup', asy
   } finally { fs.writeFile = write; fs.rename = rename; fs.rm = rm; }
 });
 
-test('failed rollback confirmation write rejects instead of reporting success', async () => {
+// 回滚真的发生（内容仍与卸载意图一致）但确认写入失败：本次必须报错，且持久意图让下一次请求自愈。
+test('failed rollback confirmation write rejects instead of reporting success, then self-heals', async () => {
   const rename = fs.rename;
-  const edited = doc('alpha', 'edited during failure');
-  let failConfirmation = false;
+  let moveFailed = false;
   fs.rename = async (from, to) => {
     if (from === dirname(file('alpha'))) {
-      await fs.writeFile(file('alpha'), edited);
-      failConfirmation = true;
+      moveFailed = true;
       throw Object.assign(new Error('move failure'), { code: 'EIO' });
     }
-    if (to === statePath && failConfirmation) throw new Error('state confirmation failure');
+    if (to === statePath && moveFailed) throw new Error('state confirmation failure');
     return rename(from, to);
   };
   try {
     await assert.rejects(manager.uninstallMany({ items: [req('alpha')] }), /state confirmation failure/);
     const saved = (await state()).installs.find(x => x.name === 'alpha' && x.trashId);
-    assert.ok(saved);
-    assert.equal(await fs.readFile(file('alpha'), 'utf8'), edited);
+    assert.ok(saved, '回滚确认写失败时卸载意图必须留在盘上');
+    assert.equal(await fs.readFile(file('alpha'), 'utf8'), doc('alpha', 'old'));
     fs.rename = rename;
     await manager.list();
-    assert.ok((await state()).installs.some(x => x.trashId === saved.trashId));
+    const healed = (await state()).installs.find(x => x.name === 'alpha' && x.complete && !x.trashId);
+    assert.ok(healed, '内容与卸载意图一致时，下一次请求必须撤销退役身份');
+    assert.equal(healed.id, repo.id);
   } finally {
     fs.rename = rename;
     await fs.writeFile(file('alpha'), doc('alpha', 'old'));

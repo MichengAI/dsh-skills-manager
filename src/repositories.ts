@@ -168,6 +168,8 @@ export function createRepositoryManager({
     try {
       await fs.writeFile(temporary, text, { encoding: "utf8", flag: "wx" });
       await fs.rename(temporary, file);
+      // 失效缓存是防呆：当前所有写入都是就地改缓存里的同一个对象，这次清空观察不到差别；
+      // 留给将来把写出对象做成副本的调用方，避免它们读到写盘前的解析结果。
       stateGeneration += 1;
       stateCache = undefined;
     } finally { await fs.rm(temporary, { force: true }); }
@@ -329,8 +331,14 @@ export function createRepositoryManager({
     try { await fs.lstat(path); return false; }
     catch (error) { return (error as NodeJS.ErrnoException).code === "ENOENT"; }
   }
-  async function presentPath(path: string) {
-    try { await fs.lstat(path); return true; } catch { return false; }
+  // 卸载失败后能否撤销退役身份：只在「安全回滚凭据 + 回收站与暂存目录都没留下 +
+  // 磁盘内容仍与卸载意图逐字节一致」三条同时成立时才允许。单条与批量卸载共用同一判据，
+  // 否则移动失败期间被并发修改的目录会被凭「目录存在」certified 成已安装。
+  async function deleteRolledBack(error: unknown, trashId: string, record: InstallRecord, fingerprint: string) {
+    if (!isSafeDeleteFailure(error)) return false;
+    if (!await absentTrashPath(join(trashRootPath(), trashId))) return false;
+    if (!await absentTrashPath(join(trashRootPath(), `.stage-${trashId}`))) return false;
+    return matches(record, fingerprint);
   }
   async function recoverTrashDeletes(loaded?: RepositoryState) {
     const data = loaded ?? await read();
@@ -809,7 +817,7 @@ export function createRepositoryManager({
         if ("ok" in result && result.ok === false) throw failure(result.error, typeof result.code === "string" ? result.code : "error.repo.invalid", result.params);
         return result;
       } catch (error) {
-        if (isSafeDeleteFailure(error) && await absentTrashPath(join(trashRootPath(), trashId)) && await absentTrashPath(join(trashRootPath(), `.stage-${trashId}`)) && await matches(record, fingerprint)) {
+        if (await deleteRolledBack(error, trashId, record, fingerprint)) {
           delete record.trashId; delete record.uninstallFingerprint;
           for (const item of catalog) delete item.trashId;
           await write(data);
@@ -941,7 +949,7 @@ export function createRepositoryManager({
           if ("ok" in result && result.ok === false) throw result;
           results[item.slot] = { id: item.id, path: item.path, root: item.record.root || "dsh", ...(item.record.workspace ? { workspace: item.record.workspace } : {}), ok: true };
         } catch (caught) { const error = caught as CodedError;
-          if (item.record.trashId && isSafeDeleteFailure(caught) && await absentTrashPath(join(trashRootPath(), `.stage-${item.trashId}`)) && await absentTrashPath(join(trashRootPath(), item.trashId)) && await presentPath(join(item.root.path, item.record.name))) {
+          if (item.record.trashId && await deleteRolledBack(caught, item.record.trashId, item.record, item.fingerprint)) {
             delete item.record.trashId;
             delete item.record.uninstallFingerprint;
             for (const entry of item.catalog) delete entry.trashId;
