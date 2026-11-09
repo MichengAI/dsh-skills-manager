@@ -12,7 +12,6 @@ type ConfirmModal = {type: 'trash-confirm'; root: string; name: string; workspac
 type ModalState = 'detail' | 'create' | 'import' | ConfirmModal | null;
 import { createRepositoryUI, repositoryLocales } from "./repository-ui.js";
 import { createDestinationKit, defaultDestination, destinationPayload, destinationReady, destinationLocales, destinationCss, type DestinationValue } from "./destination-picker.js";
-import { observePluginUpdate } from "./plugin-update-ui.js";
 import { resolveApiUrl } from "./api-base.js";
 import { createSourceSelect } from "./source-select.js";
 import * as primitives from "@deepseek-ai/dsh-client-ui-primitives";
@@ -33,32 +32,6 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
     const IconEditOutlineRegular = (primitives as any).IconEditOutlineRegular as React.ComponentType<{ size?: number }>;
     function FeedbackIcon() {
       return h(IconEditOutlineRegular, { size: 16 });
-    }
-    var UPDATE_ICON_PATHS = {
-      refresh: ["M13.5 5.5V2.5m0 0h-3m3 0-2.1 2.1A5.5 5.5 0 1 0 13.2 12"],
-      download: ["M8 2v8m0 0 3-3m-3 3-3-3M3 13v2h10v-2"],
-      copy: ["M5 5h8v8H5z", "M3 3h8"],
-      close: ["m4 4 8 8M12 4 4 12"],
-    };
-    function createPluginUpdateIcon(name: keyof typeof UPDATE_ICON_PATHS) {
-      var element = document.createElement("span");
-      var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-      svg.setAttribute("viewBox", "0 0 16 16");
-      svg.setAttribute("width", "16");
-      svg.setAttribute("height", "16");
-      svg.setAttribute("fill", "none");
-      svg.setAttribute("stroke", "currentColor");
-      svg.setAttribute("stroke-width", "1.5");
-      svg.setAttribute("stroke-linecap", "round");
-      svg.setAttribute("stroke-linejoin", "round");
-      svg.setAttribute("aria-hidden", "true");
-      UPDATE_ICON_PATHS[name].forEach(function (d) {
-        var path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-        path.setAttribute("d", d);
-        svg.append(path);
-      });
-      element.append(svg);
-      return element;
     }
     var MUTATION_HEADERS = { "content-type": "application/json", "x-dsh-skills-manager": "1" };
     var NS = "skills-manager";
@@ -1625,26 +1598,7 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
         } catch (_error) { /* 可选服务不可用时保留手动输入路径 */ }
       }
       ctx.effect(function () { return ctx.locale.register(NS, DICT); });
-      var updateCleanup: any;
       var sidebarController: any;
-      ctx.effect(function () {
-        updateCleanup = observePluginUpdate({
-          endpoint: "/api/michengai/dsh-skills-manager/update",
-          packageName: "@michengai/dsh-skills-manager",
-          titleRowSelector: ".dssm-title-row",
-          linksSelector: ".dssm-feedback-links",
-          zhName: "技能",
-          enName: "Skills",
-          createIcon: createPluginUpdateIcon,
-          isEnabled: function () {
-            return sidebarController ? sidebarController.isOnlineUpdateEnabled() : true;
-          }
-        });
-        return function () {
-          if (typeof updateCleanup === "function") updateCleanup();
-          updateCleanup = undefined;
-        };
-      }, "skills-manager: plugin update ui");
       installSettingsNavIcon(ctx, function () { return ctx.locale.bind(NS)("title"); });
 
       let offSettingsSection: (() => void) | null = null;
@@ -1757,11 +1711,6 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
         headers: MUTATION_HEADERS,
         renderPanel: function (ownerProps?: any) { return h(SkillManagerSection, Object.assign({ t: ctx.locale.bind(NS) }, ownerProps)); },
         ns: NS,
-        onOnlineUpdateChange: function () {
-          if (updateCleanup && typeof updateCleanup.refresh === "function") {
-            updateCleanup.refresh();
-          }
-        },
         onLocationChange: function () {
           syncSettingsSection();
         }

@@ -1,0 +1,7 @@
+{
+  "meta": {
+    "title": "Skills Manager",
+    "description": "ローカルの Agent Skills を一元的に読み込み、安全に管理します。",
+    "detail": "README.ja.md"
+  }
+}

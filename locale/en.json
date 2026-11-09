@@ -1,6 +1,7 @@
 {
   "meta": {
     "title": "Skills Manager",
-    "description": "Load and safely manage local Agent Skills."
+    "description": "Load and safely manage local Agent Skills in DeepSeek Harness.",
+    "detail": "README.en.md"
   }
 }

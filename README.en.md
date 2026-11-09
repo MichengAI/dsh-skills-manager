@@ -8,7 +8,9 @@
 
   **Manage local and project skills, install from GitHub, preview updates and restore backups**
 
-  [简体中文](README.md) · [Changelog](CHANGELOG.md) · [Apache-2.0](LICENSE)
+  [简体中文](README.zh-CN.md) · [English](README.en.md) · [日本語](README.ja.md) · [Español](README.es.md) · [Français](README.fr.md) · [Deutsch](README.de.md) · [Русский](README.ru.md) · [Português](README.pt.md)
+
+  [Changelog](CHANGELOG.md) · [License](LICENSE)
 
   [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
   [![npm package](https://img.shields.io/npm/v/%40michengai%2Fdsh-skills-manager.svg?label=npm%20package)](https://www.npmjs.com/package/@michengai/dsh-skills-manager)
@@ -91,18 +93,6 @@ Two native switches are available:
   - When enabled, clicking the sidebar icon opens the Skills Manager directly in the primary workspace with a **960px centered container** (matching host plugin manager conventions). This eliminates vertical scrolling constraints in narrow settings dialogs;
   - When disabled, unregisters the sidebar entry cleanly;
   - The standard **Settings → Skills** view remains active either way, and state is synchronized live across both entry points.
-
-### 2. Online Updates (`onlineUpdate` / `updater`)
-- **Default**: Enabled (`true`)
-- **Description**: Controls whether the plugin checks for and installs updates from npm.
-- **Effect**:
-  - **Dynamic UI Sync**: Disabling the toggle hides the **Check for updates** button in the header immediately without requiring a full page reload;
-  - **Endpoint Guard**: When disabled, the update API route returns `HTTP 403` for all check and install requests, preventing unreviewed updates;
-  - **Host / Platform Lock**: For curated plugin indexes (such as VibeDev) or restricted enterprise environments, this can be locked directly via Cordis configuration (bundle patch) without needing UI interaction:
-    ```yaml
-    updater: false # or onlineUpdate: false
-    ```
-    Once configured, the built-in updater is disabled at startup and the update action stays hidden.
 
 ## Usage Guide
 

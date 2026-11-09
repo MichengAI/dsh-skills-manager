@@ -226,21 +226,13 @@ try {
     ns: "skills-manager",
   });
 
-  assert.equal(controller.isOnlineUpdateEnabled(), true, "客户端默认 onlineUpdate 开启");
-
   // plugins.bundle.config 应该已经触发 inject
   assert.ok(slotInjections.has("plugins.bundle.config"));
   slotInjections.get("plugins.bundle.config")();
   assert.ok(slotRegistrations.has("plugins.bundle.config"));
 
-  // 测试 setOnlineUpdate
-  await controller.setOnlineUpdate(false);
-  assert.equal(controller.isOnlineUpdateEnabled(), false, "setOnlineUpdate(false) 后更新为 false");
-  assert.equal(updateStatus, false, "服务端 API 同步收到 false");
-
-  await controller.setOnlineUpdate(true);
-  assert.equal(controller.isOnlineUpdateEnabled(), true, "setOnlineUpdate(true) 后更新为 true");
-  assert.equal(updateStatus, true, "服务端 API 同步收到 true");
+  // 防回归验证：客户端生命周期不再发起 /online-update 请求
+  assert.equal(updateStatus, true, "客户端不再向服务端发送 /online-update 请求");
 
   controller.destroy();
 

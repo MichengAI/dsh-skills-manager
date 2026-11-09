@@ -39,7 +39,8 @@ function fixture() {
     if (id === "@deepseek-ai/dsh-client-ui-primitives") return { Switch: function Switch() {}, SegmentedControl: () => null, Button: () => null, Input: () => null, Modal: () => null, SegmentedTabs: () => null };
     throw new Error("未知测试依赖：" + id);
   });
-  const gets = { "/sidebar-entry": deferred(), "/online-update": deferred() };
+  const gets = { "/sidebar-entry": deferred() };
+  const requestedPaths = [];
   const injections = new Map(), registrations = new Map(), writes = [], changes = [];
   let writeResult;
   const ctx = {
@@ -54,19 +55,20 @@ function fixture() {
   };
   const controller = client.setupSidebarEntry(ctx, {
     ns: "skills-manager", headers: {}, renderPanel: () => null,
-    onOnlineUpdateChange: (enabled) => changes.push(enabled),
+    onLocationChange: (location) => changes.push(location),
     callApi: (path, options) => {
+      requestedPaths.push(path);
       if (options?.method === "POST") {
         writes.push(path);
-        return writeResult?.promise || Promise.resolve({ enabled: JSON.parse(options.body).enabled });
+        return writeResult?.promise || Promise.resolve({ location: JSON.parse(options.body).location });
       }
-      return gets[path].promise;
+      return gets[path]?.promise || Promise.resolve({});
     },
   });
   injections.get("plugins.bundle.config")();
   injections.get("sidebar.panellist")();
   return {
-    controller, gets, registrations, injections, writes, changes,
+    controller, gets, registrations, injections, writes, changes, requestedPaths,
     setWriteResult(value) { writeResult = value; },
     mount() {
       const element = registrations.get("plugins.bundle.config")({});
@@ -81,19 +83,13 @@ function fixture() {
   };
 }
 
-function onlineRow(card) {
-  const tree = card.type(card.props);
-  return React.Children.toArray(tree.props.children).find((row) => row.key.endsWith("online-update"));
-}
-
 test("销毁后忽略初始化请求与迟到槽位，不恢复入口或通知", async () => {
   const f = fixture();
   try {
     f.controller.destroy();
     f.controller.destroy();
     const before = [...f.registrations.keys()];
-    f.gets["/sidebar-entry"].resolve({ enabled: true });
-    f.gets["/online-update"].resolve({ enabled: false, locked: true });
+    f.gets["/sidebar-entry"].resolve({ location: "both" });
     await flush();
     assert.deepEqual([...f.registrations.keys()], before, "初始化请求不能在销毁后重新注册入口");
     assert.deepEqual(f.changes, [], "初始化响应不能在销毁后触发更新 UI");
@@ -101,172 +97,47 @@ test("销毁后忽略初始化请求与迟到槽位，不恢复入口或通知",
     f.injections.get("plugins.bundle.config")();
     assert.deepEqual([...f.registrations.keys()], before, "迟到的槽位依赖不能注册新内容");
     await f.controller.setEnabled(true);
-    await f.controller.setOnlineUpdate(false);
     assert.deepEqual(f.writes, [], "销毁后的旧控制器不能再写配置");
   } finally { f.dispose(); }
 });
 
-for (const path of ["/sidebar-entry", "/online-update"]) {
-  test(`销毁后忽略 ${path} 保存失败的回滚副作用`, async () => {
-    const f = fixture();
-    try {
-      f.gets["/sidebar-entry"].resolve({ enabled: true });
-      f.gets["/online-update"].resolve({ enabled: true });
-      await flush();
-      const pending = deferred();
-      f.setWriteResult(pending);
-      const operation = path === "/sidebar-entry" ? f.controller.setEnabled(false) : f.controller.setOnlineUpdate(false);
-      const rejected = assert.rejects(operation, /保存失败/);
-      f.controller.destroy();
-      const before = [...f.registrations.keys()], notifications = f.changes.length;
-      pending.reject(new Error("保存失败"));
-      await rejected;
-      assert.deepEqual([...f.registrations.keys()], before);
-      assert.equal(f.changes.length, notifications, "销毁后不能再发回滚通知");
-    } finally { f.dispose(); }
-  });
-}
-
-test("未锁定时可保存开关，保存失败恢复界面状态", async () => {
+test("销毁后忽略 /sidebar-entry 保存失败的回滚副作用", async () => {
   const f = fixture();
   try {
-    f.gets["/online-update"].resolve({ enabled: true, locked: false });
-    await flush();
-    const render = f.mount();
-    let card = render();
-    assert.equal(card.props.onlineUpdateDisabled, false);
-    card.props.onToggleOnlineUpdate(false);
-    await flush();
-    card = render();
-    assert.equal(card.props.onlineUpdateEnabled, false);
-    assert.equal(card.props.onlineUpdateDisabled, false);
-    assert.equal(f.controller.isOnlineUpdateEnabled(), false);
-    const pending = deferred();
-    f.setWriteResult(pending);
-    card.props.onToggleOnlineUpdate(true);
-    assert.equal(render().props.onlineUpdateDisabled, true, "保存期间禁用开关");
-    pending.reject(new Error("保存失败"));
-    await flush();
-    card = render();
-    assert.equal(card.props.onlineUpdateEnabled, false, "失败后恢复原来的关闭状态");
-    assert.equal(card.props.onlineUpdateDisabled, false);
-    assert.deepEqual(f.writes, ["/online-update", "/online-update"]);
-  } finally { f.dispose(); }
-});
-
-test("初始化读取失败后，保存返回宿主禁用错误仍能恢复关闭和锁定状态", async () => {
-  const f = fixture();
-  try {
-    const render = f.mount();
-    render();
-    f.gets["/online-update"].reject(new Error("初始化读取失败"));
+    f.gets["/sidebar-entry"].resolve({ location: "both" });
     await flush();
     const pending = deferred();
     f.setWriteResult(pending);
-    const oldToggle = render().props.onToggleOnlineUpdate;
-    oldToggle(false);
-    pending.reject({ ok: false, code: "error.update.disabled", error: "在线更新已被宿主配置锁定禁用" });
-    await flush();
-    const card = render();
-    assert.equal(card.props.onlineUpdateLocked, true, "明确禁用错误必须补齐锁定状态");
-    assert.equal(card.props.onlineUpdateEnabled, false, "锁定后不能回滚成开启");
-    assert.equal(card.props.onlineUpdateDisabled, true);
-    const row = onlineRow(card);
-    assert.ok(row, "配置行仍须可见");
-    assert.match(JSON.stringify(row), /在线更新已被宿主配置禁用/);
-    assert.equal(f.controller.isOnlineUpdateEnabled(), false);
-    assert.equal(f.changes.at(-1), false, "通知更新入口隐藏，而不是恢复显示");
-    oldToggle(true);
-    await f.controller.setOnlineUpdate(true);
-    await flush();
-    assert.deepEqual(f.writes, ["/online-update"], "锁定后旧回调和控制器都不能继续发起请求");
-  } finally { f.dispose(); }
-});
-
-for (const [name, error] of [
-  ["网络失败", new Error("网络不可用")],
-  ["其他拒绝错误", { code: "error.proto.forbidden" }],
-  ["空错误值", null],
-]) {
-  test(`${name}不能被误判为宿主锁定`, async () => {
-    const f = fixture();
-    try {
-      const render = f.mount();
-      render();
-      f.gets["/online-update"].reject(new Error("初始化读取失败"));
-      await flush();
-      const pending = deferred();
-      f.setWriteResult(pending);
-      render().props.onToggleOnlineUpdate(false);
-      pending.reject(error);
-      await flush();
-      const card = render();
-      assert.equal(card.props.onlineUpdateLocked, false);
-      assert.equal(card.props.onlineUpdateDisabled, false);
-      assert.equal(card.props.onlineUpdateEnabled, true, "普通错误仍回滚到原值");
-    } finally { f.dispose(); }
-  });
-}
-
-test("销毁后晚到的宿主禁用错误不能改变状态或通知", async () => {
-  const f = fixture();
-  try {
-    const pending = deferred();
-    f.setWriteResult(pending);
-    const operation = f.controller.setOnlineUpdate(true);
-    const rejected = assert.rejects(operation, (error) => error.code === "error.update.disabled");
+    const operation = f.controller.setEnabled(false);
+    const rejected = assert.rejects(operation, /保存失败/);
     f.controller.destroy();
-    const notifications = f.changes.length;
-    pending.reject({ code: "error.update.disabled" });
+    const before = [...f.registrations.keys()], notifications = f.changes.length;
+    pending.reject(new Error("保存失败"));
     await rejected;
-    assert.equal(f.controller.isOnlineUpdateEnabled(), true, "销毁后的回调不再更新状态");
-    assert.equal(f.changes.length, notifications);
+    assert.deepEqual([...f.registrations.keys()], before);
+    assert.equal(f.changes.length, notifications, "销毁后不能再发回滚通知");
   } finally { f.dispose(); }
 });
 
-test("开启更新的通知必须等待服务端保存成功，避免重试仍命中旧禁用状态", async () => {
+test("配置卡片仅包含入口位置，防回归：不再渲染在线更新开关且不发起 /online-update 请求", async () => {
   const f = fixture();
   try {
-    f.gets["/online-update"].resolve({ enabled: false, locked: false });
+    f.gets["/sidebar-entry"].resolve({ location: "both" });
     await flush();
-    const before = f.changes.length;
-    const pending = deferred();
-    f.setWriteResult(pending);
-    const operation = f.controller.setOnlineUpdate(true);
-    assert.equal(f.changes.length, before, "写入完成前不能触发更新状态读取");
-    pending.resolve({ enabled: true });
-    await operation;
-    assert.equal(f.changes.at(-1), true);
-  } finally { f.dispose(); }
-});
-
-test("已挂载配置卡片在初始化响应后同步宿主锁定状态", async () => {
-  const f = fixture();
-  try {
     const render = f.mount();
-    render();
-    f.gets["/online-update"].resolve({ enabled: false, locked: true });
-    await flush();
     const card = render();
-    assert.equal(card.props.onlineUpdateDisabled, true, "同一份卡片 props 必须通过订阅读到锁定状态");
-  } finally { f.dispose(); }
-});
+    const tree = card.type(card.props);
+    const children = React.Children.toArray(tree.props.children);
 
-test("宿主锁定后保留在线更新行并显示禁用原因，不能发起写请求", async () => {
-  const f = fixture();
-  try {
-    f.gets["/online-update"].resolve({ enabled: false, locked: true });
-    await flush();
-    const card = f.mount()();
-    const row = onlineRow(card);
-    assert.ok(row, "锁定时在线更新整行不能消失");
-    const toggle = React.Children.toArray(row.props.children).find((node) => node.props.label === "切换在线更新");
-    assert.equal(toggle.props.disabled, true);
-    assert.equal(toggle.props.title, "在线更新已被宿主配置禁用");
-    assert.match(JSON.stringify(row), /在线更新已被宿主配置禁用/);
-    toggle.props.onChange(true);
-    await flush();
-    assert.deepEqual(f.writes, [], "即使直接触发回调也不能写入宿主锁定的配置");
-    assert.equal(f.controller.isOnlineUpdateEnabled(), false);
+    // 必须存在 entry-location 行
+    const locationRow = children.find((row) => row.key && row.key.endsWith("entry-location"));
+    assert.ok(locationRow, "入口展示位置行必须存在");
+
+    // 绝不能存在 online-update 开关行
+    const updateRow = children.find((row) => row.key && row.key.endsWith("online-update"));
+    assert.equal(updateRow, undefined, "卡片中绝不得存在在线更新开关行");
+
+    // 绝不能向服务端发起 /online-update 读取请求
+    assert.equal(f.requestedPaths.includes("/online-update"), false, "客户端初始化绝不发起 /online-update 轮询");
   } finally { f.dispose(); }
 });

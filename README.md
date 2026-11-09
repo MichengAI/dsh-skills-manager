@@ -8,7 +8,9 @@
 
   **统一管理本机与项目技能，从 GitHub 安装、预览更新并备份回退**
 
-  [English](README.en.md) · [更新日志](CHANGELOG.zh-CN.md) · [Apache-2.0](LICENSE)
+  [简体中文](README.zh-CN.md) · [English](README.en.md) · [日本語](README.ja.md) · [Español](README.es.md) · [Français](README.fr.md) · [Deutsch](README.de.md) · [Русский](README.ru.md) · [Português](README.pt.md)
+
+  [更新日志](CHANGELOG.zh-CN.md) · [开源协议](LICENSE)
 
   [![许可证：Apache-2.0](https://img.shields.io/badge/许可证-Apache--2.0-blue.svg)](LICENSE)
   [![npm package](https://img.shields.io/npm/v/%40michengai%2Fdsh-skills-manager.svg?label=npm%20package)](https://www.npmjs.com/package/@michengai/dsh-skills-manager)
@@ -91,18 +93,6 @@ dsh plugin --profile web add @michengai/dsh-skills-manager@latest --registry=htt
   - 开启后，在侧边栏点击即可直达技能管理中心，并在主工作区以 **960px 居中版心**（对齐官方插件管理与市场规范）展开完整大面板，彻底告别在设置弹窗狭窄视口内滚动的局限；
   - 关闭后安全注销侧栏槽位；
   - 无论是否开启侧栏入口，DSH 原有的「设置 → 技能」入口始终保留，两处界面数据与状态 100% 实时同步。
-
-### 2. 在线更新 (`onlineUpdate` / `updater`)
-- **默认状态**：开启（`true`）
-- **功能说明**：控制是否允许在线检查并安装技能管理器的新版本。
-- **生效效果**：
-  - **界面联动**：关闭开关后，技能管理面板顶部的「检查更新」按钮将即时隐藏，无需刷新页面；开启后自动恢复展示；
-  - **接口安全拦截**：关闭后，服务端的更新路由对任何版本检查和安装请求均返回 `HTTP 403` 禁用状态，彻底杜绝在插件内安装未审核版本；
-  - **宿主/平台级锁定**：面向精选插件索引（如 VibeDev）或企业安全合规环境，支持直接在 Cordis 配置文件（bundle patch）中声明，无需进入界面手动配置：
-    ```yaml
-    updater: false # 或 onlineUpdate: false
-    ```
-    配置生效后，更新器在启动时即被完全禁用，且更新入口默认保持隐藏。
 
 ## 使用指南
 

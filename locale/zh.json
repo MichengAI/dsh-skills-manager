@@ -1,6 +1,7 @@
 {
   "meta": {
     "title": "Skills Manager",
-    "description": "统一加载并安全管理本机 Agent Skills。"
+    "description": "统一加载并安全管理本机 Agent Skills。",
+    "detail": "README.zh-CN.md"
   }
 }
