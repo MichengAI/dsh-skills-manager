@@ -59,6 +59,23 @@ class FakeElement {
     this.parent = null;
   }
 
+  matches(selector) {
+    if (!selector) return false;
+    if (selector.includes(",")) {
+      return selector.split(",").some((s) => this.matches(s.trim()));
+    }
+    return matches(this, selector);
+  }
+
+  closest(selector) {
+    let curr = this;
+    while (curr) {
+      if (curr.matches && curr.matches(selector)) return curr;
+      curr = curr.parent;
+    }
+    return null;
+  }
+
   querySelector(selector) {
     const [match] = this.querySelectorAll(selector);
     return match ?? null;
@@ -82,11 +99,17 @@ class FakeElement {
 
 function matches(element, selector) {
   if (selector.startsWith(".")) {
-    return element.className.split(/\s+/).includes(selector.slice(1));
+    const className = selector.slice(1);
+    return element.className.split(/\s+/).includes(className);
   }
   if (selector.startsWith("[") && selector.endsWith("]")) {
-    const name = selector.slice(1, -1);
-    return element.getAttribute(name) != null;
+    const inner = selector.slice(1, -1);
+    if (inner.includes("=")) {
+      const [name, val] = inner.split("=");
+      const cleanVal = val.replace(/^["']|["']$/g, "");
+      return element.getAttribute(name) === cleanVal;
+    }
+    return element.getAttribute(inner) != null;
   }
   return element.tagName === selector.toUpperCase();
 }
@@ -219,6 +242,83 @@ test("卸载后移除 marker 属性，宿主齿轮与内容保持不变", () => 
   assert.equal(button.getAttribute(NAV_ICON_MARKER), null);
   assert.equal(svg.innerHTML, "<path d=\"gear\"/>");
   assert.equal(svg.getAttribute("data-orca-link-icon"), "gear");
+});
+
+test("移动端抽屉（role=dialog）下的侧边栏入口绝不打 marker，已有残留必须自愈清除", () => {
+  const { doc } = createDom();
+
+  // 模拟移动端侧边栏抽屉：抽屉本身是 role="dialog"，内部包含侧栏导航
+  const mobileDrawer = doc.createElement("div");
+  mobileDrawer.setAttribute("role", "dialog");
+  mobileDrawer.className = "dcu-drawer";
+
+  const sidebarNavRoot = doc.createElement("div");
+  sidebarNavRoot.className = "dcu-sb-root dcu-sidebar-nav-root";
+  mobileDrawer.appendChild(sidebarNavRoot);
+
+  const sidebarNav = doc.createElement("nav");
+  sidebarNavRoot.appendChild(sidebarNav);
+
+  const sidebarButton = doc.createElement("button");
+  sidebarButton.className = "dcu-sb-row dcu-sb-more-item";
+  sidebarButton.textContent = "技能";
+
+  const glyphSpan = doc.createElement("span");
+  glyphSpan.className = "dcu-sb-glyph";
+  glyphSpan.setAttribute("aria-hidden", "true");
+  const svg = doc.createElement("svg");
+  glyphSpan.appendChild(svg);
+  sidebarButton.appendChild(glyphSpan);
+
+  const titleSpan = doc.createElement("span");
+  titleSpan.className = "dcu-sb-title";
+  titleSpan.textContent = "技能";
+  sidebarButton.appendChild(titleSpan);
+
+  sidebarNav.appendChild(sidebarButton);
+
+  // 1. 侧边栏按钮在移动端抽屉下，即使匹配到了同名 label，也绝不能被打上 marker
+  assert.equal(applySettingsNavIcon(sidebarButton, () => "技能"), false, "侧边栏按钮绝不打 marker");
+  assert.equal(sidebarButton.hasAttribute(NAV_ICON_MARKER), false, "不能包含 marker 属性");
+
+  // 1.1 纯文本侧栏按钮（无 glyph 容器，完全依赖 isSidebarNavButton 容器/类名守卫）也绝不打 marker
+  const textOnlySidebarButton = doc.createElement("button");
+  textOnlySidebarButton.className = "dcu-sb-row";
+  textOnlySidebarButton.textContent = "技能";
+  sidebarNav.appendChild(textOnlySidebarButton);
+  assert.equal(applySettingsNavIcon(textOnlySidebarButton, () => "技能"), false, "无 glyph 容器的侧边栏按钮也绝不打 marker");
+  assert.equal(textOnlySidebarButton.hasAttribute(NAV_ICON_MARKER), false);
+
+  // 2. 模拟如果已有残留 marker，applySettingsNavIcon 必须主动识别并清除，返回 true
+  sidebarButton.setAttribute(NAV_ICON_MARKER, "");
+  assert.equal(applySettingsNavIcon(sidebarButton, () => "技能"), true, "检测到侧边栏按钮有残留 marker 时自愈清除");
+  assert.equal(sidebarButton.hasAttribute(NAV_ICON_MARKER), false, "残留 marker 必须被成功清除");
+  assert.equal(applySettingsNavIcon(sidebarButton, () => "技能"), false, "再次同步幂等保持清除");
+});
+
+test("NAV_ICON_CSS 包含对侧栏行（.dcu-sb-row）的 ::before 伪元素防御样式", async () => {
+  const { doc } = createDom();
+  const { button } = fakeButton(doc, "技能");
+  const previousDocument = globalThis.document;
+  const previousObserver = globalThis.MutationObserver;
+  globalThis.document = doc;
+  globalThis.MutationObserver = class {
+    observe() {}
+    disconnect() {}
+  };
+  try {
+    installSettingsNavIcon({ effect(run) { run(); } }, () => "技能");
+    const style = doc.getElementById("dssm-settings-nav-icon-style");
+    assert.ok(style, "样式表必须注入");
+    assert.match(
+      style.textContent,
+      /\.dcu-sb-row\[data-dssm-nav-icon\]::before|\.dcu-sb-row::before/,
+      "样式表中必须包含对 .dcu-sb-row 伪元素重置为 content: none !important"
+    );
+  } finally {
+    globalThis.document = previousDocument;
+    globalThis.MutationObserver = previousObserver;
+  }
 });
 
 test("插件卸载时的清理回调会移除图标并保留样式单例", async () => {

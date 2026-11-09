@@ -69,6 +69,7 @@ const NAV_ICON_CSS = [
   `  -webkit-mask-size: 16px 16px;`,
   `  mask-size: 16px 16px;`,
   `}`,
+  `.dcu-sb-row[${NAV_ICON_MARKER}]::before, .dcu-sb-row::before { content: none !important; }`,
 ].join("\n");
 
 export function isOwnNavRow(rowText: string | null | undefined, wantedLabel: string | null | undefined): boolean {
@@ -76,6 +77,31 @@ export function isOwnNavRow(rowText: string | null | undefined, wantedLabel: str
   if (wanted.length === 0) return false;
   const current = String(rowText ?? "").trim();
   return current === wanted;
+}
+
+/** 判定是否属于侧边栏导航入口（包括移动端抽屉下的侧栏、面板列表入口等） */
+export function isSidebarNavButton(button: Element | null | undefined): boolean {
+  if (!button) return false;
+  const anyBtn = button as unknown as {
+    matches?: (selector: string) => boolean;
+    closest?: (selector: string) => boolean;
+    className?: unknown;
+    hasAttribute?: (name: string) => boolean;
+    querySelector?: (selector: string) => Element | null;
+  };
+  if (typeof anyBtn.matches === "function") {
+    if (anyBtn.matches('.dcu-sb-row, [data-dcu-panel-id], nav[class*="panelList"] button')) return true;
+  }
+  if (typeof anyBtn.closest === "function") {
+    if (anyBtn.closest('.dcu-sidebar-nav-root, .dcu-sb-root, nav[class*="panelList"], [data-dcu-managed], [data-dcu-sidebar-active]')) return true;
+  }
+  const cls = String(anyBtn.className || "");
+  if (cls.includes("dcu-sb-row") || cls.includes("panelRow")) return true;
+  if (typeof anyBtn.hasAttribute === "function" && anyBtn.hasAttribute("data-dcu-panel-id")) return true;
+  if (typeof anyBtn.querySelector === "function") {
+    if (anyBtn.querySelector('span[class*="dcu-sb-glyph"], span[class*="glyph"]')) return true;
+  }
+  return false;
 }
 
 /** 注入导航图标的样式；重复安装时复用同一个 style 元素 */
@@ -93,12 +119,20 @@ function ensureNavIconStyle(): void {
  * 不修改任何 DOM 节点，避免移动端列表项排版下与文字重叠冲突。
  */
 export function applySettingsNavIcon(button: Element, wantedLabel: () => string): boolean {
+  if (isSidebarNavButton(button)) {
+    if (button.hasAttribute(NAV_ICON_MARKER)) {
+      button.removeAttribute(NAV_ICON_MARKER);
+      return true;
+    }
+    return false;
+  }
   const isOwn = isOwnNavRow(button.textContent, wantedLabel());
   if (isOwn) {
-    const hasSlotIcon = Array.from(button.children).some((child) =>
-      child.tagName === "SPAN" &&
-      Boolean(child.className && String(child.className).includes("navIcon"))
-    ) || Boolean(button.querySelector?.('span[class*="navIcon"]'));
+    const hasSlotIcon = Array.from(button.children).some((child) => {
+      if (!child || child.tagName !== "SPAN") return false;
+      const cls = String((child as Element).className || "");
+      return cls.includes("navIcon") || cls.includes("dcu-sb-glyph");
+    }) || Boolean(button.querySelector?.('span[class*="navIcon"], span[class*="dcu-sb-glyph"]'));
     if (hasSlotIcon) {
       if (button.hasAttribute(NAV_ICON_MARKER)) {
         button.removeAttribute(NAV_ICON_MARKER);
