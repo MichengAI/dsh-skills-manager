@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.3.1] - 2026-11-09
+
+### Behavior Changes
+
+- **Toolbar layout optimized to prevent boundary clipping**: on the default DSH desktop window, top-right action buttons such as "Import skill" and "Source folders" are no longer cut off by the container boundary (#83).
+- **Consolidate grouping and invocation status filters**: the separate "Group by" and "Status" menus are combined into a single multi-section dropdown that displays current active filters adaptively when closed, freeing up horizontal space.
+- **Unify action buttons into an add menu**: action buttons across Global Skills and Project Skills tabs are standardized to a Refresh button and a "➕" add dropdown menu, providing consistent access to creating skills, importing skills, and managing source folders.
+
+[中文](CHANGELOG.zh-CN.md)
+
+
 ## [1.3.0] - 2026-11-08
 
 ### New Features
