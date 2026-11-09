@@ -163,38 +163,62 @@ test("onStatusGroupChange 真实解析行为与变异防护（彻底避免切片
   assert.equal(recorded.status, "");
 });
 
-test("statusGroupLabel 组合显示文案逻辑验证", async () => {
-  function evaluateLabel(status, group) {
-    const t = (k) => {
-      const dict = {
-        "status.enabled": "已启用",
-        "status.disabled": "已停用",
-        "filter.statusAll": "全部状态",
-        "group.byRepo": "按来源仓库",
-      };
-      return dict[k] || k;
-    };
-    const filters = { status, group };
-    const statusText = filters.status ? t("status." + filters.status) : t("filter.statusAll");
-    return filters.group === "repo" ? statusText + " · " + t("group.byRepo") : statusText;
-  }
+test("statusGroupLabel 组合显示文案与触发器文本渲染", () => {
+  let registeredComponent;
+  client.apply({
+    effect() {},
+    slots: {
+      inject(name, fn) { fn(); },
+      register(options, fn) {
+        if (options.name === "settings.section" || !registeredComponent) registeredComponent = fn;
+      },
+    },
+  });
 
-  assert.equal(evaluateLabel("", ""), "全部状态");
-  assert.equal(evaluateLabel("", "repo"), "全部状态 · 按来源仓库");
-  assert.equal(evaluateLabel("enabled", ""), "已启用");
-  assert.equal(evaluateLabel("enabled", "repo"), "已启用 · 按来源仓库");
-  assert.equal(evaluateLabel("disabled", "repo"), "已停用 · 按来源仓库");
+  const t = (k) => client.DICT.zh[k] || k;
+  const view = registeredComponent({ t, useSessions: () => undefined });
+  const tree = view.type(view.props);
+  const all = findNodes(tree);
+
+  const statusFilterWrap = all.find((n) => n.props?.className === "dssm-status-filter");
+  assert.ok(statusFilterWrap, "找到状态与分组筛选容器");
+
+  const labelNode = findNodes(statusFilterWrap).find((n) => n.props?.className === "dssm-menu-select-label");
+  assert.ok(labelNode, "包含触发器可见文本 span");
+  assert.equal(labelNode.children[0], t("filter.statusAll"), "默认初始状态显示全部状态");
 });
 
-test("addMenuOptions 在 user 与 project 视图下的选项收拢规范", async () => {
-  const clientSource = await readFile(new URL("../src/client.ts", import.meta.url), "utf8");
+test("addMenuOptions 真实 Menu items 动作序列与结构规范", () => {
+  let registeredComponent;
+  client.apply({
+    effect() {},
+    slots: {
+      inject(name, fn) { fn(); },
+      register(options, fn) {
+        if (options.name === "settings.section" || !registeredComponent) registeredComponent = fn;
+      },
+    },
+  });
 
-  // 必须收归创建、导入与来源目录管理，不再保留单独平铺按钮
-  assert.doesNotMatch(clientSource, /filterActionButton\(t\("import\.global"\)/);
-  assert.doesNotMatch(clientSource, /filterActionButton\(t\("rootPath\.manage"\)/);
+  const t = (k) => client.DICT.zh[k] || k;
+  const view = registeredComponent({ t, useSessions: () => undefined });
+  const tree = view.type(view.props);
+  const all = findNodes(tree);
 
-  // 选项包含 create 与 import
-  assert.match(clientSource, /value:\s*"create",\s*label:\s*t\("btn\.create"\)\s*\+\s*"…"/);
-  assert.match(clientSource, /value:\s*"import",\s*label:\s*t\("import\.global"\)\s*\+\s*"…"/);
-  assert.match(clientSource, /value:\s*"root-path",\s*label:\s*t\("rootPath\.manage"\)\s*\+\s*"…"/);
+  // 找到全局视图下的添加动作菜单
+  const actionMenu = all.find((n) => n.props?.className === "dssm-action-menu-wrap");
+  assert.ok(actionMenu, "必须包含动作菜单容器");
+
+  const menu = actionMenu.children.find((n) => n.props && "items" in n.props);
+  assert.ok(menu, "动作菜单内渲染宿主 Menu");
+
+  // 严格从真实 Menu 的 items 数组断言动作 id 与文本
+  assert.deepEqual(
+    menu.props.items.map((it) => it.id),
+    ["create", "import", "root-path"],
+    "加号菜单必须精确收纳新建技能、导入技能与来源目录三个动作",
+  );
+  assert.equal(menu.props.items[0].label, t("btn.create") + "…");
+  assert.equal(menu.props.items[1].label, t("import.global") + "…");
+  assert.equal(menu.props.items[2].label, t("rootPath.manage") + "…");
 });
