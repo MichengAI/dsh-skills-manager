@@ -50,7 +50,6 @@ const source = await readFile(
 const literalSource = [
   source,
   await readFile(new URL("../src/repository-ui.ts", import.meta.url), "utf8"),
-  await readFile(new URL("../src/plugin-update-ui.ts", import.meta.url), "utf8"),
 ].join("\n");
 const bundleSource = await readFile(
   process.env.DSH_CLIENT_TEST_BUNDLE || new URL("../lib/client.js", import.meta.url),

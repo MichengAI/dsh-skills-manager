@@ -200,9 +200,10 @@ try {
   };
 
   let sidebarStatus = false;
-  let updateStatus = true;
+  const requestedPaths = [];
   const controller = client.setupSidebarEntry(mockCtx, {
     callApi: async (path, options) => {
+      requestedPaths.push(path);
       if (path === "/sidebar-entry") {
         if (options?.method === "POST") {
           const body = JSON.parse(options.body);
@@ -211,15 +212,7 @@ try {
         }
         return { enabled: sidebarStatus };
       }
-      if (path === "/online-update") {
-        if (options?.method === "POST") {
-          const body = JSON.parse(options.body);
-          updateStatus = body.enabled;
-          return { enabled: updateStatus };
-        }
-        return { enabled: updateStatus };
-      }
-      throw new Error("unexpected path: " + path);
+      return {};
     },
     headers: {},
     renderPanel: () => "panel-element",
@@ -231,8 +224,11 @@ try {
   slotInjections.get("plugins.bundle.config")();
   assert.ok(slotRegistrations.has("plugins.bundle.config"));
 
-  // 防回归验证：客户端生命周期不再发起 /online-update 请求
-  assert.equal(updateStatus, true, "客户端不再向服务端发送 /online-update 请求");
+  await new Promise((resolve) => setTimeout(resolve, 20));
+
+  // 防回归强断言：客户端初始化与生命周期绝不能向 /online-update 发起任何 GET/POST 请求
+  assert.equal(requestedPaths.includes("/online-update"), false, "客户端初始化与生命周期绝不调用 /online-update");
+  assert.deepEqual(requestedPaths, ["/sidebar-entry"], "客户端仅允许向 /sidebar-entry 发起初始化请求");
 
   controller.destroy();
 

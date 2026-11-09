@@ -158,7 +158,7 @@ function SkillBundleConfigCardWrapper(props: {
 }
 
 export interface SetupSidebarEntryOptions {
-  callApi: (path: "/sidebar-entry" | "/online-update", options?: RequestInit) => Promise<{ location?: EntryLocation; enabled?: boolean; locked?: boolean }>;
+  callApi: (path: "/sidebar-entry", options?: RequestInit) => Promise<{ location?: EntryLocation; enabled?: boolean }>;
   headers: Record<string, string>;
   renderPanel: (ownerProps?: any) => React.ReactNode;
   ns: string;
@@ -172,8 +172,6 @@ export interface SidebarEntryController {
   isEnabled(): boolean;
   isSupported(): boolean;
   setEnabled(enabled: boolean): Promise<boolean>;
-  isOnlineUpdateEnabled?: () => boolean;
-  setOnlineUpdate?: (enabled: boolean) => Promise<boolean>;
   destroy(): void;
 }
 
@@ -190,8 +188,6 @@ export function setupSidebarEntry(
       isEnabled: () => false,
       isSupported: () => false,
       setEnabled: async () => false,
-      isOnlineUpdateEnabled: () => true,
-      setOnlineUpdate: async () => false,
       destroy: () => {},
     };
   }

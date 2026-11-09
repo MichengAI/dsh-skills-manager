@@ -30,7 +30,6 @@ const bundleSource = await readFile(
   "utf8",
 );
 const clientSource = await readFile(new URL("../src/client.ts", import.meta.url), "utf8");
-const updateUiSource = await readFile(new URL("../src/plugin-update-ui.ts", import.meta.url), "utf8");
 
 // 模拟宿主 AMD 加载器：执行 bundle，捕获 load 定义，再调用 factory 读取导出。
 let loaded = null;
@@ -149,16 +148,6 @@ ok(
 ok(
   !/fetch\(\s*["'`]\/api\//.test(clientSource),
   "client.ts has no raw root-absolute fetch left",
-);
-// 更新检查：解析收在模块唯一入口，模块内部只消费已解析的 URL（而不是靠注释提醒）。
-ok(
-  updateUiSource.includes("const endpoint = resolveApiUrl(options.endpoint)"),
-  "plugin-update-ui.ts resolves the update endpoint once at the module entry",
-);
-ok(
-  !/fetch\(\s*(?:options\.)?endpoint\b/.test(updateUiSource) &&
-    !/requestStatus\(\s*options\.endpoint/.test(updateUiSource),
-  "plugin-update-ui.ts never feeds the raw root-absolute endpoint downstream",
 );
 
 if (failed > 0) {

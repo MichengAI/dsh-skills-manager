@@ -73,9 +73,9 @@ $OutputEncoding = [System.Text.Encoding]::UTF8
 dsh plugin --profile web add @michengai/dsh-skills-manager@latest --registry=https://registry.npmjs.org/
 ```
 
-Restart DSH, refresh the page, and open **Settings → Skills**. To update, select **Check for updates** or run the installation command again.
+Restart DSH, refresh the page, and open **Settings → Skills**. To update, update in the host plugin manager or run the installation command again.
 
-- Plugin `1.3.1` is tested with DeepSeek Harness `0.2.0-rc.1`, `0.2.0-rc.2`, `0.2.1-rc.1`, `0.2.1-rc.2`, `0.2.1-rc.3`, `0.2.1-rc.4`, `0.2.1-rc.5`, `0.2.2-rc.1`.
+- Plugin `1.4.0` is tested with DeepSeek Harness `0.2.0-rc.1`, `0.2.0-rc.2`, `0.2.1-rc.1`, `0.2.1-rc.2`, `0.2.1-rc.3`, `0.2.1-rc.4`, `0.2.1-rc.5`, `0.2.2-rc.1`.
 - Host compatibility: Full DeepSeek Harness `0.2.x` line (`>=0.2.0-rc.1 <0.3.0-0`), forwards-compatible with subsequent `0.2.x` RC releases without requiring routine plugin version bumps. Legacy versions and breaking changes in the `0.3.0` generation are rejected by the version gate. If you still use a `0.1.x` host, install plugin `1.1.23` instead of `@latest`.
 - **Reverse proxy deployment**: Supports hosting DSH behind prefix-stripping reverse proxies (e.g. `/app/dsh/`). API and update endpoints resolve against the page base URI (`document.baseURI`).
 
@@ -84,7 +84,7 @@ Restart DSH, refresh the page, and open **Settings → Skills**. To update, sele
 The plugin follows standard DSH bundle configuration conventions. Options are located at:
 > **Sidebar → Plugins → Click `Skills Manager`** (the host's `plugins.bundle.config` slot).
 
-Two native switches are available:
+Native configuration options are available:
 
 ### 1. Sidebar Entry (`sidebarEntry`)
 - **Default**: Disabled (`false`)
@@ -147,7 +147,7 @@ The DeepSeek Harness loader enforces strict identifier policies:
 
 ### Repository & Installation Boundaries
 
-- The header **Check for updates** updates the plugin itself; repository **Refresh** checks subscribed skill contents without replacing local files.
+- Repository **Refresh** checks subscribed skill contents without replacing local files; to update the plugin itself, update in the host plugin manager or run the installation command again.
 - Repository installation can target user DSH skills, Shared Agent (`~/.agents/skills`, overridable via `DSH_AGENTS_HOME`), or `<project>/.dsh/skills` for registered workspaces. Unsafe paths and external agent roots (Codex, Claude) are locked against writes.
 - All repository sources are fetched through Git on demand: only directories containing `SKILL.md` are downloaded, so README images and other unrelated assets are skipped (a subdirectory narrows the scope further). Without a usable local Git, repositories cannot be added and the plugin asks you to install Git.
 - Local edits are detected and require explicit confirmation before overwriting; backup history is preserved for rollback.

@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.4.0] - 2026-11-09
+
+### New Features
+
+- **Full support for 8 host languages**: added plugin metadata manifests (`locale/*.json`) and comprehensive documentation for German, Spanish, French, Japanese, Portuguese, and Russian, delivering native descriptions and guides across all supported host locales.
+
+### Behavior Changes
+
+- **Retire in-panel update entry and toggle**: the plugin's installation and update lifecycle is now managed uniformly by the DSH host plugin manager. The "Check for updates" button in the header and the redundant update toggle in bundle settings have been removed.
+- **Enrich standard plugin metadata**: added publisher details, standardized icon export paths, and declared manifest version for seamless compatibility with host package managers.
+
+[中文](CHANGELOG.zh-CN.md)
+
+
 ## [1.3.1] - 2026-11-09
 
 ### Behavior Changes

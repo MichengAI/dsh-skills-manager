@@ -48,7 +48,6 @@ export type ApiRoutes = RepositoryRoutes & Record<SkillsShSearchPath, SkillsShSe
     '/category-disable': unknown;
     '/skill-note': unknown;
     '/sidebar-entry': { enabled: boolean };
-    '/online-update': { enabled: boolean };
 };
 export type ApiCall = <K extends keyof ApiRoutes>(path: K, options?: RequestInit) => Promise<ApiRoutes[K]>;
 export interface ModalProps {

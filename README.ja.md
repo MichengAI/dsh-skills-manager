@@ -41,6 +41,10 @@ PC やプロジェクト内に分散しているスキルを DSH に集約し、
 
 ![グローバルスキル管理画面](assets/screenshots/skills-manager-v2-preview.webp)
 
+プロジェクトスキル管理画面（ワークスペース別）:
+
+![プロジェクトスキル管理画面](assets/screenshots/skills-manager-project-scope-preview.webp)
+
 ## インストール
 
 ### エージェントに依頼してインストール
@@ -61,10 +65,22 @@ DSH 設定ディレクトリまたはプロファイルディレクトリで実�
 dsh plugin add @michengai/dsh-skills-manager
 ```
 
+Windows PowerShell 環境の場合:
+
+```powershell
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
+dsh plugin --profile web add @michengai/dsh-skills-manager@latest --registry=https://registry.npmjs.org/
+```
+
+DSH を再起動し、ページをリロードして **設定 → スキル** を開いて使用します。プラグイン本体の更新は、宿主のプラグイン管理画面から行うか、インストールコマンドを再実行してください。
+
 ## プラグイン設定
 
 本プラグインは標準の DSH バンドル設定仕様に準拠しています。設定場所:
 > **サイドバー → プラグイン → `Skills Manager` をクリック**（ホストの `plugins.bundle.config` スロット）。
+
+利用可能な設定項目:
 
 ### 1. サイドバーエントリ (`sidebarEntry`)
 - **デフォルト**: 無効 (`false`)
@@ -117,10 +133,14 @@ description: コードの品質とセキュリティを自動レビューする�
 ...
 ```
 
+- **インテリジェント診断**: 英語の `name` が欠落しているスキルには明確な診断警告が表示され、安全に無効化または整理できます。
+
 ### リポジトリとインストールの境界
 
-- **安全な書き込み**: 本プラグインが書き込みを行うのは、DSH スキルディレクトリおよび登録済みワークスペースのプロジェクトスキルディレクトリのみです。
-- **外部ソースの保護**: 外部エージェント（Codex、Claude Code 等）のディレクトリは完全な読み取り専用として扱われます。
+- リポジトリリストの **「更新」** は購読リポジトリの内容確認のみを行い、ローカルファイルを自動上書きしません。プラグイン自体の更新は宿主のプラグイン管理で行ってください。
+- リポジトリからのインストールは、ユーザーの DSH skills、Shared Agent（`~/.agents/skills`）、または登録済みワークスペースの `.dsh/skills` を対象にできます。
+- すべてのリポジトリは Git のオンデマンドチェックアウトを使用し、`SKILL.md` を含むディレクトリのみをダウンロードします。
+- 更新前にはローカルの変更を自動検出し、ロールバック用のバックアップ履歴が保持されます。
 
 ## 対応エージェントディレクトリ
 

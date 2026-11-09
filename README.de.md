@@ -33,18 +33,95 @@ Bündeln Sie Ihre lokalen und projektspezifischen Skills direkt in DSH, ohne st�
 - **Erstellung und flexibler Import**: Neue Skills erstellen oder ZIP-Dateien, Ordner und `SKILL.md`-Dateien sicher importieren.
 - **Breitbild-Detailansicht**: Responsiver 760px-Dialog mit Monospace-Code-Hervorhebung und Ein-Klick-Kopie des Markdown-Texts.
 - **Papierkorb und sichere Wiederherstellung**: Gelöschte DSH-Skills werden in den Papierkorb verschoben und können vollständig wiederhergestellt werden.
+- **Benutzerdefinierte Quellordner**: Externe Agent-Pfade direkt im Panel ändern, ohne Dateien zu verschieben.
+
+## Screenshots
+
+Globale Skill-Verwaltungsansicht:
+
+![Globale Skill-Verwaltungsansicht](assets/screenshots/skills-manager-v2-preview.webp)
+
+Projekt-Skill-Verwaltungsansicht:
+
+![Projekt-Skill-Verwaltungsansicht](assets/screenshots/skills-manager-project-scope-preview.webp)
 
 ## Installation
 
-In einer DSH-Konversation:
+### Installation per Agent
+
+Weisen Sie den Agenten in einer DSH-Konversation an:
+
 ```text
 Installiere das Plugin @michengai/dsh-skills-manager
 ```
 
-Oder manuell im Terminal:
+### Manuelle Installation
+
+Führen Sie im Terminal aus:
+
 ```bash
 dsh plugin add @michengai/dsh-skills-manager
 ```
+
+In Windows PowerShell:
+
+```powershell
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
+dsh plugin --profile web add @michengai/dsh-skills-manager@latest --registry=https://registry.npmjs.org/
+```
+
+Starten Sie DSH neu, aktualisieren Sie die Seite und öffnen Sie **Einstellungen → Skills**. Aktualisierungen des Plugins erfolgen über die Plugin-Verwaltung des Hosts oder durch erneute Ausführung des Installationsbefehls.
+
+## Plugin-Konfiguration
+
+Das Plugin folgt den Standard-DSH-Bundle-Konventionen:
+> **Seitenleiste → Plugins → Klick auf `Skills Manager`** (`plugins.bundle.config`).
+
+Verfügbare Optionen:
+
+### 1. Seitenleisteneintrag (`sidebarEntry`)
+- **Standard**: Deaktiviert (`false`)
+- **Beschreibung**: Zeigt ein dauerhaftes **Skills**-Navigationssymbol direkt unter **Plugins** in der primären Seitenleiste an.
+- **Wirkung**: Öffnet den Manager direkt im Hauptarbeitsbereich in einem zentrierten 960px-Container.
+
+## Bedienungsanleitung
+
+| Aktion | Durchführung |
+| --- | --- |
+| **Skills suchen** | Zwischen Globalen und Projekt-Tabs wechseln, Quellen ein-/ausklappen oder Suche und Filter nutzen. |
+| **Details anzeigen** | Auf «Details anzeigen» klicken, um `SKILL.md` im 760px-Modal mit Ein-Klick-Kopie zu lesen. |
+| **Aktivieren / Deaktivieren** | Schalter in der Zeile umlegen; ändert nur den Aufrufstatus in DSH. |
+| **Quellordner ändern** | Im ➕-Menü «Quellordner…» wählen, um externe Pfade sicher umzuleiten. |
+| **Kategorien verwalten** | Kategorien erstellen und Skills per Drag & Drop (`⋮⋮`) anordnen. |
+| **Erstellen & Importieren** | Über das ➕-Menü neue Skills anlegen oder ZIP/Ordner importieren. |
+| **Entdecken & Installieren** | Im Tab «Entdecken» ClawHub oder GitHub-Repositories durchstöbern. |
+| **Skills aktualisieren** | Diff-Vorschau vor dem Update prüfen, automatische Sicherung nutzen. |
+| **Wiederherstellen** | Zurückrollen auf Vorversionen dank gespeicherter Backups. |
+| **Papierkorb** | Gelöschte DSH-Skills jederzeit wiederherstellen oder endgültig entfernen. |
+
+## Unterstützte Agent-Verzeichnisse
+
+| Agent | Globales Verzeichnis | Umgebungsvariable | Projektverzeichnis |
+| --- | --- | --- | --- |
+| **DeepSeek Harness** | `~/.dsh/skills` | — | `.dsh/skills` |
+| **Shared Agent** | `~/.agents/skills` | `DSH_AGENTS_HOME` | `.agents/skills` |
+| **Codex** | `~/.codex/skills` | `CODEX_HOME` | `.codex/skills` |
+| **Claude Code** | `~/.claude/skills` | `CLAUDE_HOME` | `.claude/skills` |
+| **GitHub Copilot** | `~/.copilot/skills` | `COPILOT_HOME` | `.copilot/skills` |
+| **Cursor** | `~/.cursor/skills` | `CURSOR_HOME` | `.cursor/skills` |
+| **Google Antigravity** | `~/.gemini/skills` | `GEMINI_HOME` | `.gemini/skills` |
+| **Windsurf** | `~/.windsurf/skills` | `WINDSURF_HOME` | `.windsurf/skills` |
+| **Qoder** | `~/.qoder/skills` | `QODER_HOME` | `.qoder/skills` |
+| **Trae** | `~/.trae/skills` | `TRAE_HOME` | `.trae/skills` |
+
+## DSH Produkt-Ökosystem
+
+| Plugin | Beschreibung |
+| --- | --- |
+| **[dsh-skills-manager](https://github.com/MichengAI/dsh-skills-manager)** | Einheitliche Skill-Verwaltung mit Backup- und GitHub-Unterstützung. |
+| **[dsh-im-connect](https://github.com/MichengAI/dsh-im-connect)** | Anbindung an Feishu, DingTalk, WeChat, Telegram, Slack und Discord. |
+| **[dsh-codex-ui](https://github.com/MichengAI/dsh-codex-ui)** | Elegantes Desktop-Theme für DSH. |
 
 ## Lizenz
 
