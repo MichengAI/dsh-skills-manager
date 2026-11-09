@@ -94,6 +94,13 @@ Native configuration options are available:
   - When disabled, unregisters the sidebar entry cleanly;
   - The standard **Settings → Skills** view remains active either way, and state is synchronized live across both entry points.
 
+### 2. Enterprise & Compliance Lock (`updater` / `onlineUpdate`)
+- **Configuration**: For curated plugin indexes or enterprise security environments, you can declare this directly in your Cordis bundle patch configuration:
+  ```yaml
+  updater: false # or onlineUpdate: false
+  ```
+- **Effect**: Completely disables the underlying plugin update API at runtime (returning `HTTP 403 Forbidden`), preventing unreviewed update requests.
+
 ## Usage Guide
 
 | Action | How to do it |

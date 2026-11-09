@@ -85,6 +85,13 @@ dsh plugin --profile web add @michengai/dsh-skills-manager@latest --registry=htt
 - **Описание**: Отображает постоянный значок **Навыки** под разделом «Плагины» в основной боковой панели.
 - **Результат**: Открывает менеджер навыков в центрированном контейнере шириной 960px в основной рабочей области.
 
+### 2. Корпоративная блокировка обновлений (`updater` / `onlineUpdate`)
+- **Конфигурация**: Для корпоративных сред интерфейс обновлений можно полностью отключить в Cordis:
+  ```yaml
+  updater: false # или onlineUpdate: false
+  ```
+- **Результат**: Полностью отключает API обновления плагина (возвращает `HTTP 403 Forbidden`).
+
 ## Руководство пользователя
 
 | Действие | Инструкция |
@@ -99,6 +106,12 @@ dsh plugin --profile web add @michengai/dsh-skills-manager@latest --registry=htt
 | **Обновление навыков** | Просматривайте различия (diff) перед подтверждением обновления с резервной копией. |
 | **Откат версий** | Возвращайтесь к предыдущим версиям благодаря сохраненным копиям. |
 | **Корзина** | Безопасное восстановление или окончательное удаление навыков. |
+
+### Границы установки и репозиториев
+
+- **Обновление**: Кнопка «Обновить» проверяет только репозитории навыков. Обновление самого плагина выполняется через хост.
+- **Безопасные пути**: Установка может выполняться в каталог DSH пользователя, Shared Agent (`~/.agents/skills`) или `.dsh/skills` проекта.
+- **Выборочная загрузка Git**: Загружаются только каталоги, содержащие `SKILL.md`.
 
 ## Поддерживаемые каталоги агентов
 
@@ -115,6 +128,10 @@ dsh plugin --profile web add @michengai/dsh-skills-manager@latest --registry=htt
 | **Qoder** | `~/.qoder/skills` | `QODER_HOME` | `.qoder/skills` |
 | **Trae** | `~/.trae/skills` | `TRAE_HOME` | `.trae/skills` |
 
+### Пользовательские источники
+
+Для добавления агента, отсутствующего в списке, воспользуйтесь меню ➕ и выберите «Папки источников…».
+
 ## Экосистема продуктов DSH
 
 | Плагин | Описание |
@@ -122,6 +139,11 @@ dsh plugin --profile web add @michengai/dsh-skills-manager@latest --registry=htt
 | **[dsh-skills-manager](https://github.com/MichengAI/dsh-skills-manager)** | Единое управление навыками с поддержкой резервного копирования и GitHub. |
 | **[dsh-im-connect](https://github.com/MichengAI/dsh-im-connect)** | Интеграция с мессенджерами (Feishu, DingTalk, WeChat, Telegram, Slack). |
 | **[dsh-codex-ui](https://github.com/MichengAI/dsh-codex-ui)** | Элегантная тема интерфейса для DSH Desktop. |
+
+## Обратная связь и участие
+
+- Сообщить об ошибке: [GitHub Issues](https://github.com/MichengAI/dsh-skills-manager/issues)
+- Приветствуются пул-реквесты.
 
 ## Лицензия
 

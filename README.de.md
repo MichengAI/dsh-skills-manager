@@ -85,6 +85,13 @@ Verfügbare Optionen:
 - **Beschreibung**: Zeigt ein dauerhaftes **Skills**-Navigationssymbol direkt unter **Plugins** in der primären Seitenleiste an.
 - **Wirkung**: Öffnet den Manager direkt im Hauptarbeitsbereich in einem zentrierten 960px-Container.
 
+### 2. Unternehmens- und Compliance-Sperre (`updater` / `onlineUpdate`)
+- **Konfiguration**: In Unternehmensumgebungen kann die Update-Schnittstelle über Cordis deaktiviert werden:
+  ```yaml
+  updater: false # oder onlineUpdate: false
+  ```
+- **Wirkung**: Deaktiviert die Update-API vollständig zur Laufzeit (Antwort `HTTP 403 Forbidden`).
+
 ## Bedienungsanleitung
 
 | Aktion | Durchführung |
@@ -99,6 +106,12 @@ Verfügbare Optionen:
 | **Skills aktualisieren** | Diff-Vorschau vor dem Update prüfen, automatische Sicherung nutzen. |
 | **Wiederherstellen** | Zurückrollen auf Vorversionen dank gespeicherter Backups. |
 | **Papierkorb** | Gelöschte DSH-Skills jederzeit wiederherstellen oder endgültig entfernen. |
+
+### Repository- und Installationsgrenzen
+
+- **Aktualisieren**: «Aktualisieren» prüft lediglich den Stand abonnierter Skill-Repositories und überschreibt keine lokalen Daten. Plugin-Updates laufen über das Host-Plugin-Management.
+- **Ziele**: Installationen können auf globale DSH-Skills, Shared Agent (`~/.agents/skills`) oder das Projektverzeichnis `.dsh/skills` erfolgen.
+- **Selektiver Git-Download**: Es werden nur Ordner mit `SKILL.md` geladen.
 
 ## Unterstützte Agent-Verzeichnisse
 
@@ -115,6 +128,10 @@ Verfügbare Optionen:
 | **Qoder** | `~/.qoder/skills` | `QODER_HOME` | `.qoder/skills` |
 | **Trae** | `~/.trae/skills` | `TRAE_HOME` | `.trae/skills` |
 
+### Benutzerdefinierte Quellen
+
+Für nicht aufgeführte Agents können Sie im ➕-Menü über «Quellordner…» eigene Pfade registrieren.
+
 ## DSH Produkt-Ökosystem
 
 | Plugin | Beschreibung |
@@ -122,6 +139,11 @@ Verfügbare Optionen:
 | **[dsh-skills-manager](https://github.com/MichengAI/dsh-skills-manager)** | Einheitliche Skill-Verwaltung mit Backup- und GitHub-Unterstützung. |
 | **[dsh-im-connect](https://github.com/MichengAI/dsh-im-connect)** | Anbindung an Feishu, DingTalk, WeChat, Telegram, Slack und Discord. |
 | **[dsh-codex-ui](https://github.com/MichengAI/dsh-codex-ui)** | Elegantes Desktop-Theme für DSH. |
+
+## Feedback und Beiträge
+
+- Problem melden: [GitHub Issues](https://github.com/MichengAI/dsh-skills-manager/issues)
+- Pull Requests sind herzlich willkommen.
 
 ## Lizenz
 

@@ -13,7 +13,6 @@
 
 [中文](CHANGELOG.zh-CN.md)
 
-
 ## [1.3.1] - 2026-11-09
 
 ### Behavior Changes

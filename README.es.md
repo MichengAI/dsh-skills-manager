@@ -87,6 +87,13 @@ Opciones de configuración disponibles:
 - **Descripción**: Muestra un icono permanente de **Skills** directamente debajo de **Plugins** en la barra lateral principal izquierda.
 - **Efecto**: Abre el administrador en un contenedor centrado de 960px en el espacio de trabajo principal sin restricciones de scroll.
 
+### 2. Bloqueo empresarial y de cumplimiento (`updater` / `onlineUpdate`)
+- **Configuración**: Para entornos empresariales con directivas estrictas, puedes declararlo directamente en la configuración de parches Cordis:
+  ```yaml
+  updater: false # o onlineUpdate: false
+  ```
+- **Efecto**: Desactiva totalmente la API de actualización del plugin (respondiendo `HTTP 403 Forbidden`), impidiendo peticiones de actualización no auditadas.
+
 ## Guía de uso
 
 | Acción | Cómo realizarla |
@@ -128,6 +135,12 @@ description: Ayuda para revisar código de forma sistemática
 ...
 ```
 
+### Límites de repositorios e instalación
+
+- **Refrescar repositorio**: La acción «Refrescar» en la lista de repositorios solo comprueba si hay nuevas versiones de los skills suscritos y no sobreescribe archivos locales. Para actualizar el plugin en sí, utiliza la gestión de plugins del host.
+- **Destinos seguros**: La instalación de repositorios puede dirigirse a los skills de usuario de DSH, Shared Agent (`~/.agents/skills`) o al espacio de trabajo `.dsh/skills`.
+- **Descarga selectiva Git**: Solo se descargan los directorios que contienen `SKILL.md`.
+
 ## Directorios de agentes compatibles
 
 | Agente | Directorio global | Variable de entorno | Directorio de proyecto |
@@ -143,6 +156,10 @@ description: Ayuda para revisar código de forma sistemática
 | **Qoder** | `~/.qoder/skills` | `QODER_HOME` | `.qoder/skills` |
 | **Trae** | `~/.trae/skills` | `TRAE_HOME` | `.trae/skills` |
 
+### Fuentes personalizadas
+
+Si usas un agente que no figure en la lista anterior, puedes registrarlo mediante el menú ➕ seleccionando «Carpetas de origen…».
+
 ## Ecosistema de productos DSH
 
 | Plugin | Descripción |
@@ -150,6 +167,11 @@ description: Ayuda para revisar código de forma sistemática
 | **[dsh-skills-manager](https://github.com/MichengAI/dsh-skills-manager)** | Gestión unificada de skills locales y de proyectos con respaldo y GitHub. |
 | **[dsh-im-connect](https://github.com/MichengAI/dsh-im-connect)** | Conecta DSH a Feishu, DingTalk, WeChat, QQ, Telegram, Discord y Slack. |
 | **[dsh-codex-ui](https://github.com/MichengAI/dsh-codex-ui)** | Tema de interfaz refinado para el cliente de escritorio DSH. |
+
+## Comentarios y contribuciones
+
+- Informar problemas: [GitHub Issues](https://github.com/MichengAI/dsh-skills-manager/issues)
+- Las solicitudes de extracción (Pull Requests) son bienvenidas.
 
 ## Licencia
 

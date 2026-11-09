@@ -85,6 +85,13 @@ Options disponibles :
 - **Description** : Affiche une icône permanente **Skills** directement sous **Plugins** dans la barre latérale principale de l'hôte.
 - **Effet** : Ouvre le gestionnaire dans un conteneur centré de 960px dans l'espace de travail principal.
 
+### 2. Verrouillage entreprise et conformité (`updater` / `onlineUpdate`)
+- **Configuration** : Pour les environnements d'entreprise stricts, vous pouvez désactiver les mises à jour via le patch Cordis :
+  ```yaml
+  updater: false # ou onlineUpdate: false
+  ```
+- **Effet** : Désactive totalement l'API de mise à jour du plugin (renvoie `HTTP 403 Forbidden`).
+
 ## Guide d'utilisation
 
 | Action | Procédure |
@@ -100,7 +107,13 @@ Options disponibles :
 | **Restaurer** | Revenez à une version précédente à l'aide de l'historique de sauvegarde. |
 | **Corbeille** | Restaurez ou supprimez définitivement des skills supprimés. |
 
-### Répertoires d'agents pris en charge
+### Limites des dépôts et de l'installation
+
+- **Actualisation** : L'action « Rafraîchir » vérifie uniquement le contenu des dépôts de skills sans écraser les fichiers locaux. Pour mettre à jour le plugin lui-même, passez par la gestion de plugins de l'hôte.
+- **Destinations sécurisées** : Les installations peuvent cibler les skills DSH de l'utilisateur, Shared Agent (`~/.agents/skills`) ou `.dsh/skills` dans l'espace de travail.
+- **Téléchargement Git sélectif** : Seuls les dossiers contenant `SKILL.md` sont téléchargés.
+
+## Répertoires d'agents pris en charge
 
 | Agent | Répertoire global | Variable d'environnement | Répertoire de projet |
 | --- | --- | --- | --- |
@@ -115,6 +128,10 @@ Options disponibles :
 | **Qoder** | `~/.qoder/skills` | `QODER_HOME` | `.qoder/skills` |
 | **Trae** | `~/.trae/skills` | `TRAE_HOME` | `.trae/skills` |
 
+### Sources personnalisées
+
+Pour ajouter un agent non répertorié, utilisez le menu ➕ et sélectionnez « Dossiers sources… ».
+
 ## Écosystème DSH
 
 | Plugin | Description |
@@ -122,6 +139,11 @@ Options disponibles :
 | **[dsh-skills-manager](https://github.com/MichengAI/dsh-skills-manager)** | Gestion unifiée des skills locaux et de projets avec sauvegardes et intégration GitHub. |
 | **[dsh-im-connect](https://github.com/MichengAI/dsh-im-connect)** | Intégration de messageries d'entreprise (Feishu, DingTalk, WeChat, Telegram, Slack). |
 | **[dsh-codex-ui](https://github.com/MichengAI/dsh-codex-ui)** | Thème d'interface raffiné pour le client de bureau DSH. |
+
+## Retours et contributions
+
+- Signaler un problème : [GitHub Issues](https://github.com/MichengAI/dsh-skills-manager/issues)
+- Les contributions sont les bienvenues.
 
 ## Licence
 
