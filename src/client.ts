@@ -46,6 +46,7 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
         "filter.workspace": "工作区", "filter.source": "来源", "filter.all": "全部来源", "filter.option": "{name}（{count}）", "search": "搜索", "search.placeholder": "搜索技能名称、描述或备注", "search.clear": "清除搜索",
         "empty.search": "没有匹配的技能。", "empty.source": "该来源目录不存在或暂时没有技能。", "loading": "正在加载技能…", "note.missing": "未提供简介", "skill.linked": "外部目录链接，只读", "source.toggle": "启停来源", "skill.toggle": "启停技能", "category.toggle": "启停分类", "category.create": "新建分类", "category.uncategorized": "未分类", "category.assign": "归入{name}", "category.rename": "重命名", "category.delete": "删除分类", "category.note": "分类只记在这个来源里，不移动文件。", "category.name": "分类名称", "category.empty": "还没有技能。从条目的「更多」归入。", "category.progress": "{count} 项 · {enabled}/{usable} 启用", "category.actions": "分类操作", "category.created": "已添加分类「{name}」。文件没有新建目录。", "category.renamed": "已重命名。技能文件名没有变化。", "category.deleted": "已删除分类「{name}」。技能回到未分类，没有进回收站。", "category.assigned": "已将 {name} 归入「{category}」。文件没有移动。", "category.dragTip": "拖拽调整顺序或移动到其他分类", "category.moved": "已调整技能 {name} 的分类或顺序。", "confirm.category.title": "删除分类？", "confirm.category.desc": "「{name}」会消失，里面的技能回到未分类。文件不会移动。", "error.category.duplicate": "已有同名分类: {name}", "error.category.name": "分类名称不能为空，且不能超过 24 个字符", "error.category.notFound": "分类不存在", "error.category.root": "技能来源不存在: {root}", "error.category.position": "技能排序位置无效", "error.category.target": "排序目标不属于目标分类",
         "detail.title": "技能详情", "detail.description": "简介", "detail.customNote": "自定义简介", "detail.document": "SKILL.md", "detail.body": "正文", "detail.frontmatter": "Frontmatter", "detail.diagnostics": "诊断", "detail.path": "源文件", "detail.noIssues": "未发现诊断问题。", "detail.copyBody": "复制正文", "detail.copied": "已复制", "detail.copyFailed": "复制失败",
+        "invocation.manualOnly": "仅手动", "invocation.modelOnly": "仅模型", "invocation.manualOnlyTip": "模型不可自动感知；聊天框输入 / 可手动调用", "invocation.modelOnlyTip": "仅允许模型自动调用；用户不可手动调用", "detail.invocation": "调用方式", "detail.declaredPolicy": "源文件声明", "detail.effectivePolicy": "当前生效", "detail.policy.all": "模型 + 手动", "detail.policy.manualOnly": "仅手动调用（disable-model-invocation: true）", "detail.policy.modelOnly": "仅模型调用（user-invocable: false）", "detail.policy.disabled": "不可调用（受管理器总闸停用阻断）", "detail.policy.blocked": "不可调用",
         "skill.editNote": "编辑备注", "note.title": "自定义简介 / 备注", "note.label": "备注内容", "note.placeholder": "记录这个技能是干嘛的、什么时候用…", "note.help": "保存在插件内部显示层，不修改原 SKILL.md。清空可还原为原简介。", "note.clear": "清空", "note.updated": "已更新「{name}」的自定义简介。", "note.cleared": "已清除「{name}」的自定义简介。",
         "error.note.root": "技能来源不存在: {root}", "error.note.tooLarge": "自定义简介过长（最多 {max} 个字符）",
         "create.title": "创建技能", "create.name": "名称", "create.name.placeholder": "例如 code-review-helper", "create.description": "简介", "create.description.placeholder": "一句话说明什么时候使用", "create.body": "正文（Markdown）", "create.body.placeholder": "写下技能要遵循的指令、步骤和边界…", "create.chat.note": "创建的技能不会挂仓库更新，也不会修改原文件。",
@@ -81,6 +82,7 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
         "filter.workspace": "Workspace", "filter.source": "Source", "filter.all": "All sources", "filter.option": "{name} ({count})", "search": "Search", "search.placeholder": "Search skill names, descriptions or notes", "search.clear": "Clear search",
         "empty.search": "No matching skills.", "empty.source": "This source does not exist or has no skills yet.", "loading": "Loading skills…", "note.missing": "No description provided", "skill.linked": "External directory link, read-only", "source.toggle": "Toggle source", "skill.toggle": "Toggle skill", "category.toggle": "Toggle category", "category.create": "New category", "category.uncategorized": "Uncategorized", "category.assign": "Move to {name}", "category.rename": "Rename", "category.delete": "Delete category", "category.note": "Categories stay in this source and do not move files.", "category.name": "Category name", "category.empty": "No skills yet. Use More on a skill to place it here.", "category.progress": "{count} · {enabled}/{usable} enabled", "category.actions": "Category actions", "category.created": "Added category “{name}”. No directory was created.", "category.renamed": "Renamed. Skill file names are unchanged.", "category.deleted": "Deleted category “{name}”. Skills returned to Uncategorized and were not trashed.", "category.assigned": "Moved {name} to “{category}”. The file was not moved.", "category.dragTip": "Drag to reorder or move to another category", "category.moved": "Updated the category or order for {name}.", "confirm.category.title": "Delete category?", "confirm.category.desc": "“{name}” will be removed. Its skills return to Uncategorized. Files are not moved.", "error.category.duplicate": "A category with this name already exists: {name}", "error.category.name": "Category name is required and must be at most 24 characters", "error.category.notFound": "Category not found", "error.category.root": "Skill source not found: {root}", "error.category.position": "Invalid skill ordering position", "error.category.target": "The target skill is not in the destination category",
         "detail.title": "Skill details", "detail.description": "Description", "detail.customNote": "Custom note", "detail.document": "SKILL.md", "detail.body": "Body", "detail.frontmatter": "Frontmatter", "detail.diagnostics": "Diagnostics", "detail.path": "Source file", "detail.noIssues": "No diagnostic issues found.", "detail.copyBody": "Copy body", "detail.copied": "Copied", "detail.copyFailed": "Copy failed",
+        "invocation.manualOnly": "Manual only", "invocation.modelOnly": "Model only", "invocation.manualOnlyTip": "Model cannot invoke automatically; manual invocation via / remains available", "invocation.modelOnlyTip": "Only available for model invocation; manual invocation disabled", "detail.invocation": "Invocation", "detail.declaredPolicy": "Declared", "detail.effectivePolicy": "Effective", "detail.policy.all": "Model + Manual", "detail.policy.manualOnly": "Manual only (disable-model-invocation: true)", "detail.policy.modelOnly": "Model only (user-invocable: false)", "detail.policy.disabled": "Disabled (blocked by manager switch or source)", "detail.policy.blocked": "Blocked",
         "skill.editNote": "Edit note", "note.title": "Custom description / Note", "note.label": "Note", "note.placeholder": "Record what this skill does and when to use it…", "note.help": "Saved in the plugin display layer without modifying SKILL.md. Clear to revert to original description.", "note.clear": "Clear", "note.updated": "Updated custom note for “{name}”.", "note.cleared": "Cleared custom note for “{name}”.",
         "error.note.root": "Skill source not found: {root}", "error.note.tooLarge": "Custom note is too long (maximum {max} characters)",
         "create.title": "Create skill", "create.name": "Name", "create.name.placeholder": "e.g. code-review-helper", "create.description": "Description", "create.description.placeholder": "One sentence describing when to use it", "create.body": "Body (Markdown)", "create.body.placeholder": "Write the instructions, steps, and boundaries…", "create.chat.note": "Created skills are not linked to repository updates, and no source file is modified.",
@@ -207,6 +209,13 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
 .dssm-prov-note{display:block;margin:0 0 6px 0}
 .dssm-prov-badge{flex:none;border:1px solid var(--dsw-alias-border-secondary,#e2e2e2);border-radius:999px;padding:0 6px;font-size:11px;line-height:16px;color:var(--dsw-alias-label-secondary,#666);white-space:nowrap}
 .dssm-prov-repo-link{border:0.5px solid var(--dsw-alias-border-l2,#494949);text-decoration:none}
+.dssm-invocation-badge{display:inline-flex;align-items:center;padding:0 6px;height:18px;border-radius:4px;font-size:11px;line-height:16px;white-space:nowrap;background:var(--dsw-alias-bg-layer-2,rgba(255,255,255,.06));color:var(--dsw-alias-label-secondary,#8c8c8c);border:0.5px solid var(--dsw-alias-border-l2,rgba(255,255,255,.1));margin-left:6px;vertical-align:middle;font-weight:normal}
+.dssm-detail-policy{display:flex;flex-direction:column;gap:6px;padding:8px 10px;border-radius:6px;background:var(--dsw-alias-bg-layer-1,rgba(255,255,255,.03));border:0.5px solid var(--dsw-alias-border-l2,rgba(255,255,255,.08));font-size:12px;line-height:18px}
+.dssm-detail-policy-title{font-weight:600;color:var(--dsw-alias-label-primary,#eee)}
+.dssm-detail-policy-grid{display:flex;flex-direction:column;gap:4px}
+.dssm-detail-policy-item{display:flex;align-items:center;gap:6px}
+.dssm-detail-policy-label{color:var(--dsw-alias-label-tertiary,#8c8c8c);flex:none}
+.dssm-detail-policy-val{color:var(--dsw-alias-label-secondary,#ccc)}
 
 `;
 
@@ -222,6 +231,19 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
     }
     function parseApiResponse<T = unknown>(response: Response): Promise<T> { return response.json().catch(function () { var error: CodedError = new Error("non-json response"); error.code = "error.proto.nonJson"; error.params = { status: response.status }; throw error; }).then(function (value: unknown) { const payload = value as {ok?: boolean; data: T}; if (!response.ok || payload.ok === false) throw payload; return payload.data; }); }
     function callApi<K extends keyof ApiRoutes>(path: K, options?: RequestInit): Promise<ApiRoutes[K]> { return fetch(resolveApiUrl("/api/michengai/dsh-skills-manager" + path), options).then(parseApiResponse<ApiRoutes[K]>); }
+    function skillDeclaredInvocationKind(skill: Partial<SkillView>): 'all' | 'manual' | 'model' | 'none' {
+      if (skill.modelInvocable === false && skill.userInvocable !== false) return 'manual';
+      if (skill.modelInvocable !== false && skill.userInvocable === false) return 'model';
+      if (skill.modelInvocable === false && skill.userInvocable === false) return 'none';
+      return 'all';
+    }
+    function skillEffectiveInvocationKind(skill: Partial<SkillView>): 'all' | 'manual' | 'model' | 'none' {
+      if (skill.managerEnabled === false) return 'none';
+      if (skill.effectiveModelInvocable && skill.effectiveUserInvocable) return 'all';
+      if (!skill.effectiveModelInvocable && skill.effectiveUserInvocable) return 'manual';
+      if (skill.effectiveModelInvocable && !skill.effectiveUserInvocable) return 'model';
+      return 'none';
+    }
     function isSkillEnabled(skill: Partial<SkillView>): boolean { if (skill.enabled !== undefined) return skill.enabled === true; return !!(skill.invocationPolicyValid && skill.modelInvocable && skill.userInvocable && skill.managerEnabled !== false); }
     function countKey(key: string, count: number) { return key + (Number(count) === 1 ? ".one" : ".other"); }
     var localeService: ClientContext["locale"] | undefined;
@@ -253,6 +275,8 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
       var q = normalizeSkillQuery(query);
       if (!q) return true;
       var prov = skill.provenance;
+      var kind = typeof skillDeclaredInvocationKind === "function" ? skillDeclaredInvocationKind(skill) : 'all';
+      var invocationLabels = kind === 'manual' ? ["仅手动", "manual only", "manual", "手动"] : kind === 'model' ? ["仅模型", "model only", "model", "模型"] : [];
       return [
         skill.name,
         skill.declaredName,
@@ -266,7 +290,7 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
         prov ? prov.repo : null,
         prov ? prov.category : null,
         prov ? prov.path : null
-      ].some(function (value) { return String(value == null ? "" : value).toLowerCase().includes(q); });
+      ].concat(invocationLabels).some(function (value) { return String(value == null ? "" : value).toLowerCase().includes(q); });
     }
     function filterSkills<T extends SearchSkill>(list: T[], options?: {rootKey?: string; query?: unknown}) { var rootKey = options && options.rootKey != null ? options.rootKey : ""; return list.filter(function (skill) { return (!rootKey || skill.rootKey === rootKey) && matchSkillQuery(skill, options && options.query); }); }
     function visibleSkillRoots<T extends {mutable?: boolean; exists?: boolean; overridden?: boolean}>(roots: T[]) {
@@ -634,6 +658,7 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
       var csb = react.useState(false), customSourceBusy = csb[0], setCustomSourceBusy = csb[1];
       var cse = react.useState<string | null>(null), customSourceError = cse[0], setCustomSourceError = cse[1];
       var ds = react.useState<Detail | null>(null), detail = ds[0], setDetail = ds[1];
+      var dsk = react.useState<SkillView | null>(null), detailSkill = dsk[0], setDetailSkill = dsk[1];
       var copySt = react.useState<"idle" | "copied" | "failed">("idle"), copyState = copySt[0], setCopyState = copySt[1];
       function copyText(text: string) {
         if (typeof navigator === "undefined" || !navigator.clipboard) { setCopyState("failed"); return; }
@@ -653,7 +678,7 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
       function refresh(silent: boolean) { if (!silent) setSnapshot({ loading: true, error: null, data: snapshot.data }); return sessionApi("/state").then(function (data) { setSnapshot({ loading: false, error: null, data: data }); return data; }).catch(function (error) { setSnapshot({ loading: false, error: translateError(t, error), data: snapshot.data }); }); }
       react.useEffect(function () { refresh(false); }, []);
       function post<K extends keyof ApiRoutes>(path: K, body: unknown, successKey?: string | null, successParams?: object): Promise<ApiRoutes[K]> { if (inflightRef.current) return Promise.reject({ error: "operation already in progress" }); inflightRef.current = true; setBusy(true); setResult(null); return sessionApi(path, { method: "POST", headers: MUTATION_HEADERS, body: JSON.stringify(body || {}) }).then(function (data) { setResult({ ok: true, text: successKey ? t(successKey, successParams || data || {}) : t("result.updated") }); var scopedWorkspace = body && typeof (body as { workspace?: unknown }).workspace === "string" ? (body as { workspace: string }).workspace : ""; return Promise.all([refresh(true), scopedWorkspace ? loadWorkspaceDetail(scopedWorkspace) : null]).then(function () { return data; }); }).catch(function (error) { setResult({ ok: false, text: t("error.action", { error: translateError(t, error) }) }); throw error; }).finally(function () { inflightRef.current = false; setBusy(false); }); }
-      function openDetail(root: RootView, skill: SkillView, workspacePath?: string) { setBusy(true); setDetail(null); setCopyState("idle"); setModal("detail"); sessionApi("/detail", { method: "POST", headers: MUTATION_HEADERS, body: JSON.stringify(workspacePath ? { root: root.key, name: skill.name, workspace: workspacePath } : { root: root.key, name: skill.name }) }).then(setDetail).catch(function (error) { setResult({ ok: false, text: t("error.action", { error: translateError(t, error) }) }); setModal(null); }).finally(function () { setBusy(false); }); }
+      function openDetail(root: RootView, skill: SkillView, workspacePath?: string) { setBusy(true); setDetail(null); setDetailSkill(skill); setCopyState("idle"); setModal("detail"); sessionApi("/detail", { method: "POST", headers: MUTATION_HEADERS, body: JSON.stringify(workspacePath ? { root: root.key, name: skill.name, workspace: workspacePath } : { root: root.key, name: skill.name }) }).then(setDetail).catch(function (error) { setResult({ ok: false, text: t("error.action", { error: translateError(t, error) }) }); setDetailSkill(null); setModal(null); }).finally(function () { setBusy(false); }); }
       function openRootPath(root: RootView) {
         setRootPathValue(root.path || "");
         setRootPathPicking(false);
@@ -850,6 +875,45 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
         if (!target) return null;
         return h("div", { className: "dssm-note dssm-fallback" }, t("status.fallback." + skill.fallbackTo.scope, { source: rootDisplayName(t, target) }));
       }
+      function renderInvocationBadge(skill: Partial<SkillView>) {
+        var kind = skillDeclaredInvocationKind(skill);
+        if (kind === "all") return null;
+        var isManual = kind === "manual";
+        var labelKey = isManual ? "invocation.manualOnly" : "invocation.modelOnly";
+        var tipKey = isManual ? "invocation.manualOnlyTip" : "invocation.modelOnlyTip";
+        return h("span", {
+          className: "dssm-invocation-badge",
+          title: t(tipKey),
+          "aria-label": t(labelKey),
+        }, t(labelKey));
+      }
+      function renderDetailPolicy(skill: SkillView | null) {
+        if (!skill) return null;
+        var declaredKind = skillDeclaredInvocationKind(skill);
+        var effectiveKind = skillEffectiveInvocationKind(skill);
+        var colon = t("format.locale") === "zh-CN" ? "：" : ":";
+        var declaredText = declaredKind === 'manual' ? t("detail.policy.manualOnly") :
+                           declaredKind === 'model' ? t("detail.policy.modelOnly") :
+                           declaredKind === 'none' ? t("detail.policy.blocked") :
+                           t("detail.policy.all");
+        var effectiveText = effectiveKind === 'manual' ? t("detail.policy.manualOnly") :
+                            effectiveKind === 'model' ? t("detail.policy.modelOnly") :
+                            effectiveKind === 'none' ? (skill.managerEnabled === false ? t("detail.policy.disabled") : t("detail.policy.blocked")) :
+                            t("detail.policy.all");
+        return h("div", { className: "dssm-detail-policy" },
+          h("div", { className: "dssm-detail-policy-title" }, t("detail.invocation")),
+          h("div", { className: "dssm-detail-policy-grid" },
+            h("div", { className: "dssm-detail-policy-item" },
+              h("span", { className: "dssm-detail-policy-label" }, t("detail.declaredPolicy") + colon),
+              h("span", { className: "dssm-detail-policy-val" }, declaredText)
+            ),
+            h("div", { className: "dssm-detail-policy-item" },
+              h("span", { className: "dssm-detail-policy-label" }, t("detail.effectivePolicy") + colon),
+              h("span", { className: "dssm-detail-policy-val" }, effectiveText)
+            )
+          )
+        );
+      }
       function renderSkillStatusIcon(key: string, title?: string, cls?: string) {
         var isSuccess = key === "status.enabled";
         var isWarn = key === "status.disabled";
@@ -958,7 +1022,7 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
           }
         },
         canDrag ? h("div", { className: "dssm-drag-handle", title: t("category.dragTip") }, "⋮⋮") : null,
-        h("div", { className: "dssm-skill-copy" }, h("div", { className: "dssm-name" }, skillName), h("div", { className: "dssm-skill-desc" + (hasCustomNote ? " dssm-custom-note" : ""), title: descTitle }, description), renderLinkedNote(skill), renderFallback(skill)), h("div", { className: "dssm-skill-actions" }, skillActions));
+        h("div", { className: "dssm-skill-copy" }, h("div", { className: "dssm-name" }, skillName, typeof renderInvocationBadge === "function" ? renderInvocationBadge(skill) : null), h("div", { className: "dssm-skill-desc" + (hasCustomNote ? " dssm-custom-note" : ""), title: descTitle }, description), renderLinkedNote(skill), renderFallback(skill)), h("div", { className: "dssm-skill-actions" }, skillActions));
       }
       var rows = roots.flatMap(function (root) { return (root.skills || []).map(function (skill) { return { root: root, skill: skill }; }); });
       var filteredRows = rows.filter(function (row) { return (!activeSource || row.root.key === activeSource) && (!filters.status || skillStatus(row.skill) === filters.status) && matchSkillQuery(Object.assign({}, row.skill, { rootLabel: rootDisplayName(t, row.root) }), query); });
@@ -1461,7 +1525,7 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
       if (modal === "detail") {
         var currentDetail = detail;
         var detailTitle = currentDetail ? currentDetail.declaredName || currentDetail.name : "";
-        content.push(h(Modal, { key: "detail", className: "dssm-modal-wide", title: t("detail.title"), closeLabel: t("btn.close"), onClose: function () { setCopyState("idle"); setModal(null); } }, currentDetail ? h("div", { className: "dssm-detail" }, h("div", { className: "dssm-detail-head" }, h("div", { className: "dssm-name", title: detailTitle }, detailTitle), currentDetail.body ? h(PrimitiveButton, { variant: "outline", size: "sm", "aria-live": "polite", onClick: function () { if (currentDetail && currentDetail.body) copyText(currentDetail.body); } }, copyState === "copied" ? t("detail.copied") : copyState === "failed" ? t("detail.copyFailed") : t("detail.copyBody")) : null), currentDetail.customNote ? h("p", { className: "dssm-desc dssm-custom-note", title: t("detail.customNote") }, currentDetail.customNote) : null, currentDetail.description ? h("p", { className: "dssm-desc" + (currentDetail.customNote ? " dssm-desc-secondary" : "") }, currentDetail.description) : null, h("div", { className: "dssm-detail-path" }, currentDetail.path), currentDetail.diagnostics.length ? currentDetail.diagnostics.map(function (item, index) { return h("div", { key: index, className: "dssm-diag" }, t(item.code!, item.params || {})); }) : null, h(Input.TextArea, { className: "dssm-detail-body", readOnly: true, value: currentDetail.body || "", rows: 16 })) : h("div", { className: "dssm-empty" }, t("loading"))));
+        content.push(h(Modal, { key: "detail", className: "dssm-modal-wide", title: t("detail.title"), closeLabel: t("btn.close"), onClose: function () { setCopyState("idle"); setDetailSkill(null); setModal(null); } }, currentDetail ? h("div", { className: "dssm-detail" }, h("div", { className: "dssm-detail-head" }, h("div", { className: "dssm-name", title: detailTitle }, detailTitle), currentDetail.body ? h(PrimitiveButton, { variant: "outline", size: "sm", "aria-live": "polite", onClick: function () { if (currentDetail && currentDetail.body) copyText(currentDetail.body); } }, copyState === "copied" ? t("detail.copied") : copyState === "failed" ? t("detail.copyFailed") : t("detail.copyBody")) : null), currentDetail.customNote ? h("p", { className: "dssm-desc dssm-custom-note", title: t("detail.customNote") }, currentDetail.customNote) : null, currentDetail.description ? h("p", { className: "dssm-desc" + (currentDetail.customNote ? " dssm-desc-secondary" : "") }, currentDetail.description) : null, h("div", { className: "dssm-detail-path" }, currentDetail.path), renderDetailPolicy(detailSkill), currentDetail.diagnostics.length ? currentDetail.diagnostics.map(function (item, index) { return h("div", { key: index, className: "dssm-diag" }, t(item.code!, item.params || {})); }) : null, h(Input.TextArea, { className: "dssm-detail-body", readOnly: true, value: currentDetail.body || "", rows: 16 })) : h("div", { className: "dssm-empty" }, t("loading"))));
       }
       if (modal && typeof modal === "object" && modal.type === "trash-confirm") content.push(h(Modal, { key: "trash-confirm", title: t("confirm.trash.title"), description: t("confirm.trash.desc", { name: modal.name }), closeLabel: t("btn.close"), onClose: function () { setModal(null); }, footer: h(React.Fragment, null, hostButton(t("btn.cancel"), function () { setModal(null); }, "outline"), hostButton(t("btn.trash"), function () { post("/delete", Object.assign({ root: (modal as Extract<ConfirmModal, {type: "trash-confirm"}>).root, name: (modal as Extract<ConfirmModal, {name: string}>).name }, (modal as { workspace?: string }).workspace ? { workspace: (modal as { workspace?: string }).workspace } : {}), "result.trashed", { name: (modal as Extract<ConfirmModal, {name: string}>).name }).then(function () { setModal(null); }).catch(function () {}); }, "danger", busy)) }));
       if (modal && typeof modal === "object" && modal.type === "delete-confirm") content.push(h(Modal, { key: "delete-confirm", title: t("confirm.delete.title"), description: t("confirm.delete.desc", { name: modal.name }), closeLabel: t("btn.close"), onClose: function () { setModal(null); }, footer: h(React.Fragment, null, hostButton(t("btn.cancel"), function () { setModal(null); }, "outline"), hostButton(t("btn.delete.forever"), function () { post("/trash-delete", { id: (modal as Extract<ConfirmModal, {type: "delete-confirm"}>).id }, "result.deleted", { name: (modal as Extract<ConfirmModal, {name: string}>).name }).then(function () { setModal(null); }).catch(function () {}); }, "danger", busy)) }));
@@ -1726,4 +1790,4 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
         };
       }, "skills-manager: sidebar entry cleanup");
     }
-    module.exports.formatTrashTime = formatTrashTime; module.exports.DICT = DICT; module.exports.translateError = translateError; module.exports.parseApiResponse = parseApiResponse; module.exports.resolveApiUrl = resolveApiUrl; module.exports.resolveRepoBrand = resolveRepoBrand; module.exports.isSkillEnabled = isSkillEnabled; module.exports.countKey = countKey; module.exports.rootDisplayName = rootDisplayName; module.exports.summarizeImportResult = summarizeImportResult; module.exports.normalizeSkillQuery = normalizeSkillQuery; module.exports.matchSkillQuery = matchSkillQuery; module.exports.filterSkills = filterSkills; module.exports.visibleSkillRoots = visibleSkillRoots; module.exports.scopeSkillRoots = scopeSkillRoots; module.exports.skillStatus = skillStatus; module.exports.countSkillStatuses = countSkillStatuses; module.exports.currentSessionId = currentSessionId; module.exports.canToggleSource = canToggleSource; module.exports.recoverModalFocus = recoverModalFocus; module.exports.trapModalFocus = trapModalFocus; module.exports.inspectUploadSelection = inspectUploadSelection; module.exports.setupSidebarEntry = setupSidebarEntry; module.exports.apply = apply; module.exports.inject = inject;
+    module.exports.formatTrashTime = formatTrashTime; module.exports.DICT = DICT; module.exports.translateError = translateError; module.exports.parseApiResponse = parseApiResponse; module.exports.resolveApiUrl = resolveApiUrl; module.exports.resolveRepoBrand = resolveRepoBrand; module.exports.skillDeclaredInvocationKind = skillDeclaredInvocationKind; module.exports.skillEffectiveInvocationKind = skillEffectiveInvocationKind; module.exports.isSkillEnabled = isSkillEnabled; module.exports.countKey = countKey; module.exports.rootDisplayName = rootDisplayName; module.exports.summarizeImportResult = summarizeImportResult; module.exports.normalizeSkillQuery = normalizeSkillQuery; module.exports.matchSkillQuery = matchSkillQuery; module.exports.filterSkills = filterSkills; module.exports.visibleSkillRoots = visibleSkillRoots; module.exports.scopeSkillRoots = scopeSkillRoots; module.exports.skillStatus = skillStatus; module.exports.countSkillStatuses = countSkillStatuses; module.exports.currentSessionId = currentSessionId; module.exports.canToggleSource = canToggleSource; module.exports.recoverModalFocus = recoverModalFocus; module.exports.trapModalFocus = trapModalFocus; module.exports.inspectUploadSelection = inspectUploadSelection; module.exports.setupSidebarEntry = setupSidebarEntry; module.exports.apply = apply; module.exports.inject = inject;
