@@ -29,6 +29,7 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
       return h("label", { className: props.className }, h("input", { type: "checkbox", checked: props.checked, disabled: props.disabled, onChange: function (event: React.ChangeEvent<HTMLInputElement>) { props.onChange(event.target.checked); } }), h("span", null, props.label));
     };
     const DisplayCheckbox: React.ComponentType<CheckboxProps> = (primitives as any).Checkbox || FallbackCheckbox;
+    const HostTag: React.ComponentType<{ tone?: string; className?: string; title?: string; children?: React.ReactNode }> = (primitives as any).Tag || function HostTag(props: any) { return h("span", { className: props.className, title: props.title }, props.children); };
     const IconEditOutlineRegular = (primitives as any).IconEditOutlineRegular as React.ComponentType<{ size?: number }>;
     function FeedbackIcon() {
       return h(IconEditOutlineRegular, { size: 16 });
@@ -234,13 +235,6 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
       if (skill.modelInvocable !== false && skill.userInvocable === false) return 'model';
       if (skill.modelInvocable === false && skill.userInvocable === false) return 'none';
       return 'all';
-    }
-    function skillEffectiveInvocationKind(skill: Partial<SkillView>): 'all' | 'manual' | 'model' | 'none' {
-      if (skill.managerEnabled === false) return 'none';
-      if (skill.effectiveModelInvocable && skill.effectiveUserInvocable) return 'all';
-      if (!skill.effectiveModelInvocable && skill.effectiveUserInvocable) return 'manual';
-      if (skill.effectiveModelInvocable && !skill.effectiveUserInvocable) return 'model';
-      return 'none';
     }
     function isSkillEnabled(skill: Partial<SkillView>): boolean { if (skill.enabled !== undefined) return skill.enabled === true; return !!(skill.invocationPolicyValid && skill.modelInvocable && skill.userInvocable && skill.managerEnabled !== false); }
     function countKey(key: string, count: number) { return key + (Number(count) === 1 ? ".one" : ".other"); }
@@ -875,15 +869,12 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
       }
       function renderInvocationBadge(skill: Partial<SkillView>) {
         var kind = skillDeclaredInvocationKind(skill);
-        if (kind === "all") return null;
-        var isManual = kind === "manual";
-        var labelKey = isManual ? "invocation.manualOnly" : "invocation.modelOnly";
-        var tipKey = isManual ? "invocation.manualOnlyTip" : "invocation.modelOnlyTip";
-        return h("span", {
+        if (kind !== "manual") return null;
+        return h(HostTag, {
+          tone: "neutral",
           className: "dssm-invocation-badge",
-          title: t(tipKey),
-          "aria-label": t(labelKey),
-        }, t(labelKey));
+          title: t("invocation.manualOnlyTip"),
+        }, t("invocation.manualOnly"));
       }
       function renderDetailPolicy(skill: SkillView | null) {
         if (!skill) return null;
@@ -1776,4 +1767,4 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
         };
       }, "skills-manager: sidebar entry cleanup");
     }
-    module.exports.formatTrashTime = formatTrashTime; module.exports.DICT = DICT; module.exports.translateError = translateError; module.exports.parseApiResponse = parseApiResponse; module.exports.resolveApiUrl = resolveApiUrl; module.exports.resolveRepoBrand = resolveRepoBrand; module.exports.skillDeclaredInvocationKind = skillDeclaredInvocationKind; module.exports.skillEffectiveInvocationKind = skillEffectiveInvocationKind; module.exports.isSkillEnabled = isSkillEnabled; module.exports.countKey = countKey; module.exports.rootDisplayName = rootDisplayName; module.exports.summarizeImportResult = summarizeImportResult; module.exports.normalizeSkillQuery = normalizeSkillQuery; module.exports.matchSkillQuery = matchSkillQuery; module.exports.filterSkills = filterSkills; module.exports.visibleSkillRoots = visibleSkillRoots; module.exports.scopeSkillRoots = scopeSkillRoots; module.exports.skillStatus = skillStatus; module.exports.countSkillStatuses = countSkillStatuses; module.exports.currentSessionId = currentSessionId; module.exports.canToggleSource = canToggleSource; module.exports.recoverModalFocus = recoverModalFocus; module.exports.trapModalFocus = trapModalFocus; module.exports.inspectUploadSelection = inspectUploadSelection; module.exports.setupSidebarEntry = setupSidebarEntry; module.exports.apply = apply; module.exports.inject = inject;
+    module.exports.formatTrashTime = formatTrashTime; module.exports.DICT = DICT; module.exports.translateError = translateError; module.exports.parseApiResponse = parseApiResponse; module.exports.resolveApiUrl = resolveApiUrl; module.exports.resolveRepoBrand = resolveRepoBrand; module.exports.skillDeclaredInvocationKind = skillDeclaredInvocationKind; module.exports.isSkillEnabled = isSkillEnabled; module.exports.countKey = countKey; module.exports.rootDisplayName = rootDisplayName; module.exports.summarizeImportResult = summarizeImportResult; module.exports.normalizeSkillQuery = normalizeSkillQuery; module.exports.matchSkillQuery = matchSkillQuery; module.exports.filterSkills = filterSkills; module.exports.visibleSkillRoots = visibleSkillRoots; module.exports.scopeSkillRoots = scopeSkillRoots; module.exports.skillStatus = skillStatus; module.exports.countSkillStatuses = countSkillStatuses; module.exports.currentSessionId = currentSessionId; module.exports.canToggleSource = canToggleSource; module.exports.recoverModalFocus = recoverModalFocus; module.exports.trapModalFocus = trapModalFocus; module.exports.inspectUploadSelection = inspectUploadSelection; module.exports.setupSidebarEntry = setupSidebarEntry; module.exports.apply = apply; module.exports.inject = inject;

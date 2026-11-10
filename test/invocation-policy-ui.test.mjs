@@ -35,12 +35,10 @@ const tEn = (key, params) => {
   return text;
 };
 
-// 1. 验证多语言词条对齐
+// 1. 验证多语言词条对齐（只保留业务真实需要的词条，清理死词条）
 const requiredKeys = [
   'invocation.manualOnly',
-  'invocation.modelOnly',
   'invocation.manualOnlyTip',
-  'invocation.modelOnlyTip',
   'detail.invocation',
   'detail.policy.all',
   'detail.policy.manualOnly',
@@ -56,80 +54,76 @@ for (const key of requiredKeys) {
 // 2. 验证调用方式判定函数导出与行为
 const fnStart = source.indexOf('    function skillDeclaredInvocationKind(');
 const fnEnd = source.indexOf('    function isSkillEnabled(', fnStart);
-assert.ok(fnStart >= 0 && fnEnd > fnStart, '必须存在 skillDeclaredInvocationKind 与 skillEffectiveInvocationKind 辅助函数');
+assert.ok(fnStart >= 0 && fnEnd > fnStart, '必须存在 skillDeclaredInvocationKind 辅助函数');
+
+// P3-1 验证死代码已清理：源码中不应再包含 skillEffectiveInvocationKind
+assert.equal(source.includes('function skillEffectiveInvocationKind'), false, '必须清除生产死代码 skillEffectiveInvocationKind');
 
 const fnBlock = stripTypeScriptTypes(source.slice(fnStart, fnEnd));
-const { skillDeclaredInvocationKind, skillEffectiveInvocationKind } = new Function(
-  fnBlock + '\nreturn { skillDeclaredInvocationKind, skillEffectiveInvocationKind };'
+const { skillDeclaredInvocationKind } = new Function(
+  fnBlock + '\nreturn { skillDeclaredInvocationKind };'
 )();
 
 // 默认全开
 const defaultSkill = {
   modelInvocable: true,
   userInvocable: true,
-  effectiveModelInvocable: true,
-  effectiveUserInvocable: true,
   managerEnabled: true
 };
 assert.equal(skillDeclaredInvocationKind(defaultSkill), 'all');
-assert.equal(skillEffectiveInvocationKind(defaultSkill), 'all');
 
 // 仅手动（disable-model-invocation: true）
 const manualOnlySkill = {
   modelInvocable: false,
   userInvocable: true,
-  effectiveModelInvocable: false,
-  effectiveUserInvocable: true,
   managerEnabled: true
 };
 assert.equal(skillDeclaredInvocationKind(manualOnlySkill), 'manual');
-assert.equal(skillEffectiveInvocationKind(manualOnlySkill), 'manual');
 
 // 仅模型（user-invocable: false）
 const modelOnlySkill = {
   modelInvocable: true,
   userInvocable: false,
-  effectiveModelInvocable: true,
-  effectiveUserInvocable: false,
   managerEnabled: true
 };
 assert.equal(skillDeclaredInvocationKind(modelOnlySkill), 'model');
-assert.equal(skillEffectiveInvocationKind(modelOnlySkill), 'model');
 
-// 管理器停用后的阻断
-const disabledManualSkill = {
+// 双关技能（两个开关都关）
+const noneSkill = {
   modelInvocable: false,
-  userInvocable: true,
-  effectiveModelInvocable: false,
-  effectiveUserInvocable: false,
-  managerEnabled: false
+  userInvocable: false,
+  managerEnabled: true
 };
-assert.equal(skillDeclaredInvocationKind(disabledManualSkill), 'manual', '源声明保持为仅手动');
-assert.equal(skillEffectiveInvocationKind(disabledManualSkill), 'none', '实际生效为完全阻断');
+assert.equal(skillDeclaredInvocationKind(noneSkill), 'none');
 
-// 3. 验证徽标渲染与防视觉冗余：默认技能绝不能渲染徽标
-const badgeFnStart = source.indexOf('    function renderInvocationBadge(');
-const badgeFnEnd = source.indexOf('    function renderSkillStatusIcon(', badgeFnStart);
+// 3. 验证徽标渲染与防视觉冗余：
+// P2-1 核心修复：只有 manual 才渲染徽标；all、model、none 绝不渲染徽标！尤其是 none 绝不能误标为仅模型！
+// P2-2 核心修复：必须使用宿主原语 Tag（tone="neutral"）而非手绘 span
+const badgeFnStart = source.indexOf('      function renderInvocationBadge(');
+const badgeFnEnd = source.indexOf('      function renderDetailPolicy(', badgeFnStart);
 assert.ok(badgeFnStart >= 0 && badgeFnEnd > badgeFnStart, '必须包含 renderInvocationBadge 函数');
 
+const HostTagMock = function HostTag(props) { return h('HostTag', props, props.children); };
 const badgeFnBlock = stripTypeScriptTypes(source.slice(badgeFnStart, badgeFnEnd));
 const { renderInvocationBadge } = new Function(
-  'h', 't', 'skillDeclaredInvocationKind',
+  'h', 't', 'skillDeclaredInvocationKind', 'HostTag',
   badgeFnBlock + '\nreturn { renderInvocationBadge };'
-)(h, tZh, skillDeclaredInvocationKind);
+)(h, tZh, skillDeclaredInvocationKind, HostTagMock);
 
-assert.equal(renderInvocationBadge(defaultSkill), null, '默认模型+手动技能绝不渲染徽标，保持列表清爽');
+assert.equal(renderInvocationBadge(defaultSkill), null, '默认技能绝不渲染徽标');
+assert.equal(renderInvocationBadge(modelOnlySkill), null, '仅模型不渲染徽标');
+assert.equal(renderInvocationBadge(noneSkill), null, 'P2-1 防护：双关技能绝不能误渲染为仅模型徽标');
 
 const manualBadgeZh = renderInvocationBadge(manualOnlySkill);
 assert.ok(manualBadgeZh, '仅手动技能必须渲染徽标');
-assert.equal(manualBadgeZh.props.className, 'dssm-invocation-badge');
+assert.equal(manualBadgeZh.props.tone, 'neutral', 'P2-2 防护：必须使用宿主 Tag 原语的 neutral tone');
 assert.equal(manualBadgeZh.children[0], '仅手动');
 assert.equal(manualBadgeZh.props.title, '模型不可自动感知；聊天框输入 / 可手动调用');
 
 const { renderInvocationBadge: renderInvocationBadgeEn } = new Function(
-  'h', 't', 'skillDeclaredInvocationKind',
+  'h', 't', 'skillDeclaredInvocationKind', 'HostTag',
   badgeFnBlock + '\nreturn { renderInvocationBadge };'
-)(h, tEn, skillDeclaredInvocationKind);
+)(h, tEn, skillDeclaredInvocationKind, HostTagMock);
 const manualBadgeEn = renderInvocationBadgeEn(manualOnlySkill);
 assert.equal(manualBadgeEn.children[0], 'Manual only');
 
@@ -140,12 +134,13 @@ assert.ok(matchFnStart >= 0 && matchFnEnd > matchFnStart, 'matchSkillQuery 必�
 
 const matchFnBlock = stripTypeScriptTypes(source.slice(matchFnStart, matchFnEnd));
 const { matchSkillQuery } = new Function(
-  'skillDeclaredInvocationKind',
+  'DICT', 'skillDeclaredInvocationKind',
   'function normalizeSkillQuery(query) { return String(query == null ? "" : query).trim().toLowerCase(); }\n' +
   matchFnBlock + '\nreturn { matchSkillQuery };'
-)(skillDeclaredInvocationKind);
+)(DICT, skillDeclaredInvocationKind);
 
 assert.equal(matchSkillQuery(defaultSkill, '手动'), false, '默认技能搜手动不应命中');
+assert.equal(matchSkillQuery(noneSkill, '手动'), false, '双关技能搜手动不应命中');
 assert.equal(matchSkillQuery(manualOnlySkill, '手动'), true, '仅手动技能搜手动必须命中');
 assert.equal(matchSkillQuery(manualOnlySkill, '仅手动'), true, '仅手动技能搜仅手动必须命中');
 assert.equal(matchSkillQuery(manualOnlySkill, 'manual'), true, '仅手动技能搜 manual 必须命中');
@@ -167,7 +162,6 @@ const policyNodeZh = renderDetailPolicy(manualOnlySkill);
 assert.ok(policyNodeZh, '仅手动技能必须渲染策略栏');
 assert.equal(policyNodeZh.props.className, 'dssm-detail-policy');
 
-// 递归抽取所有叶子文本
 function extractText(node) {
   if (!node) return [];
   if (typeof node === 'string') return [node];
@@ -185,7 +179,45 @@ const { renderDetailPolicy: renderDetailPolicyEn } = new Function(
 const textsEn = extractText(renderDetailPolicyEn(manualOnlySkill)).join(' ');
 assert.ok(textsEn.includes('Invocation: Manual only (disable-model-invocation: true)'), '英文环境单字段调用方式正常本地化');
 
-// 6. 验证 CSS 样式包含徽标定义
+// 6. P3-3 装配层真实渲染覆盖（防变异穿透：防止行渲染漏挂徽标）
+const skillStart = source.indexOf('      function renderSkill(root:');
+const skillEnd = source.indexOf('      var rows =', skillStart);
+assert.ok(skillStart >= 0 && skillEnd > skillStart, 'renderSkill 必须存在');
+
+const skillBlock = stripTypeScriptTypes(source.slice(skillStart, skillEnd));
+const makeRenderSkill = new Function(
+  'h', 't', 'isSkillEnabled', 'renderInvocationBadge', 'renderSkillStatusIcon', 'enableSwitch', 'renderLinkedNote', 'renderFallback', 'SourceSelect', 'moreIcon', 'busy', 'filters', 'allRoots', 'draggingRef', 'post', 'openDetail', 'setSkillNoteText', 'setModal', 'rootDisplayName',
+  skillBlock + '\nreturn renderSkill;'
+);
+
+const fakeRoot = { key: 'dsh', toggleable: true, mutable: true, enabled: true, categories: [] };
+const renderSkillTested = makeRenderSkill(
+  h, tZh, () => true, renderInvocationBadge, () => null, () => h('switch'), () => null, () => null, function SourceSelect() {}, () => null, false, {}, [fakeRoot], { current: null }, () => Promise.resolve(), () => {}, () => {}, () => {}, () => 'DSH'
+);
+
+function findVNode(node, predicate) {
+  if (!node || typeof node !== 'object') return null;
+  if (predicate(node)) return node;
+  for (const child of node.children || []) {
+    const found = findVNode(child, predicate);
+    if (found) return found;
+  }
+  return null;
+}
+
+const manualRow = renderSkillTested(fakeRoot, { name: 'my-manual-tool', ...manualOnlySkill });
+const manualBadgeFound = findVNode(manualRow, n => n.props && n.props.className === 'dssm-invocation-badge');
+assert.ok(manualBadgeFound, 'P3-3 变异防御：仅手动技能的列表行 DOM 中必须真实装配 dssm-invocation-badge 徽标');
+
+const defaultRow = renderSkillTested(fakeRoot, { name: 'my-default-tool', ...defaultSkill });
+const defaultBadgeFound = findVNode(defaultRow, n => n.props && n.props.className === 'dssm-invocation-badge');
+assert.equal(defaultBadgeFound, null, 'P3-3 变异防御：默认技能的列表行 DOM 中绝不能装配徽标');
+
+const noneRow = renderSkillTested(fakeRoot, { name: 'my-none-tool', ...noneSkill });
+const noneBadgeFound = findVNode(noneRow, n => n.props && n.props.className === 'dssm-invocation-badge');
+assert.equal(noneBadgeFound, null, 'P3-3 变异防御：双关技能的列表行 DOM 中绝不能装配徽标');
+
+// 7. 验证 CSS 样式包含徽标定义
 assert.match(source, /\.dssm-invocation-badge\{/, 'CSS 样式中必须定义 .dssm-invocation-badge');
 assert.match(source, /\.dssm-detail-policy\{/, 'CSS 样式中必须定义 .dssm-detail-policy');
 
