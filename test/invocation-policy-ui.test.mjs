@@ -219,8 +219,26 @@ const noneRow = renderSkillTested(fakeRoot, { name: 'my-none-tool', ...noneSkill
 const noneBadgeFound = findVNode(noneRow, n => n.props && n.props.className === 'dssm-invocation-badge');
 assert.equal(noneBadgeFound, null, 'P3-3 变异防御：双关技能的列表行 DOM 中绝不能装配徽标');
 
-// 7. P3-3 详情弹窗装配层验证（防止 detailSkill 未注入 renderDetailPolicy）
-assert.match(source, /renderDetailPolicy\(detailSkill\)/, 'P3-3 变异防御：详情弹窗必须真实装配 renderDetailPolicy(detailSkill)');
+// 7. P3-3 详情弹窗装配层验证（防变异穿透：真实装配 DOM 树断言，防止返回值丢弃或假绿）
+const detailModalStart = source.indexOf('      if (modal === "detail") {');
+const detailModalEnd = source.indexOf('      if (modal && typeof modal === "object" && modal.type === "trash-confirm")', detailModalStart);
+assert.ok(detailModalStart >= 0 && detailModalEnd > detailModalStart, '必须存在详情弹窗渲染代码块');
+
+const detailModalBlock = stripTypeScriptTypes(source.slice(detailModalStart, detailModalEnd));
+const makeDetailModal = new Function(
+  'h', 't', 'Modal', 'PrimitiveButton', 'Input', 'renderDetailPolicy',
+  `return function renderDetailModal(modal, detail, detailSkill) {
+     const content = [];
+     const copyState = 'idle', setCopyState = () => {}, setDetailSkill = () => {}, setModal = () => {}, copyText = () => {};
+     ${detailModalBlock}
+     return content[0];
+   };`
+)(h, tZh, function Modal(props) { return h('Modal', props, props.children); }, function PrimitiveButton(props) { return h('Button', props, props.children); }, { TextArea: function TextArea(props) { return h('textarea', props); } }, renderDetailPolicy);
+
+const fakeDetailData = { name: 'my-manual-tool', declaredName: 'My Manual Tool', path: 'D:/skills/my-manual-tool/SKILL.md', body: 'steps', diagnostics: [] };
+const renderedModalVNode = makeDetailModal('detail', fakeDetailData, manualOnlySkill);
+const detailPolicyVNode = findVNode(renderedModalVNode, n => n.props && n.props.className === 'dssm-detail-policy');
+assert.ok(detailPolicyVNode, 'P3-3 变异防御：详情弹窗真实渲染 DOM 树中必须存在 .dssm-detail-policy 结构节点');
 
 // 8. 验证 CSS 样式包含徽标定义与详情策略定义
 assert.match(source, /\.dssm-invocation-badge\{/, 'CSS 样式中必须定义 .dssm-invocation-badge');
