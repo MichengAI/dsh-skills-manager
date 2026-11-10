@@ -46,7 +46,7 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
         "filter.workspace": "工作区", "filter.source": "来源", "filter.all": "全部来源", "filter.option": "{name}（{count}）", "search": "搜索", "search.placeholder": "搜索技能名称、描述或备注", "search.clear": "清除搜索",
         "empty.search": "没有匹配的技能。", "empty.source": "该来源目录不存在或暂时没有技能。", "loading": "正在加载技能…", "note.missing": "未提供简介", "skill.linked": "外部目录链接，只读", "source.toggle": "启停来源", "skill.toggle": "启停技能", "category.toggle": "启停分类", "category.create": "新建分类", "category.uncategorized": "未分类", "category.assign": "归入{name}", "category.rename": "重命名", "category.delete": "删除分类", "category.note": "分类只记在这个来源里，不移动文件。", "category.name": "分类名称", "category.empty": "还没有技能。从条目的「更多」归入。", "category.progress": "{count} 项 · {enabled}/{usable} 启用", "category.actions": "分类操作", "category.created": "已添加分类「{name}」。文件没有新建目录。", "category.renamed": "已重命名。技能文件名没有变化。", "category.deleted": "已删除分类「{name}」。技能回到未分类，没有进回收站。", "category.assigned": "已将 {name} 归入「{category}」。文件没有移动。", "category.dragTip": "拖拽调整顺序或移动到其他分类", "category.moved": "已调整技能 {name} 的分类或顺序。", "confirm.category.title": "删除分类？", "confirm.category.desc": "「{name}」会消失，里面的技能回到未分类。文件不会移动。", "error.category.duplicate": "已有同名分类: {name}", "error.category.name": "分类名称不能为空，且不能超过 24 个字符", "error.category.notFound": "分类不存在", "error.category.root": "技能来源不存在: {root}", "error.category.position": "技能排序位置无效", "error.category.target": "排序目标不属于目标分类",
         "detail.title": "技能详情", "detail.description": "简介", "detail.customNote": "自定义简介", "detail.document": "SKILL.md", "detail.body": "正文", "detail.frontmatter": "Frontmatter", "detail.diagnostics": "诊断", "detail.path": "源文件", "detail.noIssues": "未发现诊断问题。", "detail.copyBody": "复制正文", "detail.copied": "已复制", "detail.copyFailed": "复制失败",
-        "invocation.manualOnly": "仅手动", "invocation.modelOnly": "仅模型", "invocation.manualOnlyTip": "模型不可自动感知；聊天框输入 / 可手动调用", "invocation.modelOnlyTip": "仅允许模型自动调用；用户不可手动调用", "detail.invocation": "调用方式", "detail.declaredPolicy": "源文件声明", "detail.effectivePolicy": "当前生效", "detail.policy.all": "模型 + 手动", "detail.policy.manualOnly": "仅手动调用（disable-model-invocation: true）", "detail.policy.modelOnly": "仅模型调用（user-invocable: false）", "detail.policy.disabled": "不可调用（受管理器总闸停用阻断）", "detail.policy.blocked": "不可调用",
+        "invocation.manualOnly": "仅手动", "invocation.modelOnly": "仅模型", "invocation.manualOnlyTip": "模型不可自动感知；聊天框输入 / 可手动调用", "invocation.modelOnlyTip": "仅允许模型自动调用；用户不可手动调用", "detail.invocation": "调用方式", "detail.policy.all": "模型 + 手动", "detail.policy.manualOnly": "仅手动调用（disable-model-invocation: true）", "detail.policy.modelOnly": "仅模型调用（user-invocable: false）", "detail.policy.blocked": "不可调用",
         "skill.editNote": "编辑备注", "note.title": "自定义简介 / 备注", "note.label": "备注内容", "note.placeholder": "记录这个技能是干嘛的、什么时候用…", "note.help": "保存在插件内部显示层，不修改原 SKILL.md。清空可还原为原简介。", "note.clear": "清空", "note.updated": "已更新「{name}」的自定义简介。", "note.cleared": "已清除「{name}」的自定义简介。",
         "error.note.root": "技能来源不存在: {root}", "error.note.tooLarge": "自定义简介过长（最多 {max} 个字符）",
         "create.title": "创建技能", "create.name": "名称", "create.name.placeholder": "例如 code-review-helper", "create.description": "简介", "create.description.placeholder": "一句话说明什么时候使用", "create.body": "正文（Markdown）", "create.body.placeholder": "写下技能要遵循的指令、步骤和边界…", "create.chat.note": "创建的技能不会挂仓库更新，也不会修改原文件。",
@@ -82,7 +82,7 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
         "filter.workspace": "Workspace", "filter.source": "Source", "filter.all": "All sources", "filter.option": "{name} ({count})", "search": "Search", "search.placeholder": "Search skill names, descriptions or notes", "search.clear": "Clear search",
         "empty.search": "No matching skills.", "empty.source": "This source does not exist or has no skills yet.", "loading": "Loading skills…", "note.missing": "No description provided", "skill.linked": "External directory link, read-only", "source.toggle": "Toggle source", "skill.toggle": "Toggle skill", "category.toggle": "Toggle category", "category.create": "New category", "category.uncategorized": "Uncategorized", "category.assign": "Move to {name}", "category.rename": "Rename", "category.delete": "Delete category", "category.note": "Categories stay in this source and do not move files.", "category.name": "Category name", "category.empty": "No skills yet. Use More on a skill to place it here.", "category.progress": "{count} · {enabled}/{usable} enabled", "category.actions": "Category actions", "category.created": "Added category “{name}”. No directory was created.", "category.renamed": "Renamed. Skill file names are unchanged.", "category.deleted": "Deleted category “{name}”. Skills returned to Uncategorized and were not trashed.", "category.assigned": "Moved {name} to “{category}”. The file was not moved.", "category.dragTip": "Drag to reorder or move to another category", "category.moved": "Updated the category or order for {name}.", "confirm.category.title": "Delete category?", "confirm.category.desc": "“{name}” will be removed. Its skills return to Uncategorized. Files are not moved.", "error.category.duplicate": "A category with this name already exists: {name}", "error.category.name": "Category name is required and must be at most 24 characters", "error.category.notFound": "Category not found", "error.category.root": "Skill source not found: {root}", "error.category.position": "Invalid skill ordering position", "error.category.target": "The target skill is not in the destination category",
         "detail.title": "Skill details", "detail.description": "Description", "detail.customNote": "Custom note", "detail.document": "SKILL.md", "detail.body": "Body", "detail.frontmatter": "Frontmatter", "detail.diagnostics": "Diagnostics", "detail.path": "Source file", "detail.noIssues": "No diagnostic issues found.", "detail.copyBody": "Copy body", "detail.copied": "Copied", "detail.copyFailed": "Copy failed",
-        "invocation.manualOnly": "Manual only", "invocation.modelOnly": "Model only", "invocation.manualOnlyTip": "Model cannot invoke automatically; manual invocation via / remains available", "invocation.modelOnlyTip": "Only available for model invocation; manual invocation disabled", "detail.invocation": "Invocation", "detail.declaredPolicy": "Declared", "detail.effectivePolicy": "Effective", "detail.policy.all": "Model + Manual", "detail.policy.manualOnly": "Manual only (disable-model-invocation: true)", "detail.policy.modelOnly": "Model only (user-invocable: false)", "detail.policy.disabled": "Disabled (blocked by manager switch or source)", "detail.policy.blocked": "Blocked",
+        "invocation.manualOnly": "Manual only", "invocation.modelOnly": "Model only", "invocation.manualOnlyTip": "Model cannot invoke automatically; manual invocation via / remains available", "invocation.modelOnlyTip": "Only available for model invocation; manual invocation disabled", "detail.invocation": "Invocation", "detail.policy.all": "Model + Manual", "detail.policy.manualOnly": "Manual only (disable-model-invocation: true)", "detail.policy.modelOnly": "Model only (user-invocable: false)", "detail.policy.blocked": "Blocked",
         "skill.editNote": "Edit note", "note.title": "Custom description / Note", "note.label": "Note", "note.placeholder": "Record what this skill does and when to use it…", "note.help": "Saved in the plugin display layer without modifying SKILL.md. Clear to revert to original description.", "note.clear": "Clear", "note.updated": "Updated custom note for “{name}”.", "note.cleared": "Cleared custom note for “{name}”.",
         "error.note.root": "Skill source not found: {root}", "error.note.tooLarge": "Custom note is too long (maximum {max} characters)",
         "create.title": "Create skill", "create.name": "Name", "create.name.placeholder": "e.g. code-review-helper", "create.description": "Description", "create.description.placeholder": "One sentence describing when to use it", "create.body": "Body (Markdown)", "create.body.placeholder": "Write the instructions, steps, and boundaries…", "create.chat.note": "Created skills are not linked to repository updates, and no source file is modified.",
@@ -210,9 +210,7 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
 .dssm-prov-badge{flex:none;border:1px solid var(--dsw-alias-border-secondary,#e2e2e2);border-radius:999px;padding:0 6px;font-size:11px;line-height:16px;color:var(--dsw-alias-label-secondary,#666);white-space:nowrap}
 .dssm-prov-repo-link{border:0.5px solid var(--dsw-alias-border-l2,#494949);text-decoration:none}
 .dssm-invocation-badge{display:inline-flex;align-items:center;padding:0 6px;height:18px;border-radius:4px;font-size:11px;line-height:16px;white-space:nowrap;background:var(--dsw-alias-bg-layer-2,rgba(255,255,255,.06));color:var(--dsw-alias-label-secondary,#8c8c8c);border:0.5px solid var(--dsw-alias-border-l2,rgba(255,255,255,.1));margin-left:6px;vertical-align:middle;font-weight:normal}
-.dssm-detail-policy{display:flex;flex-direction:column;gap:6px;padding:8px 10px;border-radius:6px;background:var(--dsw-alias-bg-layer-1,rgba(255,255,255,.03));border:0.5px solid var(--dsw-alias-border-l2,rgba(255,255,255,.08));font-size:12px;line-height:18px}
-.dssm-detail-policy-title{font-weight:600;color:var(--dsw-alias-label-primary,#eee)}
-.dssm-detail-policy-grid{display:flex;flex-direction:column;gap:4px}
+.dssm-detail-policy{display:flex;align-items:center;padding:6px 10px;border-radius:6px;background:var(--dsw-alias-bg-layer-1,rgba(255,255,255,.03));border:0.5px solid var(--dsw-alias-border-l2,rgba(255,255,255,.08));font-size:12px;line-height:18px}
 .dssm-detail-policy-item{display:flex;align-items:center;gap:6px}
 .dssm-detail-policy-label{color:var(--dsw-alias-label-tertiary,#8c8c8c);flex:none}
 .dssm-detail-policy-val{color:var(--dsw-alias-label-secondary,#ccc)}
@@ -889,28 +887,16 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
       }
       function renderDetailPolicy(skill: SkillView | null) {
         if (!skill) return null;
-        var declaredKind = skillDeclaredInvocationKind(skill);
-        var effectiveKind = skillEffectiveInvocationKind(skill);
+        var kind = skillDeclaredInvocationKind(skill);
         var colon = t("format.locale") === "zh-CN" ? "：" : ":";
-        var declaredText = declaredKind === 'manual' ? t("detail.policy.manualOnly") :
-                           declaredKind === 'model' ? t("detail.policy.modelOnly") :
-                           declaredKind === 'none' ? t("detail.policy.blocked") :
-                           t("detail.policy.all");
-        var effectiveText = effectiveKind === 'manual' ? t("detail.policy.manualOnly") :
-                            effectiveKind === 'model' ? t("detail.policy.modelOnly") :
-                            effectiveKind === 'none' ? (skill.managerEnabled === false ? t("detail.policy.disabled") : t("detail.policy.blocked")) :
-                            t("detail.policy.all");
+        var text = kind === 'manual' ? t("detail.policy.manualOnly") :
+                   kind === 'model' ? t("detail.policy.modelOnly") :
+                   kind === 'none' ? t("detail.policy.blocked") :
+                   t("detail.policy.all");
         return h("div", { className: "dssm-detail-policy" },
-          h("div", { className: "dssm-detail-policy-title" }, t("detail.invocation")),
-          h("div", { className: "dssm-detail-policy-grid" },
-            h("div", { className: "dssm-detail-policy-item" },
-              h("span", { className: "dssm-detail-policy-label" }, t("detail.declaredPolicy") + colon),
-              h("span", { className: "dssm-detail-policy-val" }, declaredText)
-            ),
-            h("div", { className: "dssm-detail-policy-item" },
-              h("span", { className: "dssm-detail-policy-label" }, t("detail.effectivePolicy") + colon),
-              h("span", { className: "dssm-detail-policy-val" }, effectiveText)
-            )
+          h("div", { className: "dssm-detail-policy-item" },
+            h("span", { className: "dssm-detail-policy-label" }, t("detail.invocation") + colon),
+            h("span", { className: "dssm-detail-policy-val" }, text)
           )
         );
       }

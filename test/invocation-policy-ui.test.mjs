@@ -42,12 +42,10 @@ const requiredKeys = [
   'invocation.manualOnlyTip',
   'invocation.modelOnlyTip',
   'detail.invocation',
-  'detail.declaredPolicy',
-  'detail.effectivePolicy',
   'detail.policy.all',
   'detail.policy.manualOnly',
   'detail.policy.modelOnly',
-  'detail.policy.disabled',
+  'detail.policy.blocked',
 ];
 
 for (const key of requiredKeys) {
@@ -152,21 +150,21 @@ assert.equal(matchSkillQuery(manualOnlySkill, '手动'), true, '仅手动技能�
 assert.equal(matchSkillQuery(manualOnlySkill, '仅手动'), true, '仅手动技能搜仅手动必须命中');
 assert.equal(matchSkillQuery(manualOnlySkill, 'manual'), true, '仅手动技能搜 manual 必须命中');
 
-// 5. 验证详情弹窗调用策略对比组件 renderDetailPolicy
+// 5. 验证详情弹窗调用策略单字段组件 renderDetailPolicy
 const detailPolicyStart = source.indexOf('      function renderDetailPolicy(');
 const detailPolicyEnd = source.indexOf('      function renderSkillStatusIcon(', detailPolicyStart);
 assert.ok(detailPolicyStart >= 0 && detailPolicyEnd > detailPolicyStart, '必须包含 renderDetailPolicy 函数');
 
 const detailPolicyBlock = stripTypeScriptTypes(source.slice(detailPolicyStart, detailPolicyEnd));
 const { renderDetailPolicy } = new Function(
-  'h', 't', 'skillDeclaredInvocationKind', 'skillEffectiveInvocationKind',
+  'h', 't', 'skillDeclaredInvocationKind',
   detailPolicyBlock + '\nreturn { renderDetailPolicy };'
-)(h, tZh, skillDeclaredInvocationKind, skillEffectiveInvocationKind);
+)(h, tZh, skillDeclaredInvocationKind);
 
 assert.equal(renderDetailPolicy(null), null, '空技能对象返回 null');
 
-const policyNodeZh = renderDetailPolicy(disabledManualSkill);
-assert.ok(policyNodeZh, '管理器停用的仅手动技能必须渲染策略栏');
+const policyNodeZh = renderDetailPolicy(manualOnlySkill);
+assert.ok(policyNodeZh, '仅手动技能必须渲染策略栏');
 assert.equal(policyNodeZh.props.className, 'dssm-detail-policy');
 
 // 递归抽取所有叶子文本
@@ -176,16 +174,16 @@ function extractText(node) {
   return (node.children || []).flatMap(extractText);
 }
 const textsZh = extractText(policyNodeZh).join(' ');
-assert.ok(textsZh.includes('源文件声明： 仅手动调用（disable-model-invocation: true）'), '源声明必须准确反映 YAML 声明');
-assert.ok(textsZh.includes('当前生效： 不可调用（受管理器总闸停用阻断）'), '实际生效必须准确反映管理器停用阻断');
+assert.ok(textsZh.includes('调用方式： 仅手动调用（disable-model-invocation: true）'), '单字段调用方式必须准确反映 YAML 声明');
+assert.equal(textsZh.includes('当前生效'), false, '必须清除冗余的当前生效字段');
+assert.equal(textsZh.includes('源文件声明'), false, '必须清除多余的源文件声明对比标签');
 
 const { renderDetailPolicy: renderDetailPolicyEn } = new Function(
-  'h', 't', 'skillDeclaredInvocationKind', 'skillEffectiveInvocationKind',
+  'h', 't', 'skillDeclaredInvocationKind',
   detailPolicyBlock + '\nreturn { renderDetailPolicy };'
-)(h, tEn, skillDeclaredInvocationKind, skillEffectiveInvocationKind);
-const textsEn = extractText(renderDetailPolicyEn(disabledManualSkill)).join(' ');
-assert.ok(textsEn.includes('Declared: Manual only (disable-model-invocation: true)'), '英文环境源声明正常本地化');
-assert.ok(textsEn.includes('Effective: Disabled (blocked by manager switch or source)'), '英文环境生效阻断正常本地化');
+)(h, tEn, skillDeclaredInvocationKind);
+const textsEn = extractText(renderDetailPolicyEn(manualOnlySkill)).join(' ');
+assert.ok(textsEn.includes('Invocation: Manual only (disable-model-invocation: true)'), '英文环境单字段调用方式正常本地化');
 
 // 6. 验证 CSS 样式包含徽标定义
 assert.match(source, /\.dssm-invocation-badge\{/, 'CSS 样式中必须定义 .dssm-invocation-badge');
