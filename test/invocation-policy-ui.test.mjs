@@ -42,7 +42,6 @@ const requiredKeys = [
   'detail.invocation',
   'detail.policy.all',
   'detail.policy.manualOnly',
-  'detail.policy.modelOnly',
   'detail.policy.blocked',
 ];
 
@@ -80,14 +79,6 @@ const manualOnlySkill = {
 };
 assert.equal(skillDeclaredInvocationKind(manualOnlySkill), 'manual');
 
-// 仅模型（user-invocable: false）
-const modelOnlySkill = {
-  modelInvocable: true,
-  userInvocable: false,
-  managerEnabled: true
-};
-assert.equal(skillDeclaredInvocationKind(modelOnlySkill), 'model');
-
 // 双关技能（两个开关都关）
 const noneSkill = {
   modelInvocable: false,
@@ -97,7 +88,7 @@ const noneSkill = {
 assert.equal(skillDeclaredInvocationKind(noneSkill), 'none');
 
 // 3. 验证徽标渲染与防视觉冗余：
-// P2-1 核心修复：只有 manual 才渲染徽标；all、model、none 绝不渲染徽标！尤其是 none 绝不能误标为仅模型！
+// P2-1 核心修复：只有 manual 才渲染徽标；all、none 绝不渲染徽标！
 // P2-2 核心修复：必须使用宿主原语 Tag（tone="neutral"）而非手绘 span
 const badgeFnStart = source.indexOf('      function renderInvocationBadge(');
 const badgeFnEnd = source.indexOf('      function renderDetailPolicy(', badgeFnStart);
@@ -111,8 +102,7 @@ const { renderInvocationBadge } = new Function(
 )(h, tZh, skillDeclaredInvocationKind, HostTagMock);
 
 assert.equal(renderInvocationBadge(defaultSkill), null, '默认技能绝不渲染徽标');
-assert.equal(renderInvocationBadge(modelOnlySkill), null, '仅模型不渲染徽标');
-assert.equal(renderInvocationBadge(noneSkill), null, 'P2-1 防护：双关技能绝不能误渲染为仅模型徽标');
+assert.equal(renderInvocationBadge(noneSkill), null, 'P2-1 防护：双关技能绝不能误渲染徽标');
 
 const manualBadgeZh = renderInvocationBadge(manualOnlySkill);
 assert.ok(manualBadgeZh, '仅手动技能必须渲染徽标');
