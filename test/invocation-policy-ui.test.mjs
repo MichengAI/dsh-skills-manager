@@ -116,16 +116,18 @@ assert.equal(renderInvocationBadge(noneSkill), null, 'P2-1 防护：双关技能
 
 const manualBadgeZh = renderInvocationBadge(manualOnlySkill);
 assert.ok(manualBadgeZh, '仅手动技能必须渲染徽标');
-assert.equal(manualBadgeZh.props.tone, 'neutral', 'P2-2 防护：必须使用宿主 Tag 原语的 neutral tone');
-assert.equal(manualBadgeZh.children[0], '仅手动');
-assert.equal(manualBadgeZh.props.title, '模型不可自动感知；聊天框输入 / 可手动调用');
+assert.equal(manualBadgeZh.props.className, 'dssm-invocation-badge');
+assert.equal(manualBadgeZh.props.title, '模型不可自动感知；聊天框输入 / 可手动调用', 'P2-A 防护：外层 span 必须承载 title 以产生原生 Tooltip');
+const innerTagZh = manualBadgeZh.children[0];
+assert.equal(innerTagZh.props.tone, 'neutral', 'P2-2 防护：内层必须使用宿主 Tag 原语的 neutral tone');
+assert.equal(innerTagZh.children[0], '仅手动');
 
 const { renderInvocationBadge: renderInvocationBadgeEn } = new Function(
   'h', 't', 'skillDeclaredInvocationKind', 'HostTag',
   badgeFnBlock + '\nreturn { renderInvocationBadge };'
 )(h, tEn, skillDeclaredInvocationKind, HostTagMock);
 const manualBadgeEn = renderInvocationBadgeEn(manualOnlySkill);
-assert.equal(manualBadgeEn.children[0], 'Manual only');
+assert.equal(manualBadgeEn.children[0].children[0], 'Manual only');
 
 // 4. 验证搜索匹配支持
 const matchFnStart = source.indexOf('    function matchSkillQuery(');
@@ -217,8 +219,11 @@ const noneRow = renderSkillTested(fakeRoot, { name: 'my-none-tool', ...noneSkill
 const noneBadgeFound = findVNode(noneRow, n => n.props && n.props.className === 'dssm-invocation-badge');
 assert.equal(noneBadgeFound, null, 'P3-3 变异防御：双关技能的列表行 DOM 中绝不能装配徽标');
 
-// 7. 验证 CSS 样式包含徽标定义
+// 7. P3-3 详情弹窗装配层验证（防止 detailSkill 未注入 renderDetailPolicy）
+assert.match(source, /renderDetailPolicy\(detailSkill\)/, 'P3-3 变异防御：详情弹窗必须真实装配 renderDetailPolicy(detailSkill)');
+
+// 8. 验证 CSS 样式包含徽标定义与详情策略定义
 assert.match(source, /\.dssm-invocation-badge\{/, 'CSS 样式中必须定义 .dssm-invocation-badge');
 assert.match(source, /\.dssm-detail-policy\{/, 'CSS 样式中必须定义 .dssm-detail-policy');
 
-console.log('invocation-policy-ui 单元测试全部通过！');
+console.log('invocation-policy-ui 全部 8 项单元测试（含双端装配层与防伪防御）全部通过！');
