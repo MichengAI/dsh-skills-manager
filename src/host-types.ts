@@ -121,19 +121,3 @@ export interface HostContext {
         }) => () => void;
     };
 }
-export interface UpdateOptions {
-    endpoint: string;
-    packageName: string;
-    manifestUrl: URL;
-    isEnabled?: () => Promise<boolean> | boolean;
-}
-export interface UpdateTarget {
-    profileName: string;
-    profileDir: string;
-    cliEntry?: string;
-    desktopPnpm?: Services['desktopPnpm'];
-    packageManager?: { command: string; args: readonly string[]; env?: NodeJS.ProcessEnv };
-    pluginManager?: { installBundle(spec: string): Promise<{ application?: string; error?: { message?: string }; packageResult?: { output?: string } }> };
-    officialDesktop: boolean;
-    canAutoUpdate: boolean;
-}

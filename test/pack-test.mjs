@@ -20,23 +20,25 @@ try {
   // 仅复用已安装依赖，既不下载依赖，也不复制或读取工作区 lib。
   await symlink(join(root, 'node_modules'), join(sandbox, 'node_modules'), process.platform === 'win32' ? 'junction' : 'dir');
   await assert.rejects(access(join(sandbox, 'lib')), { code: 'ENOENT' });
-  const { stdout } = await run(process.execPath, [npm, 'pack', '--json'], {
+  const [packBin, packArgs] = npm.endsWith('.exe') ? [npm, ['pack', '--json']] : [process.execPath, [npm, 'pack', '--json']];
+  const { stdout } = await run(packBin, packArgs, {
     cwd: sandbox, encoding: 'utf8', maxBuffer: 4 * 1024 * 1024, windowsHide: true,
   });
-  // npm 会把 prepack 的构建日志写到 JSON 前面，仅解析独立数组起始行。
-  const jsonStart = stdout.search(/^\[\s*$/m);
-  assert.ok(jsonStart >= 0, 'npm pack 必须返回文件清单');
-  const [pack] = JSON.parse(stdout.slice(jsonStart));
-  const files = new Set(pack.files.map(file => file.path));
+  // npm/pnpm 会把 prepack 的构建日志写到 JSON 前面，解析独立的 JSON 起始行。
+  const jsonStart = stdout.search(/^(\[|\{)\s*$/m);
+  assert.ok(jsonStart >= 0, 'pack 必须返回文件清单');
+  const parsed = JSON.parse(stdout.slice(jsonStart));
+  const pack = Array.isArray(parsed) ? parsed[0] : parsed;
+  const files = new Set((pack.files || []).map(file => typeof file === 'string' ? file : file.path));
   const manifest = JSON.parse(await readFile(join(sandbox, 'package.json'), 'utf8'));
   assert.equal(pack.version, manifest.version);
-  for (const name of ['index', 'client', 'core', 'readonly-discovery', 'plugin-updater', 'repositories', 'repository-updates', 'skills-sh-catalog', 'catalog-skill', 'clawhub-catalog']) {
+  for (const name of ['index', 'client', 'core', 'readonly-discovery', 'repositories', 'repository-updates', 'skills-sh-catalog', 'catalog-skill', 'clawhub-catalog']) {
     assert.ok(files.has(`lib/${name}.js`), `发布包必须包含 ${name} 产物`);
   }
   assert.ok(files.has('cordis.patch.yml'), '发布包必须包含宿主注册补丁');
   assert.ok(![...files].some(file => /^(?:src|test|scripts)\//.test(file) || file.endsWith('.ts') || file === 'tsconfig.json'), '发布包不含源码、测试和开发配置');
   await run(process.execPath, ['--input-type=module', '-e', "await import('./lib/index.js')"], { cwd: sandbox, windowsHide: true });
-  console.log('干净目录打包通过：自动生成全部十项产物，发布入口可加载，无开发文件。');
+  console.log('干净目录打包通过：自动生成全部九项产物，发布入口可加载，无开发文件。');
 } finally {
   // 先移除依赖链接，清理临时目录绝不递归进入真实 node_modules。
   await rm(join(sandbox, 'node_modules'), { force: true, recursive: process.platform === 'win32' });
