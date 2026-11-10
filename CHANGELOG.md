@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.4.1] - 2026-11-10
+
+### New Features
+
+- **Distinguish invocation policy from manager state in skill list**: skills declaring `disable-model-invocation: true` in `SKILL.md` now display a native host "Manual only" badge beside the skill name with an informative hover tooltip (model cannot invoke automatically; manual invocation via / remains available). Standard skills stay visually silent to prevent clutter (#85).
+- **Single-field clarity in skill details**: skill details now feature a dedicated single-line "Invocation" attribute clearly stating whether the skill is "Model + Manual" or "Manual only (disable-model-invocation: true)", eliminating redundant deduced state comparisons (#85).
+- **Search by invocation mode**: typing keywords such as "Manual only" or "manual" in the list search box instantly filters and matches skills declared for manual invocation only (#85).
+
+[中文](CHANGELOG.zh-CN.md)
+
 ## [1.4.0] - 2026-11-09
 
 ### New Features
