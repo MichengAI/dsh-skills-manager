@@ -85,12 +85,6 @@ Options disponibles :
 - **Description** : Affiche une icône permanente **Skills** directement sous **Plugins** dans la barre latérale principale de l'hôte.
 - **Effet** : Ouvre le gestionnaire dans un conteneur centré de 960px dans l'espace de travail principal.
 
-### 2. Verrouillage entreprise et conformité (`updater` / `onlineUpdate`)
-- **Configuration** : Pour les environnements d'entreprise stricts, vous pouvez désactiver les mises à jour via le patch Cordis :
-  ```yaml
-  updater: false # ou onlineUpdate: false
-  ```
-- **Effet** : Désactive totalement l'API de mise à jour du plugin (renvoie `HTTP 403 Forbidden`).
 
 ## Guide d'utilisation
 

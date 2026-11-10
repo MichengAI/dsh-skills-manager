@@ -85,12 +85,6 @@ Verfügbare Optionen:
 - **Beschreibung**: Zeigt ein dauerhaftes **Skills**-Navigationssymbol direkt unter **Plugins** in der primären Seitenleiste an.
 - **Wirkung**: Öffnet den Manager direkt im Hauptarbeitsbereich in einem zentrierten 960px-Container.
 
-### 2. Unternehmens- und Compliance-Sperre (`updater` / `onlineUpdate`)
-- **Konfiguration**: In Unternehmensumgebungen kann die Update-Schnittstelle über Cordis deaktiviert werden:
-  ```yaml
-  updater: false # oder onlineUpdate: false
-  ```
-- **Wirkung**: Deaktiviert die Update-API vollständig zur Laufzeit (Antwort `HTTP 403 Forbidden`).
 
 ## Bedienungsanleitung
 

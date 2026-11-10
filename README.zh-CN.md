@@ -94,12 +94,6 @@ dsh plugin --profile web add @michengai/dsh-skills-manager@latest --registry=htt
   - 关闭后安全注销侧栏槽位；
   - 无论是否开启侧栏入口，DSH 原有的「设置 → 技能」入口始终保留，两处界面数据与状态 100% 实时同步。
 
-### 2. 企业安全与合规环境锁定 (`updater` / `onlineUpdate`)
-- **配置方式**：面向精选插件索引或企业安全合规环境，支持直接在 Cordis 配置文件（bundle patch）中声明：
-  ```yaml
-  updater: false # 或 onlineUpdate: false
-  ```
-- **生效效果**：在底层完全禁用插件更新接口（返回 `HTTP 403` 禁用状态），彻底杜绝未经审核的更新请求。
 
 ## 使用指南
 

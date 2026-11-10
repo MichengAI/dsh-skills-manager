@@ -2077,7 +2077,7 @@ function defaultManagerState(): ManagerState {
     disabledSkills[root.key] = [];
     enabledSkills[root.key] = [];
   }
-  return { version: 1, sources, disabledSkills, enabledSkills, sidebarEntry: false, onlineUpdate: true, categories: Object.create(null), categoryMembers: Object.create(null), categoryOrder: Object.create(null), customNotes: Object.create(null) };
+  return { version: 1, sources, disabledSkills, enabledSkills, sidebarEntry: false, categories: Object.create(null), categoryMembers: Object.create(null), categoryOrder: Object.create(null), customNotes: Object.create(null) };
 }
 
 function validStateSkillName(name: unknown): name is string {
@@ -2126,7 +2126,6 @@ function validManagerStateDocument(value: ManagerState) {
   )
     return false;
   if (value.sidebarEntry !== undefined && typeof value.sidebarEntry !== "boolean") return false;
-  if (value.onlineUpdate !== undefined && typeof value.onlineUpdate !== "boolean") return false;
   for (const root of userRoots()) {
     if (root.key === "dsh") {
       if (value.sources.dsh !== undefined && typeof value.sources.dsh !== "boolean") return false;
@@ -2207,9 +2206,6 @@ function normalizeManagerState(value: ManagerState) {
     return normalized;
   if (typeof value.sidebarEntry === "boolean") {
     normalized.sidebarEntry = value.sidebarEntry;
-  }
-  if (typeof value.onlineUpdate === "boolean") {
-    normalized.onlineUpdate = value.onlineUpdate;
   }
   for (const root of userRoots()) {
     if (
@@ -2447,24 +2443,6 @@ export async function setSidebarEntry(enabled: boolean): Promise<boolean> {
     throw codedError("sidebarEntry must be a boolean", "error.proto.invalidParams");
   }
   await setEntryLocation(enabled ? "both" : "settings");
-  return enabled;
-}
-
-export async function getOnlineUpdate(): Promise<boolean> {
-  const current = await readManagerState();
-  return current.state.onlineUpdate !== false;
-}
-
-export async function setOnlineUpdate(enabled: boolean): Promise<boolean> {
-  if (typeof enabled !== "boolean") {
-    throw codedError("onlineUpdate must be a boolean", "error.proto.invalidParams");
-  }
-  const current = await readManagerState();
-  if (current.writable === false) {
-    throw codedError("manager state file is read-only", "error.state.invalid");
-  }
-  current.state.onlineUpdate = enabled;
-  await writeManagerState(current.state);
   return enabled;
 }
 

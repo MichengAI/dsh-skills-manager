@@ -87,12 +87,6 @@ Opciones de configuración disponibles:
 - **Descripción**: Muestra un icono permanente de **Skills** directamente debajo de **Plugins** en la barra lateral principal izquierda.
 - **Efecto**: Abre el administrador en un contenedor centrado de 960px en el espacio de trabajo principal sin restricciones de scroll.
 
-### 2. Bloqueo empresarial y de cumplimiento (`updater` / `onlineUpdate`)
-- **Configuración**: Para entornos empresariales con directivas estrictas, puedes declararlo directamente en la configuración de parches Cordis:
-  ```yaml
-  updater: false # o onlineUpdate: false
-  ```
-- **Efecto**: Desactiva totalmente la API de actualización del plugin (respondiendo `HTTP 403 Forbidden`), impidiendo peticiones de actualización no auditadas.
 
 ## Guía de uso
 

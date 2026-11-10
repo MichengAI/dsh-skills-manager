@@ -85,12 +85,6 @@ Opções disponíveis:
 - **Descrição**: Exibe um ícone permanente de **Skills** logo abaixo de **Plugins** na barra lateral primária.
 - **Efeito**: Abre o gerenciador em um contêiner centralizado de 960px no espaço de trabalho principal.
 
-### 2. Bloqueio corporativo e de conformidade (`updater` / `onlineUpdate`)
-- **Configuração**: Em ambientes corporativos, a interface de atualizações pode ser desativada diretamente no Cordis:
-  ```yaml
-  updater: false # ou onlineUpdate: false
-  ```
-- **Efeito**: Desativa totalmente a API de atualização do plugin (retornando `HTTP 403 Forbidden`).
 
 ## Guia de uso
 
