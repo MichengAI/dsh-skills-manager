@@ -239,6 +239,8 @@ const fakeDetailData = { name: 'my-manual-tool', declaredName: 'My Manual Tool',
 const renderedModalVNode = makeDetailModal('detail', fakeDetailData, manualOnlySkill);
 const detailPolicyVNode = findVNode(renderedModalVNode, n => n.props && n.props.className === 'dssm-detail-policy');
 assert.ok(detailPolicyVNode, 'P3-3 变异防御：详情弹窗真实渲染 DOM 树中必须存在 .dssm-detail-policy 结构节点');
+const modalPolicyTexts = extractText(detailPolicyVNode).join(' ');
+assert.ok(modalPolicyTexts.includes(DICT.zh['detail.policy.manualOnly']), 'P3-3 变异防御：详情弹窗真实装配必须传入 detailSkill 并渲染对应策略文案，防止误传 detail 导致文案错误');
 
 // 8. 验证 CSS 样式包含徽标定义与详情策略定义
 assert.match(source, /\.dssm-invocation-badge\{/, 'CSS 样式中必须定义 .dssm-invocation-badge');

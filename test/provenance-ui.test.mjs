@@ -106,7 +106,7 @@ const makeSkill = new Function('env', `
   const { h, t, filters } = env;
   const isSkillEnabled = () => true, busy = false, allRoots = [], draggingRef = { current: null };
   const moreIcon = () => null, SourceSelect = function SourceSelect() {}, SkillSwitch = function SkillSwitch() {};
-  const renderSkillStatusIcon = () => null, enableSwitch = () => h('switch', {}), renderLinkedNote = () => null, renderFallback = () => null;
+  const renderSkillStatusIcon = () => null, enableSwitch = () => h('switch', {}), renderLinkedNote = () => null, renderFallback = () => null, renderInvocationBadge = () => null;
   const iconButton = (label) => h('button', { 'aria-label': label }), strokeIcon = () => null, canToggleSource = () => true;
   ${skillFns}
   return { renderSkill, sourceExtra };
@@ -145,10 +145,17 @@ const identityOnly = ui.collectProvenanceRoots()[0].repos.find(group => group.ro
 assert.equal(identityOnly.fallback, false, 'identity alone is known provenance');
 
 // 验证 matchSkillQuery / filterSkills 包含仓库名与仓库内目录 (P3-5 覆盖)
+const dictMatch = source.match(/var DICT\s*=\s*(\{[\s\S]*?\n    \});/);
+assert.ok(dictMatch, 'DICT 定义必须存在');
+const DICT = new Function(`return ${dictMatch[1]};`)();
+const fnStart = source.indexOf('    function skillDeclaredInvocationKind(');
+const fnEnd = source.indexOf('    function isSkillEnabled(', fnStart);
+const skillDeclaredInvocationKind = new Function(stripTypeScriptTypes(source.slice(fnStart, fnEnd)) + '\nreturn skillDeclaredInvocationKind;')();
+
 const searchMatchStart = source.indexOf('    function normalizeSkillQuery(');
 const searchMatchEnd = source.indexOf('    function visibleSkillRoots<', searchMatchStart);
 const searchFns = stripTypeScriptTypes(source.slice(searchMatchStart, searchMatchEnd));
-const { matchSkillQuery, filterSkills } = new Function(searchFns + '\nreturn { matchSkillQuery, filterSkills };')();
+const { matchSkillQuery, filterSkills } = new Function('DICT', 'skillDeclaredInvocationKind', searchFns + '\nreturn { matchSkillQuery, filterSkills };')(DICT, skillDeclaredInvocationKind);
 const testRow = { name: 'my-tool', provenance: { repo: 'acme/super-repo', category: 'devops', path: 'skills/devops/my-tool' } };
 assert.ok(matchSkillQuery(testRow, 'super-repo'), '可根据来源仓库名搜索到技能');
 assert.ok(matchSkillQuery(testRow, 'devops'), '可根据来源仓库内分类目录搜索到技能');

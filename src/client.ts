@@ -267,8 +267,8 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
       var q = normalizeSkillQuery(query);
       if (!q) return true;
       var prov = skill.provenance;
-      var kind = typeof skillDeclaredInvocationKind === "function" ? skillDeclaredInvocationKind(skill) : 'all';
-      var invocationLabels = kind === 'manual' ? ["仅手动", "manual only", "manual", "手动"] : kind === 'model' ? ["仅模型", "model only", "model", "模型"] : [];
+      var kind = skillDeclaredInvocationKind(skill);
+      var invocationLabels = kind === 'manual' ? [DICT.zh["invocation.manualOnly"], DICT.en["invocation.manualOnly"], "manual only", "manual", "手动", "仅手动"] : [];
       return [
         skill.name,
         skill.declaredName,
@@ -1000,7 +1000,7 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
           }
         },
         canDrag ? h("div", { className: "dssm-drag-handle", title: t("category.dragTip") }, "⋮⋮") : null,
-        h("div", { className: "dssm-skill-copy" }, h("div", { className: "dssm-name" }, skillName, typeof renderInvocationBadge === "function" ? renderInvocationBadge(skill) : null), h("div", { className: "dssm-skill-desc" + (hasCustomNote ? " dssm-custom-note" : ""), title: descTitle }, description), renderLinkedNote(skill), renderFallback(skill)), h("div", { className: "dssm-skill-actions" }, skillActions));
+        h("div", { className: "dssm-skill-copy" }, h("div", { className: "dssm-name" }, skillName, renderInvocationBadge(skill)), h("div", { className: "dssm-skill-desc" + (hasCustomNote ? " dssm-custom-note" : ""), title: descTitle }, description), renderLinkedNote(skill), renderFallback(skill)), h("div", { className: "dssm-skill-actions" }, skillActions));
       }
       var rows = roots.flatMap(function (root) { return (root.skills || []).map(function (skill) { return { root: root, skill: skill }; }); });
       var filteredRows = rows.filter(function (row) { return (!activeSource || row.root.key === activeSource) && (!filters.status || skillStatus(row.skill) === filters.status) && matchSkillQuery(Object.assign({}, row.skill, { rootLabel: rootDisplayName(t, row.root) }), query); });
