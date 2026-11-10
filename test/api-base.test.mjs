@@ -101,12 +101,12 @@ if (typeof resolveApiUrl === "function") {
     );
   });
 
-  // 4. 更新检查端点同样走该解析。
+  // 4. 管理端点同样走该解析。
   withBase("https://nas.example.com/app/dsh/", () => {
     eq(
-      resolveApiUrl("/api/michengai/dsh-skills-manager/update"),
-      "https://nas.example.com/app/dsh/api/michengai/dsh-skills-manager/update",
-      "update endpoint resolves against the same base",
+      resolveApiUrl("/api/michengai/dsh-skills-manager/sidebar-entry"),
+      "https://nas.example.com/app/dsh/api/michengai/dsh-skills-manager/sidebar-entry",
+      "management endpoint resolves against the same base",
     );
   });
 
