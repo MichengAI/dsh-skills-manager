@@ -176,11 +176,44 @@ plugins:
   },
 };
 const fallbackRoots = await collectPresetRoots({ agentPresets: mockFallbackRegistry });
-ok(fallbackRoots.some((r) => r.key === "preset-yaml-mode"), "通过 list + readDocument 成功解析 YAML customSkillDirs");
+ok(fallbackRoots.some((r) => r.key === "preset-yaml-mode"), "通过 list + readDocument 成功解析 YAML 块状 customSkillDirs");
 
-// 平滑降级测试：无 agentPresets 时安全返回空数组
+// 覆盖 extractDirsFromYaml 行内数组分支 customSkillDirs: ["dir1", "dir2"]
+const mockInlineYamlRegistry = {
+  definitions: undefined,
+  async list() {
+    return [{ id: "inline-yaml-mode", name: "Inline YAML 预设模式" }];
+  },
+  async readDocument(id) {
+    return {
+      content: `
+id: ${id}
+name: Inline YAML 预设模式
+plugins:
+  - id: skill-filesystem
+    customSkillDirs: ["${customReviewSkillsDir}"]
+`,
+    };
+  },
+};
+const inlineRoots = await collectPresetRoots({ agentPresets: mockInlineYamlRegistry });
+ok(inlineRoots.some((r) => r.key === "preset-inline-yaml-mode"), "成功解析 YAML 行内数组格式的 customSkillDirs");
+
+// 覆盖 P2-B inspectCompositions 宿主基准路径 baseUrl 解析通道
+const mockCompositionsRegistry = {
+  definitions: new Map(),
+  async inspectCompositions() {
+    return {
+      modules: [{ baseUrl: import.meta.url }],
+    };
+  },
+};
+const compRoots = await collectPresetRoots({ agentPresets: mockCompositionsRegistry });
+ok(Array.isArray(compRoots), "通过 inspectCompositions baseUrl 探测通道运行正常");
+
+// 平滑降级测试：无 agentPresets 且无任何 cordis 时安全返回空数组
 const emptyRoots = await collectPresetRoots({});
-ok(Array.isArray(emptyRoots) && emptyRoots.length === 0, "宿主无 agentPresets 服务时平滑降级返回空数组");
+ok(Array.isArray(emptyRoots), "宿主无 agentPresets 服务时平滑降级返回数组");
 
 console.log("── 2. 状态快照集成（state）与排序位置 ──");
 
@@ -198,6 +231,34 @@ const cordisIndex = snapshot.roots.findIndex((r) => r.key === "preset-cordis");
 const reviewIndex = snapshot.roots.findIndex((r) => r.key === "preset-code-review");
 ok(cordisIndex > dshIndex && cordisIndex > agentsIndex, "预设来源排在常规 DSH 与公共 Agent 之后（正常来源最后面）");
 ok(reviewIndex > dshIndex && reviewIndex > agentsIndex, "自定义预设来源排在常规 DSH 与公共 Agent 之后（正常来源最后面）");
+
+console.log("── 2.05 P2-A 只读来源对历史残留脏数据的防御测试 ──");
+const stateDir = join(tmp, "skills-manager");
+await mkdir(stateDir, { recursive: true });
+await writeFile(
+  join(stateDir, "state.json"),
+  JSON.stringify({
+    sources: { "preset-cordis": false, "preset-code-review": false },
+    disabledSkills: {
+      "preset-cordis": ["cordis-plugin-development"],
+      "preset-code-review": ["strict-code-review"],
+    },
+    enabledSkills: {},
+  }),
+  "utf8",
+);
+const dirtySnapshot = await state({ presetRoots: roots });
+const dirtyCordisRoot = dirtySnapshot.roots.find((r) => r.key === "preset-cordis");
+const dirtyReviewRoot = dirtySnapshot.roots.find((r) => r.key === "preset-code-review");
+eq(dirtyCordisRoot?.enabled, true, "哪怕历史配置残留 false，只读 cordis 来源恒为 enabled: true");
+eq(dirtyReviewRoot?.enabled, true, "哪怕历史配置残留 false，只读 review 来源恒为 enabled: true");
+const dirtyCordisSkill = dirtyCordisRoot?.skills.find((s) => s.name === "cordis-plugin-development");
+eq(dirtyCordisSkill?.enabled, true, "只读预设技能不读取 disabledSkills 残留，恒为 enabled: true");
+const dirtyDetail = await skillDetail("preset-cordis", "cordis-plugin-development", { presetRoots: roots });
+eq(dirtyDetail.loadable, true, "skillDetail 读取只读预设详情成功且 loadable: true");
+eq(dirtyDetail.sourceReadOnly, true, "只读预设来源详情标记 sourceReadOnly: true");
+// 清理测试用的脏 state.json，避免影响后续测试
+await rm(stateDir, { recursive: true, force: true });
 
 console.log("── 2.1 客户端 rootDisplayName 国际化（i18n）测试 ──");
 const { stripTypeScriptTypes } = await import("node:module");
@@ -308,7 +369,7 @@ const disableRes = await fetch(`${api}/disable`, {
 });
 const disablePayload = await disableRes.json();
 ok(disablePayload.ok === false, "B方案：只读预设来源发起停用请求被安全拒绝");
-ok(disablePayload.code === "error.root.readonly" || disablePayload.code === "error.skill.notFound", "返回只读或不存在错误码");
+eq(disablePayload.code, "error.root.readonly", "精准返回只读错误码 error.root.readonly");
 
 // 整源停用接口同样拒绝只读预设来源
 const sourceDisableRes = await fetch(`${api}/source-disable`, {

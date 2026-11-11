@@ -2140,9 +2140,9 @@ function validManagerStateDocument(value: ManagerState) {
     if (!Array.isArray(list) || list.some((name) => !validStateSkillName(name)))
       return false;
   }
-  // 项目来源键与预设来源键允许缺省（默认开启），但显式值必须与全局来源一样严格校验。
+  // 项目来源键允许缺省（默认开启），但显式值必须与全局来源一样严格校验。
   for (const [key, flag] of Object.entries(value.sources)) {
-    if ((PROJECT_ROOT_KEY_RE.test(key) || key.startsWith("preset-")) && typeof flag !== "boolean") return false;
+    if (PROJECT_ROOT_KEY_RE.test(key) && typeof flag !== "boolean") return false;
   }
   const enabledSkills = value.enabledSkills || {};
   for (const key of new Set([
@@ -2230,7 +2230,7 @@ function normalizeManagerState(value: ManagerState) {
   }
   if (value.sources && typeof value.sources === "object" && !Array.isArray(value.sources)) {
     for (const [key, flag] of Object.entries(value.sources)) {
-      if ((PROJECT_ROOT_KEY_RE.test(key) || key.startsWith("preset-")) && !key.startsWith("project-dsh:") && typeof flag === "boolean")
+      if (PROJECT_ROOT_KEY_RE.test(key) && !key.startsWith("project-dsh:") && typeof flag === "boolean")
         normalized.sources[key] = flag;
     }
   }
@@ -2238,7 +2238,7 @@ function normalizeManagerState(value: ManagerState) {
     const source = value[field];
     if (source && typeof source === "object" && !Array.isArray(source)) {
       for (const [key, list] of Object.entries(source)) {
-        if ((!PROJECT_ROOT_KEY_RE.test(key) && !key.startsWith("preset-")) || !Array.isArray(list)) continue;
+        if (!PROJECT_ROOT_KEY_RE.test(key) || !Array.isArray(list)) continue;
         normalized[field][key] = [
           ...new Set(list.filter(validStateSkillName)),
         ].sort();
@@ -2377,16 +2377,20 @@ function managerSkillOverride(policy: ManagerState, rootKey: string, name: strin
 }
 
 function effectiveSkillPolicy(policyResult: PolicyResult, root: SkillRoot, entry: SkillEntry): Policy {
-  const override = managerSkillOverride(
-    policyResult.state,
-    root.key,
-    entry.name,
-    entry.policyAliases,
-  );
+  const isReadonlyPreset = root.kind === "preset";
+  const override = isReadonlyPreset
+    ? undefined
+    : managerSkillOverride(
+        policyResult.state,
+        root.key,
+        entry.name,
+        entry.policyAliases,
+      );
   const sourceEnabled =
+    isReadonlyPreset ||
     root.kind === "project-dsh" ||
     policyResult.state.sources[root.key] !== false;
-  if (policyResult.writable === false || !sourceEnabled || override === false) {
+  if ((!isReadonlyPreset && policyResult.writable === false) || !sourceEnabled || override === false) {
     return {
       override,
       sourceEnabled,
@@ -4424,9 +4428,11 @@ export async function state(options: ScopeOptions = {}) {
       exists,
       truncated: truncated === true,
       enabled:
-        policyResult.writable !== false &&
-        (root.kind === "project-dsh" ||
-          policyResult.state.sources[root.key] !== false),
+        root.kind === "preset"
+          ? true
+          : policyResult.writable !== false &&
+            (root.kind === "project-dsh" ||
+              policyResult.state.sources[root.key] !== false),
       skills,
       categories: policyResult.state.categories[root.key] || [],
       categoryOrder: policyResult.state.categoryOrder[root.key] || {},

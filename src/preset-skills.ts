@@ -77,14 +77,29 @@ async function isExistingDir(path: string): Promise<boolean> {
 
 /**
  * 探测官方内置创造模式（Cordis）随包出货的技能目录。
- * 遵循跨平台安全原则，优先使用模块解析与运行时资源路径，绝不写死任何盘符或产品专有绝对路径。
+ * 遵循跨平台安全原则，优先使用宿主运行时模块基址及标准模块解析，绝不写死任何盘符或产品专有绝对路径。
  */
-async function findCordisSkillsDir(explicitDir?: string): Promise<string | undefined> {
+async function findCordisSkillsDir(explicitDir?: string, hostBaseUrls?: string[]): Promise<string | undefined> {
   if (explicitDir && (await isExistingDir(explicitDir))) {
     return resolve(explicitDir);
   }
 
-  // 1. 本地动态模块解析：从 @deepseek-ai/dsh-agent-preset 直接解析
+  // 1. 优先从宿主当前环境的基准路径 baseUrl 解析（对齐宿主 YAML 原生行为）
+  if (Array.isArray(hostBaseUrls)) {
+    for (const base of hostBaseUrls) {
+      if (!base || typeof base !== "string") continue;
+      try {
+        const req = createRequire(base);
+        const p = req.resolve("@deepseek-ai/dsh-agent-preset/package.json");
+        const candidate = join(dirname(p), "skills");
+        if (!candidate.includes(".asar") && (await isExistingDir(candidate))) {
+          return resolve(candidate);
+        }
+      } catch {}
+    }
+  }
+
+  // 2. 本地动态模块解析：从 @deepseek-ai/dsh-agent-preset 直接解析
   try {
     const req = createRequire(import.meta.url);
     const p = req.resolve("@deepseek-ai/dsh-agent-preset/package.json");
@@ -94,28 +109,13 @@ async function findCordisSkillsDir(explicitDir?: string): Promise<string | undef
     }
   } catch {}
 
-  // 2. 从 @deepseek-ai/dsh 依赖内部解析
+  // 3. 从 @deepseek-ai/dsh 依赖内部解析
   try {
     const req = createRequire(import.meta.url);
     const dshPkg = req.resolve("@deepseek-ai/dsh/package.json");
     const candidate = join(dirname(dshPkg), "node_modules", "@deepseek-ai", "dsh-agent-preset", "skills");
     if (!candidate.includes(".asar") && (await isExistingDir(candidate))) {
       return resolve(candidate);
-    }
-  } catch {}
-
-  // 3. 从 Electron 宿主运行时资源目录 resourcesPath 动态推导
-  try {
-    const resourcesPath = (process as unknown as { resourcesPath?: string }).resourcesPath;
-    if (resourcesPath) {
-      const candidates = [
-        join(resourcesPath, "app.asar.unpacked", "node_modules", "@deepseek-ai", "dsh-agent-preset", "skills"),
-        join(resourcesPath, "runtime", "primary-runtime", "node_modules", "@deepseek-ai", "dsh-agent-preset", "skills"),
-        join(resourcesPath, "runtime", "node_modules", "@deepseek-ai", "dsh-agent-preset", "skills"),
-      ];
-      for (const c of candidates) {
-        if (await isExistingDir(c)) return resolve(c);
-      }
     }
   } catch {}
 
@@ -138,7 +138,28 @@ export async function collectPresetRoots(ctx: unknown, options: PresetRootsOptio
     ? (typeof hostCtx.get === "function" ? (hostCtx.get("agentPresets") as any) : (hostCtx.agentPresets as any))
     : undefined;
 
-  if (!agentPresets) return [];
+  const hostBaseUrls: string[] = [];
+  if (agentPresets) {
+    if (typeof agentPresets.inspectCompositions === "function") {
+      try {
+        const comps = await agentPresets.inspectCompositions();
+        if (Array.isArray(comps?.modules)) {
+          for (const m of comps.modules) {
+            if (m?.baseUrl && typeof m.baseUrl === "string") hostBaseUrls.push(m.baseUrl);
+          }
+        }
+      } catch {}
+    }
+    if (typeof agentPresets.baseUrl === "string") hostBaseUrls.push(agentPresets.baseUrl);
+  }
+  if (hostCtx && typeof (hostCtx as any).baseUrl === "string") {
+    hostBaseUrls.push((hostCtx as any).baseUrl);
+  }
+
+  // 探测内置创造模式随包技能物理路径（支持 options.cordisSkillsDir 与宿主 baseUrl 动态解析）
+  const cordisBundledSkillsDir = await findCordisSkillsDir(options.cordisSkillsDir, hostBaseUrls);
+
+  if (!agentPresets && !cordisBundledSkillsDir) return [];
 
   const presetConfigs: Array<{ id: string; name?: string; description?: string; plugins?: unknown[]; rawYaml?: string }> = [];
 
@@ -181,9 +202,6 @@ export async function collectPresetRoots(ctx: unknown, options: PresetRootsOptio
       } catch {}
     }
   }
-
-  // 探测内置创造模式随包技能物理路径（支持 options.cordisSkillsDir 注入）
-  const cordisBundledSkillsDir = await findCordisSkillsDir(options.cordisSkillsDir);
 
   // 如果未能从 agentPresets 中枚举到 cordis 预设（或 agentPresets 尚未就绪），但本地存在创造模式技能目录，作为内置预设保底提供
   if (!presetConfigs.some((p) => p.id === "cordis") && cordisBundledSkillsDir) {
