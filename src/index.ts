@@ -214,11 +214,13 @@ function activeSessionCwds(ctx: HostContext, sessionId: unknown) {
 }
 
 /**
- * 预设根解析带 2s 短 TTL + in-flight 去重：provider 热路径及常规路由优先走缓存，
- * 管理端 `/state`（forceRefresh=true）、写后操作、预设切换事件以及查无目标预设时自动穿透强制刷新。
+ * 预设根解析带 2s 短 TTL + in-flight 去重 + 1.5s miss 穿透冷却（负缓存）：
+ * provider 热路径及常规路由优先走缓存；`/state`（forceRefresh=true）、写后操作、预设切换事件强制失效刷新；
+ * 当 `preset-*` 在缓存中未命中时，仅在距上次真实刷新已超过冷却期时才穿透强刷，防连续无效 key 放大扫盘。
  */
 const PRESET_ROOTS_TTL_MS = 2000;
-const presetRootsCache = new WeakMap<object, { expiresAt: number; roots?: SkillRoot[]; pending?: Promise<SkillRoot[]> }>();
+const MISS_REFRESH_COOLDOWN_MS = 1500;
+const presetRootsCache = new WeakMap<object, { expiresAt: number; refreshedAt: number; roots?: SkillRoot[]; pending?: Promise<SkillRoot[]> }>();
 
 function invalidatePresetRootsCache(hostCtx?: HostContext) {
   if (hostCtx && typeof hostCtx === "object") presetRootsCache.delete(hostCtx);
@@ -234,15 +236,25 @@ async function getPresetRootsCached(hostCtx: HostContext, forceRefresh = false):
   }
   const pending = collectPresetRoots(hostCtx)
     .then((roots) => {
-      presetRootsCache.set(hostCtx, { expiresAt: Date.now() + PRESET_ROOTS_TTL_MS, roots });
+      const doneAt = Date.now();
+      presetRootsCache.set(hostCtx, { expiresAt: doneAt + PRESET_ROOTS_TTL_MS, refreshedAt: doneAt, roots });
       return roots;
     })
     .catch((err) => {
       presetRootsCache.delete(hostCtx);
       throw err;
     });
-  presetRootsCache.set(hostCtx, { expiresAt: now + PRESET_ROOTS_TTL_MS, roots: forceRefresh ? undefined : entry?.roots, pending });
+  presetRootsCache.set(hostCtx, { expiresAt: now + PRESET_ROOTS_TTL_MS, refreshedAt: entry?.refreshedAt ?? 0, roots: forceRefresh ? undefined : entry?.roots, pending });
   return pending;
+}
+
+async function getPresetRootsOnMiss(hostCtx: HostContext): Promise<SkillRoot[]> {
+  if (!hostCtx || typeof hostCtx !== "object") return [];
+  const entry = presetRootsCache.get(hostCtx);
+  if (entry?.roots && Date.now() - entry.refreshedAt < MISS_REFRESH_COOLDOWN_MS) {
+    return entry.roots;
+  }
+  return getPresetRootsCached(hostCtx, true);
 }
 
 async function resolveAgentPresetScope(
@@ -475,7 +487,7 @@ function apply(ctx: HostContext, config?: PluginConfig) {
     const hit = presets.find((root) => root.key === key);
     if (hit) return hit;
     if (key.startsWith("preset-")) {
-      return (await getPresetRootsCached(ctx, true)).find((root) => root.key === key);
+      return (await getPresetRootsOnMiss(ctx)).find((root) => root.key === key);
     }
     return undefined;
   };
@@ -642,7 +654,7 @@ function apply(ctx: HostContext, config?: PluginConfig) {
           const matchesPreset = (rootsList: SkillRoot[]) => typeof b.root === "string" && rootsList.some((r) => r.key === b.root && r.mutable && r.native === false);
           let isValidPreset = matchesPreset(await getPresetRootsCached(ctx));
           if (!isValidPreset && typeof b.root === "string" && b.root.startsWith("preset-")) {
-            isValidPreset = matchesPreset(await getPresetRootsCached(ctx, true));
+            isValidPreset = matchesPreset(await getPresetRootsOnMiss(ctx));
           }
           if (!isValidPreset) throw Object.assign(new Error("技能安装位置无效"), { statusCode: 400, code: "error.repo.invalid" });
         }

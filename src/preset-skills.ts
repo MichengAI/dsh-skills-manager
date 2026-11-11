@@ -86,7 +86,7 @@ export function isHostBuiltinLocation(pathOrUrl?: string): boolean {
   if (normalized.includes(".asar")) return true;
   if (/\/node_modules\/@deepseek-ai(?:\/|$)/.test(normalized)) return true;
   if (/\/dsh-runtime(?:\/|$)/.test(normalized)) return true;
-  if (/(?:^|\/)resources(?:\/|$)/.test(normalized)) return true;
+  if (/(?:^|\/)resources\/app(?:\/|$)/.test(normalized)) return true;
   const resourcesPath = (process as { resourcesPath?: unknown }).resourcesPath;
   if (typeof resourcesPath === "string" && resourcesPath.trim()) {
     const resPrefix = resourcesPath.replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();

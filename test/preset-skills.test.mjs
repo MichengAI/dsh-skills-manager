@@ -970,13 +970,30 @@ await writeFile(
   "---\nname: base-skill\ndescription: 宿主baseUrl加载的新预设\n---\n内容",
   "utf8",
 );
-const resourcesSkillsDir = join(tmp, "resources", "skills");
-await mkdir(join(resourcesSkillsDir, "res-skill"), { recursive: true });
+const resourcesAppSkillsDir = join(tmp, "resources", "app", "skills");
+await mkdir(join(resourcesAppSkillsDir, "res-app-skill"), { recursive: true });
 await writeFile(
-  join(resourcesSkillsDir, "res-skill", "SKILL.md"),
-  "---\nname: res-skill\ndescription: 宿主resources目录内置预设技能\n---\n内容",
+  join(resourcesAppSkillsDir, "res-app-skill", "SKILL.md"),
+  "---\nname: res-app-skill\ndescription: 宿主resources/app目录内置预设技能\n---\n内容",
   "utf8",
 );
+const userResourcesSkillsDir = join(tmp, "my-project", "resources", "preset-skills");
+await mkdir(join(userResourcesSkillsDir, "user-res-skill"), { recursive: true });
+await writeFile(
+  join(userResourcesSkillsDir, "user-res-skill", "SKILL.md"),
+  "---\nname: user-res-skill\ndescription: 用户项目下同名resources目录的自定义预设技能\n---\n内容",
+  "utf8",
+);
+const fakeElectronResourcesDir = join(tmp, "fake-electron-resources");
+const fakeElectronSkillsDir = join(fakeElectronResourcesDir, "skills");
+await mkdir(join(fakeElectronSkillsDir, "electron-res-skill"), { recursive: true });
+await writeFile(
+  join(fakeElectronSkillsDir, "electron-res-skill", "SKILL.md"),
+  "---\nname: electron-res-skill\ndescription: 宿主process.resourcesPath下内置预设技能\n---\n内容",
+  "utf8",
+);
+const prevResourcesPath = Object.getOwnPropertyDescriptor(process, "resourcesPath");
+Object.defineProperty(process, "resourcesPath", { value: fakeElectronResourcesDir, configurable: true });
 const futureBuiltinPresets = {
   definitions: new Map([
     [
@@ -1001,30 +1018,61 @@ const futureBuiltinPresets = {
       },
     ],
     [
-      "res-mode",
+      "res-app-mode",
       {
         config: {
-          id: "res-mode",
-          name: "资源目录模式",
-          plugins: [{ id: "skill-filesystem", config: { customSkillDirs: [resourcesSkillsDir] } }],
+          id: "res-app-mode",
+          name: "宿主资源App目录模式",
+          plugins: [{ id: "skill-filesystem", config: { customSkillDirs: [resourcesAppSkillsDir] } }],
+        },
+      },
+    ],
+    [
+      "electron-res-mode",
+      {
+        config: {
+          id: "electron-res-mode",
+          name: "Electron资源根目录模式",
+          plugins: [{ id: "skill-filesystem", config: { customSkillDirs: [fakeElectronSkillsDir] } }],
+        },
+      },
+    ],
+    [
+      "user-res-mode",
+      {
+        config: {
+          id: "user-res-mode",
+          name: "用户项目resources自定义模式",
+          plugins: [{ id: "skill-filesystem", config: { customSkillDirs: [userResourcesSkillsDir] } }],
         },
       },
     ],
   ]),
 };
 const futureRoots = await collectPresetRoots({ get: (k) => (k === "agentPresets" ? futureBuiltinPresets : undefined) });
+if (prevResourcesPath) {
+  Object.defineProperty(process, "resourcesPath", prevResourcesPath);
+} else {
+  delete process.resourcesPath;
+}
 const futureReviewRoot = futureRoots.find((r) => r.key === "preset-deep-review");
 const futureBaseRoot = futureRoots.find((r) => r.key === "preset-host-base-mode");
-const futureResRoot = futureRoots.find((r) => r.key === "preset-res-mode");
+const futureResAppRoot = futureRoots.find((r) => r.key === "preset-res-app-mode");
+const futureElectronResRoot = futureRoots.find((r) => r.key === "preset-electron-res-mode");
+const futureUserResRoot = futureRoots.find((r) => r.key === "preset-user-res-mode");
 eq(futureReviewRoot?.native, true, "位于 node_modules/@deepseek-ai 下的新预设自动识别为官方内置（无需写死 id 名单）");
 eq(futureReviewRoot?.mutable, false, "宿主安装目录内的未知 ID 预设自动只读禁止写入");
 eq(futureReviewRoot?.toggleable, false, "宿主安装目录内的未知 ID 预设自动关闭真开关");
 eq(futureBaseRoot?.native, true, "从 @deepseek-ai baseUrl 加载的新预设自动识别为官方内置");
 eq(futureBaseRoot?.mutable, false, "从 @deepseek-ai baseUrl 加载的未知 ID 预设自动只读");
 eq(futureBaseRoot?.toggleable, false, "从 @deepseek-ai baseUrl 加载的未知 ID 预设自动关闭开关");
-eq(futureResRoot?.native, true, "位于 resources/ 目录下的新预设同样自动判定为内置只读");
-eq(futureResRoot?.mutable, false, "位于 resources/ 目录下的新预设禁止写入");
-eq(futureResRoot?.toggleable, false, "位于 resources/ 目录下的新预设关闭开关");
+eq(futureResAppRoot?.native, true, "位于 resources/app/ 目录下的新预设自动判定为内置只读");
+eq(futureResAppRoot?.mutable, false, "位于 resources/app/ 目录下的新预设禁止写入");
+eq(futureElectronResRoot?.native, true, "位于真实 process.resourcesPath 下的新预设自动判定为内置只读");
+eq(futureElectronResRoot?.mutable, false, "位于真实 process.resourcesPath 下的新预设禁止写入");
+eq(futureUserResRoot?.native, false, "用户项目下包含 resources/ 目录的自定义预设不被误伤为内置");
+eq(futureUserResRoot?.mutable, true, "用户项目下包含 resources/ 目录的自定义预设正常可写");
+eq(futureUserResRoot?.toggleable, true, "用户项目下包含 resources/ 目录的自定义预设正常支持开关");
 
 // 6.2 P3 #2: 含非 ASCII 字符（如中文）的自定义预设 ID 支持开关持久化且二次读取不丢失
 const cjkSkillsDir = join(tmp, "cjk-preset-skills");
@@ -1124,6 +1172,22 @@ for (const listener of cachedListeners.get("agent-preset/selected") || []) {
 }
 await cachedProvider.list();
 eq(presetCollectCount, 2, "收到 agent-preset/selected 事件后立即清缓存并在下次读取时刷新");
+
+// 验证 miss 穿透负缓存：对不存在的 preset-nonexistent 连续发起请求，冷却窗口内不重复触发扫盘
+const cachedServer = createServer(cachedBridge.handler);
+await new Promise((r) => cachedServer.listen(0, "127.0.0.1", r));
+const cachedPort = cachedServer.address().port;
+const cachedApi = `http://127.0.0.1:${cachedPort}/api/michengai/dsh-skills-manager`;
+const countBeforeMiss = presetCollectCount;
+for (let i = 0; i < 3; i++) {
+  await fetch(`${cachedApi}/enable`, {
+    method: "POST",
+    headers: { host: `127.0.0.1:${cachedPort}`, "content-type": "application/json", "x-dsh-skills-manager": "1" },
+    body: JSON.stringify({ root: "preset-nonexistent", name: "any" }),
+  });
+}
+eq(presetCollectCount, countBeforeMiss, "连续对失效 preset-* 发起请求时受 miss 负缓存保护，冷却期内零重复扫盘");
+cachedServer.close();
 
 server.close();
 await rm(tmp, { recursive: true, force: true });
