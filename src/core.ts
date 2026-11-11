@@ -4339,7 +4339,7 @@ export async function state(options: ScopeOptions = {}) {
     ],
   };
   const all: ViewItem[] = [];
-  for (const root of [...scoped, ...presets, ...user]) {
+  for (const root of [...scoped, ...user, ...presets]) {
     const scanResult =
       root.scope === "project"
         ? (await scanDeduplicatedRoots([root])).get(root.key)!

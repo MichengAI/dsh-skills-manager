@@ -20,6 +20,8 @@ export interface SkillRoot {
     custom?: boolean;
     /** 自定义来源的归属分组，通常是扫描到的产品总目录名，用于同源来源归拢显示。 */
     group?: string;
+    /** 绑定的 Agent 预设 ID（如 cordis、minimal 等），用于多语言词条索引。 */
+    presetId?: string;
 }
 export type RootInput = SkillRoot | string | null | undefined;
 export interface Diagnostic {

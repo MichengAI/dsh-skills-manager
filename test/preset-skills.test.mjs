@@ -1,7 +1,7 @@
 // 预设模式专属技能（内置创造模式 + 用户新建自定义模式）的发现、详情与管理测试
 // 运行：node test/preset-skills.test.mjs
 
-import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, writeFile, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createServer } from "node:http";
@@ -142,7 +142,7 @@ ok(reviewRoot.label.includes("代码审查模式"), "标签包含自定义模式
 const emptyRoots = await collectPresetRoots({});
 ok(Array.isArray(emptyRoots) && emptyRoots.length === 0, "宿主无 agentPresets 服务时平滑降级返回空数组");
 
-console.log("── 2. 状态快照集成（state）──");
+console.log("── 2. 状态快照集成（state）与排序位置 ──");
 
 const snapshot = await state({ presetRoots: roots });
 const foundReviewRoot = snapshot.roots.find((r) => r.key === "preset-code-review");
@@ -151,6 +151,41 @@ ok(
   foundReviewRoot && foundReviewRoot.skills.some((s) => s.name === "strict-code-review"),
   "自定义预设来源中包含其专属技能 strict-code-review",
 );
+
+const dshIndex = snapshot.roots.findIndex((r) => r.key === "dsh");
+const agentsIndex = snapshot.roots.findIndex((r) => r.key === "agents");
+const cordisIndex = snapshot.roots.findIndex((r) => r.key === "preset-cordis");
+const reviewIndex = snapshot.roots.findIndex((r) => r.key === "preset-code-review");
+ok(cordisIndex > dshIndex && cordisIndex > agentsIndex, "预设来源排在常规 DSH 与公共 Agent 之后（正常来源最后面）");
+ok(reviewIndex > dshIndex && reviewIndex > agentsIndex, "自定义预设来源排在常规 DSH 与公共 Agent 之后（正常来源最后面）");
+
+console.log("── 2.1 客户端 rootDisplayName 国际化（i18n）测试 ──");
+const { stripTypeScriptTypes } = await import("node:module");
+const clientSource = await readFile(new URL("../src/client.ts", import.meta.url), "utf8");
+const dictMatch = clientSource.match(/var DICT\s*=\s*(\{[\s\S]*?\n\s{4}\});/);
+ok(dictMatch, "DICT 定义存在");
+const DICT = new Function(`return ${dictMatch[1]};`)();
+
+const fnMatch = clientSource.match(/function rootDisplayName\s*\([\s\S]*?\n\s{4}\}/);
+ok(fnMatch, "rootDisplayName 函数存在");
+const strippedJs = stripTypeScriptTypes(fnMatch[0]);
+const translateOrFallback = (t, key, fallback) => {
+  const val = t(key);
+  return typeof val === "string" && val !== key ? val : fallback;
+};
+const rootDisplayName = new Function("translateOrFallback", `return ${strippedJs}`)(translateOrFallback);
+
+function translateMock(locale, key, params) {
+  let val = DICT[locale]?.[key] || key;
+  if (params) {
+    for (const [k, v] of Object.entries(params)) val = val.replace(`{${k}}`, v);
+  }
+  return val;
+}
+eq(rootDisplayName((k, p) => translateMock("zh", k, p), cordisRoot), "预设: 创造模式", "中文下正确渲染「预设: 创造模式」");
+eq(rootDisplayName((k, p) => translateMock("en", k, p), cordisRoot), "Preset: Creator Mode", "英文下正确渲染「Preset: Creator Mode」");
+eq(rootDisplayName((k, p) => translateMock("zh", k, p), reviewRoot), "预设: 代码审查模式", "自定义模式中文下正确保留自定义名");
+eq(rootDisplayName((k, p) => translateMock("en", k, p), reviewRoot), "Preset: 代码审查模式", "自定义模式英文下前缀本地化");
 
 console.log("── 3. 技能详情读取（skillDetail）──");
 

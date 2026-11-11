@@ -204,12 +204,14 @@ export async function collectPresetRoots(ctx: unknown): Promise<SkillRoot[]> {
         key: rootKey,
         path: resolved,
         label,
-        rank: 300,
+        rank: 700,
         mutable: false,
         native: isBuiltin,
         toggleable: true,
         kind: "preset",
         group: presetName,
+        presetId: preset.id,
+        localeKey: `preset.${preset.id}`,
       });
     }
   }
