@@ -169,6 +169,12 @@ export async function collectPresetRoots(ctx: unknown): Promise<SkillRoot[]> {
   }
 
   const BUILTIN_IDS = new Set(["standard", "ptc", "minimal", "cordis"]);
+  const BUILTIN_PRESET_NAMES: Record<string, string> = {
+    cordis: "创造模式",
+    standard: "标准模式",
+    ptc: "PTC 模式",
+    minimal: "极简模式",
+  };
 
   for (const preset of presetConfigs) {
     const isBuiltin = BUILTIN_IDS.has(preset.id);
@@ -191,7 +197,7 @@ export async function collectPresetRoots(ctx: unknown): Promise<SkillRoot[]> {
       seenPaths.add(resolved);
 
       const rootKey = declaredDirs.length === 1 ? `preset-${preset.id}` : `preset-${preset.id}-${i + 1}`;
-      const presetName = preset.name || preset.id;
+      const presetName = preset.name || BUILTIN_PRESET_NAMES[preset.id] || preset.id;
       const label = `预设: ${presetName}`;
 
       roots.push({
