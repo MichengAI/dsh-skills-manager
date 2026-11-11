@@ -48,7 +48,7 @@ export async function discoverReadonlyEntries(root: string) {
     let realDirectory;
     const items = [];
     try {
-      realDirectory = await fs.realpath(current.path);
+      realDirectory = await fs.realpath(current.path).catch(() => current.path);
       const key = identity(realDirectory);
       if (current.ancestors.has(key)) continue;
       // 普通 bundle 是叶子，在枚举前识别，避免资源文件耗尽整根预算。
@@ -63,7 +63,7 @@ export async function discoverReadonlyEntries(root: string) {
         }
         if (docStat?.isFile() && !docStat.isSymbolicLink()) {
           const name = relative(rootPath, current.path).split(sep).join("/");
-          const realDocPath = await fs.realpath(docPath);
+          const realDocPath = await fs.realpath(docPath).catch(() => docPath);
           directories++;
           byName.set(name, {
             name,

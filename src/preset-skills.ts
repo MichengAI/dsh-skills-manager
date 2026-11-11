@@ -69,41 +69,29 @@ async function isExistingDir(path: string): Promise<boolean> {
  * 5. 探测 Electron 宿主 resourcesPath / execPath。
  */
 async function findCordisSkillsDir(): Promise<string | undefined> {
+  // 1. 优先使用真实的物理文件系统路径（非 asar 虚拟归档），确保 fs.realpath 与扫描完全通畅
+  const physicalCandidates = [
+    "D:/Tools/nodejs/node_global/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-agent-preset/skills",
+    join(homedir(), "AppData/Roaming/DSH Codex Desktop/dsh-runtime/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-agent-preset/skills"),
+  ];
+  for (const c of physicalCandidates) {
+    if (await isExistingDir(c)) return resolve(c);
+  }
+
+  // 2. 本地直接 resolve
   try {
     const req = createRequire(import.meta.url);
     const p = req.resolve("@deepseek-ai/dsh-agent-preset/package.json");
     const candidate = join(dirname(p), "skills");
-    if (await isExistingDir(candidate)) return resolve(candidate);
+    if (!candidate.includes(".asar") && (await isExistingDir(candidate))) return resolve(candidate);
   } catch {}
 
+  // 3. 从 @deepseek-ai/dsh 依赖内部 resolve
   try {
     const req = createRequire(import.meta.url);
     const dshPkg = req.resolve("@deepseek-ai/dsh/package.json");
     const candidate = join(dirname(dshPkg), "node_modules", "@deepseek-ai", "dsh-agent-preset", "skills");
-    if (await isExistingDir(candidate)) return resolve(candidate);
-  } catch {}
-
-  const globalCandidates = [
-    "D:/Tools/nodejs/node_global/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-agent-preset/skills",
-    join(homedir(), "AppData/Roaming/DSH Codex Desktop/dsh-runtime/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-agent-preset/skills"),
-  ];
-  for (const c of globalCandidates) {
-    if (await isExistingDir(c)) return resolve(c);
-  }
-
-  try {
-    const resPath = (process as unknown as { resourcesPath?: string }).resourcesPath;
-    if (resPath) {
-      const c1 = join(resPath, "app.asar", "dsh", "node_modules", "@deepseek-ai", "dsh-agent-preset", "skills");
-      if (await isExistingDir(c1)) return resolve(c1);
-      const c2 = join(resPath, "app.asar.unpacked", "dsh", "node_modules", "@deepseek-ai", "dsh-agent-preset", "skills");
-      if (await isExistingDir(c2)) return resolve(c2);
-    }
-    if (process.execPath) {
-      const exeDir = dirname(process.execPath);
-      const c3 = join(exeDir, "resources", "app.asar", "dsh", "node_modules", "@deepseek-ai", "dsh-agent-preset", "skills");
-      if (await isExistingDir(c3)) return resolve(c3);
-    }
+    if (!candidate.includes(".asar") && (await isExistingDir(candidate))) return resolve(candidate);
   } catch {}
 
   return undefined;
