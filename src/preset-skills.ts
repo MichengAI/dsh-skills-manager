@@ -246,7 +246,7 @@ export async function collectPresetRoots(ctx: unknown, options: PresetRootsOptio
 
       const rootKey = declaredDirs.length === 1 ? `preset-${preset.id}` : `preset-${preset.id}-${i + 1}`;
       const presetName = preset.name || BUILTIN_PRESET_NAMES[preset.id] || preset.id;
-      const label = `预设: ${presetName}`;
+      const label = declaredDirs.length === 1 ? `预设: ${presetName}` : `预设: ${presetName} (${i + 1})`;
 
       roots.push({
         key: rootKey,

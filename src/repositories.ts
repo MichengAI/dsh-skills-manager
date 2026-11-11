@@ -4,7 +4,7 @@ import { promises as fs } from "node:fs";
 import { join, resolve } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import { managerHomePath, resolveWorkspaceTarget, repositoryDestinations, trashRootPath, listTrash, restoreTrash as restoreSkillTrash, permanentlyDeleteTrash, parseSkillDoc, importUploadedSkill, deleteSkill, isSafeDeleteFailure, setSkillEnabled, readManagerState, state, createWorkspaceIndex, type indexRegisteredWorkspaces } from "./core.js";
-import { createRepositoryUpdater, fileIndex, signature, readSkillTree, repositoryInstallRoot, recordInstallRoot, selectInstallRecord } from "./repository-updates.js";
+import { createRepositoryUpdater, fileIndex, signature, readSkillTree, repositoryInstallRoot, recordInstallRoot, selectInstallRecord, isRepositoryRootKey } from "./repository-updates.js";
 import { parseGitUrl, fetchGitRepository, probeGitRemote } from "./repository-git.js";
 
 const STATE_LIMIT = 16 << 20;
@@ -37,7 +37,7 @@ function validateStoredState(input: unknown): asserts input is RepositoryState {
   }
   for (const record of value.installs) {
     if (!record || typeof record.id !== "string" || typeof record.complete !== "boolean" || !Array.isArray(record.files) || !record.files.length || record.files.length > 1000 || !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(record.commit || "")) throw failure("仓库安装记录无效");
-    repositoryInstallRoot(record.root);
+    if (!isRepositoryRootKey(record.root)) throw failure("技能安装位置无效");
     if (record.workspace !== undefined && (typeof record.workspace !== "string" || !record.workspace || record.workspace.length > 1024 || record.root === "agents")) throw failure("仓库安装工作区无效");
     if (record.trashId !== undefined && (typeof record.trashId !== "string" || !/^\d+-[a-f0-9-]{36}$/.test(record.trashId))) throw failure("仓库回收记录无效");
     if (record.restoreFingerprint !== undefined && (typeof record.restoreFingerprint !== "string" || !record.trashId || !/^[a-f0-9]{64}$/.test(record.restoreFingerprint))) throw failure("仓库恢复记录无效");
@@ -60,7 +60,7 @@ function validateStoredState(input: unknown): asserts input is RepositoryState {
         if (typeof item.name !== "string" || !item.name.trim() || item.name.length > 128) throw failure("目录安装技能名称无效");
         safePath(item.name);
         if (item.name.includes("/")) throw failure("目录安装技能名称无效");
-        if (item.root !== undefined) repositoryInstallRoot(item.root);
+        if (item.root !== undefined && !isRepositoryRootKey(item.root)) throw failure("技能安装位置无效");
         if (item.workspace !== undefined && (item.root !== "dsh" || typeof item.workspace !== "string" || !item.workspace || item.workspace.length > 1024)) throw failure("目录安装工作区无效");
         if (item.trashId !== undefined && (typeof item.trashId !== "string" || !/^\d+-[a-f0-9-]{36}$/.test(item.trashId))) throw failure("目录回收记录无效");
         if (item.restoreFingerprint !== undefined && (!item.trashId || !/^[a-f0-9]{64}$/.test(item.restoreFingerprint))) throw failure("目录恢复记录无效");
@@ -134,9 +134,10 @@ export function createRepositoryManager({
     record: { root?: unknown; workspace?: string },
     registered?: string[],
     indexed?: Awaited<ReturnType<typeof indexRegisteredWorkspaces>>,
+    presetRoots?: SkillRoot[],
   ) => {
-    const presetRoots = await fetchPresetRoots();
-    return recordInstallRoot(record, registered, indexed, presetRoots);
+    const presets = presetRoots ?? await fetchPresetRoots();
+    return recordInstallRoot(record, registered, indexed, presets);
   };
   const pickInstallRecord = async (
     records: InstallRecord[],
@@ -382,7 +383,7 @@ export function createRepositoryManager({
       const directory = await fs.lstat(receipt), file = await fs.lstat(join(receipt, "metadata.json"));
       if (!directory.isDirectory() || directory.isSymbolicLink() || !file.isFile() || file.isSymbolicLink() || file.size > 32 << 10) return false;
       const metadata = JSON.parse(await fs.readFile(join(receipt, "metadata.json"), "utf8"));
-      return metadata.id === record.trashId && metadata.name === record.name && (record.workspace ? metadata.root?.scope === "project" && metadata.root.projectRoot === record.workspace : metadata.root?.scope === "user" && metadata.root.key === (record.root || "dsh")) && ("path" in record ? metadata.repository?.id === record.id && metadata.repository.path === record.path : Array.isArray(metadata.catalog) && metadata.catalog.includes(record.id)) && metadata.entries?.length === 1 && metadata.entries[0] === record.name;
+      return metadata.id === record.trashId && metadata.name === record.name && (record.workspace ? metadata.root?.scope === "project" && metadata.root.projectRoot === record.workspace : (metadata.root?.scope === "user" || metadata.root?.scope === "preset") && metadata.root.key === (record.root || "dsh")) && ("path" in record ? metadata.repository?.id === record.id && metadata.repository.path === record.path : Array.isArray(metadata.catalog) && metadata.catalog.includes(record.id)) && metadata.entries?.length === 1 && metadata.entries[0] === record.name;
     } catch { return false; }
   }
   async function recoverPending(loaded?: RepositoryState) {
@@ -446,14 +447,14 @@ export function createRepositoryManager({
     const data = await read();
     const presetRoots = await fetchPresetRoots();
     const local = await state({ presetRoots });
-    const skills = local.roots.flatMap((r) => r.skills || []);
+    const skills = local.roots.filter((r) => r.mutable !== false).flatMap((r) => r.skills || []);
     // 每次只读取一个目录，避免多个大技能并行读取使内存随安装数量增长。
     const matched = new Map<InstallRecord, boolean>();
     const present = new Set<InstallRecord>();
     const registered = requestIndex().registered;
     for (const record of data.installs.filter(record => record.complete && !record.trashId)) {
       try {
-        const files = fileIndex(await readSkillTree(join((await resolveInstallRoot(record, registered, await indexedFor(record))).path, record.name)));
+        const files = fileIndex(await readSkillTree(join((await resolveInstallRoot(record, registered, await indexedFor(record), presetRoots)).path, record.name)));
         present.add(record);
         matched.set(record, signature(files) === signature(record.files));
       } catch { /* Missing or unsafe installed copies must not be deleted. */ }
@@ -462,7 +463,7 @@ export function createRepositoryManager({
         const catalogCopies: { id: string; name: string; installedRoot: RepositoryRoot; installedWorkspace?: string; canUninstall: boolean }[] = [];
         for (const record of catalogRecords(data).filter(record => record.root && record.complete !== false && !record.trashId)) {
           try {
-            const root = await resolveInstallRoot(record, registered, await indexedFor(record));
+            const root = await resolveInstallRoot(record, registered, await indexedFor(record), presetRoots);
             const files = await readSkillTree(join(root.path, record.name));
             if (files["SKILL.md"]) {
               if (!activeCatalogIds.includes(record.id)) activeCatalogIds.push(record.id);
@@ -540,7 +541,7 @@ export function createRepositoryManager({
       const records = catalogRecords(data).filter(record => record.trashId === id && metadata?.catalog?.includes(record.id));
       if (!records.length) return restoreSkillTrash(id, log, options);
       for (const record of records) {
-        if (metadata!.name !== record.name || (record.workspace ? metadata!.root?.projectRoot !== record.workspace || metadata!.root.scope !== "project" : metadata!.root?.scope !== "user" || metadata!.root.key !== record.root)) throw failure("回收站来源与目录身份不一致");
+        if (metadata!.name !== record.name || (record.workspace ? metadata!.root?.projectRoot !== record.workspace || metadata!.root.scope !== "project" : (metadata!.root?.scope !== "user" && metadata!.root?.scope !== "preset") || metadata!.root.key !== record.root)) throw failure("回收站来源与目录身份不一致");
         record.restoreFingerprint = signature(fileIndex(await readSkillTree(join(trashRootPath(), id, record.name))));
       }
       await write(data);
@@ -804,7 +805,7 @@ export function createRepositoryManager({
         const data = await read();
         const record = data.installs.find(item => item.trashId === id && item.id === metadata.repository!.id && item.path === metadata.repository!.path);
         if (!record) return restoreSkillTrash(id, log, options);
-        if (metadata.name !== record.name || (record.workspace ? metadata.root?.scope !== "project" || metadata.root.projectRoot !== record.workspace : metadata.root?.scope !== "user" || metadata.root.key !== (record.root || "dsh")) || metadata.entries.length !== 1 || metadata.entries[0] !== record.name) throw failure("回收站来源与安装记录不一致");
+        if (metadata.name !== record.name || (record.workspace ? metadata.root?.scope !== "project" || metadata.root.projectRoot !== record.workspace : (metadata.root?.scope !== "user" && metadata.root?.scope !== "preset") || metadata.root.key !== (record.root || "dsh")) || metadata.entries.length !== 1 || metadata.entries[0] !== record.name) throw failure("回收站来源与安装记录不一致");
         // Journal the exact local edits being restored before moving any files.
         record.restoreFingerprint = signature(fileIndex(await readSkillTree(join(trashRootPath(), id, record.name))));
         const catalog = catalogRecords(data).filter(item => item.trashId === id && metadata.catalog?.includes(item.id));

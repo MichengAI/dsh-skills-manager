@@ -625,7 +625,8 @@ ok(installedSkillInRepo?.installations?.some((c) => c.installedRoot === "preset-
 
 // 4. 卸载该技能并移入回收站
 const uninstalled = await repoManager.uninstall({ id: addedRepo.id, path: "audit", root: "preset-code-review" });
-ok(uninstalled.ok !== false, "成功从自定义预设模式卸载技能");
+const trashId = uninstalled.id || uninstalled.trashId;
+ok(uninstalled.ok !== false && !!trashId, "成功从自定义预设模式卸载技能并拿到 trashId");
 
 // 校验物理文件已被移出
 let repoFileExists = true;
@@ -635,6 +636,27 @@ try {
   repoFileExists = false;
 }
 ok(!repoFileExists, "卸载后物理文件已被移出自定义预设目录");
+
+// 5. 从回收站恢复到原预设目录
+const restoredRepoSkill = await repoManager.restoreTrash(trashId);
+ok(restoredRepoSkill.ok !== false, "仓库技能从回收站成功恢复至原自定义预设目录");
+ok(await readFile(installedSkillPath, "utf8").then((c) => c.includes("仓库测试技能")), "恢复后物理文件回到原预设专属目录");
+
+// 6. 恢复后列表识别再度变成 installed
+const listRestored = await repoManager.list();
+const restoredInList = listRestored.repositories.find((r) => r.id === addedRepo.id)?.skills.find((s) => s.name === "repo-audit-skill");
+ok(restoredInList?.installations?.some((c) => c.installedRoot === "preset-code-review"), "恢复后仓库列表重新识别已安装到预设的副本");
+
+// 7. 校验 P2 fail-closed：缺少 presetRoots 时 repositoryInstallRoot 严格拒绝，不返回空路径假根
+const { repositoryInstallRoot, isRepositoryRootKey } = await import("../lib/repository-updates.js");
+ok(isRepositoryRootKey("preset-code-review") === true, "静态数据校验函数认可合法预设键格式");
+let failClosedCaught = false;
+try {
+  repositoryInstallRoot("preset-code-review");
+} catch {
+  failClosedCaught = true;
+}
+ok(failClosedCaught, "repositoryInstallRoot 在缺 presetRoots 时严格抛错（fail-closed）");
 
 server.close();
 await rm(tmp, { recursive: true, force: true });

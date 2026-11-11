@@ -8,6 +8,13 @@ import { managerHomePath, userRoots, checkedRepositoryRootDefinition, projectRoo
 
 const hash = (bytes: string | Uint8Array) => createHash("sha256").update(bytes).digest("hex");
 const repositoryInstallKeys = new Set(["dsh", "agents"]);
+/** 纯静态判定是否为合法的仓库安装来源键，专供持久化数据格式校验。 */
+export function isRepositoryRootKey(key: unknown): boolean {
+  const normalized = key === undefined ? "dsh" : key;
+  if (typeof normalized !== "string") return false;
+  if (normalized.startsWith("preset-") || normalized === "preset") return true;
+  return repositoryInstallKeys.has(normalized);
+}
 /** 解析 DSH、公共 Agent 以及用户自建的自定义预设模式。缺省和旧记录都属于 DSH。 */
 export function repositoryInstallRoot(key: unknown = "dsh", presetRoots?: SkillRoot[]) {
   const normalized = key === undefined ? "dsh" : key;
@@ -18,18 +25,8 @@ export function repositoryInstallRoot(key: unknown = "dsh", presetRoots?: SkillR
       if (preset && preset.mutable && preset.native === false) {
         return { ...preset, key: preset.key as RepositoryRoot };
       }
-      throw failure("技能安装位置无效");
     }
-    return {
-      key: normalized as RepositoryRoot,
-      path: "",
-      label: normalized,
-      rank: 10000,
-      mutable: true,
-      native: false,
-      toggleable: false,
-      kind: "preset",
-    };
+    throw failure("技能安装位置无效");
   }
   if (!repositoryInstallKeys.has(normalized)) throw failure("技能安装位置无效");
   const root = userRoots().find(item => item.key === normalized);
