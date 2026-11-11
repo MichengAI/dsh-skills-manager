@@ -172,4 +172,13 @@ const englishTree = englishPicker({ t: key => destinationLocales.en[key] || key,
 assert.ok(text(englishTree).includes("Unsafe directory: C:/unsafe"), "英文界面使用注入的错误翻译");
 assert.equal(text(englishTree).includes("目录不安全"), false);
 assert.equal(translatedDiagnostic, diagnostic, "保留完整诊断对象与参数");
+
+// 自定义预设模式目标范围验证
+const presets = [{ key: "preset-custom", name: "自定义模式", path: "D:\\skills\\custom", available: true }];
+const presetTree = picker({ t, value: { scope: "preset", location: "dsh", workspace: "", presetKey: "preset-custom" }, onChange: change, workspaces, userDestinations: user, presetDestinations: presets, allowAgents: true });
+assert.deepEqual(destinationPayload({ scope: "preset", location: "dsh", workspace: "", presetKey: "preset-custom" }), { root: "preset-custom" }, "预设模式生成正确的 root 键");
+assert.equal(destinationReady({ scope: "preset", location: "dsh", workspace: "", presetKey: "preset-custom" }, workspaces, user, presets), true, "有效自定义预设 ready 判定通过");
+assert.equal(destinationReady({ scope: "preset", location: "dsh", workspace: "", presetKey: "preset-unknown" }, workspaces, user, presets), false, "未知自定义预设 ready 判定不通过");
+assert.ok(nodes(presetTree).some(n => n.type === "code" && n.children.includes("D:\\skills\\custom")), "预设模式展示专属物理路径预览");
+
 console.log("目标选择器：默认用户目录、工作区必须点选、联动位置、空列表与失效路径处理均通过");

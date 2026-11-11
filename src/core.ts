@@ -1336,6 +1336,10 @@ function writableRootDefinition(root: RootInput) {
     return resolve(definition.path) === resolve(dshRootPath())
       ? rootByKey("dsh")
       : null;
+  // 自定义预设模式：必须是自定义的、mutable 为 true 的预设来源
+  if (definition.kind === "preset" && definition.native === false) {
+    return isAbsolute(definition.path) ? definition : null;
+  }
   if (
     definition.scope !== "project" ||
     definition.kind !== "project-dsh" ||
@@ -1363,7 +1367,9 @@ async function checkedUserRootAncestors(definition: SkillRoot): Promise<SkillRoo
 
 async function checkedWritableRootDefinition(root: RootInput): Promise<SkillRoot | OperationError | null | undefined> {
   const definition = writableRootDefinition(root);
-  if (definition?.key === "agents") return checkedUserRootAncestors(definition);
+  if (definition?.key === "agents" || (definition?.kind === "preset" && definition.native === false)) {
+    return checkedUserRootAncestors(definition);
+  }
   if (!definition || definition.scope !== "project") return definition;
   if (await overlapsUserSkillRoot(definition.path)) {
     return {
@@ -2909,6 +2915,17 @@ async function publishTrashStage(stage: string, finalPath: string, metadata: Tra
 }
 
 function trashRootMetadata(definition: SkillRoot) {
+  if (definition.kind === "preset") {
+    return {
+      key: definition.key,
+      scope: "preset",
+      kind: "preset",
+      path: definition.path,
+      label: definition.label,
+      mutable: definition.mutable,
+      ...(definition.localeKey ? { localeKey: definition.localeKey } : {}),
+    };
+  }
   if (definition.scope !== "project" && rootByKey(definition.key))
     return { key: definition.key, scope: "user", label: definition.label, ...(definition.localeKey ? { localeKey: definition.localeKey } : {}) };
   return {
@@ -2924,6 +2941,22 @@ function trashRootMetadata(definition: SkillRoot) {
 async function restoreRootDefinition(metadata: TrashMetadata, options: MutationOptions = {}): Promise<SkillRoot | OperationError | null | undefined> {
   // version 1 entries predate scoped Trash and always belong to $DSH_HOME/skills.
   if (!metadata.root) return rootByKey("dsh");
+  if (metadata.root.kind === "preset") {
+    const presetRoot = (options.presetRoots || []).find((r) => r.key === metadata.root?.key);
+    if (presetRoot) return checkedWritableRootDefinition(presetRoot);
+    if (metadata.root.mutable === true && typeof metadata.root.path === "string" && isAbsolute(metadata.root.path)) {
+      return checkedWritableRootDefinition({
+        key: metadata.root.key,
+        path: metadata.root.path,
+        label: metadata.root.label || metadata.root.key,
+        rank: 10000,
+        mutable: true,
+        native: false,
+        toggleable: false,
+        kind: "preset",
+      });
+    }
+  }
   if (metadata.root.scope === "user" && rootByKey(metadata.root.key))
     return checkedWritableRootDefinition(rootByKey(metadata.root.key));
   if (
@@ -4483,4 +4516,4 @@ export type ProviderCandidate = Awaited<ReturnType<typeof listProviderCandidates
 type SourceAnalysis = ({kind: "none"} & Diagnostic) | ({kind: "single"; skillFile: string} & ImportCandidate) | {kind: "batch"; rawName: string; source: string; isDir: boolean};
 type MetadataEntry = DiscoveredEntry & {name: string; providerRank?: number; policyAliases?: {rootKey: string; name: string}[]};
 interface MetadataScan {exists: boolean; entries: MetadataEntry[]; truncated?: boolean}
-interface TrashMetadata { id: string; name: string; deletedAt: string; repository?: {id: string; path: string}; catalog?: string[]; root?: {key: string; scope: string; label: string; localeKey?: string; projectRoot?: string; projectName?: string; kind?: string}; entries: string[] }
+interface TrashMetadata { id: string; name: string; deletedAt: string; repository?: {id: string; path: string}; catalog?: string[]; root?: {key: string; scope: string; label: string; localeKey?: string; projectRoot?: string; projectName?: string; kind?: string; path?: string; mutable?: boolean}; entries: string[] }

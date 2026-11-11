@@ -1,7 +1,7 @@
 type RepositoryAction = "add" | "remove" | "refresh" | "detail" | "install" | "installMany" | "uninstall" | "uninstallMany" | "preview" | "previewMany" | "update" | "updateMany" | "rollback";
 import type * as React from 'react';
 import type { ApiCall, ApiRoutes, Translate, ModalProps, SourceSelectProps } from './client-types.js';
-import type { DestinationKit, DestinationValue } from './destination-types.js';
+import type { DestinationKit, DestinationValue, PresetDestination } from './destination-types.js';
 import type { WorkspaceRow } from './core.js';
 import type { InstallSource, Diagnostic, RepositoryRoot, RepositoryDestination } from './types.js';
 type RepoView = ApiRoutes['/repositories']['repositories'][number];
@@ -201,7 +201,7 @@ export function createRepositoryUI({ react, Modal, Input, Button, Checkbox, Sour
   }
   const PrimitiveButton = Button;
   const { DestinationPicker, defaultDestination, destinationPayload, destinationReady } = destination;
-  return function useRepositoryUI({ active, t, onInstalled }: {active: boolean; t: Translate; onInstalled?: () => unknown}) {
+  return function useRepositoryUI({ active, t, onInstalled, presetDestinations = [] }: {active: boolean; t: Translate; onInstalled?: () => unknown; presetDestinations?: readonly PresetDestination[]}) {
     const [repos, setRepos] = react.useState<RepoView[]>([]);
     const [installRoots, setInstallRoots] = react.useState<RepositoryDestination[]>([]);
     const [busy, setBusy] = react.useState(false);
@@ -274,7 +274,7 @@ export function createRepositoryUI({ react, Modal, Input, Button, Checkbox, Sour
         setCatalogUnknownIds(data.catalogUnknownIds || []); setCatalogWarnings(data.catalogWarnings || []);
         pruneSelection(data.repositories || []);
         if (destination.scope === 'user' && !roots.some(root => root.key === destination.location && root.available))
-          setDestination({ ...destination, location: roots.find(root => root.available)?.key || 'dsh' });
+          setDestination({ ...destination, location: (roots.find(root => root.available)?.key as "dsh" | "agents") || 'dsh' });
         // 工作区列表只读登记信息，失败不影响仓库列表本身。
         api('/workspaces').then(listed => { if (mounted.current) setWorkspaces(listed.items || []); }).catch(() => undefined);
       }
@@ -625,7 +625,7 @@ export function createRepositoryUI({ react, Modal, Input, Button, Checkbox, Sour
       setModal({ type: "catalog-install", target });
     }
     function confirmCatalogInstall() {
-      if (!modal || modal.type !== "catalog-install" || !destinationReady(destination, workspaces, installRoots)) return;
+      if (!modal || modal.type !== "catalog-install" || !destinationReady(destination, workspaces, installRoots, presetDestinations)) return;
       const target = modal.target;
       const scope = destinationPayload(destination);
       return perform(async () => {
@@ -752,7 +752,7 @@ export function createRepositoryUI({ react, Modal, Input, Button, Checkbox, Sour
     function changeInstallation() {
       if (!modal || (modal.type !== 'install' && modal.type !== 'uninstall')) return;
       const selected = modal, action = selected.type, chosen = destination;
-      if (action === 'install' && !destinationReady(chosen, workspaces, installRoots)) return;
+      if (action === 'install' && !destinationReady(chosen, workspaces, installRoots, presetDestinations)) return;
       const scope = action === 'install' ? destinationPayload(chosen) : selected.copy && copyTarget(selected.copy);
       if (!scope) return;
       return perform(async () => {
@@ -1150,12 +1150,12 @@ export function createRepositoryUI({ react, Modal, Input, Button, Checkbox, Sour
             let footer: React.ReactNode;
             if (modal.type === 'install') body = h('div', { className: 'dssm-repo-panel', 'aria-busy': busy },
               h('div', { className: 'dssm-name' }, modal.skill.name),
-              h(DestinationPicker, { t, value: destination, disabled: busy, allowAgents: true, workspaces, userDestinations: installRoots,
+              h(DestinationPicker, { t, value: destination, disabled: busy, allowAgents: true, workspaces, userDestinations: installRoots, presetDestinations,
                 onChange: (next: Partial<DestinationValue>) => { if (!locked.current) setDestination({ ...destination, ...next }); } }),
               h('p', { className: 'dssm-note' }, t('repo.installLocationsHint')),
               h('p', { className: 'dssm-note' }, t('repo.installHint')),
               busy ? h('div', { role: 'status', 'aria-live': 'polite' }, t('repo.installProgress')) : null, feedbackNode,
-              h('div', { className: 'dssm-modal-actions' }, button('repo.cancel', close), button(busy ? 'repo.installing' : 'repo.install', changeInstallation, false, !destinationReady(destination, workspaces, installRoots))));
+              h('div', { className: 'dssm-modal-actions' }, button('repo.cancel', close), button(busy ? 'repo.installing' : 'repo.install', changeInstallation, false, !destinationReady(destination, workspaces, installRoots, presetDestinations))));
             if (modal.type === 'uninstall') {
               description = t('repo.uninstallHint');
               body = h('div', { className: 'dssm-repo-panel', 'aria-busy': busy },
@@ -1180,7 +1180,7 @@ export function createRepositoryUI({ react, Modal, Input, Button, Checkbox, Sour
         const running = state.phase === "running";
         const counts = bucketCounts(state.items);
         const executable = bulkExecutableCount(state);
-        const kickoffDisabled = !executable || busy || (state.op === "install" && !destinationReady(destination, workspaces, installRoots));
+        const kickoffDisabled = !executable || busy || (state.op === "install" && !destinationReady(destination, workspaces, installRoots, presetDestinations));
         const progressText = state.op === "install" ? t("repo.installing") : state.op === "uninstall" ? t("repo.uninstalling") : t("repo.bulk.replacing");
         description = t("repo.bulk.preflightHint");
         body = h("div", { className: "dssm-repo-panel", "aria-busy": busy || running },
@@ -1195,7 +1195,7 @@ export function createRepositoryUI({ react, Modal, Input, Button, Checkbox, Sour
             h("span", { className: "dssm-bulk-detail" }, item.repo.owner + "/" + item.repo.name + " · " + item.skill.path + (item.copy ? " · " + locationLabel(item.copy) : "")),
             h("span", { className: "dssm-bulk-reason" }, bucketLabel(item.bucket)),
             item.error ? h("span", { className: "dssm-bulk-reason" }, message(item.error)) : null))),
-          state.op === "install" ? h(DestinationPicker, { t, value: destination, disabled: busy || running, allowAgents: true, workspaces, userDestinations: installRoots,
+          state.op === "install" ? h(DestinationPicker, { t, value: destination, disabled: busy || running, allowAgents: true, workspaces, userDestinations: installRoots, presetDestinations,
             onChange: (next: Partial<DestinationValue>) => { if (!locked.current && !running) setDestination({ ...destination, ...next }); } }) : null,
           state.op === "install" ? h("p", { className: "dssm-note" }, t("repo.installHint")) : null,
           counts["local-modified"] ? h(Checkbox, { className: "dssm-bulk-policy", checked: state.policy.localModified === "overwrite", disabled: busy || running,
@@ -1248,11 +1248,11 @@ export function createRepositoryUI({ react, Modal, Input, Button, Checkbox, Sour
       if (modal.type === "catalog-detail" && !modal.detail) body = h("div", { role: "status", className: "dssm-repo-panel" }, modal.loading ? t("repo.detailLoading") : null, modal.failed ? feedbackNode : null);
       if (modal.type === "catalog-install") body = h("div", { className: "dssm-repo-panel", "aria-busy": busy },
         h("div", { className: "dssm-name" }, modal.target.name),
-        h(DestinationPicker, { t, value: destination, disabled: busy, allowAgents: true, workspaces, userDestinations: installRoots, onChange: (next: Partial<DestinationValue>) => { if (!locked.current) setDestination({ ...destination, ...next }); } }),
+        h(DestinationPicker, { t, value: destination, disabled: busy, allowAgents: true, workspaces, userDestinations: installRoots, presetDestinations, onChange: (next: Partial<DestinationValue>) => { if (!locked.current) setDestination({ ...destination, ...next }); } }),
         h("p", { className: "dssm-note" }, t("repo.installLocationsHint")),
         h("p", { className: "dssm-note" }, t("repo.installHint")),
         busy ? h("div", { role: "status", "aria-live": "polite" }, t("repo.installProgress")) : null, feedbackNode,
-        h("div", { className: "dssm-modal-actions" }, button("repo.cancel", close), button(busy ? "repo.installing" : "repo.install", confirmCatalogInstall, false, !destinationReady(destination, workspaces, installRoots))));
+        h("div", { className: "dssm-modal-actions" }, button("repo.cancel", close), button(busy ? "repo.installing" : "repo.install", confirmCatalogInstall, false, !destinationReady(destination, workspaces, installRoots, presetDestinations))));
       if (modal.type === "catalog-uninstall") {
         description = t('repo.uninstallHint');
         body = h('div', { className: 'dssm-repo-panel', 'aria-busy': busy },

@@ -149,7 +149,7 @@ ok(cordisRoot.label.includes("创造模式") || cordisRoot.label.includes("cordi
 const reviewRoot = roots.find((r) => r.key === "preset-code-review");
 ok(!!reviewRoot, "发现自定义 code-review 预设根");
 eq(reviewRoot.kind, "preset", "根类型为 preset");
-eq(reviewRoot.mutable, false, "自定义预设根同样为只读");
+eq(reviewRoot.mutable, true, "自定义预设根支持管理与写入（mutable: true）");
 eq(reviewRoot.toggleable, false, "B方案：自定义预设根只读，不提供假开关");
 eq(reviewRoot.rank, 10000, "自定义预设根优先级为 10000 稳定沉底");
 eq(reviewRoot.native, false, "自定义模式 native 为 false");
@@ -383,6 +383,105 @@ const sourceDisableRes = await fetch(`${api}/source-disable`, {
 });
 const sourceDisablePayload = await sourceDisableRes.json();
 ok(sourceDisablePayload.ok === false, "B方案：只读预设来源发起整源停用被安全拒绝");
+
+console.log("── 5. 自定义预设模式专属技能管理能力测试（增删改与目标选择）──");
+
+// 5.1 目标选择器（DestinationPicker）契约
+const { destinationPayload, destinationReady } = await import("../lib/destination-picker.js");
+const presetValue = { scope: "preset", location: "dsh", workspace: "", presetKey: "preset-code-review" };
+const presetPl = destinationPayload(presetValue);
+eq(presetPl.root, "preset-code-review", "destinationPayload 在 scope=preset 时正确带出 presetKey");
+const testPresetDests = [{ key: "preset-code-review", name: "代码审查模式", path: customReviewSkillsDir, available: true }];
+ok(destinationReady(presetValue, [], [], testPresetDests), "destinationReady 认可有效的自定义预设");
+ok(!destinationReady({ ...presetValue, presetKey: "unknown" }, [], [], testPresetDests), "destinationReady 拒绝未知的预设");
+
+// 5.2 在自定义预设模式下新建技能（POST /create）
+const createRes = await fetch(`${api}/create`, {
+  method: "POST",
+  headers: {
+    host: `127.0.0.1:${port}`,
+    "content-type": "application/json",
+    "x-dsh-skills-manager": "1",
+  },
+  body: JSON.stringify({
+    root: "preset-code-review",
+    name: "new-analyzer-skill",
+    description: "专为代码审查模式创建的深度分析技能",
+    body: "这是新建分析技能的正文内容",
+  }),
+});
+eq(createRes.status, 200, "POST /create 到自定义预设返回 200");
+const createPayload = await createRes.json();
+ok(createPayload.ok === true && createPayload.data.name === "new-analyzer-skill", "自定义预设成功创建新技能");
+
+// 校验物理文件确实存在于 customReviewSkillsDir
+const newSkillFile = join(customReviewSkillsDir, "new-analyzer-skill", "SKILL.md");
+const newSkillContent = await readFile(newSkillFile, "utf8");
+ok(newSkillContent.includes("专为代码审查模式创建的深度分析技能"), "物理文件成功写入自定义预设专属目录");
+
+// 5.3 在自定义预设模式下删除技能 / 移入回收站（POST /delete）
+const deleteRes = await fetch(`${api}/delete`, {
+  method: "POST",
+  headers: {
+    host: `127.0.0.1:${port}`,
+    "content-type": "application/json",
+    "x-dsh-skills-manager": "1",
+  },
+  body: JSON.stringify({
+    root: "preset-code-review",
+    name: "new-analyzer-skill",
+  }),
+});
+eq(deleteRes.status, 200, "POST /delete 移除自定义预设技能返回 200");
+const deletePayload = await deleteRes.json();
+ok(deletePayload.ok === true && !!deletePayload.data.id, "自定义预设技能成功移入回收站");
+
+// 校验物理文件已被移除
+let fileExistsAfterDelete = true;
+try {
+  await readFile(newSkillFile, "utf8");
+} catch {
+  fileExistsAfterDelete = false;
+}
+ok(!fileExistsAfterDelete, "物理文件已被移出自定义预设目录");
+
+// 5.4 从回收站恢复（POST /trash-restore）
+const restoreRes = await fetch(`${api}/trash-restore`, {
+  method: "POST",
+  headers: {
+    host: `127.0.0.1:${port}`,
+    "content-type": "application/json",
+    "x-dsh-skills-manager": "1",
+  },
+  body: JSON.stringify({
+    id: deletePayload.data.id,
+  }),
+});
+eq(restoreRes.status, 200, "POST /trash-restore 恢复预设技能返回 200");
+const restorePayload = await restoreRes.json();
+ok(restorePayload.ok === true, "自定义预设技能从回收站恢复成功");
+
+// 校验物理文件已恢复回 customReviewSkillsDir
+const restoredContent = await readFile(newSkillFile, "utf8");
+ok(restoredContent.includes("专为代码审查模式创建的深度分析技能"), "物理文件成功恢复至自定义预设目录");
+
+// 5.5 内置预设模式（cordis）严格防写保护
+const builtinCreateRes = await fetch(`${api}/create`, {
+  method: "POST",
+  headers: {
+    host: `127.0.0.1:${port}`,
+    "content-type": "application/json",
+    "x-dsh-skills-manager": "1",
+  },
+  body: JSON.stringify({
+    root: "preset-cordis",
+    name: "malicious-write",
+    description: "尝试向官方内置模式写入技能",
+    body: "应该被拒绝",
+  }),
+});
+const builtinCreatePayload = await builtinCreateRes.json();
+ok(builtinCreatePayload.ok === false, "向内置只读预设（cordis）写入技能被安全拒绝");
 
 server.close();
 await rm(tmp, { recursive: true, force: true });

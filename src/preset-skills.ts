@@ -249,7 +249,7 @@ export async function collectPresetRoots(ctx: unknown, options: PresetRootsOptio
         path: resolved,
         label,
         rank: 10000,
-        mutable: false,
+        mutable: !isBuiltin,
         native: isBuiltin,
         toggleable: false,
         kind: "preset",

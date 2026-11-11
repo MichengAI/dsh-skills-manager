@@ -1,20 +1,29 @@
 import type * as React from "react";
 import type { SourceSelectProps, Translate } from "./client-types.js";
 import type { WorkspaceRow } from "./core.js";
-import type { DestinationKit, DestinationValue, DestinationPickerProps, UserDestination } from "./destination-types.js";
+import type { DestinationKit, DestinationValue, DestinationPickerProps, UserDestination, PresetDestination } from "./destination-types.js";
 
-export type { DestinationKit, DestinationValue, UserDestination } from "./destination-types.js";
+export type { DestinationKit, DestinationValue, UserDestination, PresetDestination } from "./destination-types.js";
 
-export const defaultDestination = (): DestinationValue => ({ scope: "user", location: "dsh", workspace: "" });
+export const defaultDestination = (): DestinationValue => ({ scope: "user", location: "dsh", workspace: "", presetKey: "" });
 
-/** 请求体只带必要字段：用户目录沿用旧的 root；工作区只带 workspace，位置固定为项目 DSH。 */
-export function destinationPayload(value: DestinationValue): { root?: "dsh" | "agents"; workspace?: string } {
+/** 请求体只带必要字段：用户目录沿用旧的 root；工作区只带 workspace；预设模式带 root 为 presetKey。 */
+export function destinationPayload(value: DestinationValue): { root?: string; workspace?: string } {
   if (value.scope === "workspace") return { workspace: value.workspace };
+  if (value.scope === "preset") return { root: value.presetKey };
   return { root: value.location === "agents" ? "agents" : "dsh" };
 }
 
-/** 能否提交：工作区必须是列表里可用的一项；传入用户位置时，所选位置也必须可用。 */
-export function destinationReady(value: DestinationValue, workspaces: readonly WorkspaceRow[], userDestinations?: readonly { key: string; available?: boolean }[]): boolean {
+/** 能否提交：工作区必须是列表里可用的一项；用户位置与预设模式所选项也必须可用。 */
+export function destinationReady(
+  value: DestinationValue,
+  workspaces: readonly WorkspaceRow[],
+  userDestinations?: readonly { key: string; available?: boolean }[],
+  presetDestinations?: readonly PresetDestination[],
+): boolean {
+  if (value.scope === "preset") {
+    return !presetDestinations || presetDestinations.some((item) => item.key === value.presetKey && item.available !== false);
+  }
   if (value.scope === "user") return !userDestinations || userDestinations.some((item) => item.key === value.location && item.available === true);
   return workspaces.some((row) => row.available && !!row.registeredPaths[0] && row.registeredPaths[0] === value.workspace);
 }
@@ -27,21 +36,25 @@ function projectPreview(path: string) {
 
 export const destinationLocales = {
   zh: {
-    "dest.scope": "范围", "dest.scope.user": "用户目录", "dest.scope.workspace": "指定工作区",
+    "dest.scope": "范围", "dest.scope.user": "用户目录", "dest.scope.workspace": "指定工作区", "dest.scope.preset": "预设模式",
     "dest.workspace": "工作区", "dest.workspace.placeholder": "请选择工作区", "dest.workspace.unavailable": "{name}（目录不可用）",
+    "dest.preset": "预设模式", "dest.preset.placeholder": "请选择预设模式",
     "dest.pickFirst": "先选择一个已登记工作区。确认前不会创建目录。", "dest.empty": "还没有已登记的工作区。请先在侧栏添加，再回到这里选择。",
     "dest.location": "位置", "dest.location.dsh": "DSH skills", "dest.location.agents": "Shared Agent",
     "dest.location.agentsOff": "工作区只支持 DSH skills。",
     "dest.projectNote": "会写进这个项目，可能被提交到仓库。",
+    "dest.presetNote": "会安装到该预设模式专属的技能目录，仅在该模式下可用。",
     "dest.createdInWorkspace": "已创建在所选工作区。要在该工作区的会话里才会看到。",
   },
   en: {
-    "dest.scope": "Scope", "dest.scope.user": "User directory", "dest.scope.workspace": "Specific workspace",
+    "dest.scope": "Scope", "dest.scope.user": "User directory", "dest.scope.workspace": "Specific workspace", "dest.scope.preset": "Agent Preset",
     "dest.workspace": "Workspace", "dest.workspace.placeholder": "Select a workspace", "dest.workspace.unavailable": "{name} (directory unavailable)",
+    "dest.preset": "Agent Preset", "dest.preset.placeholder": "Select a preset",
     "dest.pickFirst": "Select a registered workspace first. No directory is created before you confirm.", "dest.empty": "No registered workspaces yet. Add one in the sidebar, then come back.",
     "dest.location": "Location", "dest.location.dsh": "DSH skills", "dest.location.agents": "Shared Agent",
     "dest.location.agentsOff": "Workspaces support DSH skills only.",
     "dest.projectNote": "This is written into the project and may be committed to its repository.",
+    "dest.presetNote": "Installed into this preset's dedicated directory and available only in this preset.",
     "dest.createdInWorkspace": "Created in the selected workspace. It appears in sessions of that workspace.",
   },
 };
@@ -72,12 +85,15 @@ interface Dependencies {
 /** 创建、导入、仓库安装共用的目标选择器：范围、工作区下拉、位置、写入预览。 */
 export function createDestinationPicker({ react, SourceSelect, translateError }: Dependencies) {
   const h = react.createElement;
-  return function DestinationPicker({ t, value, onChange, workspaces, userDestinations, allowAgents, disabled }: DestinationPickerProps) {
+  return function DestinationPicker({ t, value, onChange, workspaces, userDestinations, presetDestinations = [], allowAgents, disabled }: DestinationPickerProps) {
     const inWorkspace = value.scope === "workspace";
+    const inPreset = value.scope === "preset";
     const chosen = workspaces.find((row) => !!row.registeredPaths[0] && row.registeredPaths[0] === value.workspace);
+    const chosenPreset = (presetDestinations || []).find((row) => row.key === value.presetKey);
     const scopeOptions = [
       { value: "user", label: t("dest.scope.user") },
       { value: "workspace", label: t("dest.scope.workspace") },
+      ...(presetDestinations && presetDestinations.length > 0 ? [{ value: "preset", label: t("dest.scope.preset") }] : []),
     ];
     // 下拉只显示名称；只有重名时才附上路径，否则用户分不清选的是哪一个。
     const nameCount = new Map<string, number>();
@@ -89,36 +105,65 @@ export function createDestinationPicker({ react, SourceSelect, translateError }:
         disabled: !row.available || !row.registeredPaths[0],
       })),
     );
+    const presetOptions = [{ value: "", label: t("dest.preset.placeholder") }].concat(
+      (presetDestinations || []).map((row) => ({
+        value: row.key,
+        label: row.name,
+        disabled: row.available === false,
+      })),
+    );
     // 用户目录下只展示后端确实返回的位置，避免出现用不了的选项；工作区的位置固定为项目 DSH，不是选项。
     const offered = (allowAgents ? ["dsh", "agents"] : ["dsh"]) as ("dsh" | "agents")[];
     const locations = offered.filter((key) => userDestinations.some((item) => item.key === key));
     const target = (key: "dsh" | "agents") => userDestinations.find((item) => item.key === key);
     const usable = (key: string) => locations.some((item) => item === key) && target(key as "dsh" | "agents")?.available !== false;
     const locationOptions = locations.map((key) => ({ value: key, label: t("dest.location." + key), disabled: target(key)?.available === false }));
-    // 右侧二级选择器：用户目录下选位置，指定工作区下选工作区。两者都是下拉，放在范围右边。
+    // 右侧二级选择器：用户目录下选位置，指定工作区下选工作区，预设模式下选自定义模式。
     const second = inWorkspace
       ? h("div", { className: "dssm-field", key: "workspace" },
           h("span", { className: "dssm-label" }, t("dest.workspace")),
           h(SourceSelect, { label: t("dest.workspace"), value: value.workspace, disabled: disabled || workspaces.length === 0, options: workspaceOptions, onChange: (next: string) => {
             if (!disabled && workspaces.length > 0 && (next === "" || destinationReady({ ...value, scope: "workspace", workspace: next }, workspaces))) onChange({ workspace: next });
           } }))
-      : h("div", { className: "dssm-field", key: "location" },
-          h("span", { className: "dssm-label" }, t("dest.location")),
-          h(SourceSelect, {
-            label: t("dest.location"), value: value.location, disabled: disabled || locations.length === 0, options: locationOptions,
-            // 置灰项也可能被合成事件触发，所以选择器自己再拒绝一次，不靠 disabled 属性兜底。
-            onChange: (next: string) => { if (!disabled && usable(next)) onChange({ location: next as "dsh" | "agents" }); },
-          }));
-    // 实际写入路径只显示一行：用户目录显示所选位置的配置路径，工作区显示项目的 .dsh/skills。
-    const path = inWorkspace ? (chosen && chosen.available ? projectPreview(chosen.projectRoot || chosen.path) : "") : (target(value.location)?.path ?? "");
-    const broken = inWorkspace ? [] : locations.filter((key) => target(key)?.available === false);
+      : inPreset
+        ? h("div", { className: "dssm-field", key: "preset" },
+            h("span", { className: "dssm-label" }, t("dest.preset")),
+            h(SourceSelect, {
+              label: t("dest.preset"),
+              value: value.presetKey || "",
+              disabled: disabled || (presetDestinations || []).length === 0,
+              options: presetOptions,
+              onChange: (next: string) => {
+                if (!disabled) onChange({ presetKey: next });
+              },
+            }))
+        : h("div", { className: "dssm-field", key: "location" },
+            h("span", { className: "dssm-label" }, t("dest.location")),
+            h(SourceSelect, {
+              label: t("dest.location"), value: value.location, disabled: disabled || locations.length === 0, options: locationOptions,
+              // 置灰项也可能被合成事件触发，所以选择器自己再拒绝一次，不靠 disabled 属性兜底。
+              onChange: (next: string) => { if (!disabled && usable(next)) onChange({ location: next as "dsh" | "agents" }); },
+            }));
+    // 实际写入路径只显示一行：用户目录显示所选位置的配置路径，工作区显示项目的 .dsh/skills，预设显示模式专属目录。
+    const path = inWorkspace
+      ? (chosen && chosen.available ? projectPreview(chosen.projectRoot || chosen.path) : "")
+      : inPreset
+        ? (chosenPreset?.path ?? "")
+        : (target(value.location)?.path ?? "");
+    const broken = inWorkspace || inPreset ? [] : locations.filter((key) => target(key)?.available === false);
     return h("div", { className: "dssm-destination" },
       h("div", { className: "dssm-destination-pair" },
         h("div", { className: "dssm-field", key: "scope" },
           h("span", { className: "dssm-label" }, t("dest.scope")),
           h(SourceSelect, {
             label: t("dest.scope"), value: value.scope, disabled, options: scopeOptions,
-            onChange: (next: string) => { if (!disabled && (next === "workspace" || next === "user")) onChange(next === "workspace" ? { scope: "workspace", location: "dsh" } : { scope: "user", workspace: "" }); },
+            onChange: (next: string) => {
+              if (!disabled && (next === "workspace" || next === "user" || next === "preset")) {
+                if (next === "workspace") onChange({ scope: "workspace", location: "dsh", presetKey: "" });
+                else if (next === "preset") onChange({ scope: "preset", presetKey: presetDestinations?.[0]?.key || "" });
+                else onChange({ scope: "user", workspace: "", presetKey: "" });
+              }
+            },
           })),
         second),
       inWorkspace && workspaces.length === 0 ? h("p", { className: "dssm-feedback dssm-warning", role: "status" }, t("dest.empty")) : null,
@@ -130,6 +175,7 @@ export function createDestinationPicker({ react, SourceSelect, translateError }:
         h("code", { className: "dssm-destination-path" }, target(key)?.path ?? ""),
         h("span", null, target(key)?.error ? translateError(t, target(key)!.error) : ""))),
       inWorkspace && chosen ? h("p", { className: "dssm-note" }, t("dest.projectNote") + " " + t("dest.location.agentsOff")) : null,
+      inPreset && chosenPreset ? h("p", { className: "dssm-note" }, t("dest.presetNote")) : null,
     );
   };
 }

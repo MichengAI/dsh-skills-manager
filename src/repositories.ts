@@ -1,4 +1,4 @@
-import type { Archive, FileDigest, Repository, RepositoryInput, RepositorySkill, RepositoryState, InstallRecord, CatalogInstallRecord, SkillRequest, Log, CodedError, MutationOptions, SkillRoot } from "./types.js";
+import type { Archive, FileDigest, Repository, RepositoryInput, RepositorySkill, RepositoryState, InstallRecord, CatalogInstallRecord, SkillRequest, Log, CodedError, MutationOptions, SkillRoot, RepositoryRoot } from "./types.js";
 // 公开 GitHub 仓库目录：直连归档下载服务、固定内容快照安装，不执行仓库代码。
 import { promises as fs } from "node:fs";
 import { join, resolve } from "node:path";
@@ -438,7 +438,7 @@ export function createRepositoryManager({
       } catch { /* Missing or unsafe installed copies must not be deleted. */ }
     }
     const activeCatalogIds: string[] = [];
-        const catalogCopies: { id: string; name: string; installedRoot: "dsh" | "agents"; installedWorkspace?: string; canUninstall: boolean }[] = [];
+        const catalogCopies: { id: string; name: string; installedRoot: RepositoryRoot; installedWorkspace?: string; canUninstall: boolean }[] = [];
         for (const record of catalogRecords(data).filter(record => record.root && record.complete !== false && !record.trashId)) {
           try {
             const root = await recordInstallRoot(record, registered, await indexedFor(record));

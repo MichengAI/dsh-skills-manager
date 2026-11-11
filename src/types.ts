@@ -206,7 +206,7 @@ export interface Repository extends RepositorySource {
     refreshedAt: string | null;
     error: Diagnostic | null;
 }
-export type RepositoryRoot = 'dsh' | 'agents';
+export type RepositoryRoot = 'dsh' | 'agents' | (string & {});
 export interface RepositoryDestination {
     key: RepositoryRoot;
     path: string;
