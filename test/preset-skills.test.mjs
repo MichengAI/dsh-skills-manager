@@ -582,6 +582,60 @@ ok(overlapPayload.ok === false, "P2-A 闭环：与全局目录重叠的预设根
 eq(overlapPayload.code, "error.root.unsafe", "重叠预设根精准返回 error.root.unsafe");
 overlapServer.close();
 
+console.log("── 5.8 仓库安装、列表 present 识别与卸载端到端闭环（P1-B）──");
+const { createRepositoryManager } = await import("../lib/repositories.js");
+const repoManager = createRepositoryManager({
+  probeRemote: false,
+  gitFetch: async (_repo, dest) => {
+    await mkdir(join(dest, "audit"), { recursive: true });
+    await writeFile(
+      join(dest, "audit", "SKILL.md"),
+      `---
+name: repo-audit-skill
+description: 仓库测试技能
+---
+这是正文`,
+      "utf8",
+    );
+    return { commit: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" };
+  },
+  getPresetRoots: async () => roots,
+});
+const addedRepo = await repoManager.add({ url: "example/preset-repo" });
+await repoManager.refresh({ id: addedRepo.id });
+
+// 1. 验证 installRoots 里包含自定义预设模式
+const listBefore = await repoManager.list();
+const presetDest = listBefore.installRoots.find((item) => item.key === "preset-code-review");
+ok(!!presetDest && presetDest.available, "installRoots 成功列出可用的自定义预设安装位置");
+
+// 2. 安装技能到自定义预设模式
+const installed = await repoManager.install({ id: addedRepo.id, path: "audit", root: "preset-code-review" });
+eq(installed.root, customReviewSkillsDir, "成功安装到自定义预设模式物理目录");
+
+// 校验物理文件已写入
+const installedSkillPath = join(customReviewSkillsDir, "repo-audit-skill", "SKILL.md");
+ok(await readFile(installedSkillPath, "utf8").then((c) => c.includes("仓库测试技能")), "仓库技能文件成功写入自定义预设专属目录");
+
+// 3. 校验 list() 中 present 状态判定成功，技能标记为 installed
+const listAfter = await repoManager.list();
+const repoInList = listAfter.repositories.find((r) => r.id === addedRepo.id);
+const installedSkillInRepo = repoInList?.skills.find((s) => s.name === "repo-audit-skill");
+ok(installedSkillInRepo?.installations?.some((c) => c.installedRoot === "preset-code-review"), "仓库列表中正确识别已安装到预设的副本");
+
+// 4. 卸载该技能并移入回收站
+const uninstalled = await repoManager.uninstall({ id: addedRepo.id, path: "audit", root: "preset-code-review" });
+ok(uninstalled.ok !== false, "成功从自定义预设模式卸载技能");
+
+// 校验物理文件已被移出
+let repoFileExists = true;
+try {
+  await readFile(installedSkillPath);
+} catch {
+  repoFileExists = false;
+}
+ok(!repoFileExists, "卸载后物理文件已被移出自定义预设目录");
+
 server.close();
 await rm(tmp, { recursive: true, force: true });
 

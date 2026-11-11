@@ -12,11 +12,24 @@ const repositoryInstallKeys = new Set(["dsh", "agents"]);
 export function repositoryInstallRoot(key: unknown = "dsh", presetRoots?: SkillRoot[]) {
   const normalized = key === undefined ? "dsh" : key;
   if (typeof normalized !== "string") throw failure("技能安装位置无效");
-  if (presetRoots && (normalized.startsWith("preset-") || normalized === "preset")) {
-    const preset = presetRoots.find((item) => item.key === normalized);
-    if (preset && preset.mutable && preset.native === false) {
-      return { ...preset, key: preset.key as RepositoryRoot };
+  if (normalized.startsWith("preset-") || normalized === "preset") {
+    if (presetRoots) {
+      const preset = presetRoots.find((item) => item.key === normalized);
+      if (preset && preset.mutable && preset.native === false) {
+        return { ...preset, key: preset.key as RepositoryRoot };
+      }
+      throw failure("技能安装位置无效");
     }
+    return {
+      key: normalized as RepositoryRoot,
+      path: "",
+      label: normalized,
+      rank: 10000,
+      mutable: true,
+      native: false,
+      toggleable: false,
+      kind: "preset",
+    };
   }
   if (!repositoryInstallKeys.has(normalized)) throw failure("技能安装位置无效");
   const root = userRoots().find(item => item.key === normalized);
