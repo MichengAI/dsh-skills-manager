@@ -22,7 +22,7 @@ export function destinationReady(
   presetDestinations?: readonly PresetDestination[],
 ): boolean {
   if (value.scope === "preset") {
-    return !presetDestinations || presetDestinations.some((item) => item.key === value.presetKey && item.available !== false);
+    return !!presetDestinations && presetDestinations.length > 0 && presetDestinations.some((item) => item.key === value.presetKey && item.available !== false);
   }
   if (value.scope === "user") return !userDestinations || userDestinations.some((item) => item.key === value.location && item.available === true);
   return workspaces.some((row) => row.available && !!row.registeredPaths[0] && row.registeredPaths[0] === value.workspace);

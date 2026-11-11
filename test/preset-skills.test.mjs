@@ -326,7 +326,8 @@ applyHost({
 
 const server = createServer(handler);
 await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
-const port = server.address().port;
+const addr = server.address();
+const port = addr && typeof addr === "object" ? addr.port : 0;
 const api = `http://127.0.0.1:${port}/api/michengai/dsh-skills-manager`;
 
 const stateRes = await fetch(`${api}/state`, {
@@ -394,6 +395,8 @@ eq(presetPl.root, "preset-code-review", "destinationPayload 在 scope=preset 时
 const testPresetDests = [{ key: "preset-code-review", name: "代码审查模式", path: customReviewSkillsDir, available: true }];
 ok(destinationReady(presetValue, [], [], testPresetDests), "destinationReady 认可有效的自定义预设");
 ok(!destinationReady({ ...presetValue, presetKey: "unknown" }, [], [], testPresetDests), "destinationReady 拒绝未知的预设");
+ok(!destinationReady(presetValue, [], [], undefined), "destinationReady 缺列表时安全拒绝");
+ok(!destinationReady(presetValue, [], [], []), "destinationReady 空列表时安全拒绝");
 
 // 5.2 在自定义预设模式下新建技能（POST /create）
 const createRes = await fetch(`${api}/create`, {
@@ -482,6 +485,102 @@ const builtinCreateRes = await fetch(`${api}/create`, {
 });
 const builtinCreatePayload = await builtinCreateRes.json();
 ok(builtinCreatePayload.ok === false, "向内置只读预设（cordis）写入技能被安全拒绝");
+
+// 5.6 导入（POST /upload）到自定义预设模式，验证文件精确写入预设目录，且全局目录零污染
+const uploadRes = await fetch(`${api}/upload`, {
+  method: "POST",
+  headers: {
+    host: `127.0.0.1:${port}`,
+    "content-type": "application/json",
+    "x-dsh-skills-manager": "1",
+  },
+  body: JSON.stringify({
+    root: "preset-code-review",
+    name: "imported-checker-skill",
+    entries: [
+      {
+        path: "SKILL.md",
+        data: Buffer.from(`---
+name: imported-checker-skill
+description: 通过 upload 导入到代码审查模式的静态检查器
+---
+这是检查器正文`).toString("base64"),
+      },
+    ],
+  }),
+});
+eq(uploadRes.status, 200, "POST /upload 到自定义预设返回 200");
+const uploadPayload = await uploadRes.json();
+ok(uploadPayload.ok === true, "POST /upload 成功导入");
+
+// 校验物理文件落入预设专属目录，且全局技能目录无此技能
+const importedSkillInPreset = join(customReviewSkillsDir, "imported-checker-skill", "SKILL.md");
+const importedSkillInGlobal = join(tmp, "skills", "imported-checker-skill", "SKILL.md");
+let globalHasSkill = false;
+try {
+  await readFile(importedSkillInGlobal);
+  globalHasSkill = true;
+} catch {}
+ok(await readFile(importedSkillInPreset, "utf8").then((c) => c.includes("静态检查器")), "物理文件精确落入自定义预设专属目录");
+ok(!globalHasSkill, "P1-A 闭环：全局 DSH 技能目录零写入、无副本污染");
+
+// 5.7 预设目录重叠守卫（P2-A）：与全局技能目录重叠时拒绝写入
+const overlapSkillsDir = join(tmp, "skills");
+await mkdir(overlapSkillsDir, { recursive: true });
+const overlapMockPresets = {
+  definitions: new Map([
+    [
+      "overlap-preset",
+      {
+        config: {
+          id: "overlap-preset",
+          name: "重叠模式",
+          plugins: [
+            {
+              id: "skill-filesystem",
+              name: "@deepseek-ai/dsh-skill-filesystem",
+              config: {
+                customSkillDirs: [overlapSkillsDir],
+              },
+            },
+          ],
+        },
+      },
+    ],
+  ]),
+};
+const overlapBridge = createTestFetchBridge();
+applyHost({
+  connection: overlapBridge.connection,
+  skills: { registerProvider: () => () => {} },
+  tools: { register: () => () => {} },
+  effect: (fn) => fn(),
+  emit: () => {},
+  get: (name) => (name === "agentPresets" ? overlapMockPresets : undefined),
+});
+const overlapServer = createServer(overlapBridge.handler);
+await new Promise((resolve) => overlapServer.listen(0, "127.0.0.1", resolve));
+const overlapPort = overlapServer.address().port;
+const overlapApi = `http://127.0.0.1:${overlapPort}/api/michengai/dsh-skills-manager`;
+
+const overlapCreateRes = await fetch(`${overlapApi}/create`, {
+  method: "POST",
+  headers: {
+    host: `127.0.0.1:${overlapPort}`,
+    "content-type": "application/json",
+    "x-dsh-skills-manager": "1",
+  },
+  body: JSON.stringify({
+    root: "preset-overlap-preset",
+    name: "overlap-skill",
+    description: "尝试向与全局重叠的预设写入",
+    body: "应该被拒绝",
+  }),
+});
+const overlapPayload = await overlapCreateRes.json();
+ok(overlapPayload.ok === false, "P2-A 闭环：与全局目录重叠的预设根拒绝写入");
+eq(overlapPayload.code, "error.root.unsafe", "重叠预设根精准返回 error.root.unsafe");
+overlapServer.close();
 
 server.close();
 await rm(tmp, { recursive: true, force: true });

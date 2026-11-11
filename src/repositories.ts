@@ -106,6 +106,7 @@ export function createRepositoryManager({
   log,
   registeredWorkspaces,
   onWorkspaceIndexBuild,
+  getPresetRoots,
 }: {
   gitFetch?: (repo: Repository, destinationDir: string, options?: { maxBytes?: number; maxTransientBytes?: number; timeoutMs?: number }) => Promise<{ commit: string }>;
   probeRemote?: boolean;
@@ -115,7 +116,9 @@ export function createRepositoryManager({
   log?: Log;
   registeredWorkspaces?: () => string[] | undefined;
   onWorkspaceIndexBuild?: () => void;
+  getPresetRoots?: () => Promise<SkillRoot[] | undefined>;
 } = {}) {
+  const fetchPresetRoots = async () => (getPresetRoots ? (await getPresetRoots()) || [] : []);
   const maxRepositoryBytes = typeof rawMaxBytes === "number" && Number.isFinite(rawMaxBytes) && rawMaxBytes > 0 ? rawMaxBytes : 2 * 1024 * 1024 * 1024;
   const maxTransientBytes = typeof rawMaxTransientBytes === "number" && Number.isFinite(rawMaxTransientBytes) && rawMaxTransientBytes > 0 ? rawMaxTransientBytes : maxRepositoryBytes * 2.5;
   const gitTimeoutMs = typeof rawTimeoutMs === "number" && Number.isFinite(rawTimeoutMs) && rawTimeoutMs > 0 ? rawTimeoutMs : 900_000;
@@ -439,9 +442,10 @@ export function createRepositoryManager({
     }
     const activeCatalogIds: string[] = [];
         const catalogCopies: { id: string; name: string; installedRoot: RepositoryRoot; installedWorkspace?: string; canUninstall: boolean }[] = [];
+        const presetRoots = await fetchPresetRoots();
         for (const record of catalogRecords(data).filter(record => record.root && record.complete !== false && !record.trashId)) {
           try {
-            const root = await recordInstallRoot(record, registered, await indexedFor(record));
+            const root = await recordInstallRoot(record, registered, await indexedFor(record), presetRoots);
             const files = await readSkillTree(join(root.path, record.name));
             if (files["SKILL.md"]) {
               if (!activeCatalogIds.includes(record.id)) activeCatalogIds.push(record.id);
@@ -449,7 +453,7 @@ export function createRepositoryManager({
             }
           } catch { /* 缺失、未登记或不安全的位置不显示徽章，也不认领其他根的同名文件。 */ }
         }
-        return { installRoots: await repositoryDestinations(), catalogInstalls: activeCatalogIds, catalogCopies,
+        return { installRoots: await repositoryDestinations(presetRoots), catalogInstalls: activeCatalogIds, catalogCopies,
       catalogUnknownIds: [...new Set((data.catalogInstalls || []).flatMap(record => typeof record === "string" ? [record] : !record.root && !record.trashId ? [record.id] : []))].filter(id => !activeCatalogIds.includes(id)),
       catalogWarnings: [...catalogWarnings], repositories: data.repositories.map((repo) => ({ ...repo, skills: repo.skills.map((skill) => {
       const found = skills.some((s) => s.name.toLowerCase() === skill.name.toLowerCase() || s.declaredName?.toLowerCase() === skill.name.toLowerCase());
@@ -483,7 +487,8 @@ export function createRepositoryManager({
       if ("ok" in target && target.ok === false) throw failure(target.error, target.code, target.params);
       return { root: "dsh" as const, workspace: (target as { root: { projectRoot: string } }).root.projectRoot };
     }
-    return { root: repositoryInstallRoot(input.root).key };
+    const presetRoots = await fetchPresetRoots();
+    return { root: repositoryInstallRoot(input.root, presetRoots).key };
   }
   async function enableCatalog(root: SkillRoot, name: string, respectDisabled = false) {
     try {
@@ -501,7 +506,8 @@ export function createRepositoryManager({
   }
   async function catalogMatches(record: CatalogInstallRecord, fingerprint: string) {
     try {
-      const root = await recordInstallRoot(record, requestIndex().registered, await indexedFor(record));
+      const presetRoots = await fetchPresetRoots();
+      const root = await recordInstallRoot(record, requestIndex().registered, await indexedFor(record), presetRoots);
       return signature(fileIndex(await readSkillTree(join(root.path, record.name)))) === fingerprint;
     } catch { return false; }
   }
@@ -533,14 +539,15 @@ export function createRepositoryManager({
   const refreshVersions = new Map<string, number>();
   return {
     installCatalog: (id: string, pack: import("./types.js").UploadInput, target: { root?: unknown; workspace?: string } = {}) => serialize(async () => {
+      const presetRoots = await fetchPresetRoots();
       const location = await catalogLocation(target);
-      const root = await recordInstallRoot(location, requestIndex().registered, await indexedFor(location));
+      const root = await recordInstallRoot(location, requestIndex().registered, await indexedFor(location), presetRoots);
       const data = await read();
       const previousCatalog = data.catalogInstalls;
       let intent: CatalogInstallRecord | undefined;
       let reusedLegacy = false;
       // 下载或状态读写可能让出执行权；在实际写入前再次校验目标路径。
-      await recordInstallRoot(location, requestIndex().registered);
+      await recordInstallRoot(location, requestIndex().registered, undefined, presetRoots);
       const imported = await importUploadedSkill(pack, log, {
         conflict: "skip", root,
         beforeImport: async (pending, conflicts, failed) => {
@@ -673,7 +680,7 @@ export function createRepositoryManager({
       await write(data, true);
       return { catalogInstalls: catalogRecords(data).map(record => record.id) };
     }, false),
-    ...createRepositoryUpdater({ read, write, repository, download, serialize, parseRepositoryInput, registeredWorkspaces, onWorkspaceIndexBuild }),
+    ...createRepositoryUpdater({ read, write, repository, download, serialize, parseRepositoryInput, registeredWorkspaces, onWorkspaceIndexBuild, getPresetRoots }),
     add: async (input: RepositoryInput) => {
       const source = parseRepositoryInput(input);
       const shouldProbe = !gitFetch && defaultProbe && input.skipProbe !== true && process.env.DSH_SKILLS_MANAGER_SKIP_PROBE !== "1";
@@ -838,9 +845,12 @@ export function createRepositoryManager({
         if ("ok" in target && target.ok === false) throw failure(target.error, target.code, target.params);
         root = (target as { root: any }).root;
         workspaceRoot = root.projectRoot;
-      } else root = await recordInstallRoot({ root: input.root });
+      } else {
+        const presetRoots = await fetchPresetRoots();
+        root = await recordInstallRoot({ root: input.root }, registered, undefined, presetRoots);
+      }
       const data = await read();
-      const sameTarget = (await state({ projectCwds: workspaceRoot ? [workspaceRoot] : [] })).roots.filter(item => workspaceRoot ? item.projectRoot === workspaceRoot && item.kind === "project-dsh" : item.scope !== "project");
+      const sameTarget = (await state({ projectCwds: workspaceRoot ? [workspaceRoot] : [] })).roots.filter(item => workspaceRoot ? item.projectRoot === workspaceRoot && item.kind === "project-dsh" : root.kind === "preset" ? item.key === root.key : item.scope !== "project");
       const taken = new Set<string>();
       for (const item of sameTarget) for (const entry of item.skills || []) {
         taken.add(entry.name.toLowerCase());

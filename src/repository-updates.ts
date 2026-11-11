@@ -1,5 +1,5 @@
 import type { CodedError } from "./types.js";
-import type { Archive, FileDigest, RepositoryDependencies, SkillRequest, InstallSource, RepositoryRoot, InstallRecord } from "./types.js";
+import type { Archive, FileDigest, RepositoryDependencies, SkillRequest, InstallSource, RepositoryRoot, InstallRecord, SkillRoot } from "./types.js";
 // 仓库更新使用完整文件摘要预览和目录切换，保留备份，不执行下载内容。
 import { promises as fs } from "node:fs";
 import { join, dirname, resolve } from "node:path";
@@ -8,21 +8,28 @@ import { managerHomePath, userRoots, checkedRepositoryRootDefinition, projectRoo
 
 const hash = (bytes: string | Uint8Array) => createHash("sha256").update(bytes).digest("hex");
 const repositoryInstallKeys = new Set(["dsh", "agents"]);
-/** 只解析 DSH 与公共 Agent。缺省和旧记录都属于 DSH。 */
-export function repositoryInstallRoot(key: unknown = "dsh") {
+/** 解析 DSH、公共 Agent 以及用户自建的自定义预设模式。缺省和旧记录都属于 DSH。 */
+export function repositoryInstallRoot(key: unknown = "dsh", presetRoots?: SkillRoot[]) {
   const normalized = key === undefined ? "dsh" : key;
-  if (typeof normalized !== "string" || !repositoryInstallKeys.has(normalized)) throw failure("技能安装位置无效");
+  if (typeof normalized !== "string") throw failure("技能安装位置无效");
+  if (presetRoots && (normalized.startsWith("preset-") || normalized === "preset")) {
+    const preset = presetRoots.find((item) => item.key === normalized);
+    if (preset && preset.mutable && preset.native === false) {
+      return { ...preset, key: preset.key as RepositoryRoot };
+    }
+  }
+  if (!repositoryInstallKeys.has(normalized)) throw failure("技能安装位置无效");
   const root = userRoots().find(item => item.key === normalized);
   if (!root) throw failure("技能安装位置无效");
   return { ...root, key: root.key as RepositoryRoot };
 }
 /**
- * 解析安装记录所在的可写根：工作区记录按保存的项目根重新校验，其余走用户目录。
+ * 解析安装记录所在的可写根：工作区记录按保存的项目根重新校验，其余走用户目录或预设目录。
  * 返回值的 path 即技能所在目录；工作区路径失效时抛出明确错误，不回退到全局。
  */
-export async function recordInstallRoot(record: { root?: unknown; workspace?: string }, registered?: string[], indexed?: Awaited<ReturnType<typeof indexRegisteredWorkspaces>>) {
+export async function recordInstallRoot(record: { root?: unknown; workspace?: string }, registered?: string[], indexed?: Awaited<ReturnType<typeof indexRegisteredWorkspaces>>, presetRoots?: SkillRoot[]) {
   if (record.workspace === undefined) {
-    const root = repositoryInstallRoot(record.root);
+    const root = repositoryInstallRoot(record.root, presetRoots);
     const checked = await checkedRepositoryRootDefinition(root);
     if (!checked) throw failure("技能安装位置不可用", "error.root.unsafe");
     if (checked.ok === false) throw Object.assign(failure(checked.error, checked.code || "error.root.unsafe"), { params: checked.params });
@@ -35,14 +42,14 @@ export async function recordInstallRoot(record: { root?: unknown; workspace?: st
 const targetIdentity = (path: string) => process.platform === "win32" ? resolve(path).toLowerCase() : resolve(path);
 export const installationSourceKey = (rootPath: string, name: string) => JSON.stringify([targetIdentity(rootPath), name]);
 /** 请求明确选择副本；旧请求只可命中唯一用户级记录，不猜第一条。 */
-export async function selectInstallRecord(records: InstallRecord[], input: SkillRequest, registered: string[] | undefined, missing: string) {
+export async function selectInstallRecord(records: InstallRecord[], input: SkillRequest, registered: string[] | undefined, missing: string, presetRoots?: SkillRoot[]) {
   let workspace: string | undefined;
   if (input.workspace !== undefined) {
     if (input.root !== undefined && input.root !== "dsh") throw failure("工作区只能管理项目 DSH skills");
     const target = await resolveWorkspaceTarget(input.workspace, registered);
     if ("ok" in target && target.ok === false) throw Object.assign(failure(target.error, target.code), { params: target.params });
     workspace = (target as { root: { projectRoot: string } }).root.projectRoot;
-  } else if (input.root !== undefined) repositoryInstallRoot(input.root);
+  } else if (input.root !== undefined) repositoryInstallRoot(input.root, presetRoots);
   const matches = records.filter(record => record.id === input.id && record.path === input.path && record.complete && !record.trashId &&
     (workspace !== undefined ? record.workspace !== undefined && targetIdentity(record.workspace) === targetIdentity(workspace) : record.workspace === undefined && (input.root === undefined || (record.root || "dsh") === input.root)));
   if (matches.length !== 1) throw failure(matches.length ? "安装记录不唯一，请明确选择安装位置" : missing);
@@ -86,12 +93,14 @@ function changesBetween(before: FileDigest[], after: FileDigest[]) {
 }
 
 /** 注入现有仓库存储与串行队列，避免更新和安装互相覆盖状态。 */
-export function createRepositoryUpdater({ read, write, repository, download, serialize, parseRepositoryInput, registeredWorkspaces, onWorkspaceIndexBuild }: RepositoryDependencies) {
+export function createRepositoryUpdater({ read, write, repository, download, serialize, parseRepositoryInput, registeredWorkspaces, onWorkspaceIndexBuild, getPresetRoots }: RepositoryDependencies) {
+  const fetchPresetRoots = async () => (getPresetRoots ? (await getPresetRoots()) || [] : []);
   async function prepare(input: SkillRequest, includeArchive = false, sharedData?: Awaited<ReturnType<typeof read>>) {
     const { id, path } = input, data = sharedData ?? await read();
     const registered = registeredWorkspaces?.();
-    const record = await selectInstallRecord(data.installs, input, registered, "没有可追溯的安装记录，不能在线更新");
-    const target = join((await recordInstallRoot(record, registered)).path, record.name);
+    const presetRoots = await fetchPresetRoots();
+    const record = await selectInstallRecord(data.installs, input, registered, "没有可追溯的安装记录，不能在线更新", presetRoots);
+    const target = join((await recordInstallRoot(record, registered, undefined, presetRoots)).path, record.name);
     const current = fileIndex(await readSkillTree(target));
     let entries: Archive | undefined, next: FileDigest[], commit: string | null;
     if (input.rollback === true) {
@@ -159,7 +168,8 @@ export function createRepositoryUpdater({ read, write, repository, download, ser
       if (!source) continue;
       const parsed = parseRepositoryInput({ url: source.url || `${source.owner}/${source.name}`, ref: source.ref, subdirectory: source.subdirectory });
       try {
-        const root = await recordInstallRoot(record, index.registered, record.workspace === undefined ? undefined : await index.load());
+        const presetRoots = await fetchPresetRoots();
+        const root = await recordInstallRoot(record, index.registered, record.workspace === undefined ? undefined : await index.load(), presetRoots);
         const realRoot = await fs.realpath(root.path);
         result[installationSourceKey(realRoot, record.name)] = { ...parsed, id: record.id, path: record.path, commit: record.commit, root: record.root || "dsh", ...(record.workspace ? { workspace: record.workspace } : {}) };
       } catch { /* 失效或未登记项目的记录不能挂到任何同名技能上。 */ }

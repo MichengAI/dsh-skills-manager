@@ -320,6 +320,7 @@ function apply(ctx: HostContext, config?: PluginConfig) {
     maxTransientBytes: config?.maxTransientBytes,
     gitTimeoutMs: config?.gitTimeoutMs,
     registeredWorkspaces: () => registeredWorkspacePaths(ctx),
+    getPresetRoots: () => collectPresetRoots(ctx),
   });
   // 目录可被 roots.json 改写，来源定义必须在每次请求时重新读取，不能缓存在启动时。
   const findUserRoot = (key: string) => userRoots().find((root) => root.key === key);
@@ -792,10 +793,11 @@ function apply(ctx: HostContext, config?: PluginConfig) {
       fetch: (req) => handlePost(req, async (b) => {
         const target = await workspaceTarget(b);
         if (target && "ok" in target && target.ok === false) return target;
+        const root = target ? (target as { root: SkillRoot }).root : await requestRoot(String(b.root || "dsh"), undefined, req.headers.get("x-dsh-skills-session"));
         return importSkill(String(b.source || ""), log, {
           conflict: b.conflict === "overwrite" ? "overwrite" : "skip",
           dryRun: b.dryRun === true,
-          ...(target ? { root: (target as { root: SkillRoot }).root } : b.root === "agents" ? { root: await requestRoot("agents", undefined, req.headers.get("x-dsh-skills-session")) } : {}),
+          root,
         });
       }, { afterSuccess: (b) => { if (b.dryRun !== true) afterWrite(); } }),
     },
@@ -805,9 +807,10 @@ function apply(ctx: HostContext, config?: PluginConfig) {
       fetch: (req) => handlePost(req, async (b) => {
         const target = await workspaceTarget(b);
         if (target && "ok" in target && target.ok === false) return target;
+        const root = target ? (target as { root: SkillRoot }).root : await requestRoot(String(b.root || "dsh"), undefined, req.headers.get("x-dsh-skills-session"));
         return importUploadedSkill({ name: b.name, entries: b.entries, zip: b.zip }, log, {
           conflict: b.conflict === "overwrite" ? "overwrite" : "skip",
-          ...(target ? { root: (target as { root: SkillRoot }).root } : b.root === "agents" ? { root: await requestRoot("agents", undefined, req.headers.get("x-dsh-skills-session")) } : {}),
+          root,
         });
       }, { afterSuccess: afterWrite, maxBytes: MAX_UPLOAD_BODY_BYTES }),
     },

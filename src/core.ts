@@ -1367,7 +1367,18 @@ async function checkedUserRootAncestors(definition: SkillRoot): Promise<SkillRoo
 
 async function checkedWritableRootDefinition(root: RootInput): Promise<SkillRoot | OperationError | null | undefined> {
   const definition = writableRootDefinition(root);
-  if (definition?.key === "agents" || (definition?.kind === "preset" && definition.native === false)) {
+  if (definition?.key === "agents") {
+    return checkedUserRootAncestors(definition);
+  }
+  if (definition?.kind === "preset" && definition.native === false) {
+    if (await overlapsUserSkillRoot(definition.path)) {
+      return {
+        ok: false,
+        error: `预设技能目录与用户技能目录重叠，拒绝写入: ${definition.path}`,
+        code: "error.root.unsafe",
+        params: { path: definition.path },
+      };
+    }
     return checkedUserRootAncestors(definition);
   }
   if (!definition || definition.scope !== "project") return definition;
@@ -1401,10 +1412,18 @@ export async function checkedRepositoryRootDefinition(root: RootInput): Promise<
   return checkedUserRootAncestors(definition);
 }
 
-/** 仓库可选的安装位置：全局 DSH，以及已配置的公共 Agent 目录。 */
-export async function repositoryDestinations(): Promise<RepositoryDestination[]> {
+/** 仓库可选的安装位置：全局 DSH、公共 Agent，以及用户自建的自定义模式。 */
+export async function repositoryDestinations(presetRoots?: SkillRoot[]): Promise<RepositoryDestination[]> {
   const result: RepositoryDestination[] = [];
   for (const root of userRoots().filter(item => item.key === "dsh" || item.key === "agents")) {
+    let error: Diagnostic | undefined;
+    try {
+      const checked = await checkedRepositoryRootDefinition(root);
+      if (!checked || checked.ok === false) error = checked || { code: "error.root.unsafe", error: "技能安装位置不可用" };
+    } catch (caught) { const exception = caught as CodedError; error = { code: "error.root.unsafe", error: exception.message, params: { path: root.path } }; }
+    result.push({ key: root.key as RepositoryDestination['key'], path: resolve(root.path), label: root.label, localeKey: root.localeKey, available: !error, ...(error ? { error } : {}) });
+  }
+  for (const root of (presetRoots || []).filter(item => item.kind === "preset" && item.mutable && item.native === false)) {
     let error: Diagnostic | undefined;
     try {
       const checked = await checkedRepositoryRootDefinition(root);
@@ -4365,7 +4384,7 @@ export async function state(options: ScopeOptions = {}) {
   const result = {
     roots: [] as RootView[],
     // 创建、导入、仓库安装共用的用户级写入位置，由后端校验过可写性。
-    writeDestinations: await repositoryDestinations(),
+    writeDestinations: await repositoryDestinations(presets),
     projects: [] as {root?: string; name?: string; workspaceCwds?: string[]}[],
     summary: {total: 0, enabled: 0, disabled: 0, issues: 0},
     trash,

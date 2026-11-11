@@ -143,9 +143,13 @@ export async function collectPresetRoots(ctx: unknown, options: PresetRootsOptio
     if (typeof agentPresets.inspectCompositions === "function") {
       try {
         const comps = await agentPresets.inspectCompositions();
-        if (Array.isArray(comps?.modules)) {
-          for (const m of comps.modules) {
-            if (m?.baseUrl && typeof m.baseUrl === "string") hostBaseUrls.push(m.baseUrl);
+        const list = Array.isArray(comps) ? comps : (Array.isArray(comps?.modules) ? comps.modules : [comps]);
+        for (const item of list) {
+          if (item?.baseUrl && typeof item.baseUrl === "string") hostBaseUrls.push(item.baseUrl);
+          if (Array.isArray(item?.modules)) {
+            for (const m of item.modules) {
+              if (m?.baseUrl && typeof m.baseUrl === "string") hostBaseUrls.push(m.baseUrl);
+            }
           }
         }
       } catch {}
