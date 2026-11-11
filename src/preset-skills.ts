@@ -1,5 +1,6 @@
 import { stat } from "node:fs/promises";
-import { resolve, join, dirname } from "node:path";
+import { resolve, join, dirname, isAbsolute } from "node:path";
+import { homedir } from "node:os";
 import { createRequire } from "node:module";
 import type { SkillRoot } from "./types.js";
 
@@ -73,6 +74,17 @@ async function isExistingDir(path: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+function expandPresetDir(raw: string): string {
+  const trimmed = raw.trim();
+  if (trimmed === "~") return homedir();
+  if (trimmed.startsWith("~/") || trimmed.startsWith("~\\")) {
+    return join(homedir(), trimmed.slice(2));
+  }
+  if (isAbsolute(trimmed)) return resolve(trimmed);
+  const dshHome = process.env.DSH_HOME?.trim() || join(homedir(), ".dsh");
+  return resolve(dshHome, trimmed);
 }
 
 /**
@@ -239,25 +251,26 @@ export async function collectPresetRoots(ctx: unknown, options: PresetRootsOptio
       if (dir === "@deepseek-ai/dsh-agent-preset/skills" && cordisBundledSkillsDir) {
         dir = cordisBundledSkillsDir;
       }
-      const resolved = resolve(dir);
+      const resolved = expandPresetDir(dir);
       if (seenPaths.has(resolved)) continue;
       if (!(await isExistingDir(resolved))) continue;
       seenPaths.add(resolved);
 
       const rootKey = declaredDirs.length === 1 ? `preset-${preset.id}` : `preset-${preset.id}-${i + 1}`;
       const presetName = preset.name || BUILTIN_PRESET_NAMES[preset.id] || preset.id;
-      const label = declaredDirs.length === 1 ? `预设: ${presetName}` : `预设: ${presetName} (${i + 1})`;
+      const suffix = declaredDirs.length === 1 ? "" : ` (${i + 1})`;
+      const label = `预设: ${presetName}${suffix}`;
 
       roots.push({
         key: rootKey,
         path: resolved,
         label,
-        rank: 10000,
+        rank: 10000 + roots.length * 10,
         mutable: !isBuiltin,
         native: isBuiltin,
         toggleable: false,
         kind: "preset",
-        group: presetName,
+        group: `${presetName}${suffix}`,
         presetId: preset.id,
         localeKey: `preset.${preset.id}`,
       });

@@ -243,10 +243,13 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
     function hostLocale() { return localeService?.getLocale?.().active; }
     function formatTrashTime(t: Translate, value: string) { return new Date(value).toLocaleString(hostLocale() || t("format.locale")); }
     function rootDisplayName(t: Translate, root: SkillRoot) {
-      if (root.kind === "preset") {
-        var rawName = root.group || root.label.replace(/^预设:\s*/, "");
-        var presetKey = root.presetId || (root.key ? root.key.replace(/^preset-/, "") : "");
-        var localizedName = translateOrFallback(t, "preset." + presetKey, rawName);
+      if (root.kind === "preset" || root.scope === "preset") {
+        var rawName = root.group || (root.label || "").replace(/^预设:\s*/, "");
+        var suffixMatch = rawName.match(/(\s+\(\d+\))$/);
+        var suffix = suffixMatch ? suffixMatch[1] : "";
+        var baseRaw = suffix ? rawName.slice(0, -suffix.length) : rawName;
+        var presetKey = root.presetId || (root.key ? root.key.replace(/^preset-/, "").replace(/-\d+$/, "") : "");
+        var localizedName = translateOrFallback(t, "preset." + presetKey, baseRaw) + suffix;
         var formatted = t("preset.prefix", { name: localizedName });
         return (typeof formatted === "string" && formatted !== "preset.prefix") ? formatted : ("预设: " + localizedName);
       }
@@ -867,7 +870,11 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
         var row = projectRoot ? workspaceRows.find(function (candidate) { return candidate.projectRoot === projectRoot && candidate.available; }) : undefined;
         return row ? { id: item.id, workspace: row.registeredPaths[0] || row.path } : { id: item.id };
       }
-      function trashRootLabel(item: TrashItem) { return item.root && item.root.scope === "project" ? t("root.projectDsh") + " · " + (item.root.projectName || item.root.projectRoot) : translateOrFallback(t, "root." + (item.root?.localeKey || item.root?.key || "dsh"), item.root?.label || t("root.dsh")); }
+      function trashRootLabel(item: TrashItem) {
+        if (item.root && item.root.scope === "project") return t("root.projectDsh") + " · " + (item.root.projectName || item.root.projectRoot);
+        if (item.root && (item.root.scope === "preset" || item.root.kind === "preset")) return rootDisplayName(t, item.root as SkillRoot);
+        return translateOrFallback(t, "root." + (item.root?.localeKey || item.root?.key || "dsh"), item.root?.label || t("root.dsh"));
+      }
       function renderRootIcon(key: string) {
         return h("span", { className: "dssm-brand-icon", "aria-hidden": true, style: { display: "inline-flex", alignItems: "center", justifyContent: "center", width: 16, height: 16, flexShrink: 0 } }, getRootBrandIcon(key));
       }

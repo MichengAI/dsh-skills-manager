@@ -75,7 +75,7 @@ dsh plugin --profile web add @michengai/dsh-skills-manager@latest --registry=htt
 
 Restart DSH, refresh the page, and open **Settings → Skills**. To update, update in the host plugin manager or run the installation command again.
 
-- Plugin `1.4.1` is tested with DeepSeek Harness `0.2.0-rc.1`, `0.2.0-rc.2`, `0.2.1-rc.1`, `0.2.1-rc.2`, `0.2.1-rc.3`, `0.2.1-rc.4`, `0.2.1-rc.5`, `0.2.2-rc.1`.
+- Plugin `1.4.2` is tested with DeepSeek Harness `0.2.0-rc.1`, `0.2.0-rc.2`, `0.2.1-rc.1`, `0.2.1-rc.2`, `0.2.1-rc.3`, `0.2.1-rc.4`, `0.2.1-rc.5`, `0.2.2-rc.1`.
 - Host compatibility: Full DeepSeek Harness `0.2.x` line (`>=0.2.0-rc.1 <0.3.0-0`), forwards-compatible with subsequent `0.2.x` RC releases without requiring routine plugin version bumps. Legacy versions and breaking changes in the `0.3.0` generation are rejected by the version gate. If you still use a `0.1.x` host, install plugin `1.1.23` instead of `@latest`.
 - **Reverse proxy deployment**: Supports hosting DSH behind prefix-stripping reverse proxies (e.g. `/app/dsh/`). API and update endpoints resolve against the page base URI (`document.baseURI`).
 
@@ -190,6 +190,12 @@ An agent that is not in the table above does not need to wait for a release: ope
 When an agent keeps a separate skills folder per sub-profile (multiple accounts or workspaces), point at the **product folder** and choose **Scan subfolders**: the plugin looks two levels down for every `skills` folder containing `SKILL.md` and lists them as candidates named `product / subfolder`, each with its skill count, so you can register them in one go. Scanning only produces candidates and never registers anything by itself; candidates overlapping an existing source are flagged and cannot be added.
 
 Registrations live in the `customSources` section of `roots.json`, alongside the folder overrides. Removing a registration only deletes that record — the skill files on disk are left untouched. Up to 32 custom sources are supported.
+
+### Agent Presets
+
+Skills Manager automatically discovers Agent Presets configured with dedicated skill folders in DSH and lists them at the end of the global skills view:
+- **Official Built-in Presets** (such as Creator Mode): bundled skills remain strictly read-only for inspection without misleading toggles or modifications to host files;
+- **Custom Presets**: your own Agent Presets configured with `customSkillDirs` support full skill lifecycle management — select a custom preset target directly in Create, Import, or Repository/Registry Install modals, move skills to Trash, and restore them back to the original preset folder. Preset paths overlapping with global skill directories are safely blocked to prevent accidental deletion.
 
 ## DSH product ecosystem
 

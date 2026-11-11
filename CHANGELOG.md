@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.4.2] - 2026-11-11
+
+### New Features
+
+- **Discover and browse built-in Agent Preset skills**: skills bundled with official built-in presets (such as Creator Mode) are now automatically discovered, categorized, and presented at the bottom of the global skills list with read-only detail inspection (#86).
+- **Full skill lifecycle management for custom Agent Presets**: skills stored in your own custom Agent Preset directories support full management right inside Skills Manager — create, upload, import from local directories, install/uninstall via Git repositories and registries, move to Trash, and restore back to the original preset folder (#86).
+- **Three-way Destination Picker**: creation, import, and repository installation modals now allow selecting between Global (User), Workspace (Project), and Custom Agent Preset targets, while preventing unsafe writes to preset paths that overlap with global directories (#86).
+
+### Behavior Changes
+
+- **Localized preset display and multi-folder disambiguation**: built-in preset labels automatically adapt to the host locale, and presets configured with multiple skill folders are numbered sequentially across all views and filters (#86).
+- **Refined conflict detection in repositories**: repository skill lists no longer report false-positive conflicts against read-only built-in preset skills, while preserving duplicate protection across user, custom preset, and external Agent sources.
+
+[中文](CHANGELOG.zh-CN.md)
+
 ## [1.4.1] - 2026-11-10
 
 ### New Features

@@ -142,7 +142,7 @@ ok(!!cordisRoot, "发现内置 cordis 预设根");
 eq(cordisRoot.kind, "preset", "根类型为 preset");
 eq(cordisRoot.mutable, false, "预设根不可写");
 eq(cordisRoot.toggleable, false, "B方案：内置预设根只读，不提供假开关");
-eq(cordisRoot.rank, 10000, "预设根优先级为 10000 稳定沉底");
+ok(cordisRoot.rank >= 10000, "预设根优先级沉底 (>= 10000)");
 eq(cordisRoot.native, true, "内置 cordis 模式 native 为 true");
 ok(cordisRoot.label.includes("创造模式") || cordisRoot.label.includes("cordis"), "标签包含模式名称");
 
@@ -151,7 +151,7 @@ ok(!!reviewRoot, "发现自定义 code-review 预设根");
 eq(reviewRoot.kind, "preset", "根类型为 preset");
 eq(reviewRoot.mutable, true, "自定义预设根支持管理与写入（mutable: true）");
 eq(reviewRoot.toggleable, false, "B方案：自定义预设根只读，不提供假开关");
-eq(reviewRoot.rank, 10000, "自定义预设根优先级为 10000 稳定沉底");
+ok(reviewRoot.rank >= 10000 && reviewRoot.rank !== cordisRoot.rank, "自定义预设根优先级独立且沉底 (>= 10000)");
 eq(reviewRoot.native, false, "自定义模式 native 为 false");
 eq(reviewRoot.path, customReviewSkillsDir, "路径指向自定义模式配置的 customSkillDirs");
 ok(reviewRoot.label.includes("代码审查模式"), "标签包含自定义模式名称");
@@ -287,6 +287,33 @@ eq(rootDisplayName((k, p) => translateMock("zh", k, p), cordisRoot), "预设: �
 eq(rootDisplayName((k, p) => translateMock("en", k, p), cordisRoot), "Preset: Creator Mode", "英文下正确渲染「Preset: Creator Mode」");
 eq(rootDisplayName((k, p) => translateMock("zh", k, p), reviewRoot), "预设: 代码审查模式", "自定义模式中文下正确保留自定义名");
 eq(rootDisplayName((k, p) => translateMock("en", k, p), reviewRoot), "Preset: 代码审查模式", "自定义模式英文下前缀本地化");
+
+// 多目录预设：group 与 label 必须保留 (1)/(2) 后缀且不影响国际化翻译
+const multiDir1 = join(tmp, "multi-dir-1");
+const multiDir2 = join(tmp, "multi-dir-2");
+await mkdir(multiDir1, { recursive: true });
+await mkdir(multiDir2, { recursive: true });
+const multiPresetRoots = await collectPresetRoots({
+  agentPresets: {
+    definitions: new Map([
+      [
+        "cordis",
+        {
+          config: {
+            id: "cordis",
+            name: "创造模式",
+            plugins: [{ id: "skill-filesystem", config: { customSkillDirs: [multiDir1, multiDir2] } }],
+          },
+        },
+      ],
+    ]),
+  },
+});
+eq(multiPresetRoots.length, 2, "多目录预设返回 2 个根");
+eq(multiPresetRoots[0].group, "创造模式 (1)", "多目录第 1 项 group 带 (1) 消歧");
+eq(multiPresetRoots[1].group, "创造模式 (2)", "多目录第 2 项 group 带 (2) 消歧");
+eq(rootDisplayName((k, p) => translateMock("en", k, p), multiPresetRoots[0]), "Preset: Creator Mode (1)", "英文下多目录第 1 项保留序号且翻译完整");
+eq(rootDisplayName((k, p) => translateMock("en", k, p), multiPresetRoots[1]), "Preset: Creator Mode (2)", "英文下多目录第 2 项保留序号且翻译完整");
 
 console.log("── 3. 技能详情读取（skillDetail）──");
 
@@ -657,6 +684,51 @@ try {
   failClosedCaught = true;
 }
 ok(failClosedCaught, "repositoryInstallRoot 在缺 presetRoots 时严格抛错（fail-closed）");
+
+// 8. 只读内置预设同名不阻断仓库列表为 conflict，且 uninstallMany 支持预设批量卸载并复用 presetRoots
+let presetRootsFetchCount = 0;
+const readonlyConflictRepoMgr = createRepositoryManager({
+  probeRemote: false,
+  gitFetch: async (_repo, dest) => {
+    for (const [dir, name] of [
+      ["cordis-builtin", "cordis-builtin-skill"],
+      ["audit-a", "audit-skill-a"],
+      ["audit-b", "audit-skill-b"],
+    ]) {
+      await mkdir(join(dest, dir), { recursive: true });
+      await writeFile(
+        join(dest, dir, "SKILL.md"),
+        `---\nname: ${name}\ndescription: 仓库技能\n---\n正文`,
+        "utf8",
+      );
+    }
+    return { commit: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" };
+  },
+  getPresetRoots: async () => {
+    presetRootsFetchCount++;
+    return roots;
+  },
+});
+const conflictTestRepo = await readonlyConflictRepoMgr.add({ url: "example/conflict-check" });
+await readonlyConflictRepoMgr.refresh({ id: conflictTestRepo.id });
+const conflictList = await readonlyConflictRepoMgr.list();
+const cordisSkillInRepo = conflictList.repositories
+  .find((r) => r.id === conflictTestRepo.id)
+  ?.skills.find((s) => s.name === "cordis-builtin-skill");
+eq(cordisSkillInRepo?.status, "available", "只读内置预设中的同名技能不会导致仓库列表误判为 conflict");
+
+// 装入两个技能后，验证 uninstallMany 批量卸载预设技能时仅调用 1 次 getPresetRoots
+await readonlyConflictRepoMgr.install({ id: conflictTestRepo.id, path: "audit-a", root: "preset-code-review" });
+await readonlyConflictRepoMgr.install({ id: conflictTestRepo.id, path: "audit-b", root: "preset-code-review" });
+presetRootsFetchCount = 0;
+const bulkUninstallRes = await readonlyConflictRepoMgr.uninstallMany({
+  items: [
+    { id: conflictTestRepo.id, path: "audit-a", root: "preset-code-review" },
+    { id: conflictTestRepo.id, path: "audit-b", root: "preset-code-review" },
+  ],
+});
+ok(bulkUninstallRes.results[0]?.ok === true && bulkUninstallRes.results[1]?.ok === true, "uninstallMany 成功批量卸载自定义预设下的多个仓库技能");
+eq(presetRootsFetchCount, 1, "uninstallMany 在批量卸载多条预设记录时只调用 1 次 getPresetRoots（无线性重复探测）");
 
 server.close();
 await rm(tmp, { recursive: true, force: true });

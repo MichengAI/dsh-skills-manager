@@ -144,9 +144,10 @@ export function createRepositoryManager({
     input: SkillRequest,
     registered: string[] | undefined,
     missing: string,
+    presetRoots?: SkillRoot[],
   ) => {
-    const presetRoots = await fetchPresetRoots();
-    return selectInstallRecord(records, input, registered, missing, presetRoots);
+    const presets = presetRoots ?? await fetchPresetRoots();
+    return selectInstallRecord(records, input, registered, missing, presets);
   };
   async function read(): Promise<RepositoryState> {
     try {
@@ -447,7 +448,7 @@ export function createRepositoryManager({
     const data = await read();
     const presetRoots = await fetchPresetRoots();
     const local = await state({ presetRoots });
-    const skills = local.roots.filter((r) => r.mutable !== false).flatMap((r) => r.skills || []);
+    const skills = local.roots.filter((r) => !(r.kind === "preset" && r.mutable === false)).flatMap((r) => r.skills || []);
     // 每次只读取一个目录，避免多个大技能并行读取使内存随安装数量增长。
     const matched = new Map<InstallRecord, boolean>();
     const present = new Set<InstallRecord>();
@@ -937,6 +938,7 @@ export function createRepositoryManager({
       if (rawItems.length > 100) throw failure("批量卸载项超过上限（最多 100 项）", "error.repo.tooMany");
       const data = await read();
       const index = requestIndex();
+      const presetRoots = await fetchPresetRoots();
       type BulkUninstallResult = { id: string; path: string; root?: string; workspace?: string; ok: boolean; error?: string; code?: string; params?: unknown };
       const results: BulkUninstallResult[] = new Array(rawItems.length);
       const prepared: Array<{ slot: number; id: string; path: string; record: InstallRecord; root: any; fingerprint: string; trashId: string; catalog: ReturnType<typeof catalogCopies> }> = [];
@@ -952,12 +954,12 @@ export function createRepositoryManager({
         seen.add(duplicate);
         try {
           const request = { id, path: entryPath, ...(raw?.root !== undefined ? { root: raw.root as SkillRequest["root"] } : {}), ...(typeof raw?.workspace === "string" ? { workspace: raw.workspace } : {}) };
-          const record = await pickInstallRecord(data.installs, request, index.registered, "没有可追溯的安装记录，不能卸载");
+          const record = await pickInstallRecord(data.installs, request, index.registered, "没有可追溯的安装记录，不能卸载", presetRoots);
           if (selected.has(record)) throw failure("重复的卸载项", "error.repo.duplicate");
           selected.add(record);
           rootKey = record.root || "dsh";
           workspaceKey = record.workspace;
-          const root = await resolveInstallRoot(record, index.registered, await indexedFor(record));
+          const root = await resolveInstallRoot(record, index.registered, await indexedFor(record), presetRoots);
           const fingerprint = signature(fileIndex(await readSkillTree(join(root.path, record.name))));
           const trashId = `${Date.now()}-${randomUUID()}`;
           // 先持久化卸载意图；本进程失败凭据或中断恢复检查决定能否撤销。
@@ -977,7 +979,7 @@ export function createRepositoryManager({
             for (const entry of item.catalog) delete entry.trashId;
             throw error;
           }
-          await resolveInstallRoot(item.record, index.registered, await indexedFor(item.record));
+          await resolveInstallRoot(item.record, index.registered, await indexedFor(item.record), presetRoots);
           const result = await deleteSkill(item.root, item.record.name, log, { repositoryEntryOnly: true, repositoryTrash: { id: item.trashId, repository: { id: item.id, path: item.path } }, ...(item.catalog.length ? { catalogTrash: { id: item.trashId, ids: item.catalog.map(entry => entry.id) } } : {}) });
           if ("ok" in result && result.ok === false) throw result;
           results[item.slot] = { id: item.id, path: item.path, root: item.record.root || "dsh", ...(item.record.workspace ? { workspace: item.record.workspace } : {}), ok: true };
