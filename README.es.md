@@ -158,7 +158,7 @@ Si usas un agente que no figure en la lista anterior, puedes registrarlo mediant
 
 Skills Manager detecta automáticamente los preajustes de agente configurados en DSH con directorios dedicados y los muestra al final de la lista global:
 - **Preajustes oficiales integrados** (como Modo Creador): las habilidades integradas son de solo lectura para consulta e inspección, sin interruptores engañosos;
-- **Preajustes personalizados**: tus propios preajustes con `customSkillDirs` admiten la gestión completa — creación, importación, instalación y desinstalación desde repositorios, envío a la Papelera y restauración en su carpeta original. Las rutas que se solapan con directorios globales se bloquean de forma segura.
+- **Preajustes personalizados**: tus propios preajustes con `customSkillDirs` admiten la gestión completa — creación, importación, instalación y desinstalación desde repositorios, envío a la Papelera y restauración en su carpeta original. Las rutas que se solapan con directorios globales se bloquean de forma segura, y las rutas relativas permanecen de solo lectura por seguridad (usa una ruta absoluta para habilitar la gestión completa).
 
 ## Ecosistema de productos DSH
 

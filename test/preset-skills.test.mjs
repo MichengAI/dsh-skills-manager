@@ -427,6 +427,38 @@ const disableRes = await fetch(`${api}/disable`, {
 const disablePayload = await disableRes.json();
 ok(disablePayload.ok === false, "B方案：只读预设来源发起停用请求被安全拒绝");
 eq(disablePayload.code, "error.root.readonly", "精准返回只读错误码 error.root.readonly");
+ok(disablePayload.error.includes("启用或停用"), "toggle 只读错误精准包含对应动作文案");
+
+// 校验 readonlyError 对 create / delete 返回精准的对应动作描述
+const createOnReadonlyRes = await fetch(`${api}/create`, {
+  method: "POST",
+  headers: {
+    host: `127.0.0.1:${port}`,
+    "content-type": "application/json",
+    "x-dsh-skills-manager": "1",
+  },
+  body: JSON.stringify({ root: "preset-cordis", name: "fail-skill", description: "d", body: "b" }),
+});
+const createOnReadonlyPayload = await createOnReadonlyRes.json();
+eq(createOnReadonlyPayload.code, "error.root.readonly", "向只读内置预设新建技能返回 error.root.readonly");
+ok(createOnReadonlyPayload.error.includes("创建"), "create 只读错误文案精准提示不允许创建（非启用或停用）");
+
+const deleteOnReadonlyRes = await fetch(`${api}/delete`, {
+  method: "POST",
+  headers: {
+    host: `127.0.0.1:${port}`,
+    "content-type": "application/json",
+    "x-dsh-skills-manager": "1",
+  },
+  body: JSON.stringify({ root: "preset-cordis", name: "cordis-builtin-skill" }),
+});
+const deleteOnReadonlyPayload = await deleteOnReadonlyRes.json();
+eq(deleteOnReadonlyPayload.code, "error.root.readonly", "删除只读内置预设技能返回 error.root.readonly");
+ok(deleteOnReadonlyPayload.error.includes("删除"), "delete 只读错误文案精准提示不允许删除");
+
+// 验证 clientSource 中预设不进入外部目录覆盖列表且带只读相对路径徽标
+ok(clientSource.includes('root.kind !== "preset" && root.scope !== "preset"'), "UI 中预设根不进入外部可覆盖目录按钮列表");
+ok(clientSource.includes("preset.readonlyRelative"), "UI 中相对路径自定义预设带只读警示徽标");
 
 // 整源停用接口同样拒绝只读预设来源
 const sourceDisableRes = await fetch(`${api}/source-disable`, {

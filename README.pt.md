@@ -130,7 +130,7 @@ Para adicionar um agente ausente na lista, abra o menu ➕ e selecione «Pastas 
 
 O Skills Manager descobre automaticamente predefinições de agente configuradas com pastas de skills dedicadas no DSH e as exibe ao final da lista global:
 - **Predefinições oficiais integradas** (como o Modo Criador): skills integradas permanecem estritamente em modo somente leitura para inspeção, sem alternadores enganosos;
-- **Predefinições personalizadas**: suas próprias predefinições com `customSkillDirs` suportam ciclo de vida completo — criação, importação, instalação e desinstalação via repositórios, envio à Lixeira e restauração na pasta original. Caminhos que se sobrepõem a diretórios globais são bloqueados com segurança.
+- **Predefinições personalizadas**: suas próprias predefinições com `customSkillDirs` suportam ciclo de vida completo — criação, importação, instalação e desinstalação via repositórios, envio à Lixeira e restauração na pasta original. Caminhos que se sobrepõem a diretórios globais são bloqueados com segurança, e caminhos relativos permanecem somente leitura por precaução (use um caminho absoluto para habilitar o gerenciamento completo).
 
 ## Ecossistema de produtos DSH
 

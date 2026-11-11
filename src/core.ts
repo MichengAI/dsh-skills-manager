@@ -1296,16 +1296,23 @@ function dshRootPath() {
   return userRoots().find((root) => root.key === "dsh")!.path;
 }
 
-/** 只读来源的拒绝结果；action 为可翻译语义值（toggle/delete）。 */
+const READONLY_ACTION_ZH: Record<string, string> = {
+  create: "创建",
+  import: "导入",
+  upload: "上传",
+  delete: "删除",
+  restore: "恢复",
+  toggle: "启用或停用",
+};
+
+/** 只读来源的拒绝结果；action 为可翻译语义值（toggle/delete/create/restore/import/upload）。 */
 function readonlyError(action: string): OperationError {
+  const actionLabel = READONLY_ACTION_ZH[action] || "启用或停用";
   return {
     ok: false,
     code: "error.root.readonly",
     params: { action },
-    error:
-      action === "delete"
-        ? "该技能来源不允许删除"
-        : "该技能来源不允许启用或停用",
+    error: `该技能来源不允许${actionLabel}`,
   };
 }
 
