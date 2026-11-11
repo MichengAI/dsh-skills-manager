@@ -242,7 +242,7 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
     // getLocale().active 是宿主对 locale.preference 的最终有效解析，不读取网页/浏览器语言。
     function hostLocale() { return localeService?.getLocale?.().active; }
     function formatTrashTime(t: Translate, value: string) { return new Date(value).toLocaleString(hostLocale() || t("format.locale")); }
-    function rootDisplayName(t: Translate, root: SkillRoot) { var base = translateOrFallback(t, "root." + (root.localeKey || root.kind || root.key), root.label); return root.projectName ? base + " · " + root.projectName : base; }
+    function rootDisplayName(t: Translate, root: SkillRoot) { if (root.kind === "preset") return root.label; var base = translateOrFallback(t, "root." + (root.localeKey || root.kind || root.key), root.label); return root.projectName ? base + " · " + root.projectName : base; }
     function summarizeImportResult(t: Translate, data: ImportResult) {
       var importedItems = data && data.imported || [];
       var imported = importedItems.map(function (item) { return item.name; });
@@ -407,6 +407,11 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
 
     function getRootBrandIcon(key: string) {
       var k = String(key || "").toLowerCase();
+      if (k.startsWith("preset") || k.includes("preset")) {
+        return h("svg", { viewBox: "0 0 24 24", width: 16, height: 16, style: { display: "block" } },
+          h("path", { fill: "currentColor", d: "M12 2a2 2 0 0 1 2 2v1.05A7.002 7.002 0 0 1 20 12v1a3 3 0 0 1-3 3h-1v2a3 3 0 0 1-3 3h-2a3 3 0 0 1-3-3v-2H7a3 3 0 0 1-3-3v-1a7.002 7.002 0 0 1 6-6.95V4a2 2 0 0 1 2-2zm-3 8a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm6 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3z" })
+        );
+      }
       if (k.includes("dsh")) {
         return h("img", { src: DSH_ICON_B64, width: 16, height: 16, alt: "DSH", style: { width: 16, height: 16, objectFit: "contain", borderRadius: 3, display: "block" } });
       }

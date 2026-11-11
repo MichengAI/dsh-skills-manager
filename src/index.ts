@@ -43,6 +43,7 @@ import {
   getSidebarEntry,
   setEntryLocation,
   setSidebarEntry,
+  collectPresetRoots,
 } from "./core.js";
 import { createRepositoryManager } from "./repositories.js";
 import { installationSourceKey } from "./repository-updates.js";
@@ -401,8 +402,19 @@ function apply(ctx: HostContext, config?: PluginConfig) {
     if ("ok" in target && target.ok === false) return target;
     return { projectCwds: (target as { root: SkillRoot }).root.workspaceCwds ?? [] };
   };
-  const scopedOptions = (scope: { projectCwds: string[] } | null, sessionId?: string | null) => scope ?? projectOptions(sessionId);
-  const requestRoot = async (key: string, cwds?: string[], sessionId?: string | null) => cwds ? (await projectRoots(cwds)).find((root) => root.key === key) : findUserRoot(key) || (await projectRoots(projectOptions(sessionId).projectCwds)).find((root) => root.key === key);
+  const scopedOptions = (scope: { projectCwds: string[] } | null, sessionId?: string | null, presetRoots?: SkillRoot[]) => ({
+    ...(scope ?? projectOptions(sessionId)),
+    ...(presetRoots ? { presetRoots } : {}),
+  });
+  const requestRoot = async (key: string, cwds?: string[], sessionId?: string | null) => {
+    if (cwds) return (await projectRoots(cwds)).find((root) => root.key === key);
+    const user = findUserRoot(key);
+    if (user) return user;
+    const project = (await projectRoots(projectOptions(sessionId).projectCwds)).find((root) => root.key === key);
+    if (project) return project;
+    const presets = await collectPresetRoots(ctx);
+    return presets.find((root) => root.key === key);
+  };
 
   const attachSources = async <T extends { roots: RootView[]; warnings: Diagnostic[] }>(snapshot: T) => {
     try {
@@ -416,7 +428,10 @@ function apply(ctx: HostContext, config?: PluginConfig) {
     catch (caught) { const error = caught as CodedError; snapshot.warnings.push({ code: "error.repo.state", error: error.message }); }
     return snapshot;
   };
-  const stateWithSources = async (req: Request) => attachSources(await state(projectOptions(req.headers.get("x-dsh-skills-session"))));
+  const stateWithSources = async (req: Request) => {
+    const presetRoots = await collectPresetRoots(ctx);
+    return attachSources(await state({ ...projectOptions(req.headers.get("x-dsh-skills-session")), presetRoots }));
+  };
 
   const handlePost = async (
     req: Request,
@@ -649,12 +664,18 @@ function apply(ctx: HostContext, config?: PluginConfig) {
     {
       path: `${API_PREFIX}/source-enable`,
       methods: ["POST"],
-      fetch: (req) => handlePost(req, (b, scope) => setSourceEnabled(String(b.root || ""), true, log, scopedOptions(scope, req.headers.get("x-dsh-skills-session"))), { afterSuccess: afterWrite }),
+      fetch: (req) => handlePost(req, async (b, scope) => {
+        const presetRoots = await collectPresetRoots(ctx);
+        return setSourceEnabled(String(b.root || ""), true, log, scopedOptions(scope, req.headers.get("x-dsh-skills-session"), presetRoots));
+      }, { afterSuccess: afterWrite }),
     },
     {
       path: `${API_PREFIX}/source-disable`,
       methods: ["POST"],
-      fetch: (req) => handlePost(req, (b, scope) => setSourceEnabled(String(b.root || ""), false, log, scopedOptions(scope, req.headers.get("x-dsh-skills-session"))), { afterSuccess: afterWrite }),
+      fetch: (req) => handlePost(req, async (b, scope) => {
+        const presetRoots = await collectPresetRoots(ctx);
+        return setSourceEnabled(String(b.root || ""), false, log, scopedOptions(scope, req.headers.get("x-dsh-skills-session"), presetRoots));
+      }, { afterSuccess: afterWrite }),
     },
     {
       path: `${API_PREFIX}/root-path`,
@@ -744,7 +765,13 @@ function apply(ctx: HostContext, config?: PluginConfig) {
     {
       path: `${API_PREFIX}/detail`,
       methods: ["POST"],
-      fetch: (req) => handlePost(req, (b, scope) => skillDetail(String(b.root || "dsh"), String(b.name || ""), scope ? { ...scope, workspaceBound: true } : projectOptions(req.headers.get("x-dsh-skills-session")))),
+      fetch: (req) => handlePost(req, async (b, scope) => {
+        const presetRoots = await collectPresetRoots(ctx);
+        return skillDetail(String(b.root || "dsh"), String(b.name || ""), {
+          ...(scope ? { ...scope, workspaceBound: true } : projectOptions(req.headers.get("x-dsh-skills-session"))),
+          presetRoots,
+        });
+      }),
     },
     {
       path: `${API_PREFIX}/create`,

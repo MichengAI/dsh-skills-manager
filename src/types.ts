@@ -294,6 +294,8 @@ export interface ScopeOptions {
     projectCwds?: string[];
     cwd?: string;
     signal?: AbortSignal;
+    /** 宿主各 Agent 预设模式（内置创造模式与自定义模式）专属的技能根目录。 */
+    presetRoots?: SkillRoot[];
 }
 export interface RenameOptions {
     rename?: (source: string, destination: string) => Promise<void>;

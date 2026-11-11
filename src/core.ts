@@ -30,6 +30,10 @@ import {
   discoverReadonlyEntries,
   validDiscoveryName,
 } from "./readonly-discovery.js";
+import {
+  collectPresetRoots,
+  extractCustomSkillDirs,
+} from "./preset-skills.js";
 
 const KEBAB_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 // 项目来源集中定义，路径校验、策略身份和展示共用，避免新增目录只可见却不可加载。
@@ -2059,7 +2063,7 @@ async function scanDeduplicatedRoots(roots: SkillRoot[] = userRoots(), options: 
 /** 详情与列表共享路径去重，扫描定位信息时不读取无关技能正文。 */
 async function visibleEntryForRoot(root: SkillRoot, name: string) {
   if (!validDiscoveryName(name)) return null;
-  const roots = root.scope === "project" ? [root] : userRoots();
+  const roots = (root.scope === "project" || root.kind === "preset") ? [root] : userRoots();
   const scans = await scanDeduplicatedRoots(roots, { metadataOnly: true });
   return (
     scans.get(root.key)?.entries.find((entry) => entry.name === name) || null
@@ -2136,9 +2140,9 @@ function validManagerStateDocument(value: ManagerState) {
     if (!Array.isArray(list) || list.some((name) => !validStateSkillName(name)))
       return false;
   }
-  // 项目来源键允许缺省（默认开启），但显式值必须与全局来源一样严格校验。
+  // 项目来源键与预设来源键允许缺省（默认开启），但显式值必须与全局来源一样严格校验。
   for (const [key, flag] of Object.entries(value.sources)) {
-    if (PROJECT_ROOT_KEY_RE.test(key) && typeof flag !== "boolean") return false;
+    if ((PROJECT_ROOT_KEY_RE.test(key) || key.startsWith("preset-")) && typeof flag !== "boolean") return false;
   }
   const enabledSkills = value.enabledSkills || {};
   for (const key of new Set([
@@ -2226,7 +2230,7 @@ function normalizeManagerState(value: ManagerState) {
   }
   if (value.sources && typeof value.sources === "object" && !Array.isArray(value.sources)) {
     for (const [key, flag] of Object.entries(value.sources)) {
-      if (PROJECT_ROOT_KEY_RE.test(key) && !key.startsWith("project-dsh:") && typeof flag === "boolean")
+      if ((PROJECT_ROOT_KEY_RE.test(key) || key.startsWith("preset-")) && !key.startsWith("project-dsh:") && typeof flag === "boolean")
         normalized.sources[key] = flag;
     }
   }
@@ -2234,7 +2238,7 @@ function normalizeManagerState(value: ManagerState) {
     const source = value[field];
     if (source && typeof source === "object" && !Array.isArray(source)) {
       for (const [key, list] of Object.entries(source)) {
-        if (!PROJECT_ROOT_KEY_RE.test(key) || !Array.isArray(list)) continue;
+        if ((!PROJECT_ROOT_KEY_RE.test(key) && !key.startsWith("preset-")) || !Array.isArray(list)) continue;
         normalized[field][key] = [
           ...new Set(list.filter(validStateSkillName)),
         ].sort();
@@ -2270,7 +2274,7 @@ function normalizeCustomNotes(value: ManagerState["customNotes"] | undefined) {
 }
 
 function categoryRootKey(key: string) {
-  if (rootByKey(key) || PROJECT_ROOT_KEY_RE.test(key)) return key;
+  if (rootByKey(key) || PROJECT_ROOT_KEY_RE.test(key) || key.startsWith("preset-")) return key;
   return null;
 }
 
@@ -2450,6 +2454,8 @@ export async function setSourceEnabled(key: string, enabled: boolean, log?: Log,
   let root = rootByKey(key);
   if (!root && PROJECT_ROOT_KEY_RE.test(key) && !key.startsWith("project-dsh:"))
     root = (await projectRoots(options.projectCwds)).find((item) => item.key === key);
+  if (!root && options.presetRoots)
+    root = options.presetRoots.find((item) => item.key === key);
   if (!root || root.kind === 'project-dsh' || !root.toggleable)
     return readonlyError("toggle");
   const current = await readManagerState();
@@ -2467,6 +2473,9 @@ export async function setSourceEnabled(key: string, enabled: boolean, log?: Log,
 async function checkedPolicyRootDefinition(root: RootInput): Promise<SkillRoot | OperationError | null> {
   const definition = rootDefinition(root);
   if (!definition || !definition.toggleable) return null;
+  if (definition.kind === "preset" || definition.key.startsWith("preset-")) {
+    return definition.toggleable && isAbsolute(definition.path) ? definition : null;
+  }
   if (definition.scope !== "project") {
     const canonical = rootByKey(definition.key);
     return canonical && resolve(canonical.path) === resolve(definition.path)
@@ -2644,6 +2653,8 @@ async function resolvedCategoryRoot(key: string, options: ScopeOptions = {}) {
   if (!rootKey) return null;
   const user = rootByKey(rootKey);
   if (user) return user;
+  const preset = options.presetRoots?.find((item) => item.key === rootKey);
+  if (preset) return preset;
   if (!PROJECT_ROOT_KEY_RE.test(rootKey)) return null;
   return (await projectRoots(options.projectCwds)).find((item) => item.key === rootKey) || null;
 }
@@ -3969,7 +3980,10 @@ export async function createSkill(input: CreateInput, log?: Log, options: Mutati
 
 export async function skillDetail(key: string, name: string, options: ScopeOptions & { workspaceBound?: boolean } = {}) {
   const scopedRoots = await projectRoots(options.projectCwds);
-  const root = options.workspaceBound ? scopedRoots.find((item) => item.key === key) : rootByKey(key) || scopedRoots.find((item) => item.key === key);
+  const presets = options.presetRoots || [];
+  const root = options.workspaceBound
+    ? scopedRoots.find((item) => item.key === key)
+    : rootByKey(key) || scopedRoots.find((item) => item.key === key) || presets.find((item) => item.key === key);
   if (!root)
     return {
       ok: false,
@@ -4307,6 +4321,8 @@ export async function state(options: ScopeOptions = {}) {
   const userScans = await scanDeduplicatedRoots(user);
   const projectWarnings: Diagnostic[] = [];
   const scoped = await projectRoots(options.projectCwds, projectWarnings);
+  const presets = options.presetRoots || [];
+  const presetScans = presets.length > 0 ? await scanDeduplicatedRoots(presets) : new Map();
   const policyResult = await readManagerState();
   const trash = await listTrash();
   const result = {
@@ -4323,11 +4339,13 @@ export async function state(options: ScopeOptions = {}) {
     ],
   };
   const all: ViewItem[] = [];
-  for (const root of [...scoped, ...user]) {
-    const { exists, entries, truncated } =
+  for (const root of [...scoped, ...presets, ...user]) {
+    const scanResult =
       root.scope === "project"
         ? (await scanDeduplicatedRoots([root])).get(root.key)!
-        : userScans.get(root.key)!;
+        : (root.kind === "preset" ? presetScans.get(root.key) : userScans.get(root.key))!;
+    if (!scanResult) continue;
+    const { exists, entries, truncated } = scanResult;
     // 即使项目 .dsh/skills 尚不存在，也要把可写根返回给创建表单；只读项目根仍按实际存在性展示。
     if (root.scope === "project" && !exists && root.kind !== "project-dsh")
       continue;
@@ -4452,7 +4470,7 @@ export async function state(options: ScopeOptions = {}) {
   return result;
 }
 
-export { KEBAB_RE };
+export { KEBAB_RE, collectPresetRoots, extractCustomSkillDirs };
 
 export type ProviderCandidate = Awaited<ReturnType<typeof listProviderCandidates>>[number];
 
