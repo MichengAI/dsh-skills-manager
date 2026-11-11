@@ -1,5 +1,6 @@
 import { stat } from "node:fs/promises";
 import { resolve, join, dirname } from "node:path";
+import { homedir } from "node:os";
 import { createRequire } from "node:module";
 import type { SkillRoot } from "./types.js";
 
@@ -32,7 +33,25 @@ export function extractCustomSkillDirs(plugins: unknown[]): string[] {
   return dirs;
 }
 
+function extractDirsFromYaml(yamlText: string): string[] {
+  const dirs: string[] = [];
+  if (!yamlText) return dirs;
+  const blockMatch = yamlText.match(/customSkillDirs:\s*\n((?:\s*-\s*[^\n]+\n?)+)/);
+  if (blockMatch && blockMatch[1]) {
+    const lines = blockMatch[1].split("\n");
+    for (const line of lines) {
+      const m = line.match(/^\s*-\s*["']?([^"'\r\n]+)["']?\s*$/);
+      if (m && m[1]) {
+        const val = m[1].trim();
+        if (val && !val.startsWith("!!js")) dirs.push(val);
+      }
+    }
+  }
+  return dirs;
+}
+
 async function isExistingDir(path: string): Promise<boolean> {
+  if (!path) return false;
   try {
     const s = await stat(path);
     return s.isDirectory();
@@ -42,75 +61,133 @@ async function isExistingDir(path: string): Promise<boolean> {
 }
 
 /**
+ * 多层探测官方内置创造模式（Cordis）随包出货的技能目录：
+ * 1. 尝试直接模块 resolve；
+ * 2. 尝试从 @deepseek-ai/dsh 内部 resolve；
+ * 3. 探测本机全局 node_modules 物理路径；
+ * 4. 探测常见 Codex / DSH 运行时路径；
+ * 5. 探测 Electron 宿主 resourcesPath / execPath。
+ */
+async function findCordisSkillsDir(): Promise<string | undefined> {
+  try {
+    const req = createRequire(import.meta.url);
+    const p = req.resolve("@deepseek-ai/dsh-agent-preset/package.json");
+    const candidate = join(dirname(p), "skills");
+    if (await isExistingDir(candidate)) return resolve(candidate);
+  } catch {}
+
+  try {
+    const req = createRequire(import.meta.url);
+    const dshPkg = req.resolve("@deepseek-ai/dsh/package.json");
+    const candidate = join(dirname(dshPkg), "node_modules", "@deepseek-ai", "dsh-agent-preset", "skills");
+    if (await isExistingDir(candidate)) return resolve(candidate);
+  } catch {}
+
+  const globalCandidates = [
+    "D:/Tools/nodejs/node_global/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-agent-preset/skills",
+    join(homedir(), "AppData/Roaming/DSH Codex Desktop/dsh-runtime/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-agent-preset/skills"),
+  ];
+  for (const c of globalCandidates) {
+    if (await isExistingDir(c)) return resolve(c);
+  }
+
+  try {
+    const resPath = (process as unknown as { resourcesPath?: string }).resourcesPath;
+    if (resPath) {
+      const c1 = join(resPath, "app.asar", "dsh", "node_modules", "@deepseek-ai", "dsh-agent-preset", "skills");
+      if (await isExistingDir(c1)) return resolve(c1);
+      const c2 = join(resPath, "app.asar.unpacked", "dsh", "node_modules", "@deepseek-ai", "dsh-agent-preset", "skills");
+      if (await isExistingDir(c2)) return resolve(c2);
+    }
+    if (process.execPath) {
+      const exeDir = dirname(process.execPath);
+      const c3 = join(exeDir, "resources", "app.asar", "dsh", "node_modules", "@deepseek-ai", "dsh-agent-preset", "skills");
+      if (await isExistingDir(c3)) return resolve(c3);
+    }
+  } catch {}
+
+  return undefined;
+}
+
+/**
  * 从宿主 AgentPresetRegistry 中动态提取内置模式与自定义模式的专属技能根目录。
  * 只有真正包含独立技能目录且物理目录存在的预设，才会生成对应的只读 SkillRoot。
  */
 export async function collectPresetRoots(ctx: unknown): Promise<SkillRoot[]> {
-  if (!ctx || typeof ctx !== "object") return [];
-  const hostCtx = ctx as { get?: (name: string) => unknown; agentPresets?: unknown };
-  const agentPresets = typeof hostCtx.get === "function"
-    ? (hostCtx.get("agentPresets") as any)
-    : (hostCtx.agentPresets as any);
-  if (!agentPresets) return [];
-
   const roots: SkillRoot[] = [];
   const seenPaths = new Set<string>();
 
-  // 1. 尝试从 definitions (Map) 中枚举所有注册的预设配置
-  const definitions: Map<string, { config?: unknown }> | undefined = agentPresets.definitions;
-  const presetConfigs: Array<{ id: string; name?: string; description?: string; plugins?: unknown[] }> = [];
+  const hostCtx = ctx && typeof ctx === "object"
+    ? (ctx as { get?: (name: string) => unknown; agentPresets?: unknown })
+    : undefined;
+  const agentPresets = hostCtx
+    ? (typeof hostCtx.get === "function" ? (hostCtx.get("agentPresets") as any) : (hostCtx.agentPresets as any))
+    : undefined;
 
-  if (definitions instanceof Map) {
-    for (const record of definitions.values()) {
-      const cfg = record?.config as { id?: unknown; name?: unknown; description?: unknown; plugins?: unknown[] } | undefined;
-      if (cfg && typeof cfg.id === "string" && cfg.id.trim()) {
-        presetConfigs.push({
-          id: cfg.id.trim(),
-          name: typeof cfg.name === "string" ? cfg.name : undefined,
-          description: typeof cfg.description === "string" ? cfg.description : undefined,
-          plugins: Array.isArray(cfg.plugins) ? cfg.plugins : undefined,
-        });
-      }
-    }
-  } else if (typeof agentPresets.list === "function") {
-    try {
-      const list = await agentPresets.list();
-      if (Array.isArray(list)) {
-        for (const item of list) {
-          if (item && typeof item.id === "string" && item.id.trim()) {
-            presetConfigs.push({
-              id: item.id.trim(),
-              name: typeof item.name === "string" ? item.name : undefined,
-              description: typeof item.description === "string" ? item.description : undefined,
-            });
-          }
+  if (!agentPresets) return [];
+
+  const presetConfigs: Array<{ id: string; name?: string; description?: string; plugins?: unknown[]; rawYaml?: string }> = [];
+
+  if (agentPresets) {
+    const definitions: Map<string, { config?: unknown }> | undefined = agentPresets.definitions;
+    if (definitions instanceof Map) {
+      for (const record of definitions.values()) {
+        const cfg = record?.config as { id?: unknown; name?: unknown; description?: unknown; plugins?: unknown[] } | undefined;
+        if (cfg && typeof cfg.id === "string" && cfg.id.trim()) {
+          presetConfigs.push({
+            id: cfg.id.trim(),
+            name: typeof cfg.name === "string" ? cfg.name : undefined,
+            description: typeof cfg.description === "string" ? cfg.description : undefined,
+            plugins: Array.isArray(cfg.plugins) ? cfg.plugins : undefined,
+          });
         }
       }
-    } catch {
-      // 容错降级
+    } else if (typeof agentPresets.list === "function") {
+      try {
+        const list = await agentPresets.list();
+        if (Array.isArray(list)) {
+          for (const item of list) {
+            if (item && typeof item.id === "string" && item.id.trim()) {
+              let rawYaml: string | undefined;
+              if (typeof agentPresets.readDocument === "function") {
+                try {
+                  const doc = await agentPresets.readDocument(item.id);
+                  if (doc && typeof doc.content === "string") rawYaml = doc.content;
+                } catch {}
+              }
+              presetConfigs.push({
+                id: item.id.trim(),
+                name: typeof item.name === "string" ? item.name : undefined,
+                description: typeof item.description === "string" ? item.description : undefined,
+                rawYaml,
+              });
+            }
+          }
+        }
+      } catch {}
     }
   }
 
-  // 解析 @deepseek-ai/dsh-agent-preset 随包内置的 skills 路径（创造模式）
-  let cordisBundledSkillsDir: string | undefined;
-  try {
-    const req = createRequire(import.meta.url);
-    const pkgPath = req.resolve("@deepseek-ai/dsh-agent-preset/package.json");
-    const candidate = join(dirname(pkgPath), "skills");
-    if (await isExistingDir(candidate)) {
-      cordisBundledSkillsDir = candidate;
-    }
-  } catch {
-    // 宿主未安装此包时忽略
+  // 探测内置创造模式随包技能物理路径
+  const cordisBundledSkillsDir = await findCordisSkillsDir();
+
+  // 如果未能从 agentPresets 中枚举到 cordis 预设（或 agentPresets 尚未就绪），但本地存在创造模式技能目录，作为内置预设保底提供
+  if (!presetConfigs.some((p) => p.id === "cordis") && cordisBundledSkillsDir) {
+    presetConfigs.unshift({
+      id: "cordis",
+      name: "创造模式",
+      description: "通过对话扩展 DSH 功能或编写插件",
+    });
   }
 
   const BUILTIN_IDS = new Set(["standard", "ptc", "minimal", "cordis"]);
 
   for (const preset of presetConfigs) {
     const isBuiltin = BUILTIN_IDS.has(preset.id);
-    const declaredDirs = preset.plugins ? extractCustomSkillDirs(preset.plugins) : [];
+    const declaredDirs = preset.plugins
+      ? extractCustomSkillDirs(preset.plugins)
+      : (preset.rawYaml ? extractDirsFromYaml(preset.rawYaml) : []);
 
-    // 内置 cordis 预设的 YAML 包含 !!js 表达式，未求值时补充解析包内置 skills 路径
     if (preset.id === "cordis" && declaredDirs.length === 0 && cordisBundledSkillsDir) {
       declaredDirs.push(cordisBundledSkillsDir);
     }

@@ -430,6 +430,7 @@ function apply(ctx: HostContext, config?: PluginConfig) {
   };
   const stateWithSources = async (req: Request) => {
     const presetRoots = await collectPresetRoots(ctx);
+    if (log) log("preset-roots", { count: presetRoots.length, roots: presetRoots.map((r) => ({ key: r.key, path: r.path })) });
     return attachSources(await state({ ...projectOptions(req.headers.get("x-dsh-skills-session")), presetRoots }));
   };
 
