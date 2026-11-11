@@ -970,6 +970,13 @@ await writeFile(
   "---\nname: base-skill\ndescription: 宿主baseUrl加载的新预设\n---\n内容",
   "utf8",
 );
+const resourcesSkillsDir = join(tmp, "resources", "skills");
+await mkdir(join(resourcesSkillsDir, "res-skill"), { recursive: true });
+await writeFile(
+  join(resourcesSkillsDir, "res-skill", "SKILL.md"),
+  "---\nname: res-skill\ndescription: 宿主resources目录内置预设技能\n---\n内容",
+  "utf8",
+);
 const futureBuiltinPresets = {
   definitions: new Map([
     [
@@ -993,17 +1000,31 @@ const futureBuiltinPresets = {
         },
       },
     ],
+    [
+      "res-mode",
+      {
+        config: {
+          id: "res-mode",
+          name: "资源目录模式",
+          plugins: [{ id: "skill-filesystem", config: { customSkillDirs: [resourcesSkillsDir] } }],
+        },
+      },
+    ],
   ]),
 };
 const futureRoots = await collectPresetRoots({ get: (k) => (k === "agentPresets" ? futureBuiltinPresets : undefined) });
 const futureReviewRoot = futureRoots.find((r) => r.key === "preset-deep-review");
 const futureBaseRoot = futureRoots.find((r) => r.key === "preset-host-base-mode");
+const futureResRoot = futureRoots.find((r) => r.key === "preset-res-mode");
 eq(futureReviewRoot?.native, true, "位于 node_modules/@deepseek-ai 下的新预设自动识别为官方内置（无需写死 id 名单）");
 eq(futureReviewRoot?.mutable, false, "宿主安装目录内的未知 ID 预设自动只读禁止写入");
 eq(futureReviewRoot?.toggleable, false, "宿主安装目录内的未知 ID 预设自动关闭真开关");
 eq(futureBaseRoot?.native, true, "从 @deepseek-ai baseUrl 加载的新预设自动识别为官方内置");
 eq(futureBaseRoot?.mutable, false, "从 @deepseek-ai baseUrl 加载的未知 ID 预设自动只读");
 eq(futureBaseRoot?.toggleable, false, "从 @deepseek-ai baseUrl 加载的未知 ID 预设自动关闭开关");
+eq(futureResRoot?.native, true, "位于 resources/ 目录下的新预设同样自动判定为内置只读");
+eq(futureResRoot?.mutable, false, "位于 resources/ 目录下的新预设禁止写入");
+eq(futureResRoot?.toggleable, false, "位于 resources/ 目录下的新预设关闭开关");
 
 // 6.2 P3 #2: 含非 ASCII 字符（如中文）的自定义预设 ID 支持开关持久化且二次读取不丢失
 const cjkSkillsDir = join(tmp, "cjk-preset-skills");

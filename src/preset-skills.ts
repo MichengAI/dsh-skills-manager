@@ -86,7 +86,12 @@ export function isHostBuiltinLocation(pathOrUrl?: string): boolean {
   if (normalized.includes(".asar")) return true;
   if (/\/node_modules\/@deepseek-ai(?:\/|$)/.test(normalized)) return true;
   if (/\/dsh-runtime(?:\/|$)/.test(normalized)) return true;
-  if (/(?:^|\/)resources\/app(?:\/|$)/.test(normalized)) return true;
+  if (/(?:^|\/)resources(?:\/|$)/.test(normalized)) return true;
+  const resourcesPath = (process as { resourcesPath?: unknown }).resourcesPath;
+  if (typeof resourcesPath === "string" && resourcesPath.trim()) {
+    const resPrefix = resourcesPath.replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
+    if (resPrefix && (normalized === resPrefix || normalized.startsWith(`${resPrefix}/`))) return true;
+  }
   return false;
 }
 
@@ -139,8 +144,8 @@ async function findCordisSkillsDir(explicitDir?: string, hostBaseUrls?: string[]
 
 /**
  * 从宿主 AgentPresetRegistry 中动态提取内置模式与自定义模式的专属技能根目录。
- * 只有真正包含独立技能目录且物理目录存在的预设，才会生成对应的只读 SkillRoot。
- * 遵循 B方案：预设模式专属技能作为模式绑定的只读资产，不提供假开关（toggleable: false）。
+ * 官方内置与相对路径预设维持只读（mutable: false, toggleable: false）；
+ * 用户自定义绝对路径预设依托 agent-scoped provider 开放完整生命周期与真开关控制。
  */
 export async function collectPresetRoots(ctx: unknown, options: PresetRootsOptions = {}): Promise<SkillRoot[]> {
   const roots: SkillRoot[] = [];
@@ -180,23 +185,21 @@ export async function collectPresetRoots(ctx: unknown, options: PresetRootsOptio
 
   if (!agentPresets && !cordisBundledSkillsDir) return [];
 
-  const presetConfigs: Array<{ id: string; name?: string; description?: string; plugins?: unknown[]; rawYaml?: string; explicitBuiltin?: boolean; baseUrl?: string }> = [];
+  const presetConfigs: Array<{ id: string; name?: string; description?: string; plugins?: unknown[]; rawYaml?: string; explicitBuiltin?: boolean }> = [];
 
   if (agentPresets) {
     const definitions: Map<string, { config?: unknown; context?: { baseUrl?: unknown } }> | undefined = agentPresets.definitions;
     if (definitions instanceof Map) {
       for (const record of definitions.values()) {
-        const cfg = record?.config as { id?: unknown; name?: unknown; description?: unknown; plugins?: unknown[]; builtin?: unknown; builtIn?: unknown; readonly?: unknown; source?: unknown } | undefined;
+        const cfg = record?.config as { id?: unknown; name?: unknown; description?: unknown; plugins?: unknown[] } | undefined;
         if (cfg && typeof cfg.id === "string" && cfg.id.trim()) {
           const baseUrl = typeof record?.context?.baseUrl === "string" ? record.context.baseUrl : undefined;
-          const explicitBuiltin = cfg.builtin === true || cfg.builtIn === true || cfg.readonly === true || cfg.source === "builtin" || isHostBuiltinLocation(baseUrl);
           presetConfigs.push({
             id: cfg.id.trim(),
             name: typeof cfg.name === "string" ? cfg.name : undefined,
             description: typeof cfg.description === "string" ? cfg.description : undefined,
             plugins: Array.isArray(cfg.plugins) ? cfg.plugins : undefined,
-            explicitBuiltin,
-            baseUrl,
+            explicitBuiltin: isHostBuiltinLocation(baseUrl),
           });
         }
       }
@@ -218,7 +221,6 @@ export async function collectPresetRoots(ctx: unknown, options: PresetRootsOptio
                 name: typeof item.name === "string" ? item.name : undefined,
                 description: typeof item.description === "string" ? item.description : undefined,
                 rawYaml,
-                explicitBuiltin: item.builtin === true || item.builtIn === true || item.readonly === true || item.source === "builtin",
               });
             }
           }

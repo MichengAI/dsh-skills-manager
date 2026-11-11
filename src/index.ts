@@ -213,6 +213,10 @@ function activeSessionCwds(ctx: HostContext, sessionId: unknown) {
   return typeof cwd === "string" && cwd.trim() ? [cwd.trim()] : [];
 }
 
+/**
+ * 预设根解析带 2s 短 TTL + in-flight 去重：provider 热路径及常规路由优先走缓存，
+ * 管理端 `/state`（forceRefresh=true）、写后操作、预设切换事件以及查无目标预设时自动穿透强制刷新。
+ */
 const PRESET_ROOTS_TTL_MS = 2000;
 const presetRootsCache = new WeakMap<object, { expiresAt: number; roots?: SkillRoot[]; pending?: Promise<SkillRoot[]> }>();
 
@@ -468,7 +472,12 @@ function apply(ctx: HostContext, config?: PluginConfig) {
     const project = (await projectRoots(projectOptions(sessionId).projectCwds)).find((root) => root.key === key);
     if (project) return project;
     const presets = await getPresetRootsCached(ctx);
-    return presets.find((root) => root.key === key);
+    const hit = presets.find((root) => root.key === key);
+    if (hit) return hit;
+    if (key.startsWith("preset-")) {
+      return (await getPresetRootsCached(ctx, true)).find((root) => root.key === key);
+    }
+    return undefined;
   };
 
   const attachSources = async <T extends { roots: RootView[]; warnings: Diagnostic[] }>(snapshot: T) => {
@@ -630,7 +639,11 @@ function apply(ctx: HostContext, config?: PluginConfig) {
       methods: ["POST"],
       fetch: (req) => handlePost(req, async (b) => {
         if (b.root !== undefined && b.root !== "dsh" && b.root !== "agents") {
-          const isValidPreset = typeof b.root === "string" && (await getPresetRootsCached(ctx)).some((r) => r.key === b.root && r.mutable && r.native === false);
+          const matchesPreset = (rootsList: SkillRoot[]) => typeof b.root === "string" && rootsList.some((r) => r.key === b.root && r.mutable && r.native === false);
+          let isValidPreset = matchesPreset(await getPresetRootsCached(ctx));
+          if (!isValidPreset && typeof b.root === "string" && b.root.startsWith("preset-")) {
+            isValidPreset = matchesPreset(await getPresetRootsCached(ctx, true));
+          }
           if (!isValidPreset) throw Object.assign(new Error("技能安装位置无效"), { statusCode: 400, code: "error.repo.invalid" });
         }
         if (b.workspace !== undefined && b.root !== undefined && b.root !== "dsh") throw Object.assign(new Error("工作区只能安装到项目 DSH skills"), { statusCode: 400, code: "error.repo.invalid" });
