@@ -87,6 +87,7 @@ export interface HostContext {
         (event: 'agent/created' | 'agent/disposed', handler: (event: {
             agent: Agent;
         }) => void): (() => void) | void;
+        (event: 'agent-preset/selected', handler: (...args: unknown[]) => void): (() => void) | void;
         (event: 'tools/pre-execute', handler: (execution: {
             name: string;
             agent?: unknown;

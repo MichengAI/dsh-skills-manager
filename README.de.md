@@ -130,7 +130,7 @@ Für nicht aufgeführte Agents können Sie im ➕-Menü über «Quellordner…»
 
 Skills Manager erkennt automatisch Agent-Voreinstellungen in DSH mit eigenen Skill-Ordnern und zeigt sie am Ende der globalen Liste an:
 - **Offizielle Voreinstellungen** (z. B. Creator Mode): Mitgelieferte Skills bleiben strikt schreibgeschützt ohne irreführende Umschalter;
-- **Benutzerdefinierte Voreinstellungen**: Ihre eigenen Presets mit `customSkillDirs` unterstützen das vollständige Skill-Lifecycle-Management — direktes Erstellen, Importieren und Installieren aus Repositories, Verschieben in den Papierkorb sowie Wiederherstellen. Pfade, die sich mit globalen Verzeichnissen überschneiden, werden sicher blockiert; relative Preset-Pfade bleiben zur Sicherheit schreibgeschützt (verwenden Sie einen absoluten Pfad für die vollständige Verwaltung).
+- **Benutzerdefinierte Voreinstellungen**: Ihre eigenen Presets mit `customSkillDirs` bieten volle Funktionsparität — inklusive Aktivieren/Deaktivieren einzelner Skills oder der gesamten Quelle, Kategorien & Notizen, direktes Erstellen, Importieren und Installieren aus Repositories, Verschieben in den Papierkorb sowie Wiederherstellen. Pfade, die sich mit globalen Verzeichnissen überschneiden, werden sicher blockiert; relative Preset-Pfade bleiben zur Sicherheit schreibgeschützt (verwenden Sie einen absoluten Pfad für die vollständige Verwaltung).
 
 ## DSH Produkt-Ökosystem
 

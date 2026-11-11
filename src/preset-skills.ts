@@ -76,6 +76,21 @@ async function isExistingDir(path: string): Promise<boolean> {
 }
 
 /**
+ * 判定路径或模块 baseUrl 是否位于 DSH 官方宿主安装树 / 内置包目录内。
+ * 防止宿主新增内置预设 ID 时因未写入静态 ID 名单而被误开放写入或真开关权限。
+ */
+export function isHostBuiltinLocation(pathOrUrl?: string): boolean {
+  if (!pathOrUrl || typeof pathOrUrl !== "string") return false;
+  const normalized = pathOrUrl.replace(/\\/g, "/").toLowerCase();
+  if (!normalized) return false;
+  if (normalized.includes(".asar")) return true;
+  if (/\/node_modules\/@deepseek-ai(?:\/|$)/.test(normalized)) return true;
+  if (/\/dsh-runtime(?:\/|$)/.test(normalized)) return true;
+  if (/(?:^|\/)resources\/app(?:\/|$)/.test(normalized)) return true;
+  return false;
+}
+
+/**
  * 探测官方内置创造模式（Cordis）随包出货的技能目录。
  * 遵循跨平台安全原则，优先使用宿主运行时模块基址及标准模块解析，绝不写死任何盘符或产品专有绝对路径。
  */
@@ -165,19 +180,23 @@ export async function collectPresetRoots(ctx: unknown, options: PresetRootsOptio
 
   if (!agentPresets && !cordisBundledSkillsDir) return [];
 
-  const presetConfigs: Array<{ id: string; name?: string; description?: string; plugins?: unknown[]; rawYaml?: string }> = [];
+  const presetConfigs: Array<{ id: string; name?: string; description?: string; plugins?: unknown[]; rawYaml?: string; explicitBuiltin?: boolean; baseUrl?: string }> = [];
 
   if (agentPresets) {
-    const definitions: Map<string, { config?: unknown }> | undefined = agentPresets.definitions;
+    const definitions: Map<string, { config?: unknown; context?: { baseUrl?: unknown } }> | undefined = agentPresets.definitions;
     if (definitions instanceof Map) {
       for (const record of definitions.values()) {
-        const cfg = record?.config as { id?: unknown; name?: unknown; description?: unknown; plugins?: unknown[] } | undefined;
+        const cfg = record?.config as { id?: unknown; name?: unknown; description?: unknown; plugins?: unknown[]; builtin?: unknown; builtIn?: unknown; readonly?: unknown; source?: unknown } | undefined;
         if (cfg && typeof cfg.id === "string" && cfg.id.trim()) {
+          const baseUrl = typeof record?.context?.baseUrl === "string" ? record.context.baseUrl : undefined;
+          const explicitBuiltin = cfg.builtin === true || cfg.builtIn === true || cfg.readonly === true || cfg.source === "builtin" || isHostBuiltinLocation(baseUrl);
           presetConfigs.push({
             id: cfg.id.trim(),
             name: typeof cfg.name === "string" ? cfg.name : undefined,
             description: typeof cfg.description === "string" ? cfg.description : undefined,
             plugins: Array.isArray(cfg.plugins) ? cfg.plugins : undefined,
+            explicitBuiltin,
+            baseUrl,
           });
         }
       }
@@ -199,6 +218,7 @@ export async function collectPresetRoots(ctx: unknown, options: PresetRootsOptio
                 name: typeof item.name === "string" ? item.name : undefined,
                 description: typeof item.description === "string" ? item.description : undefined,
                 rawYaml,
+                explicitBuiltin: item.builtin === true || item.builtIn === true || item.readonly === true || item.source === "builtin",
               });
             }
           }
@@ -213,6 +233,7 @@ export async function collectPresetRoots(ctx: unknown, options: PresetRootsOptio
       id: "cordis",
       name: "创造模式",
       description: "通过对话扩展 DSH 功能或编写插件",
+      explicitBuiltin: true,
     });
   }
 
@@ -225,7 +246,7 @@ export async function collectPresetRoots(ctx: unknown, options: PresetRootsOptio
   };
 
   for (const preset of presetConfigs) {
-    const isBuiltin = BUILTIN_IDS.has(preset.id);
+    const presetBuiltin = BUILTIN_IDS.has(preset.id) || preset.explicitBuiltin === true;
     const declaredDirs = preset.plugins
       ? extractCustomSkillDirs(preset.plugins)
       : (preset.rawYaml ? extractDirsFromYaml(preset.rawYaml) : []);
@@ -242,13 +263,14 @@ export async function collectPresetRoots(ctx: unknown, options: PresetRootsOptio
       // 依据宿主 @deepseek-ai/dsh-skill-filesystem/lib/index.js:78：
       // 宿主直接以 resolve(root) 解析 customSkillDirs（相对路径随进程 cwd，且不展开 ~）。
       // 为保证发现位置与宿主实际加载目录完全一致，这里对齐使用 resolve(trimmedDir)；
-      // 同时为防止相对路径或 ~ 写法因启动目录变化而误写入错位位置，仅对绝对路径的自定义预设开放可写。
+      // 同时为防止相对路径或 ~ 写法因启动目录变化而误写入错位位置，仅对绝对路径且非宿主安装包内的自定义预设开放可写。
       const trimmedDir = dir.trim();
       const resolved = resolve(trimmedDir);
       if (seenPaths.has(resolved)) continue;
       if (!(await isExistingDir(resolved))) continue;
       seenPaths.add(resolved);
 
+      const isBuiltin = presetBuiltin || isHostBuiltinLocation(resolved) || (Boolean(cordisBundledSkillsDir) && resolved === cordisBundledSkillsDir);
       const rootKey = declaredDirs.length === 1 ? `preset-${preset.id}` : `preset-${preset.id}-${i + 1}`;
       const presetName = preset.name || BUILTIN_PRESET_NAMES[preset.id] || preset.id;
       const suffix = declaredDirs.length === 1 ? "" : ` (${i + 1})`;
@@ -262,7 +284,7 @@ export async function collectPresetRoots(ctx: unknown, options: PresetRootsOptio
         rank: 10000 + roots.length * 10,
         mutable,
         native: isBuiltin,
-        // 自定义绝对路径预设依托 agent-scoped provider 实现真开关拦截；内置或相对路径预设保持只读不可开关。
+        // 自定义绝对路径预设依托 agent-scoped provider 实现真开关拦截；内置、宿主包内目录或相对路径预设保持只读不可开关。
         toggleable: mutable,
         kind: "preset",
         group: `${presetName}${suffix}`,

@@ -953,6 +953,157 @@ const bulkUninstallRes = await readonlyConflictRepoMgr.uninstallMany({
 ok(bulkUninstallRes.results[0]?.ok === true && bulkUninstallRes.results[1]?.ok === true, "uninstallMany 成功批量卸载自定义预设下的多个仓库技能");
 eq(presetRootsFetchCount, 1, "uninstallMany 在批量卸载多条预设记录时只调用 1 次 getPresetRoots（无线性重复探测）");
 
+console.log("── 6. 前向兼容只读路径判定、损坏状态隔离、非 ASCII 预设 ID 与热路径缓存失效 ──");
+
+// 6.1 P2: 不在硬编码名单内的新官方预设，只要 baseUrl 或目录位于宿主包路径（如 node_modules/@deepseek-ai 或 .asar），自动只读且禁开关
+const hostScopedSkillsDir = join(tmp, "node_modules", "@deepseek-ai", "dsh-agent-preset", "new-mode-skills");
+await mkdir(join(hostScopedSkillsDir, "official-review-skill"), { recursive: true });
+await writeFile(
+  join(hostScopedSkillsDir, "official-review-skill", "SKILL.md"),
+  "---\nname: official-review-skill\ndescription: 宿主新增内置预设技能\n---\n内容",
+  "utf8",
+);
+const customDirWithHostBase = join(tmp, "custom-host-base-skills");
+await mkdir(join(customDirWithHostBase, "base-skill"), { recursive: true });
+await writeFile(
+  join(customDirWithHostBase, "base-skill", "SKILL.md"),
+  "---\nname: base-skill\ndescription: 宿主baseUrl加载的新预设\n---\n内容",
+  "utf8",
+);
+const futureBuiltinPresets = {
+  definitions: new Map([
+    [
+      "deep-review",
+      {
+        config: {
+          id: "deep-review",
+          name: "官方深度审查",
+          plugins: [{ id: "skill-filesystem", config: { customSkillDirs: [hostScopedSkillsDir] } }],
+        },
+      },
+    ],
+    [
+      "host-base-mode",
+      {
+        context: { baseUrl: "file:///D:/Tools/dsh/node_modules/@deepseek-ai/dsh-agent-preset/index.js" },
+        config: {
+          id: "host-base-mode",
+          name: "宿主来源模式",
+          plugins: [{ id: "skill-filesystem", config: { customSkillDirs: [customDirWithHostBase] } }],
+        },
+      },
+    ],
+  ]),
+};
+const futureRoots = await collectPresetRoots({ get: (k) => (k === "agentPresets" ? futureBuiltinPresets : undefined) });
+const futureReviewRoot = futureRoots.find((r) => r.key === "preset-deep-review");
+const futureBaseRoot = futureRoots.find((r) => r.key === "preset-host-base-mode");
+eq(futureReviewRoot?.native, true, "位于 node_modules/@deepseek-ai 下的新预设自动识别为官方内置（无需写死 id 名单）");
+eq(futureReviewRoot?.mutable, false, "宿主安装目录内的未知 ID 预设自动只读禁止写入");
+eq(futureReviewRoot?.toggleable, false, "宿主安装目录内的未知 ID 预设自动关闭真开关");
+eq(futureBaseRoot?.native, true, "从 @deepseek-ai baseUrl 加载的新预设自动识别为官方内置");
+eq(futureBaseRoot?.mutable, false, "从 @deepseek-ai baseUrl 加载的未知 ID 预设自动只读");
+eq(futureBaseRoot?.toggleable, false, "从 @deepseek-ai baseUrl 加载的未知 ID 预设自动关闭开关");
+
+// 6.2 P3 #2: 含非 ASCII 字符（如中文）的自定义预设 ID 支持开关持久化且二次读取不丢失
+const cjkSkillsDir = join(tmp, "cjk-preset-skills");
+await mkdir(join(cjkSkillsDir, "cjk-preset-skill"), { recursive: true });
+await writeFile(
+  join(cjkSkillsDir, "cjk-preset-skill", "SKILL.md"),
+  "---\nname: cjk-preset-skill\ndescription: 中文ID自定义预设技能\n---\n正文",
+  "utf8",
+);
+const cjkPresetObj = {
+  definitions: new Map([
+    [
+      "深度审查",
+      {
+        config: {
+          id: "深度审查",
+          name: "深度审查",
+          plugins: [{ id: "skill-filesystem", config: { customSkillDirs: [cjkSkillsDir] } }],
+        },
+      },
+    ],
+  ]),
+};
+const cjkRoots = await collectPresetRoots({ get: (k) => (k === "agentPresets" ? cjkPresetObj : undefined) });
+const cjkRoot = cjkRoots.find((r) => r.key === "preset-深度审查");
+ok(!!cjkRoot && cjkRoot.toggleable === true, "非 ASCII 自定义预设 ID 正常发现且支持真开关");
+const { setSkillEnabled } = await import("../lib/core.js");
+const cjkDisableRes = await setSkillEnabled(cjkRoot, "cjk-preset-skill", false);
+ok(cjkDisableRes.ok !== false, "含中文 ID 的预设技能停用持久化成功");
+const cjkReloadedState = await state({ presetRoots: cjkRoots });
+const cjkSkillView = cjkReloadedState.roots.find((r) => r.key === "preset-深度审查")?.skills.find((s) => s.name === "cjk-preset-skill");
+eq(cjkSkillView?.enabled, false, "含中文 ID 的预设停用状态重启后完整保留不回弹");
+
+// 6.3 P3 #1: 当 state.json 损坏不可写（writable === false）时，绝不向宿主发送预设禁用覆盖候选
+const stateFilePath = join(tmp, "skills-manager", "state.json");
+const savedStateBackup = await readFile(stateFilePath, "utf8");
+await writeFile(stateFilePath, "{corrupted-json", "utf8");
+const { listProviderCandidates: listWithCorruptState } = await import("../lib/core.js");
+const corruptCandidates = await listWithCorruptState({ presetRoots: cjkRoots });
+ok(!corruptCandidates.some((c) => c.source === "preset-深度审查"), "state.json 损坏 fail-closed 时绝不向外发预设禁用覆盖候选（保障宿主原生预设技能可用）");
+await writeFile(stateFilePath, savedStateBackup, "utf8");
+
+// 6.4 P3 #3: 热路径缓存复用与 agent-preset/selected 事件失效验证
+let presetCollectCount = 0;
+let cachedModeActivePreset = "code-review";
+const cachedListeners = new Map();
+let cachedProvider = null;
+const cachedBridge = createTestFetchBridge();
+applyHost({
+  connection: cachedBridge.connection,
+  skills: { registerProvider: () => () => {} },
+  tools: { register: () => () => {} },
+  effect: (fn) => fn(),
+  on(ev, listener) {
+    cachedListeners.set(ev, [...(cachedListeners.get(ev) || []), listener]);
+    return () => {};
+  },
+  get(name) {
+    if (name === "agentPresets") {
+      return {
+        list: async () => {
+          presetCollectCount++;
+          return [
+            {
+              id: "code-review",
+              name: "缓存测试模式",
+            },
+          ];
+        },
+        readDocument: async () => ({
+          content: `plugins:\n  - id: skill-filesystem\n    config:\n      customSkillDirs:\n        - "${customReviewSkillsDir.replace(/\\/g, "\\\\")}"`,
+        }),
+        composedPreset: () => cachedModeActivePreset,
+      };
+    }
+    return undefined;
+  },
+});
+const cacheAgentCtx = {
+  skills: {
+    registerProvider(create) {
+      cachedProvider = create({ invalidate() {} });
+      return () => {};
+    },
+  },
+};
+for (const listener of cachedListeners.get("agent/created") || []) {
+  listener({ agent: { id: "cache-agent-1", ctx: cacheAgentCtx } });
+}
+presetCollectCount = 0;
+await cachedProvider.list();
+await cachedProvider.list();
+await cachedProvider.list();
+eq(presetCollectCount, 1, "连续多次调用 provider.list() 在 TTL 内复用缓存仅扫一次预设");
+for (const listener of cachedListeners.get("agent-preset/selected") || []) {
+  listener();
+}
+await cachedProvider.list();
+eq(presetCollectCount, 2, "收到 agent-preset/selected 事件后立即清缓存并在下次读取时刷新");
+
 server.close();
 await rm(tmp, { recursive: true, force: true });
 

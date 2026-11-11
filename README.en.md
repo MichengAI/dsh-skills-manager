@@ -195,7 +195,7 @@ Registrations live in the `customSources` section of `roots.json`, alongside the
 
 Skills Manager automatically discovers Agent Presets configured with dedicated skill folders in DSH and lists them at the end of the global skills view:
 - **Official Built-in Presets** (such as Creator Mode): bundled skills remain strictly read-only for inspection without misleading toggles or modifications to host files;
-- **Custom Presets**: your own Agent Presets configured with `customSkillDirs` support full skill lifecycle management — select a custom preset target directly in Create, Import, or Repository/Registry Install modals, move skills to Trash, and restore them back to the original preset folder. Preset paths overlapping with global skill directories are safely blocked to prevent accidental deletion, and relative preset paths remain read-only for safety (use an absolute path to enable full management).
+- **Custom Presets**: your own Agent Presets configured with `customSkillDirs` enjoy full parity with standard skills — toggle individual skills or the entire preset source on/off (actively intercepted in host runtime), organize categories and custom notes, select a custom preset target directly in Create, Import, or Repository/Registry Install modals, move skills to Trash, and restore them back to the original preset folder. Preset paths overlapping with global skill directories are safely blocked to prevent accidental deletion, and relative preset paths remain read-only for safety (use an absolute path to enable full management).
 
 ## DSH product ecosystem
 

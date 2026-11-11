@@ -2127,7 +2127,10 @@ function failClosedManagerState() {
   return state;
 }
 
-const PRESET_ROOT_KEY_RE = /^preset-[A-Za-z0-9._-]+$/;
+const PRESET_ROOT_KEY_RE = /^preset-[^\s/\\\0\u0000-\u001f\u007f]+$/;
+function isValidPresetKeySyntax(key: string) {
+  return key.length <= 200 && !key.includes("..") && PRESET_ROOT_KEY_RE.test(key);
+}
 function isBuiltinPresetKey(key: string) {
   return (
     key === "preset-cordis" ||
@@ -2138,7 +2141,7 @@ function isBuiltinPresetKey(key: string) {
   );
 }
 function isCustomPresetPolicyKey(key: string) {
-  return PRESET_ROOT_KEY_RE.test(key) && !isBuiltinPresetKey(key);
+  return isValidPresetKeySyntax(key) && !isBuiltinPresetKey(key);
 }
 
 function validPolicyLists(value: unknown, allowMissing = false) {
@@ -2321,7 +2324,7 @@ function normalizeCustomNotes(value: ManagerState["customNotes"] | undefined) {
 }
 
 function categoryRootKey(key: string) {
-  if (rootByKey(key) || PROJECT_ROOT_KEY_RE.test(key) || key.startsWith("preset-")) return key;
+  if (rootByKey(key) || PROJECT_ROOT_KEY_RE.test(key) || isValidPresetKeySyntax(key)) return key;
   return null;
 }
 
@@ -4129,7 +4132,9 @@ export async function listProviderCandidates(options: ScopeOptions = {}) {
       for (const entry of scanned.entries) items.push({ root, entry, policy: effectiveSkillPolicy(policyResult, root, entry) });
     }
   }
-  const activePresets = (options.presetRoots || []).filter((root) => root.kind === "preset" && root.toggleable);
+  const activePresets = policyResult.writable === false
+    ? []
+    : (options.presetRoots || []).filter((root) => root.kind === "preset" && root.toggleable);
   if (activePresets.length > 0) {
     const presetScans = await scanDeduplicatedRoots(activePresets);
     for (const root of activePresets) {

@@ -130,7 +130,7 @@ Pour ajouter un agent non répertorié, utilisez le menu ➕ et sélectionnez «
 
 Skills Manager détecte automatiquement les préréglages d'agent dotés de répertoires dédiés dans DSH et les affiche à la fin de la liste globale :
 - **Préréglages officiels intégrés** (comme le Mode Créateur) : les compétences intégrées restent en lecture seule sans interrupteurs superflus ni modification des fichiers hôtes ;
-- **Préréglages personnalisés** : vos préréglages configurés avec `customSkillDirs` prennent en charge la gestion complète — création, importation, installation depuis des dépôts, mise à la corbeille et restauration. Les chemins chevauchant les répertoires globaux sont bloqués par sécurité, et les chemins relatifs restent en lecture seule par prudence (utilisez un chemin absolu pour activer la gestion complète).
+- **Préréglages personnalisés** : vos préréglages configurés avec `customSkillDirs` bénéficient d'une gestion complète équivalente aux compétences globales — activation/désactivation par compétence ou par source entière, catégories et notes, création, importation, installation depuis des dépôts, mise à la corbeille et restauration. Les chemins chevauchant les répertoires globaux sont bloqués par sécurité, et les chemins relatifs restent en lecture seule par prudence (utilisez un chemin absolu pour activer la gestion complète).
 
 ## Écosystème DSH
 
