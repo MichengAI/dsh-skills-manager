@@ -150,7 +150,7 @@ const reviewRoot = roots.find((r) => r.key === "preset-code-review");
 ok(!!reviewRoot, "发现自定义 code-review 预设根");
 eq(reviewRoot.kind, "preset", "根类型为 preset");
 eq(reviewRoot.mutable, true, "自定义预设根支持管理与写入（mutable: true）");
-eq(reviewRoot.toggleable, false, "B方案：自定义预设根只读，不提供假开关");
+eq(reviewRoot.toggleable, true, "自定义预设根开放真开关（toggleable: true）");
 ok(reviewRoot.rank >= 10000 && reviewRoot.rank !== cordisRoot.rank, "自定义预设根优先级独立且沉底 (>= 10000)");
 eq(reviewRoot.native, false, "自定义模式 native 为 false");
 eq(reviewRoot.path, customReviewSkillsDir, "路径指向自定义模式配置的 customSkillDirs");
@@ -279,8 +279,8 @@ await writeFile(
 const dirtySnapshot = await state({ presetRoots: roots });
 const dirtyCordisRoot = dirtySnapshot.roots.find((r) => r.key === "preset-cordis");
 const dirtyReviewRoot = dirtySnapshot.roots.find((r) => r.key === "preset-code-review");
-eq(dirtyCordisRoot?.enabled, true, "哪怕历史配置残留 false，只读 cordis 来源恒为 enabled: true");
-eq(dirtyReviewRoot?.enabled, true, "哪怕历史配置残留 false，只读 review 来源恒为 enabled: true");
+eq(dirtyCordisRoot?.enabled, true, "哪怕历史配置残留 false，只读内置 cordis 来源恒为 enabled: true");
+eq(dirtyReviewRoot?.enabled, false, "自定义可开关预设正确继承并遵守 state.json 中的停用记忆（enabled: false）");
 const dirtyCordisSkill = dirtyCordisRoot?.skills.find((s) => s.name === "cordis-plugin-development");
 eq(dirtyCordisSkill?.enabled, true, "只读预设技能不读取 disabledSkills 残留，恒为 enabled: true");
 const dirtyDetail = await skillDetail("preset-cordis", "cordis-plugin-development", { presetRoots: roots });
@@ -414,20 +414,20 @@ const detailPayload = await detailRes.json();
 ok(detailPayload.ok === true, "POST /detail payload.ok === true");
 eq(detailPayload.data.name, "strict-code-review", "POST /detail 成功获取到技能名称");
 
-// B方案只读测试：只读预设来源拒绝写入停用状态，防止假开关误导
-const disableRes = await fetch(`${api}/disable`, {
+// 只读内置预设来源拒绝写入停用状态，防止破坏宿主内置包
+const disableCordisRes = await fetch(`${api}/disable`, {
   method: "POST",
   headers: {
     host: `127.0.0.1:${port}`,
     "content-type": "application/json",
     "x-dsh-skills-manager": "1",
   },
-  body: JSON.stringify({ root: "preset-code-review", name: "strict-code-review" }),
+  body: JSON.stringify({ root: "preset-cordis", name: "cordis-builtin-skill" }),
 });
-const disablePayload = await disableRes.json();
-ok(disablePayload.ok === false, "B方案：只读预设来源发起停用请求被安全拒绝");
-eq(disablePayload.code, "error.root.readonly", "精准返回只读错误码 error.root.readonly");
-ok(disablePayload.error.includes("启用或停用"), "toggle 只读错误精准包含对应动作文案");
+const disableCordisPayload = await disableCordisRes.json();
+ok(disableCordisPayload.ok === false, "内置只读预设来源发起停用请求被安全拒绝");
+eq(disableCordisPayload.code, "error.root.readonly", "内置预设停用精准返回只读错误码 error.root.readonly");
+ok(disableCordisPayload.error.includes("启用或停用"), "toggle 只读错误精准包含对应动作文案");
 
 // 校验 readonlyError 对 create / delete 返回精准的对应动作描述
 const createOnReadonlyRes = await fetch(`${api}/create`, {
@@ -460,8 +460,61 @@ ok(deleteOnReadonlyPayload.error.includes("删除"), "delete 只读错误文案�
 ok(clientSource.includes('root.kind !== "preset" && root.scope !== "preset"'), "UI 中预设根不进入外部可覆盖目录按钮列表");
 ok(clientSource.includes("preset.readonlyRelative"), "UI 中相对路径自定义预设带只读警示徽标");
 
-// 整源停用接口同样拒绝只读预设来源
-const sourceDisableRes = await fetch(`${api}/source-disable`, {
+// 整源停用接口同样拒绝内置只读预设来源
+const sourceDisableCordisRes = await fetch(`${api}/source-disable`, {
+  method: "POST",
+  headers: {
+    host: `127.0.0.1:${port}`,
+    "content-type": "application/json",
+    "x-dsh-skills-manager": "1",
+  },
+  body: JSON.stringify({ root: "preset-cordis" }),
+});
+const sourceDisableCordisPayload = await sourceDisableCordisRes.json();
+ok(sourceDisableCordisPayload.ok === false, "内置只读预设来源发起整源停用被安全拒绝");
+
+console.log("── 4.5 自定义预设真开关、Agent Layer 拦截、分类备注与仓库来源显示测试 ──");
+
+// 1. 停用自定义预设的单个技能
+const disableCustomRes = await fetch(`${api}/disable`, {
+  method: "POST",
+  headers: {
+    host: `127.0.0.1:${port}`,
+    "content-type": "application/json",
+    "x-dsh-skills-manager": "1",
+  },
+  body: JSON.stringify({ root: "preset-code-review", name: "strict-code-review" }),
+});
+const disableCustomPayload = await disableCustomRes.json();
+ok(disableCustomPayload.ok === true, "自定义预设单个技能支持停用开关");
+
+// 2. 在宿主层模拟不同 preset 的 Agent provider 验证真拦截且不串味
+const { listProviderCandidates } = await import("../lib/core.js");
+const agentDisabledCandidates = await listProviderCandidates({ presetRoots: roots.filter((r) => r.presetId === "code-review" && r.toggleable) });
+const disabledCandidate = agentDisabledCandidates.find((c) => c.name === "strict-code-review");
+ok(!!disabledCandidate, "自定义预设停用时在 agent layer 发布拦截候选");
+eq(disabledCandidate?.invocation?.modelInvocable, false, "被停用的预设技能 modelInvocable=false（压制宿主）");
+eq(disabledCandidate?.invocation?.userInvocable, false, "被停用的预设技能 userInvocable=false（从斜杠菜单隐藏）");
+ok((disabledCandidate?.rank ?? 999) < 300, "拦截候选 rank < 300 覆盖宿主 CUSTOM_RANK(300)");
+
+// 切换到无关模式（如 standard），不得泄漏 code-review 技能
+const standardCandidates = await listProviderCandidates({ presetRoots: roots.filter((r) => r.presetId === "standard" && r.toggleable) });
+ok(!standardCandidates.some((c) => c.name === "strict-code-review"), "其他模式不会泄漏自定义预设的专属技能");
+
+// 3. 重新启用单个技能
+const enableCustomRes = await fetch(`${api}/enable`, {
+  method: "POST",
+  headers: {
+    host: `127.0.0.1:${port}`,
+    "content-type": "application/json",
+    "x-dsh-skills-manager": "1",
+  },
+  body: JSON.stringify({ root: "preset-code-review", name: "strict-code-review" }),
+});
+ok((await enableCustomRes.json()).ok === true, "自定义预设单个技能支持重新启用");
+
+// 4. 整源开关：停用整个自定义预设来源
+const sourceDisableCustomRes = await fetch(`${api}/source-disable`, {
   method: "POST",
   headers: {
     host: `127.0.0.1:${port}`,
@@ -470,8 +523,117 @@ const sourceDisableRes = await fetch(`${api}/source-disable`, {
   },
   body: JSON.stringify({ root: "preset-code-review" }),
 });
-const sourceDisablePayload = await sourceDisableRes.json();
-ok(sourceDisablePayload.ok === false, "B方案：只读预设来源发起整源停用被安全拒绝");
+ok((await sourceDisableCustomRes.json()).ok === true, "自定义预设来源支持整组停用开关");
+
+const sourceDisabledCandidates = await listProviderCandidates({ presetRoots: roots.filter((r) => r.presetId === "code-review" && r.toggleable) });
+const srcDisabledCandidate = sourceDisabledCandidates.find((c) => c.name === "strict-code-review");
+eq(srcDisabledCandidate?.invocation?.modelInvocable, false, "整组停用自定义预设时同样发布覆盖拦截");
+
+// 恢复整源开关
+const sourceEnableCustomRes = await fetch(`${api}/source-enable`, {
+  method: "POST",
+  headers: {
+    host: `127.0.0.1:${port}`,
+    "content-type": "application/json",
+    "x-dsh-skills-manager": "1",
+  },
+  body: JSON.stringify({ root: "preset-code-review" }),
+});
+ok((await sourceEnableCustomRes.json()).ok === true, "自定义预设来源支持整组恢复启用");
+
+// 5. 在自定义预设下创建分类与技能备注
+const catCreateRes = await fetch(`${api}/category-create`, {
+  method: "POST",
+  headers: {
+    host: `127.0.0.1:${port}`,
+    "content-type": "application/json",
+    "x-dsh-skills-manager": "1",
+  },
+  body: JSON.stringify({ root: "preset-code-review", name: "审查规则" }),
+});
+const catCreatePayload = await catCreateRes.json();
+ok(catCreatePayload.ok === true, "自定义预设下成功创建分类");
+
+const noteRes = await fetch(`${api}/skill-note`, {
+  method: "POST",
+  headers: {
+    host: `127.0.0.1:${port}`,
+    "content-type": "application/json",
+    "x-dsh-skills-manager": "1",
+  },
+  body: JSON.stringify({ root: "preset-code-review", name: "strict-code-review", note: "我的模式备注" }),
+});
+ok((await noteRes.json()).ok === true, "自定义预设下成功保存技能备注");
+
+// 6. 验证 repository-ui 中自定义预设副本的目标判定与来源文案
+const repoUiSource = await readFile(new URL("../src/repository-ui.ts", import.meta.url), "utf8");
+ok(repoUiSource.includes('copy.installedRoot.startsWith("preset-")'), "repository-ui 的 copyTarget 识别自定义预设安装目标（消除“原项目未登记”警告）");
+ok(repoUiSource.includes("repo.scope.preset"), "repository-ui 的 locationParts 正确渲染预设作用域（不再错显示为全局·DSH）");
+
+// 7. 模拟真实宿主 agent/created 与 composedPreset 动态切模式端到端校验
+let currentAgentPreset = "code-review";
+let agentProviderRegistered = null;
+const agentListeners = [];
+const mockAgentBridge = createTestFetchBridge();
+applyHost({
+  connection: mockAgentBridge.connection,
+  skills: {
+    registerProvider() {
+      return () => {};
+    },
+  },
+  tools: {
+    register() {
+      return () => {};
+    },
+  },
+  effect(fn) {
+    return fn();
+  },
+  on(event, listener) {
+    if (event === "agent/created") agentListeners.push(listener);
+    return () => {};
+  },
+  get(name) {
+    if (name === "agentPresets") {
+      return {
+        ...mockAgentPresets,
+        composedPreset() {
+          return currentAgentPreset;
+        },
+      };
+    }
+    return undefined;
+  },
+});
+const fakeAgentCtx = {
+  skills: {
+    registerProvider(create) {
+      agentProviderRegistered = create({ invalidate() {} });
+      return () => {};
+    },
+  },
+};
+for (const listener of agentListeners) {
+  listener({ agent: { id: "agent-test-1", ctx: fakeAgentCtx } });
+}
+ok(!!agentProviderRegistered, "宿主 agent/created 成功在 agent 作用域注册专属 provider");
+await fetch(`${api}/disable`, {
+  method: "POST",
+  headers: { host: `127.0.0.1:${port}`, "content-type": "application/json", "x-dsh-skills-manager": "1" },
+  body: JSON.stringify({ root: "preset-code-review", name: "strict-code-review" }),
+});
+const codeReviewAgentItems = await agentProviderRegistered.list();
+const blockedEntry = codeReviewAgentItems.find((c) => c.name === "strict-code-review");
+ok(!!blockedEntry && blockedEntry.invocation.modelInvocable === false, "code-review 模式下的 Agent 实时收到停用拦截候选");
+currentAgentPreset = "standard";
+const switchedAgentItems = await agentProviderRegistered.list();
+ok(!switchedAgentItems.some((c) => c.name === "strict-code-review"), "切模式到 standard 后，同一 Agent 实时不再接收 code-review 技能候选");
+await fetch(`${api}/enable`, {
+  method: "POST",
+  headers: { host: `127.0.0.1:${port}`, "content-type": "application/json", "x-dsh-skills-manager": "1" },
+  body: JSON.stringify({ root: "preset-code-review", name: "strict-code-review" }),
+});
 
 console.log("── 5. 自定义预设模式专属技能管理能力测试（增删改与目标选择）──");
 

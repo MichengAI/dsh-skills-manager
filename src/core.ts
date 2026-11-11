@@ -2127,13 +2127,28 @@ function failClosedManagerState() {
   return state;
 }
 
+const PRESET_ROOT_KEY_RE = /^preset-[A-Za-z0-9._-]+$/;
+function isBuiltinPresetKey(key: string) {
+  return (
+    key === "preset-cordis" ||
+    key === "preset-standard" ||
+    key === "preset-ptc" ||
+    key === "preset-minimal" ||
+    /^preset-(?:cordis|standard|ptc|minimal)-\d+$/.test(key)
+  );
+}
+function isCustomPresetPolicyKey(key: string) {
+  return PRESET_ROOT_KEY_RE.test(key) && !isBuiltinPresetKey(key);
+}
+
 function validPolicyLists(value: unknown, allowMissing = false) {
   if (value === undefined && allowMissing) return true;
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   for (const [key, list] of Object.entries(value)) {
     if (
       !userRoots().some((root) => root.key === key) &&
-      !PROJECT_ROOT_KEY_RE.test(key)
+      !PROJECT_ROOT_KEY_RE.test(key) &&
+      !isCustomPresetPolicyKey(key)
     )
       continue;
     if (!Array.isArray(list) || list.some((name) => !validStateSkillName(name)))
@@ -2172,9 +2187,9 @@ function validManagerStateDocument(value: ManagerState) {
     if (!Array.isArray(list) || list.some((name) => !validStateSkillName(name)))
       return false;
   }
-  // 项目来源键允许缺省（默认开启），但显式值必须与全局来源一样严格校验。
+  // 项目来源与自定义预设来源键允许缺省（默认开启），但显式值必须与全局来源一样严格校验。
   for (const [key, flag] of Object.entries(value.sources)) {
-    if (PROJECT_ROOT_KEY_RE.test(key) && typeof flag !== "boolean") return false;
+    if ((PROJECT_ROOT_KEY_RE.test(key) || isCustomPresetPolicyKey(key)) && typeof flag !== "boolean") return false;
   }
   const enabledSkills = value.enabledSkills || {};
   for (const key of new Set([
@@ -2262,7 +2277,7 @@ function normalizeManagerState(value: ManagerState) {
   }
   if (value.sources && typeof value.sources === "object" && !Array.isArray(value.sources)) {
     for (const [key, flag] of Object.entries(value.sources)) {
-      if (PROJECT_ROOT_KEY_RE.test(key) && !key.startsWith("project-dsh:") && typeof flag === "boolean")
+      if (((PROJECT_ROOT_KEY_RE.test(key) && !key.startsWith("project-dsh:")) || isCustomPresetPolicyKey(key)) && typeof flag === "boolean")
         normalized.sources[key] = flag;
     }
   }
@@ -2270,7 +2285,7 @@ function normalizeManagerState(value: ManagerState) {
     const source = value[field];
     if (source && typeof source === "object" && !Array.isArray(source)) {
       for (const [key, list] of Object.entries(source)) {
-        if (!PROJECT_ROOT_KEY_RE.test(key) || !Array.isArray(list)) continue;
+        if ((!PROJECT_ROOT_KEY_RE.test(key) && !isCustomPresetPolicyKey(key)) || !Array.isArray(list)) continue;
         normalized[field][key] = [
           ...new Set(list.filter(validStateSkillName)),
         ].sort();
@@ -2409,7 +2424,7 @@ function managerSkillOverride(policy: ManagerState, rootKey: string, name: strin
 }
 
 function effectiveSkillPolicy(policyResult: PolicyResult, root: SkillRoot, entry: SkillEntry): Policy {
-  const isReadonlyPreset = root.kind === "preset";
+  const isReadonlyPreset = root.kind === "preset" && !root.toggleable;
   const override = isReadonlyPreset
     ? undefined
     : managerSkillOverride(
@@ -4114,10 +4129,21 @@ export async function listProviderCandidates(options: ScopeOptions = {}) {
       for (const entry of scanned.entries) items.push({ root, entry, policy: effectiveSkillPolicy(policyResult, root, entry) });
     }
   }
+  const activePresets = (options.presetRoots || []).filter((root) => root.kind === "preset" && root.toggleable);
+  if (activePresets.length > 0) {
+    const presetScans = await scanDeduplicatedRoots(activePresets);
+    for (const root of activePresets) {
+      const scanned = presetScans.get(root.key);
+      if (!scanned) continue;
+      for (const entry of scanned.entries) {
+        items.push({ root, entry, policy: effectiveSkillPolicy(policyResult, root, entry) });
+      }
+    }
+  }
   for (const group of groupLoadableSkillsByName(items).values()) {
     const { root, entry, policy } = selectSkillWinner(group);
-    // 关闭的外部来源不覆盖其他插件；原生副本、分发链接及显式单技能禁用仍需阻断。
-    const hasNativeCopy = group.some(({ root, entry }) => root.native ||
+    // 关闭的外部来源不覆盖其他插件；原生副本、预设原生来源、分发链接及显式单技能禁用仍需阻断。
+    const hasNativeCopy = group.some(({ root, entry }) => root.native || root.kind === "preset" ||
       entry.policyAliases?.some((alias) => user.some((item) => item.key === alias.rootKey && item.native)));
     const hasExplicitDisable = group.some((item) => item.policy.override === false);
     if (!hasNativeCopy && !hasExplicitDisable && !policy.sourceEnabled) continue;
@@ -4128,7 +4154,7 @@ export async function listProviderCandidates(options: ScopeOptions = {}) {
     const overlayRank = group.length > 1
       ? Math.min(...group.map((item) => Math.min(item.root.rank, item.entry.providerRank ?? item.root.rank))) - 1
       : undefined;
-    // 原生根由宿主自己的 provider 提供；来源停用必须发布覆盖层，否则停用不生效。
+    // 原生根与预设根由宿主自己的 provider 提供；来源停用或单技能停用必须发布覆盖层，否则停用不生效。
     const needsOverlay =
       !policyOnly ||
       group.length > 1 ||
@@ -4151,12 +4177,16 @@ export async function listProviderCandidates(options: ScopeOptions = {}) {
         ? root.kind
         : root.key === "dsh"
           ? "user-dsh"
-          : `agent-${root.key}`,
+          : root.kind === "preset"
+            ? root.key
+            : `agent-${root.key}`,
       rank: overlayRank ?? (project
         ? root.rank - 1
-        : root.key === "dsh"
-          ? USER_DSH_POLICY_RANK
-          : (entry.providerRank ?? root.rank)),
+        : root.kind === "preset"
+          ? 299
+          : root.key === "dsh"
+            ? USER_DSH_POLICY_RANK
+            : (entry.providerRank ?? root.rank)),
       locator: {
         rootKey: root.key,
         entryName: entry.name,
@@ -4201,6 +4231,9 @@ export async function getProviderSkill(candidate: ProviderCandidate, options: Sc
     root = (await projectRoots([options.cwd])).find(
       (item) => item.key === locator.rootKey,
     );
+  }
+  if (!root && options.presetRoots) {
+    root = options.presetRoots.find((item) => item.key === locator.rootKey);
   }
   if (!root) return undefined;
   try {
@@ -4487,7 +4520,7 @@ export async function state(options: ScopeOptions = {}) {
       exists,
       truncated: truncated === true,
       enabled:
-        root.kind === "preset"
+        root.kind === "preset" && !root.toggleable
           ? true
           : policyResult.writable !== false &&
             (root.kind === "project-dsh" ||

@@ -213,7 +213,29 @@ function activeSessionCwds(ctx: HostContext, sessionId: unknown) {
   return typeof cwd === "string" && cwd.trim() ? [cwd.trim()] : [];
 }
 
-function externalSkillProvider(control: ProviderControl, invalidators: Set<() => void>) {
+async function resolveAgentPresetScope(
+  hostCtx?: HostContext,
+  agentCtx?: unknown,
+  options: ScopeOptions = {},
+): Promise<ScopeOptions> {
+  if (!hostCtx || !agentCtx) return options;
+  const getService = typeof hostCtx.get === "function" ? (hostCtx.get as (name: string) => unknown).bind(hostCtx) : undefined;
+  const agentPresets = getService?.("agentPresets") as { composedPreset?: (ctx: unknown) => unknown } | undefined;
+  const activePresetId = typeof agentPresets?.composedPreset === "function"
+    ? agentPresets.composedPreset(agentCtx)
+    : undefined;
+  if (typeof activePresetId !== "string" || !activePresetId.trim()) return options;
+  const allPresets = await collectPresetRoots(hostCtx);
+  const matchingPresets = allPresets.filter((root) => root.presetId === activePresetId && root.toggleable);
+  return matchingPresets.length > 0 ? { ...options, presetRoots: matchingPresets } : options;
+}
+
+function externalSkillProvider(
+  control: ProviderControl,
+  invalidators: Set<() => void>,
+  hostCtx?: HostContext,
+  agentCtx?: unknown,
+) {
   invalidators.add(control.invalidate);
   if (control.signal && typeof control.signal.addEventListener === "function") {
     control.signal.addEventListener("abort", () => {
@@ -222,8 +244,8 @@ function externalSkillProvider(control: ProviderControl, invalidators: Set<() =>
   }
   return {
     name: "dsh-skills-manager-external",
-    list: async (options?: ScopeOptions) => listProviderCandidates(options),
-    get: async (candidate: ProviderCandidate, options?: ScopeOptions) => getProviderSkill(candidate, options),
+    list: async (options?: ScopeOptions) => listProviderCandidates(await resolveAgentPresetScope(hostCtx, agentCtx, options)),
+    get: async (candidate: ProviderCandidate, options?: ScopeOptions) => getProviderSkill(candidate, await resolveAgentPresetScope(hostCtx, agentCtx, options)),
   };
 }
 
@@ -243,7 +265,7 @@ function registerAgentSkillProviders(ctx: HostContext, invalidators: Set<() => v
       ? agentCtx.get("skills")
       : agentCtx && agentCtx.skills;
     if (!skills || typeof skills.registerProvider !== "function") return;
-    const dispose = skills.registerProvider((control) => externalSkillProvider(control, invalidators));
+    const dispose = skills.registerProvider((control) => externalSkillProvider(control, invalidators, ctx, agentCtx));
     registrations.set(agent.id, dispose);
   };
 
@@ -575,7 +597,10 @@ function apply(ctx: HostContext, config?: PluginConfig) {
       path: `${API_PREFIX}/catalog/install`,
       methods: ["POST"],
       fetch: (req) => handlePost(req, async (b) => {
-        if (b.root !== undefined && b.root !== "dsh" && b.root !== "agents") throw Object.assign(new Error("技能安装位置无效"), { statusCode: 400, code: "error.repo.invalid" });
+        if (b.root !== undefined && b.root !== "dsh" && b.root !== "agents") {
+          const isValidPreset = typeof b.root === "string" && (await collectPresetRoots(ctx)).some((r) => r.key === b.root && r.mutable && r.native === false);
+          if (!isValidPreset) throw Object.assign(new Error("技能安装位置无效"), { statusCode: 400, code: "error.repo.invalid" });
+        }
         if (b.workspace !== undefined && b.root !== undefined && b.root !== "dsh") throw Object.assign(new Error("工作区只能安装到项目 DSH skills"), { statusCode: 400, code: "error.repo.invalid" });
         const target = await workspaceTarget(b);
         if (target && "ok" in target && target.ok === false) return target;
@@ -706,42 +731,42 @@ function apply(ctx: HostContext, config?: PluginConfig) {
     {
       path: `${API_PREFIX}/category-create`,
       methods: ["POST"],
-      fetch: (req) => handlePost(req, (b, scope) => createCategory(String(b.root || ""), String(b.name || ""), log, scopedOptions(scope, req.headers.get("x-dsh-skills-session")))),
+      fetch: (req) => handlePost(req, async (b, scope) => createCategory(String(b.root || ""), String(b.name || ""), log, scopedOptions(scope, req.headers.get("x-dsh-skills-session"), await collectPresetRoots(ctx)))),
     },
     {
       path: `${API_PREFIX}/category-rename`,
       methods: ["POST"],
-      fetch: (req) => handlePost(req, (b, scope) => renameCategory(String(b.root || ""), String(b.id || ""), String(b.name || ""), log, scopedOptions(scope, req.headers.get("x-dsh-skills-session")))),
+      fetch: (req) => handlePost(req, async (b, scope) => renameCategory(String(b.root || ""), String(b.id || ""), String(b.name || ""), log, scopedOptions(scope, req.headers.get("x-dsh-skills-session"), await collectPresetRoots(ctx)))),
     },
     {
       path: `${API_PREFIX}/category-delete`,
       methods: ["POST"],
-      fetch: (req) => handlePost(req, (b, scope) => deleteCategory(String(b.root || ""), String(b.id || ""), log, scopedOptions(scope, req.headers.get("x-dsh-skills-session")))),
+      fetch: (req) => handlePost(req, async (b, scope) => deleteCategory(String(b.root || ""), String(b.id || ""), log, scopedOptions(scope, req.headers.get("x-dsh-skills-session"), await collectPresetRoots(ctx)))),
     },
     {
       path: `${API_PREFIX}/category-assign`,
       methods: ["POST"],
-      fetch: (req) => handlePost(req, (b, scope) => assignSkillCategory(String(b.root || ""), String(b.name || ""), String(b.category || ""), log, scopedOptions(scope, req.headers.get("x-dsh-skills-session")))),
+      fetch: (req) => handlePost(req, async (b, scope) => assignSkillCategory(String(b.root || ""), String(b.name || ""), String(b.category || ""), log, scopedOptions(scope, req.headers.get("x-dsh-skills-session"), await collectPresetRoots(ctx)))),
     },
     {
       path: `${API_PREFIX}/category-move`,
       methods: ["POST"],
-      fetch: (req) => handlePost(req, (b, scope) => moveSkillInCategory(String(b.root || ""), String(b.name || ""), String(b.category || ""), b.targetName ? String(b.targetName) : undefined, b.position === undefined ? "before" : String(b.position), log, scopedOptions(scope, req.headers.get("x-dsh-skills-session")))),
+      fetch: (req) => handlePost(req, async (b, scope) => moveSkillInCategory(String(b.root || ""), String(b.name || ""), String(b.category || ""), b.targetName ? String(b.targetName) : undefined, b.position === undefined ? "before" : String(b.position), log, scopedOptions(scope, req.headers.get("x-dsh-skills-session"), await collectPresetRoots(ctx)))),
     },
     {
       path: `${API_PREFIX}/category-enable`,
       methods: ["POST"],
-      fetch: (req) => handlePost(req, (b, scope) => setCategoryEnabled(String(b.root || ""), String(b.category || ""), true, log, scopedOptions(scope, req.headers.get("x-dsh-skills-session"))), { afterSuccess: afterWrite }),
+      fetch: (req) => handlePost(req, async (b, scope) => setCategoryEnabled(String(b.root || ""), String(b.category || ""), true, log, scopedOptions(scope, req.headers.get("x-dsh-skills-session"), await collectPresetRoots(ctx))), { afterSuccess: afterWrite }),
     },
     {
       path: `${API_PREFIX}/category-disable`,
       methods: ["POST"],
-      fetch: (req) => handlePost(req, (b, scope) => setCategoryEnabled(String(b.root || ""), String(b.category || ""), false, log, scopedOptions(scope, req.headers.get("x-dsh-skills-session"))), { afterSuccess: afterWrite }),
+      fetch: (req) => handlePost(req, async (b, scope) => setCategoryEnabled(String(b.root || ""), String(b.category || ""), false, log, scopedOptions(scope, req.headers.get("x-dsh-skills-session"), await collectPresetRoots(ctx))), { afterSuccess: afterWrite }),
     },
     {
       path: `${API_PREFIX}/skill-note`,
       methods: ["POST"],
-      fetch: (req) => handlePost(req, (b, scope) => setSkillNote(String(b.root || ""), String(b.name || ""), String(b.note || ""), log, scopedOptions(scope, req.headers.get("x-dsh-skills-session"))), { afterSuccess: afterWrite }),
+      fetch: (req) => handlePost(req, async (b, scope) => setSkillNote(String(b.root || ""), String(b.name || ""), String(b.note || ""), log, scopedOptions(scope, req.headers.get("x-dsh-skills-session"), await collectPresetRoots(ctx))), { afterSuccess: afterWrite }),
     },
     {
       path: `${API_PREFIX}/delete`,

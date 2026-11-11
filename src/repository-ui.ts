@@ -33,7 +33,7 @@ export const repositoryLocales = {
     "repo.catalog.loadMore": "再加载 10 条",
     "repo.catalog.installRefreshWarning": "技能已安装并启用，但列表刷新失败。请重新打开发现页；不要重复安装。",
     "repo.catalog.uninstallRefreshWarning": "技能已移入回收站，但列表刷新失败。请刷新技能列表或重新打开设置页；不要重复卸载。",
-    "repo.installElsewhere": "安装到其他位置", "repo.destinationUnavailable": "原项目未登记或目录不可用，无法管理此副本。请在侧栏重新登记原项目后刷新。", "repo.scope.user": "全局", "repo.scope.project": "项目", "repo.source.dsh": "DSH", "repo.source.agents": "Shared Agent",
+    "repo.installElsewhere": "安装到其他位置", "repo.destinationUnavailable": "原项目未登记或目录不可用，无法管理此副本。请在侧栏重新登记原项目后刷新。", "repo.scope.user": "全局", "repo.scope.project": "项目", "repo.scope.preset": "预设", "repo.source.dsh": "DSH", "repo.source.agents": "Shared Agent",
     "repo.refreshing": "正在检查更新…", "repo.refreshed": "刷新与更新检查完成", "repo.partialRefreshFailed": "部分仓库检查更新失败（{names}），其余已完成", "repo.detailLoading": "正在读取技能说明…",
     "repo.local": "本机", "repo.source": "安装来源", "repo.update": "可更新", "repo.review": "查看更新", "repo.rollback": "恢复上一版", "repo.confirmUpdate": "备份并更新", "repo.confirmRollback": "备份并恢复", "repo.overwrite": "备份本地修改并替换", "repo.modified": "检测到本地修改。替换会覆盖当前文件，原文件将完整备份，可恢复。", "repo.noChanges": "文件内容没有变化。", "repo.added": "新增", "repo.removed": "删除", "repo.modifiedFile": "修改", "repo.updating": "更新中…", "repo.updateProgress": "正在校验、备份并替换，请稍候…", "repo.updateSuccess": "更新完成，已保留上一版备份。", "repo.rollbackSuccess": "已恢复上一版。", "repo.manageUpdate": "管理更新", "error.repo.modified": "存在本地修改，请预览并确认备份后替换。",
     "scope.repositories": "发现技能", "repo.add": "添加仓库", "repo.manage": "管理仓库", "repo.refresh": "刷新并检查更新", "repo.save": "添加并扫描",
@@ -66,7 +66,7 @@ export const repositoryLocales = {
     "repo.catalog.loadMore": "Load 10 more",
     "repo.catalog.installRefreshWarning": "Installed and enabled, but the list could not refresh. Reopen Discover Skills; do not install again.",
     "repo.catalog.uninstallRefreshWarning": "Moved to trash, but the list could not refresh. Refresh the skill list or reopen Settings; do not uninstall again.",
-    "repo.installElsewhere": "Install elsewhere", "repo.destinationUnavailable": "The original project is unregistered or unavailable. Re-register it in the sidebar and refresh to manage this copy.", "repo.scope.user": "Global", "repo.scope.project": "Project", "repo.source.dsh": "DSH", "repo.source.agents": "Shared Agent",
+    "repo.installElsewhere": "Install elsewhere", "repo.destinationUnavailable": "The original project is unregistered or unavailable. Re-register it in the sidebar and refresh to manage this copy.", "repo.scope.user": "Global", "repo.scope.project": "Project", "repo.scope.preset": "Preset", "repo.source.dsh": "DSH", "repo.source.agents": "Shared Agent",
     "repo.refreshing": "Checking updates…", "repo.refreshed": "Refresh and update check completed", "repo.partialRefreshFailed": "Failed to check updates for some repositories ({names}); others completed.", "repo.detailLoading": "Loading skill instructions…",
     "repo.local": "Local", "repo.source": "Installed from", "repo.update": "Update available", "repo.review": "Review update", "repo.rollback": "Restore previous version", "repo.confirmUpdate": "Back up and update", "repo.confirmRollback": "Back up and restore", "repo.overwrite": "Back up local edits and replace", "repo.modified": "Local edits detected. Replacement overwrites current files and keeps a complete backup for restoration.", "repo.noChanges": "No file changes.", "repo.added": "Added", "repo.removed": "Removed", "repo.modifiedFile": "Modified", "repo.updating": "Updating…", "repo.updateProgress": "Verifying, backing up and replacing files. Please wait…", "repo.updateSuccess": "Updated. Previous version backed up.", "repo.rollbackSuccess": "Previous version restored.", "repo.manageUpdate": "Manage updates", "error.repo.modified": "Local edits detected. Review and confirm replacement with a backup.",
     "scope.repositories": "Discover Skills", "repo.add": "Add repository", "repo.manage": "Manage repositories", "repo.refresh": "Refresh & check updates", "repo.save": "Add and scan",
@@ -294,6 +294,10 @@ export function createRepositoryUI({ react, Modal, Input, Button, Checkbox, Sour
         const row = workspaces.find(row => row.projectRoot && identity(row.projectRoot) === identity(copy.installedWorkspace!));
         return row?.available && row.registeredPaths[0] ? { workspace: row.registeredPaths[0] } : null;
       }
+      if (copy.installedRoot && copy.installedRoot.startsWith("preset-")) {
+        const available = installRoots.some(r => r.key === copy.installedRoot && r.available);
+        return available ? { root: copy.installedRoot } : null;
+      }
       return copy.installedRoot === 'dsh' || copy.installedRoot === 'agents' ? { root: copy.installedRoot } : null;
     }
     function copyName(copy: RepoCopy) { return copy.installedWorkspace || copy.installedRoot ? locationLabel(copy) : ''; }
@@ -308,6 +312,15 @@ export function createRepositoryUI({ react, Modal, Input, Button, Checkbox, Sour
         function locationParts(copy: { installedRoot: RepositoryRoot | null; installedWorkspace?: string }) {
           const project = !!copy.installedWorkspace;
           const root = project ? "dsh" : copy.installedRoot;
+          if (!project && root && root.startsWith("preset-")) {
+            const matched = installRoots.find(item => item.key === root);
+            const rawLabel = matched ? destinationName(matched) : root.replace(/^preset-/, "");
+            const cleanName = rawLabel.replace(/^(?:预设:\s*|Preset:\s*)/, "");
+            const scope = t("repo.scope.preset");
+            const path = matched?.path || "";
+            const lead = [scope, cleanName].filter(Boolean).join(" · ");
+            return { lead, path };
+          }
           const source = root === "agents" ? t("repo.source.agents") : t("repo.source.dsh");
           const scope = project ? t("repo.scope.project") : t("repo.scope.user");
           const path = project ? copy.installedWorkspace || "" : installRoots.find(item => item.key === root)?.path || "";

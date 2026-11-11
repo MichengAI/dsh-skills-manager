@@ -5,13 +5,13 @@
 ### New Features
 
 - **Discover and browse built-in Agent Preset skills**: skills bundled with official built-in presets (such as Creator Mode) are now automatically discovered, categorized, and presented at the bottom of the global skills list with read-only detail inspection (#86).
-- **Full skill lifecycle management for custom Agent Presets**: skills stored in your own custom Agent Preset directories support full management right inside Skills Manager — create, upload, import from local directories, install/uninstall via Git repositories and registries, move to Trash, and restore back to the original preset folder (#86).
+- **Full skill lifecycle management for custom Agent Presets**: custom Agent Preset folders using absolute paths enjoy full parity with standard skills — toggle individual skills or the entire preset source on/off (actively intercepted in host runtime), organize categories and notes, create, upload, import from folders, install/uninstall via Git repositories and registries, move to Trash, and restore back to the original preset folder (#86).
 - **Three-way Destination Picker**: creation, import, and repository installation modals now allow selecting between Global (User), Workspace (Project), and Custom Agent Preset targets, while preventing unsafe writes to preset paths that overlap with global directories (#86).
 
 ### Behavior Changes
 
-- **Localized preset display and multi-folder disambiguation**: built-in preset labels automatically adapt to the host locale, and presets configured with multiple skill folders are numbered sequentially across all views and filters (#86).
-- **No enable/disable toggles for preset skills**: because Agent Presets load skills directly from their dedicated folders, Skills Manager omits per-skill and source-level toggles for presets (simply remove or delete unneeded skills in custom presets; built-in preset skills remain intact) (#86).
+- **Localized preset display and multi-folder disambiguation**: built-in preset labels automatically adapt to the host locale, and presets configured with multiple skill folders are numbered sequentially across all views, filters, repository copy tags, and Trash (#86).
+- **Read-only built-in and relative presets**: official built-in presets and relative-path presets remain read-only without toggles, whereas custom absolute-path presets support full toggling and lifecycle management (#86).
 - **Refined conflict detection in repositories**: repository skill lists no longer report false-positive conflicts against read-only built-in preset skills, while preserving duplicate protection across user, custom preset, and external Agent sources.
 
 [中文](CHANGELOG.zh-CN.md)

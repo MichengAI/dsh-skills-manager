@@ -254,14 +254,16 @@ export async function collectPresetRoots(ctx: unknown, options: PresetRootsOptio
       const suffix = declaredDirs.length === 1 ? "" : ` (${i + 1})`;
       const label = `预设: ${presetName}${suffix}`;
 
+      const mutable = !isBuiltin && isAbsolute(trimmedDir);
       roots.push({
         key: rootKey,
         path: resolved,
         label,
         rank: 10000 + roots.length * 10,
-        mutable: !isBuiltin && isAbsolute(trimmedDir),
+        mutable,
         native: isBuiltin,
-        toggleable: false,
+        // 自定义绝对路径预设依托 agent-scoped provider 实现真开关拦截；内置或相对路径预设保持只读不可开关。
+        toggleable: mutable,
         kind: "preset",
         group: `${presetName}${suffix}`,
         presetId: preset.id,
