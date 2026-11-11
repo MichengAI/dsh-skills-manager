@@ -126,6 +126,12 @@ Verfügbare Optionen:
 
 Für nicht aufgeführte Agents können Sie im ➕-Menü über «Quellordner…» eigene Pfade registrieren.
 
+### Agent-Voreinstellungen (Agent Presets)
+
+Skills Manager erkennt automatisch Agent-Voreinstellungen in DSH mit eigenen Skill-Ordnern und zeigt sie am Ende der globalen Liste an:
+- **Offizielle Voreinstellungen** (z. B. Creator Mode): Mitgelieferte Skills bleiben strikt schreibgeschützt ohne irreführende Umschalter;
+- **Benutzerdefinierte Voreinstellungen**: Ihre eigenen Presets mit `customSkillDirs` unterstützen das vollständige Skill-Lifecycle-Management — direktes Erstellen, Importieren und Installieren aus Repositories, Verschieben in den Papierkorb sowie Wiederherstellen. Pfade, die sich mit globalen Verzeichnissen überschneiden, werden sicher blockiert.
+
 ## DSH Produkt-Ökosystem
 
 | Plugin | Beschreibung |

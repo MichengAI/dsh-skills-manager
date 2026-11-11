@@ -126,6 +126,12 @@ Options disponibles :
 
 Pour ajouter un agent non répertorié, utilisez le menu ➕ et sélectionnez « Dossiers sources… ».
 
+### Préréglages d'agent (Agent Presets)
+
+Skills Manager détecte automatiquement les préréglages d'agent dotés de répertoires dédiés dans DSH et les affiche à la fin de la liste globale :
+- **Préréglages officiels intégrés** (comme le Mode Créateur) : les compétences intégrées restent en lecture seule sans interrupteurs superflus ni modification des fichiers hôtes ;
+- **Préréglages personnalisés** : vos préréglages configurés avec `customSkillDirs` prennent en charge la gestion complète — création, importation, installation depuis des dépôts, mise à la corbeille et restauration. Les chemins chevauchant les répertoires globaux sont bloqués par sécurité.
+
 ## Écosystème DSH
 
 | Plugin | Description |

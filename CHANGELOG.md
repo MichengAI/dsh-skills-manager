@@ -11,6 +11,7 @@
 ### Behavior Changes
 
 - **Localized preset display and multi-folder disambiguation**: built-in preset labels automatically adapt to the host locale, and presets configured with multiple skill folders are numbered sequentially across all views and filters (#86).
+- **No enable/disable toggles for preset skills**: because Agent Presets load skills directly from their dedicated folders, Skills Manager omits per-skill and source-level toggles for presets (simply remove or delete unneeded skills in custom presets; built-in preset skills remain intact) (#86).
 - **Refined conflict detection in repositories**: repository skill lists no longer report false-positive conflicts against read-only built-in preset skills, while preserving duplicate protection across user, custom preset, and external Agent sources.
 
 [中文](CHANGELOG.zh-CN.md)

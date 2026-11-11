@@ -1,6 +1,5 @@
 import { stat } from "node:fs/promises";
 import { resolve, join, dirname, isAbsolute } from "node:path";
-import { homedir } from "node:os";
 import { createRequire } from "node:module";
 import type { SkillRoot } from "./types.js";
 
@@ -74,17 +73,6 @@ async function isExistingDir(path: string): Promise<boolean> {
   } catch {
     return false;
   }
-}
-
-function expandPresetDir(raw: string): string {
-  const trimmed = raw.trim();
-  if (trimmed === "~") return homedir();
-  if (trimmed.startsWith("~/") || trimmed.startsWith("~\\")) {
-    return join(homedir(), trimmed.slice(2));
-  }
-  if (isAbsolute(trimmed)) return resolve(trimmed);
-  const dshHome = process.env.DSH_HOME?.trim() || join(homedir(), ".dsh");
-  return resolve(dshHome, trimmed);
 }
 
 /**
@@ -251,7 +239,12 @@ export async function collectPresetRoots(ctx: unknown, options: PresetRootsOptio
       if (dir === "@deepseek-ai/dsh-agent-preset/skills" && cordisBundledSkillsDir) {
         dir = cordisBundledSkillsDir;
       }
-      const resolved = expandPresetDir(dir);
+      // 依据宿主 @deepseek-ai/dsh-skill-filesystem/lib/index.js:78：
+      // 宿主直接以 resolve(root) 解析 customSkillDirs（相对路径随进程 cwd，且不展开 ~）。
+      // 为保证发现位置与宿主实际加载目录完全一致，这里对齐使用 resolve(trimmedDir)；
+      // 同时为防止相对路径或 ~ 写法因启动目录变化而误写入错位位置，仅对绝对路径的自定义预设开放可写。
+      const trimmedDir = dir.trim();
+      const resolved = resolve(trimmedDir);
       if (seenPaths.has(resolved)) continue;
       if (!(await isExistingDir(resolved))) continue;
       seenPaths.add(resolved);
@@ -266,7 +259,7 @@ export async function collectPresetRoots(ctx: unknown, options: PresetRootsOptio
         path: resolved,
         label,
         rank: 10000 + roots.length * 10,
-        mutable: !isBuiltin,
+        mutable: !isBuiltin && isAbsolute(trimmedDir),
         native: isBuiltin,
         toggleable: false,
         kind: "preset",

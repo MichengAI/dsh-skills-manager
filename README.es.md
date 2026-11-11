@@ -154,6 +154,12 @@ description: Ayuda para revisar código de forma sistemática
 
 Si usas un agente que no figure en la lista anterior, puedes registrarlo mediante el menú ➕ seleccionando «Carpetas de origen…».
 
+### Preajustes de Agente (Agent Presets)
+
+Skills Manager detecta automáticamente los preajustes de agente configurados en DSH con directorios dedicados y los muestra al final de la lista global:
+- **Preajustes oficiales integrados** (como Modo Creador): las habilidades integradas son de solo lectura para consulta e inspección, sin interruptores engañosos;
+- **Preajustes personalizados**: tus propios preajustes con `customSkillDirs` admiten la gestión completa — creación, importación, instalación y desinstalación desde repositorios, envío a la Papelera y restauración en su carpeta original. Las rutas que se solapan con directorios globales se bloquean de forma segura.
+
 ## Ecosistema de productos DSH
 
 | Plugin | Descripción |

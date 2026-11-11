@@ -215,6 +215,35 @@ ok(Array.isArray(compRoots), "通过 inspectCompositions baseUrl 探测通道运
 const emptyRoots = await collectPresetRoots({});
 ok(Array.isArray(emptyRoots), "宿主无 agentPresets 服务时平滑降级返回数组");
 
+// 校验相对路径解析与宿主 resolve() 一致且保守标为只读（mutable: false）
+const oldCwd = process.cwd();
+let relRoot;
+try {
+  process.chdir(tmp);
+  const relPresetRoots = await collectPresetRoots({
+    agentPresets: {
+      definitions: new Map([
+        [
+          "rel-mode",
+          {
+            config: {
+              id: "rel-mode",
+              name: "相对路径模式",
+              plugins: [{ id: "skill-filesystem", config: { customSkillDirs: ["./custom-review-skills"] } }],
+            },
+          },
+        ],
+      ]),
+    },
+  });
+  relRoot = relPresetRoots.find((r) => r.key === "preset-rel-mode");
+} finally {
+  process.chdir(oldCwd);
+}
+ok(!!relRoot, "相对路径 customSkillDirs 按宿主 resolve(dir) 成功发现");
+eq(relRoot?.path, customReviewSkillsDir, "相对路径解析基准对齐宿主 process.cwd()");
+eq(relRoot?.mutable, false, "相对路径或 ~ 写法保守标为只读（防止写偏）");
+
 console.log("── 2. 状态快照集成（state）与排序位置 ──");
 
 const snapshot = await state({ presetRoots: roots });
