@@ -1,8 +1,11 @@
 import { stat } from "node:fs/promises";
 import { resolve, join, dirname } from "node:path";
-import { homedir } from "node:os";
 import { createRequire } from "node:module";
 import type { SkillRoot } from "./types.js";
+
+export interface PresetRootsOptions {
+  cordisSkillsDir?: string;
+}
 
 /**
  * 递归从预设的 plugins 配置列表中提取 customSkillDirs
@@ -33,17 +36,29 @@ export function extractCustomSkillDirs(plugins: unknown[]): string[] {
   return dirs;
 }
 
-function extractDirsFromYaml(yamlText: string): string[] {
+export function extractDirsFromYaml(yamlText: string): string[] {
   const dirs: string[] = [];
   if (!yamlText) return dirs;
+  // 1. 匹配块状列表 customSkillDirs:\n  - dir1\n  - dir2
   const blockMatch = yamlText.match(/customSkillDirs:\s*\n((?:\s*-\s*[^\n]+\n?)+)/);
   if (blockMatch && blockMatch[1]) {
     const lines = blockMatch[1].split("\n");
     for (const line of lines) {
-      const m = line.match(/^\s*-\s*["']?([^"'\r\n]+)["']?\s*$/);
+      const m = line.match(/^\s*-\s*["']?([^"'#\r\n]+)["']?\s*$/);
       if (m && m[1]) {
         const val = m[1].trim();
         if (val && !val.startsWith("!!js")) dirs.push(val);
+      }
+    }
+  }
+  // 2. 匹配行内数组 customSkillDirs: ["dir1", "dir2"]
+  const inlineMatch = yamlText.match(/customSkillDirs:\s*\[([^\]]+)\]/);
+  if (inlineMatch && inlineMatch[1]) {
+    const items = inlineMatch[1].split(",");
+    for (const item of items) {
+      const val = item.trim().replace(/^["']|["']$/g, "").trim();
+      if (val && !val.startsWith("!!js") && !dirs.includes(val)) {
+        dirs.push(val);
       }
     }
   }
@@ -61,37 +76,47 @@ async function isExistingDir(path: string): Promise<boolean> {
 }
 
 /**
- * 多层探测官方内置创造模式（Cordis）随包出货的技能目录：
- * 1. 尝试直接模块 resolve；
- * 2. 尝试从 @deepseek-ai/dsh 内部 resolve；
- * 3. 探测本机全局 node_modules 物理路径；
- * 4. 探测常见 Codex / DSH 运行时路径；
- * 5. 探测 Electron 宿主 resourcesPath / execPath。
+ * 探测官方内置创造模式（Cordis）随包出货的技能目录。
+ * 遵循跨平台安全原则，优先使用模块解析与运行时资源路径，绝不写死任何盘符或产品专有绝对路径。
  */
-async function findCordisSkillsDir(): Promise<string | undefined> {
-  // 1. 优先使用真实的物理文件系统路径（非 asar 虚拟归档），确保 fs.realpath 与扫描完全通畅
-  const physicalCandidates = [
-    "D:/Tools/nodejs/node_global/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-agent-preset/skills",
-    join(homedir(), "AppData/Roaming/DSH Codex Desktop/dsh-runtime/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-agent-preset/skills"),
-  ];
-  for (const c of physicalCandidates) {
-    if (await isExistingDir(c)) return resolve(c);
+async function findCordisSkillsDir(explicitDir?: string): Promise<string | undefined> {
+  if (explicitDir && (await isExistingDir(explicitDir))) {
+    return resolve(explicitDir);
   }
 
-  // 2. 本地直接 resolve
+  // 1. 本地动态模块解析：从 @deepseek-ai/dsh-agent-preset 直接解析
   try {
     const req = createRequire(import.meta.url);
     const p = req.resolve("@deepseek-ai/dsh-agent-preset/package.json");
     const candidate = join(dirname(p), "skills");
-    if (!candidate.includes(".asar") && (await isExistingDir(candidate))) return resolve(candidate);
+    if (!candidate.includes(".asar") && (await isExistingDir(candidate))) {
+      return resolve(candidate);
+    }
   } catch {}
 
-  // 3. 从 @deepseek-ai/dsh 依赖内部 resolve
+  // 2. 从 @deepseek-ai/dsh 依赖内部解析
   try {
     const req = createRequire(import.meta.url);
     const dshPkg = req.resolve("@deepseek-ai/dsh/package.json");
     const candidate = join(dirname(dshPkg), "node_modules", "@deepseek-ai", "dsh-agent-preset", "skills");
-    if (!candidate.includes(".asar") && (await isExistingDir(candidate))) return resolve(candidate);
+    if (!candidate.includes(".asar") && (await isExistingDir(candidate))) {
+      return resolve(candidate);
+    }
+  } catch {}
+
+  // 3. 从 Electron 宿主运行时资源目录 resourcesPath 动态推导
+  try {
+    const resourcesPath = (process as unknown as { resourcesPath?: string }).resourcesPath;
+    if (resourcesPath) {
+      const candidates = [
+        join(resourcesPath, "app.asar.unpacked", "node_modules", "@deepseek-ai", "dsh-agent-preset", "skills"),
+        join(resourcesPath, "runtime", "primary-runtime", "node_modules", "@deepseek-ai", "dsh-agent-preset", "skills"),
+        join(resourcesPath, "runtime", "node_modules", "@deepseek-ai", "dsh-agent-preset", "skills"),
+      ];
+      for (const c of candidates) {
+        if (await isExistingDir(c)) return resolve(c);
+      }
+    }
   } catch {}
 
   return undefined;
@@ -100,8 +125,9 @@ async function findCordisSkillsDir(): Promise<string | undefined> {
 /**
  * 从宿主 AgentPresetRegistry 中动态提取内置模式与自定义模式的专属技能根目录。
  * 只有真正包含独立技能目录且物理目录存在的预设，才会生成对应的只读 SkillRoot。
+ * 遵循 B方案：预设模式专属技能作为模式绑定的只读资产，不提供假开关（toggleable: false）。
  */
-export async function collectPresetRoots(ctx: unknown): Promise<SkillRoot[]> {
+export async function collectPresetRoots(ctx: unknown, options: PresetRootsOptions = {}): Promise<SkillRoot[]> {
   const roots: SkillRoot[] = [];
   const seenPaths = new Set<string>();
 
@@ -156,8 +182,8 @@ export async function collectPresetRoots(ctx: unknown): Promise<SkillRoot[]> {
     }
   }
 
-  // 探测内置创造模式随包技能物理路径
-  const cordisBundledSkillsDir = await findCordisSkillsDir();
+  // 探测内置创造模式随包技能物理路径（支持 options.cordisSkillsDir 注入）
+  const cordisBundledSkillsDir = await findCordisSkillsDir(options.cordisSkillsDir);
 
   // 如果未能从 agentPresets 中枚举到 cordis 预设（或 agentPresets 尚未就绪），但本地存在创造模式技能目录，作为内置预设保底提供
   if (!presetConfigs.some((p) => p.id === "cordis") && cordisBundledSkillsDir) {
@@ -204,10 +230,10 @@ export async function collectPresetRoots(ctx: unknown): Promise<SkillRoot[]> {
         key: rootKey,
         path: resolved,
         label,
-        rank: 700,
+        rank: 10000,
         mutable: false,
         native: isBuiltin,
-        toggleable: true,
+        toggleable: false,
         kind: "preset",
         group: presetName,
         presetId: preset.id,

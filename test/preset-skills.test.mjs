@@ -36,6 +36,20 @@ function eq(actual, expected, msg) {
 }
 
 const tmp = await mkdtemp(join(tmpdir(), "dssm-preset-test-"));
+process.env.DSH_HOME = tmp;
+
+const mockCordisDir = join(tmp, "mock-cordis-skills");
+await mkdir(join(mockCordisDir, "cordis-plugin-development"), { recursive: true });
+await writeFile(
+  join(mockCordisDir, "cordis-plugin-development", "SKILL.md"),
+  `---
+name: cordis-plugin-development
+description: 创造模式内置专属技能，用于编写和扩展 DSH 插件。
+---
+这是创造模式插件开发的 instructions。`,
+  "utf8",
+);
+
 const customReviewSkillsDir = join(tmp, "custom-review-skills");
 await mkdir(join(customReviewSkillsDir, "strict-code-review"), { recursive: true });
 await writeFile(
@@ -119,7 +133,7 @@ const mockCtx = {
   },
 };
 
-const roots = await collectPresetRoots(mockCtx);
+const roots = await collectPresetRoots(mockCtx, { cordisSkillsDir: mockCordisDir });
 ok(Array.isArray(roots), "collectPresetRoots 返回数组");
 eq(roots.length, 2, "只为包含专属技能目录的预设生成根（cordis 与 code-review，排除 standard）");
 
@@ -127,6 +141,8 @@ const cordisRoot = roots.find((r) => r.key === "preset-cordis");
 ok(!!cordisRoot, "发现内置 cordis 预设根");
 eq(cordisRoot.kind, "preset", "根类型为 preset");
 eq(cordisRoot.mutable, false, "预设根不可写");
+eq(cordisRoot.toggleable, false, "B方案：内置预设根只读，不提供假开关");
+eq(cordisRoot.rank, 10000, "预设根优先级为 10000 稳定沉底");
 eq(cordisRoot.native, true, "内置 cordis 模式 native 为 true");
 ok(cordisRoot.label.includes("创造模式") || cordisRoot.label.includes("cordis"), "标签包含模式名称");
 
@@ -134,9 +150,33 @@ const reviewRoot = roots.find((r) => r.key === "preset-code-review");
 ok(!!reviewRoot, "发现自定义 code-review 预设根");
 eq(reviewRoot.kind, "preset", "根类型为 preset");
 eq(reviewRoot.mutable, false, "自定义预设根同样为只读");
+eq(reviewRoot.toggleable, false, "B方案：自定义预设根只读，不提供假开关");
+eq(reviewRoot.rank, 10000, "自定义预设根优先级为 10000 稳定沉底");
 eq(reviewRoot.native, false, "自定义模式 native 为 false");
 eq(reviewRoot.path, customReviewSkillsDir, "路径指向自定义模式配置的 customSkillDirs");
 ok(reviewRoot.label.includes("代码审查模式"), "标签包含自定义模式名称");
+
+// P2-3 覆盖：当 definitions 为 undefined 时，走 list() + readDocument() 分支
+const mockFallbackRegistry = {
+  definitions: undefined,
+  async list() {
+    return [{ id: "yaml-mode", name: "YAML 预设模式" }];
+  },
+  async readDocument(id) {
+    return {
+      content: `
+id: ${id}
+name: YAML 预设模式
+plugins:
+  - id: skill-filesystem
+    customSkillDirs:
+      - "${customReviewSkillsDir}"
+`,
+    };
+  },
+};
+const fallbackRoots = await collectPresetRoots({ agentPresets: mockFallbackRegistry });
+ok(fallbackRoots.some((r) => r.key === "preset-yaml-mode"), "通过 list + readDocument 成功解析 YAML customSkillDirs");
 
 // 平滑降级测试：无 agentPresets 时安全返回空数组
 const emptyRoots = await collectPresetRoots({});
@@ -256,7 +296,7 @@ const detailPayload = await detailRes.json();
 ok(detailPayload.ok === true, "POST /detail payload.ok === true");
 eq(detailPayload.data.name, "strict-code-review", "POST /detail 成功获取到技能名称");
 
-// 停用接口：允许停用，不改动源文件，记录在本地状态
+// B方案只读测试：只读预设来源拒绝写入停用状态，防止假开关误导
 const disableRes = await fetch(`${api}/disable`, {
   method: "POST",
   headers: {
@@ -266,19 +306,22 @@ const disableRes = await fetch(`${api}/disable`, {
   },
   body: JSON.stringify({ root: "preset-code-review", name: "strict-code-review" }),
 });
-eq(disableRes.status, 200, "POST /disable 返回 200");
 const disablePayload = await disableRes.json();
-ok(disablePayload.ok === true && disablePayload.data.enabled === false, "预设专属技能可被本地停用");
+ok(disablePayload.ok === false, "B方案：只读预设来源发起停用请求被安全拒绝");
+ok(disablePayload.code === "error.root.readonly" || disablePayload.code === "error.skill.notFound", "返回只读或不存在错误码");
 
-// 重新获取状态，验证 enabled 为 false
-const stateRes2 = await fetch(`${api}/state`, {
-  headers: { host: `127.0.0.1:${port}` },
+// 整源停用接口同样拒绝只读预设来源
+const sourceDisableRes = await fetch(`${api}/source-disable`, {
+  method: "POST",
+  headers: {
+    host: `127.0.0.1:${port}`,
+    "content-type": "application/json",
+    "x-dsh-skills-manager": "1",
+  },
+  body: JSON.stringify({ root: "preset-code-review" }),
 });
-const statePayload2 = await stateRes2.json();
-const disabledSkill = statePayload2.data.roots
-  .find((r) => r.key === "preset-code-review")
-  ?.skills.find((s) => s.name === "strict-code-review");
-ok(disabledSkill && disabledSkill.enabled === false, "状态快照中该预设技能已显示为停用");
+const sourceDisablePayload = await sourceDisableRes.json();
+ok(sourceDisablePayload.ok === false, "B方案：只读预设来源发起整源停用被安全拒绝");
 
 server.close();
 await rm(tmp, { recursive: true, force: true });

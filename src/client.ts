@@ -417,7 +417,7 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
 
     function getRootBrandIcon(key: string) {
       var k = String(key || "").toLowerCase();
-      if (k.startsWith("preset") || k.includes("preset")) {
+      if (k === "preset" || k.startsWith("preset-")) {
         return h("svg", { viewBox: "0 0 24 24", width: 16, height: 16, style: { display: "block" } },
           h("path", { fill: "currentColor", d: "M12 2a2 2 0 0 1 2 2v1.05A7.002 7.002 0 0 1 20 12v1a3 3 0 0 1-3 3h-1v2a3 3 0 0 1-3 3h-2a3 3 0 0 1-3-3v-2H7a3 3 0 0 1-3-3v-1a7.002 7.002 0 0 1 6-6.95V4a2 2 0 0 1 2-2zm-3 8a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm6 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3z" })
         );
