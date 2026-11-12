@@ -1,9 +1,11 @@
 // 预设模式专属技能（内置创造模式 + 用户新建自定义模式）的发现、详情与管理测试
 // 运行：node test/preset-skills.test.mjs
 
+import { promises as fsPromises } from "node:fs";
 import { mkdtemp, mkdir, writeFile, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { pathToFileURL } from "node:url";
 import { createServer } from "node:http";
 import { createTestFetchBridge } from "./fixtures/test-fetch-server.mjs";
 
@@ -1188,6 +1190,64 @@ for (let i = 0; i < 3; i++) {
 }
 eq(presetCollectCount, countBeforeMiss, "连续对失效 preset-* 发起请求时受 miss 负缓存保护，冷却期内零重复扫盘");
 cachedServer.close();
+
+// 6.5 桌面端 Electron .asar 兼容：支持 definitions.context.baseUrl 指向的 .asar 内置技能目录，且不依赖 fs.opendir
+const fakeAsarAppRoot = join(tmp, "desktop-dist", "resources", "app.asar", "dsh");
+const fakeAsarWebAppDir = join(fakeAsarAppRoot, "node_modules", "@deepseek-ai", "dsh-web-app", "presets");
+const fakeAsarPresetPkg = join(fakeAsarAppRoot, "node_modules", "@deepseek-ai", "dsh-agent-preset");
+const fakeAsarSkillsDir = join(fakeAsarPresetPkg, "skills");
+await mkdir(fakeAsarWebAppDir, { recursive: true });
+await mkdir(join(fakeAsarSkillsDir, "cordis-plugin-development"), { recursive: true });
+await writeFile(join(fakeAsarPresetPkg, "package.json"), JSON.stringify({ name: "@deepseek-ai/dsh-agent-preset", version: "0.2.2-rc.1" }), "utf8");
+await writeFile(join(fakeAsarWebAppDir, "cordis.patch.yml"), "# mock preset patch\n", "utf8");
+await writeFile(
+  join(fakeAsarSkillsDir, "cordis-plugin-development", "SKILL.md"),
+  "---\nname: cordis-plugin-development\ndescription: 桌面端内置 ASAR 创造模式技能\n---\nASAR 创造模式正文",
+  "utf8",
+);
+
+const origOpendir = fsPromises.opendir;
+fsPromises.opendir = async () => {
+  const err = new Error("ENOTDIR: not a directory");
+  err.code = "ENOTDIR";
+  throw err;
+};
+try {
+  const desktopAsarPresets = {
+    // 故意让 inspectCompositions 只返回 standard（模拟桌面端当前默认预设不是 cordis 时的情形）
+    inspectCompositions: () => [{ id: "standard", modules: [] }],
+    definitions: new Map([
+      [
+        "cordis",
+        {
+          context: { baseUrl: pathToFileURL(join(fakeAsarWebAppDir, "cordis.patch.yml")).href },
+          config: {
+            id: "cordis",
+            name: "创造模式",
+            plugins: [{ id: "skill-filesystem", config: { customSkillDirs: [{ __jsExpr: "deferred" }] } }],
+          },
+        },
+      ],
+    ]),
+  };
+  const asarRoots = await collectPresetRoots({ get: (k) => (k === "agentPresets" ? desktopAsarPresets : undefined) });
+  const asarCordisRoot = asarRoots.find((r) => r.key === "preset-cordis");
+  ok(!!asarCordisRoot, "桌面端 app.asar 内置预设创造模式必须被正常发现（不能被 .asar 黑名单屏蔽）");
+  eq(asarCordisRoot?.path, fakeAsarSkillsDir, "优先解析当前运行中宿主 definitions.context.baseUrl 对应的 .asar 内置技能目录");
+  eq(asarCordisRoot?.native, true, "app.asar 内置预设保持 native: true");
+  eq(asarCordisRoot?.mutable, false, "app.asar 内置预设保持只读不可写");
+  eq(asarCordisRoot?.toggleable, false, "app.asar 内置预设保持不可开关");
+
+  const asarState = await state({ presetRoots: asarRoots });
+  const asarRootView = asarState.roots.find((r) => r.key === "preset-cordis");
+  ok(asarRootView?.exists === true, "fs.opendir 抛出 ENOTDIR 时仍能通过 readdir 识别 .asar 根目录存在");
+  eq(asarRootView?.skills.length, 1, "fs.opendir 抛出 ENOTDIR 时仍能列出 .asar 内置技能");
+  eq(asarRootView?.skills[0]?.name, "cordis-plugin-development", "准确读取 .asar 内置技能名称");
+  const asarDetail = await skillDetail("preset-cordis", "cordis-plugin-development", { presetRoots: asarRoots });
+  eq(asarDetail?.body, "ASAR 创造模式正文", "点开 .asar 内置技能详情可正常读取正文");
+} finally {
+  fsPromises.opendir = origOpendir;
+}
 
 server.close();
 await rm(tmp, { recursive: true, force: true });

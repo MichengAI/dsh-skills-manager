@@ -77,10 +77,10 @@ export async function discoverReadonlyEntries(root: string) {
           continue;
         }
       }
-      const directory = await fs.opendir(current.path);
+      const directory = await fs.readdir(current.path, { withFileTypes: true });
       if (current.depth === 0) exists = true;
       directories++;
-      for await (const item of directory) {
+      for (const item of directory) {
         if (entries >= MAX_ENTRIES) {
           truncated = true;
           break;
@@ -127,7 +127,7 @@ export async function discoverReadonlyEntries(root: string) {
           ? relative(rootPath, current.path).split(sep).join("/") || "."
           : item.name.slice(0, -3);
         if (!validDiscoveryName(entryName)) continue;
-        const realDocPath = await fs.realpath(path);
+        const realDocPath = await fs.realpath(path).catch(() => path);
         const entryPath = bundle ? current.path : path;
         const realEntryPath = bundle ? realDirectory : realDocPath;
         if (!bundle && byName.has(entryName)) continue;

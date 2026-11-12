@@ -95,51 +95,92 @@ export function isHostBuiltinLocation(pathOrUrl?: string): boolean {
   return false;
 }
 
+function resolveCordisCandidatesFromBase(base: string): string[] {
+  const candidates: string[] = [];
+  const tryAnchor = (anchor: string) => {
+    try {
+      const req = createRequire(anchor);
+      const p = req.resolve("@deepseek-ai/dsh-agent-preset/package.json");
+      candidates.push(join(dirname(p), "skills"));
+    } catch {}
+    try {
+      const req = createRequire(anchor);
+      const dshPkg = req.resolve("@deepseek-ai/dsh/package.json");
+      candidates.push(join(dirname(dshPkg), "node_modules", "@deepseek-ai", "dsh-agent-preset", "skills"));
+    } catch {}
+  };
+  tryAnchor(base);
+  if (!base.endsWith("/") && !base.endsWith("\\") && !/\.(?:[cm]?js|ya?ml|json)$/i.test(base)) {
+    tryAnchor(`${base}/package.json`);
+  }
+  return candidates;
+}
+
+async function pickExistingDirPreferPhysical(candidates: string[]): Promise<string | undefined> {
+  const deduped: string[] = [];
+  const seen = new Set<string>();
+  for (const raw of candidates) {
+    if (!raw) continue;
+    const resolved = resolve(raw);
+    const key = process.platform === "win32" ? resolved.toLowerCase() : resolved;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(resolved);
+  }
+  // 同一层级优先采用非 .asar 物理展开目录，找不到时再允许合法的 Electron .asar 归档内目录
+  const physical = deduped.filter((c) => !c.toLowerCase().includes(".asar"));
+  const asar = deduped.filter((c) => c.toLowerCase().includes(".asar"));
+  for (const candidate of [...physical, ...asar]) {
+    if (await isExistingDir(candidate)) {
+      return candidate;
+    }
+  }
+  return undefined;
+}
+
 /**
  * 探测官方内置创造模式（Cordis）随包出货的技能目录。
- * 遵循跨平台安全原则，优先使用宿主运行时模块基址及标准模块解析，绝不写死任何盘符或产品专有绝对路径。
+ * 遵循跨平台安全原则，优先使用宿主运行时模块基址及标准模块解析，绝不写死任何盘符或产品专有绝对路径；
+ * 同级候选优先采用非 .asar 物理目录，同时在桌面端 Electron 环境下兼容 app.asar 内置只读包目录。
  */
 async function findCordisSkillsDir(explicitDir?: string, hostBaseUrls?: string[]): Promise<string | undefined> {
   if (explicitDir && (await isExistingDir(explicitDir))) {
     return resolve(explicitDir);
   }
 
-  // 1. 优先从宿主当前环境的基准路径 baseUrl 解析（对齐宿主 YAML 原生行为）
-  if (Array.isArray(hostBaseUrls)) {
+  // 1. 优先从当前运行中宿主环境的基准路径 baseUrl 解析（对齐宿主 YAML 原生行为，避免被无关旧版本软链劫持）
+  if (Array.isArray(hostBaseUrls) && hostBaseUrls.length > 0) {
+    const hostCandidates: string[] = [];
     for (const base of hostBaseUrls) {
       if (!base || typeof base !== "string") continue;
-      try {
-        const req = createRequire(base);
-        const p = req.resolve("@deepseek-ai/dsh-agent-preset/package.json");
-        const candidate = join(dirname(p), "skills");
-        if (!candidate.includes(".asar") && (await isExistingDir(candidate))) {
-          return resolve(candidate);
-        }
-      } catch {}
+      hostCandidates.push(...resolveCordisCandidatesFromBase(base));
     }
+    const matched = await pickExistingDirPreferPhysical(hostCandidates);
+    if (matched) return matched;
   }
 
-  // 2. 本地动态模块解析：从 @deepseek-ai/dsh-agent-preset 直接解析
-  try {
-    const req = createRequire(import.meta.url);
-    const p = req.resolve("@deepseek-ai/dsh-agent-preset/package.json");
-    const candidate = join(dirname(p), "skills");
-    if (!candidate.includes(".asar") && (await isExistingDir(candidate))) {
-      return resolve(candidate);
-    }
-  } catch {}
+  // 2. 本地动态模块解析：从插件自身位置解析 @deepseek-ai/dsh-agent-preset 或 @deepseek-ai/dsh
+  const localCandidates = resolveCordisCandidatesFromBase(import.meta.url);
+  const localMatched = await pickExistingDirPreferPhysical(localCandidates);
+  if (localMatched) return localMatched;
 
-  // 3. 从 @deepseek-ai/dsh 依赖内部解析
-  try {
-    const req = createRequire(import.meta.url);
-    const dshPkg = req.resolve("@deepseek-ai/dsh/package.json");
-    const candidate = join(dirname(dshPkg), "node_modules", "@deepseek-ai", "dsh-agent-preset", "skills");
-    if (!candidate.includes(".asar") && (await isExistingDir(candidate))) {
-      return resolve(candidate);
-    }
-  } catch {}
-
-  return undefined;
+  // 3. Electron 桌面宿主运行时资源目录兜底（基于标准 process.resourcesPath / execPath，不写死特定路径）
+  const runtimeResourcesDirs: string[] = [];
+  const resourcesPath = (process as { resourcesPath?: unknown }).resourcesPath;
+  if (typeof resourcesPath === "string" && resourcesPath.trim()) {
+    runtimeResourcesDirs.push(resourcesPath.trim());
+  }
+  if (typeof process.execPath === "string" && process.execPath.trim()) {
+    runtimeResourcesDirs.push(join(dirname(process.execPath), "resources"));
+  }
+  const electronCandidates: string[] = [];
+  for (const resDir of runtimeResourcesDirs) {
+    electronCandidates.push(
+      join(resDir, "app.asar.unpacked", "dsh", "node_modules", "@deepseek-ai", "dsh-agent-preset", "skills"),
+      join(resDir, "app.asar", "dsh", "node_modules", "@deepseek-ai", "dsh-agent-preset", "skills"),
+    );
+  }
+  return await pickExistingDirPreferPhysical(electronCandidates);
 }
 
 /**
@@ -160,6 +201,18 @@ export async function collectPresetRoots(ctx: unknown, options: PresetRootsOptio
 
   const hostBaseUrls: string[] = [];
   if (agentPresets) {
+    // 同步收集 definitions 注册记录中的 context.baseUrl（即便当前默认预设不是 cordis 也能拿到其模块基址）
+    const definitions: Map<string, { config?: unknown; context?: { baseUrl?: unknown } }> | undefined = agentPresets.definitions;
+    if (definitions instanceof Map) {
+      for (const record of definitions.values()) {
+        const baseUrl = record?.context?.baseUrl;
+        const cfgId = (record?.config as { id?: unknown } | undefined)?.id;
+        if (typeof baseUrl === "string" && baseUrl.trim()) {
+          if (cfgId === "cordis") hostBaseUrls.unshift(baseUrl.trim());
+          else hostBaseUrls.push(baseUrl.trim());
+        }
+      }
+    }
     if (typeof agentPresets.inspectCompositions === "function") {
       try {
         const comps = await agentPresets.inspectCompositions();
