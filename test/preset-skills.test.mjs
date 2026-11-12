@@ -919,6 +919,7 @@ const readonlyConflictRepoMgr = createRepositoryManager({
       ["cordis-builtin", "cordis-builtin-skill"],
       ["audit-a", "audit-skill-a"],
       ["audit-b", "audit-skill-b"],
+      ["declared-conflict", "manual-declared-alias"],
     ]) {
       await mkdir(join(dest, dir), { recursive: true });
       await writeFile(
@@ -954,6 +955,21 @@ const bulkUninstallRes = await readonlyConflictRepoMgr.uninstallMany({
 });
 ok(bulkUninstallRes.results[0]?.ok === true && bulkUninstallRes.results[1]?.ok === true, "uninstallMany 成功批量卸载自定义预设下的多个仓库技能");
 eq(presetRootsFetchCount, 1, "uninstallMany 在批量卸载多条预设记录时只调用 1 次 getPresetRoots（无线性重复探测）");
+
+// 校验 installMany 对自定义预设内已存在但目录名与 declaredName 不同的技能也精准拦截冲突（须向 state() 传入 presetRoots）
+await mkdir(join(customReviewSkillsDir, "custom-alias-folder"), { recursive: true });
+await writeFile(
+  join(customReviewSkillsDir, "custom-alias-folder", "SKILL.md"),
+  "---\nname: manual-declared-alias\ndescription: 目录名与声明名不同的本地预设技能\n---\n内容",
+  "utf8",
+);
+const bulkConflictRes = await readonlyConflictRepoMgr.installMany({
+  root: "preset-code-review",
+  items: [{ id: conflictTestRepo.id, path: "declared-conflict" }],
+});
+eq(bulkConflictRes.results[0]?.ok, false, "installMany 对预设内同 declaredName 不同目录名的既有技能拒绝覆盖");
+eq(bulkConflictRes.results[0]?.code, "error.repo.conflict", "installMany 准确返回 error.repo.conflict");
+await rm(join(customReviewSkillsDir, "custom-alias-folder"), { recursive: true, force: true });
 
 console.log("── 6. 前向兼容只读路径判定、损坏状态隔离、非 ASCII 预设 ID 与热路径缓存失效 ──");
 

@@ -829,8 +829,9 @@ export function createRepositoryManager({
       const { id, path } = input;
       const data = await read();
       const index = requestIndex();
-      const record = await pickInstallRecord(data.installs, input, index.registered, "没有可追溯的安装记录，不能卸载");
-      const root = await resolveInstallRoot(record, index.registered, await indexedFor(record));
+      const presetRoots = await fetchPresetRoots();
+      const record = await pickInstallRecord(data.installs, input, index.registered, "没有可追溯的安装记录，不能卸载", presetRoots);
+      const root = await resolveInstallRoot(record, index.registered, await indexedFor(record), presetRoots);
       const fingerprint = signature(fileIndex(await readSkillTree(join(root.path, record.name))));
       const trashId = `${Date.now()}-${randomUUID()}`;
       // Retire write authorization before moving the copy. History belongs to
@@ -841,7 +842,7 @@ export function createRepositoryManager({
       for (const item of catalog) item.trashId = trashId;
       await write(data);
       try {
-        await resolveInstallRoot(record, index.registered, await indexedFor(record));
+        await resolveInstallRoot(record, index.registered, await indexedFor(record), presetRoots);
         const result = await deleteSkill(root, record.name, log, { repositoryEntryOnly: true, repositoryTrash: { id: trashId, repository: { id, path } }, ...(catalog.length ? { catalogTrash: { id: trashId, ids: catalog.map(item => item.id) } } : {}) });
         if ("ok" in result && result.ok === false) throw failure(result.error, typeof result.code === "string" ? result.code : "error.repo.invalid", result.params);
         return result;
@@ -860,6 +861,7 @@ export function createRepositoryManager({
       if (!rawItems.length) throw failure("批量安装项为空", "error.repo.empty");
       if (rawItems.length > 100) throw failure("批量安装项超过上限（最多 100 项）", "error.repo.tooMany");
       let root: any, workspaceRoot: string | undefined;
+      let presetRoots: SkillRoot[] | undefined;
       if (input.workspace !== undefined) {
         if (input.root !== undefined && input.root !== "dsh") throw failure("工作区只能安装到项目 DSH skills");
         const target = await resolveWorkspaceTarget(input.workspace, registered);
@@ -867,11 +869,11 @@ export function createRepositoryManager({
         root = (target as { root: any }).root;
         workspaceRoot = root.projectRoot;
       } else {
-        const presetRoots = await fetchPresetRoots();
+        presetRoots = await fetchPresetRoots();
         root = await recordInstallRoot({ root: input.root }, registered, undefined, presetRoots);
       }
       const data = await read();
-      const sameTarget = (await state({ projectCwds: workspaceRoot ? [workspaceRoot] : [] })).roots.filter(item => workspaceRoot ? item.projectRoot === workspaceRoot && item.kind === "project-dsh" : root.kind === "preset" ? item.key === root.key : item.scope !== "project");
+      const sameTarget = (await state({ projectCwds: workspaceRoot ? [workspaceRoot] : [], ...(presetRoots ? { presetRoots } : {}) })).roots.filter(item => workspaceRoot ? item.projectRoot === workspaceRoot && item.kind === "project-dsh" : root.kind === "preset" ? item.key === root.key : item.scope !== "project");
       const taken = new Set<string>();
       for (const item of sameTarget) for (const entry of item.skills || []) {
         taken.add(entry.name.toLowerCase());
@@ -904,7 +906,7 @@ export function createRepositoryManager({
         }
       }
       if (prepared.length) await write(data);
-      if (prepared.length) await resolveInstallRoot({ root: input.root, workspace: workspaceRoot }, registered);
+      if (prepared.length) await resolveInstallRoot({ root: input.root, workspace: workspaceRoot }, registered, undefined, presetRoots);
       for (const item of prepared) {
         let copied = false;
         try {
@@ -998,6 +1000,7 @@ export function createRepositoryManager({
     install: ({ id, path, root: requestedRoot, workspace }: SkillRequest, registered?: string[]) => serialize(async () => {
       // 工作区只开放项目 DSH，不能与 Shared Agent 组合；路径必须来自宿主登记列表。
       let root: any, workspaceRoot: string | undefined;
+      let presetRoots: SkillRoot[] | undefined;
       if (workspace !== undefined) {
         if (requestedRoot !== undefined && requestedRoot !== "dsh") throw failure("工作区只能安装到项目 DSH skills");
         const target = await resolveWorkspaceTarget(workspace, registered);
@@ -1005,15 +1008,17 @@ export function createRepositoryManager({
         // 保留真实的项目根 key（project-dsh:<hash>）：启用策略与回收站都按它认根。
         root = (target as { root: any }).root;
         workspaceRoot = root.projectRoot;
-      } else root = await resolveInstallRoot({ root: requestedRoot });
+      } else {
+        presetRoots = await fetchPresetRoots();
+        root = await resolveInstallRoot({ root: requestedRoot }, registered, undefined, presetRoots);
+      }
       const data = await read(), repo = repository(data, id);
       const skill = repo.skills.find((s) => s.path === path);
       if (!skill || !skill.valid) throw failure("技能不存在或格式无效");
       // 工作区安装只和该项目的 .dsh/skills 比较，全局或其他项目已有同名副本不阻止安装。
       // 用户级位置（DSH 与 Shared Agent）仍互相比较：同一技能只能有一份可追溯的用户级安装。
       const lowered = skill.name.toLowerCase();
-      const presetRoots = await fetchPresetRoots();
-      const sameTarget = (await state({ projectCwds: workspaceRoot ? [workspaceRoot] : [], presetRoots })).roots.filter(item => workspaceRoot ? item.projectRoot === workspaceRoot && item.kind === "project-dsh" : root.kind === "preset" ? item.key === root.key : item.scope !== "project");
+      const sameTarget = (await state({ projectCwds: workspaceRoot ? [workspaceRoot] : [], ...(presetRoots ? { presetRoots } : {}) })).roots.filter(item => workspaceRoot ? item.projectRoot === workspaceRoot && item.kind === "project-dsh" : root.kind === "preset" ? item.key === root.key : item.scope !== "project");
       if (sameTarget.some(item => (item.skills || []).some(entry => entry.name.toLowerCase() === lowered || entry.declaredName?.toLowerCase() === lowered))) throw failure("同名技能已存在，不会覆盖本地文件", "error.repo.conflict");
       const entries = await preparedEntries(repo, skill, path);
       // 同名记录只替换同一位置：用户级按 root 区分 DSH 与 Shared Agent，工作区按项目根区分。
@@ -1024,7 +1029,7 @@ export function createRepositoryManager({
       await write(data);
       let copied = false;
       try {
-        await resolveInstallRoot({ root: requestedRoot, workspace: workspaceRoot }, registered);
+        await resolveInstallRoot({ root: requestedRoot, workspace: workspaceRoot }, registered, undefined, presetRoots);
         const result = await importUploadedSkill({ name: skill.name, entries }, log, { conflict: "skip", root });
         if (result.ok === false || !result.imported?.length) throw failure(result.error || "技能安装失败或遇到同名冲突", typeof result.code === "string" ? result.code : "error.repo.conflict", result.params);
         copied = true;

@@ -916,6 +916,75 @@ for (const kind of ["clawhub", "skillsh"]) {
     assert.equal(kind === "skillsh" ? skillshCalls.length : catalogSearchCalls.length, before, `${kind}/${exit} 必须清理防抖 timer`);
   }
 }
+// 验证安装到自定义预设模式的副本在发现页可显示名称/路径、可勾选并可点击垃圾桶卸载，且绝不误报 repo.destinationUnavailable。
+const prevReposSnapshot = structuredClone(repos);
+const prevRootsSnapshot = structuredClone(installRoots);
+installRoots = [
+  ...configuredRoots,
+  { key: "preset-code-review", path: "D:/custom-preset-skills", label: "预设: 代码审查模式", localeKey: "preset.code-review", available: true },
+];
+repos[0].skills[0] = {
+  path: "skills/pdf",
+  name: "pdf",
+  description: "PDF 文档",
+  status: "installed",
+  tracked: true,
+  installedRoot: "preset-code-review",
+  canUninstall: true,
+  installations: [
+    { installedRoot: "preset-code-review", tracked: true, updateAvailable: false, canRollback: false, canUninstall: true, status: "installed" },
+  ],
+};
+resetMount(); render(); flushEffects(); await settle();
+await clickNode(find(n => n.type === "button" && n.props.className === "dssm-source-toggle"));
+const presetCopyNodes = all().filter(n => n.props.className === "dssm-repo-copy");
+assert.equal(presetCopyNodes.length, 1, "渲染出预设副本子行");
+const presetCopyTree = nodes(presetCopyNodes[0]);
+assert.ok(presetCopyTree.some(n => n.props.className === "dssm-location-lead" && n.children.join("").includes("代码审查模式")), "预设副本必须显示可读模式名而非裸 id");
+assert.ok(presetCopyTree.some(n => n.props.className === "dssm-location-path" && n.children.join("").includes("D:/custom-preset-skills")), "预设副本必须显示所属目录路径");
+assert.equal(all().some(n => n.children.includes("repo.destinationUnavailable")), false, "可用自定义预设副本绝不能误报原项目未登记或目录不可用");
+const presetCopyCheck = presetCopyTree.find(n => n.type === "host-checkbox");
+assert.ok(presetCopyCheck && !presetCopyCheck.props.disabled, "预设副本批量勾选复选框必须可用");
+const presetTrashBtn = presetCopyTree.find(n => isAction(n, "repo.uninstall"));
+assert.ok(presetTrashBtn && !presetTrashBtn.props.disabled, "预设副本右侧垃圾桶卸载按钮必须可点击");
+// 确认安装弹窗的全局位置里没有被混入 preset-code-review
+await clickNode(rowAction("repo.installElsewhere"));
+assert.equal(Boolean(locationOption("preset-code-review")), false, "DestinationPicker 全局位置列表绝不能混入 preset-* 项");
+await clickModal("repo.cancel");
+// 点击垃圾桶确认触发真实的 POST /repositories/uninstall { root: "preset-code-review" }
+const callsBeforePresetUninstall = calls.length;
+await clickNode(presetTrashBtn);
+assert.equal(dialog()?.props.title, "repo.uninstall", "点击预设副本垃圾桶成功弹出卸载确认弹窗");
+const uninstallConfirmPromise = clickModal("repo.confirmUninstall");
+await new Promise(setImmediate);
+finishUninstall();
+await uninstallConfirmPromise;
+const uninstallReq = calls.slice(callsBeforePresetUninstall).find(c => c.path.endsWith("/uninstall"));
+assert.deepEqual(uninstallReq?.body, { id: "one", path: "skills/pdf", root: "preset-code-review" }, "确认卸载必须提交精确的 root: preset-code-review");
+// 当后端显式标记预设 available: false（例如重叠路径）时，拒绝管理并提示不可用
+installRoots = [
+  ...configuredRoots,
+  { key: "preset-code-review", path: "D:/unsafe-overlap", label: "预设: 代码审查模式", localeKey: "preset.code-review", available: false },
+];
+repos[0].skills[0] = {
+  path: "skills/pdf",
+  name: "pdf",
+  description: "PDF 文档",
+  status: "installed",
+  tracked: true,
+  installedRoot: "preset-code-review",
+  canUninstall: true,
+  installations: [
+    { installedRoot: "preset-code-review", tracked: true, updateAvailable: false, canRollback: false, canUninstall: true, status: "installed" },
+  ],
+};
+resetMount(); render(); flushEffects(); await settle();
+await clickNode(find(n => n.type === "button" && n.props.className === "dssm-source-toggle"));
+const unsafeTrash = nodes(all().find(n => n.props.className === "dssm-repo-copy")).find(n => isAction(n, "repo.uninstall"));
+assert.equal(unsafeTrash?.props.disabled, true, "不可用的预设路径仍禁止点击卸载");
+assert.ok(all().some(n => n.children.includes("repo.destinationUnavailable")), "不可用预设仍展示不可用提示");
+repos.splice(0, repos.length, ...prevReposSnapshot);
+installRoots = prevRootsSnapshot;
 unmount();
 mock.timers.reset();
 console.log("仓库界面及目录生命周期专项测试通过");

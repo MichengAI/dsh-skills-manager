@@ -204,6 +204,7 @@ export function createRepositoryUI({ react, Modal, Input, Button, Checkbox, Sour
   return function useRepositoryUI({ active, t, onInstalled, presetDestinations = [] }: {active: boolean; t: Translate; onInstalled?: () => unknown; presetDestinations?: readonly PresetDestination[]}) {
     const [repos, setRepos] = react.useState<RepoView[]>([]);
     const [installRoots, setInstallRoots] = react.useState<RepositoryDestination[]>([]);
+    const [allInstallRoots, setAllInstallRoots] = react.useState<RepositoryDestination[]>([]);
     const [busy, setBusy] = react.useState(false);
     const [refreshing, setRefreshing] = react.useState<{id: string; name: string; index: number; total: number} | null>(null);
     const [feedback, setFeedback] = react.useState<Feedback | null>(null);
@@ -269,8 +270,9 @@ export function createRepositoryUI({ react, Modal, Input, Button, Checkbox, Sour
     async function load() {
       const data = await api("/repositories");
       if (mounted.current) {
-        const roots = (data.installRoots || []).filter(root => root.key === "dsh" || root.key === "agents");
-        setRepos(data.repositories || []); setInstallRoots(roots); setCatalogInstallIds(data.catalogInstalls || []); setCatalogCopies(data.catalogCopies || []);
+        const fullRoots = data.installRoots || [];
+        const roots = fullRoots.filter(root => root.key === "dsh" || root.key === "agents");
+        setRepos(data.repositories || []); setInstallRoots(roots); setAllInstallRoots(fullRoots); setCatalogInstallIds(data.catalogInstalls || []); setCatalogCopies(data.catalogCopies || []);
         setCatalogUnknownIds(data.catalogUnknownIds || []); setCatalogWarnings(data.catalogWarnings || []);
         pruneSelection(data.repositories || []);
         if (destination.scope === 'user' && !roots.some(root => root.key === destination.location && root.available))
@@ -279,13 +281,32 @@ export function createRepositoryUI({ react, Modal, Input, Button, Checkbox, Sour
         api('/workspaces').then(listed => { if (mounted.current) setWorkspaces(listed.items || []); }).catch(() => undefined);
       }
     }
+    function findPresetDestination(key: string): RepositoryDestination | undefined {
+      const fromRepo = allInstallRoots.find((item) => item.key === key);
+      const fromState = (presetDestinations || []).find((item) => item.key === key);
+      if (fromRepo) {
+        return {
+          ...fromRepo,
+          ...(fromState ? { label: fromState.name || fromRepo.label, path: fromRepo.path || fromState.path || "" } : {}),
+        };
+      }
+      if (fromState) {
+        return {
+          key: fromState.key as RepositoryDestination["key"],
+          path: fromState.path || "",
+          label: fromState.name,
+          available: fromState.available !== false,
+        };
+      }
+      return undefined;
+    }
     function destinationName(root: Pick<RepositoryDestination, 'key' | 'label' | 'localeKey'>) {
       if (root.key === 'dsh' || root.key === 'agents') return t(root.key === 'dsh' ? 'repo.rootDsh' : 'repo.rootAgents');
       const key = 'root.' + (root.localeKey || root.key), name = t(key);
       return name === key ? root.label : name;
     }
     function installedDestination(key: RepositoryRoot) {
-      const root = installRoots.find(root => root.key === key);
+      const root = key.startsWith("preset-") ? findPresetDestination(key) : installRoots.find(root => root.key === key);
       return root ? destinationName(root) : t('root.' + key);
     }
     function copyTarget(copy: RepoCopy): CopyTarget | null {
@@ -295,8 +316,8 @@ export function createRepositoryUI({ react, Modal, Input, Button, Checkbox, Sour
         return row?.available && row.registeredPaths[0] ? { workspace: row.registeredPaths[0] } : null;
       }
       if (copy.installedRoot && copy.installedRoot.startsWith("preset-")) {
-        const available = installRoots.some(r => r.key === copy.installedRoot && r.available);
-        return available ? { root: copy.installedRoot } : null;
+        const matched = findPresetDestination(copy.installedRoot);
+        return matched && matched.available ? { root: copy.installedRoot } : null;
       }
       return copy.installedRoot === 'dsh' || copy.installedRoot === 'agents' ? { root: copy.installedRoot } : null;
     }
@@ -313,7 +334,7 @@ export function createRepositoryUI({ react, Modal, Input, Button, Checkbox, Sour
           const project = !!copy.installedWorkspace;
           const root = project ? "dsh" : copy.installedRoot;
           if (!project && root && root.startsWith("preset-")) {
-            const matched = installRoots.find(item => item.key === root);
+            const matched = findPresetDestination(root);
             const rawLabel = matched ? destinationName(matched) : root.replace(/^preset-/, "");
             const cleanName = rawLabel.replace(/^(?:预设:\s*|Preset:\s*)/, "");
             const scope = t("repo.scope.preset");
@@ -816,6 +837,7 @@ export function createRepositoryUI({ react, Modal, Input, Button, Checkbox, Sour
     }
     function destinationLabel() {
       if (destination.scope === 'user') return installedDestination(destination.location);
+      if (destination.scope === 'preset') return destination.presetKey ? installedDestination(destination.presetKey as RepositoryRoot) : "";
       const row = workspaces.find(item => item.registeredPaths.includes(destination.workspace) || item.projectRoot === destination.workspace);
       return (row ? row.name : t('repo.scope.project')) + ' · .dsh/skills';
     }
