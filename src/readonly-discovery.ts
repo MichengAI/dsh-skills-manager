@@ -1,5 +1,6 @@
 import type { CodedError } from "./types.js";
 import type { DiscoveredEntry } from "./types.js";
+import type { Dirent } from "node:fs";
 // 只读技能目录发现：允许目录链接，按发现路径过滤隐藏目录，用真实祖先路径终止循环。
 import { promises as fs } from "node:fs";
 import { resolve, join, relative, sep } from "node:path";
@@ -77,17 +78,40 @@ export async function discoverReadonlyEntries(root: string) {
           continue;
         }
       }
-      const directory = await fs.readdir(current.path, { withFileTypes: true });
+      // 优先使用流式 fs.opendir 控制超宽目录内存；仅在 Electron ASAR（Windows 抛 ENOENT，Unix 抛 ENOTDIR）或不支持 opendir 的虚拟文件系统（ENOSYS/ENOTDIR）时回退 readdir。
+      const batch: Dirent[] = [];
+      let hitCap = false;
+      try {
+        const directory = await fs.opendir(current.path);
+        for await (const item of directory) {
+          if (entries + batch.length >= MAX_ENTRIES) {
+            hitCap = true;
+            break;
+          }
+          batch.push(item);
+        }
+      } catch (error) {
+        const code = error && typeof error === "object" && "code" in error ? (error as { code?: unknown }).code : undefined;
+        const inAsar = current.path.toLowerCase().includes(".asar");
+        if (code !== "ENOTDIR" && code !== "ENOSYS" && !(inAsar && code === "ENOENT")) {
+          throw error;
+        }
+        batch.length = 0;
+        hitCap = false;
+        const fallback = await fs.readdir(current.path, { withFileTypes: true });
+        for (const item of fallback) {
+          if (entries + batch.length >= MAX_ENTRIES) {
+            hitCap = true;
+            break;
+          }
+          batch.push(item);
+        }
+      }
       if (current.depth === 0) exists = true;
       directories++;
-      for (const item of directory) {
-        if (entries >= MAX_ENTRIES) {
-          truncated = true;
-          break;
-        }
-        entries++;
-        items.push(item);
-      }
+      entries += batch.length;
+      if (hitCap) truncated = true;
+      items.push(...batch);
     } catch {
       continue;
     } // 失效链接或不可读目录不阻断其他来源。

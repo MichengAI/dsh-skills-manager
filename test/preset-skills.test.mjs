@@ -1207,9 +1207,11 @@ await writeFile(
 );
 
 const origOpendir = fsPromises.opendir;
+const origReaddir = fsPromises.readdir;
+let opendirErrCode = "ENOENT"; // Windows Electron 44 对 app.asar 路径调用 opendir 实测返回 ENOENT
 fsPromises.opendir = async () => {
-  const err = new Error("ENOTDIR: not a directory");
-  err.code = "ENOTDIR";
+  const err = new Error(`${opendirErrCode}: simulated opendir unsupported`);
+  err.code = opendirErrCode;
   throw err;
 };
 try {
@@ -1238,15 +1240,48 @@ try {
   eq(asarCordisRoot?.mutable, false, "app.asar 内置预设保持只读不可写");
   eq(asarCordisRoot?.toggleable, false, "app.asar 内置预设保持不可开关");
 
+  // 1) 验证 .asar 路径遇 ENOENT（Windows Electron 44 真机行为）自动回退 readdir
   const asarState = await state({ presetRoots: asarRoots });
   const asarRootView = asarState.roots.find((r) => r.key === "preset-cordis");
-  ok(asarRootView?.exists === true, "fs.opendir 抛出 ENOTDIR 时仍能通过 readdir 识别 .asar 根目录存在");
-  eq(asarRootView?.skills.length, 1, "fs.opendir 抛出 ENOTDIR 时仍能列出 .asar 内置技能");
+  ok(asarRootView?.exists === true, "Windows Electron .asar 路径 opendir 抛 ENOENT 时回退 readdir 识别目录存在");
+  eq(asarRootView?.skills.length, 1, "Windows Electron .asar 路径 opendir 抛 ENOENT 时回退 readdir 列出技能");
   eq(asarRootView?.skills[0]?.name, "cordis-plugin-development", "准确读取 .asar 内置技能名称");
   const asarDetail = await skillDetail("preset-cordis", "cordis-plugin-development", { presetRoots: asarRoots });
   eq(asarDetail?.body, "ASAR 创造模式正文", "点开 .asar 内置技能详情可正常读取正文");
+
+  // 2) 验证 Unix/通用路径遇 ENOTDIR / ENOSYS 时同样自动回退 readdir
+  for (const fallbackCode of ["ENOTDIR", "ENOSYS"]) {
+    opendirErrCode = fallbackCode;
+    const { discoverReadonlyEntries } = await import("../lib/readonly-discovery.js");
+    const scanFallback = await discoverReadonlyEntries(fakeAsarSkillsDir);
+    eq(scanFallback.exists, true, `opendir 抛 ${fallbackCode} 时回退 readdir 识别存在`);
+    eq(scanFallback.entries.length, 1, `opendir 抛 ${fallbackCode} 时回退 readdir 读出条目`);
+  }
 } finally {
   fsPromises.opendir = origOpendir;
+  fsPromises.readdir = origReaddir;
+}
+
+// 3) 验证普通物理目录优先走流式 fs.opendir，不提前调用 fs.readdir 全量加载内存
+let physicalOpendirCalls = 0;
+let physicalReaddirCalls = 0;
+fsPromises.opendir = async (...args) => {
+  physicalOpendirCalls++;
+  return origOpendir(...args);
+};
+fsPromises.readdir = async (...args) => {
+  physicalReaddirCalls++;
+  return origReaddir(...args);
+};
+try {
+  const { discoverReadonlyEntries } = await import("../lib/readonly-discovery.js");
+  const physicalScan = await discoverReadonlyEntries(customReviewSkillsDir);
+  eq(physicalScan.exists, true, "普通物理目录流式扫描正常");
+  ok(physicalOpendirCalls > 0, "普通物理目录优先使用流式 fs.opendir");
+  eq(physicalReaddirCalls, 0, "普通物理目录不回退调用 fs.readdir 全量读取");
+} finally {
+  fsPromises.opendir = origOpendir;
+  fsPromises.readdir = origReaddir;
 }
 
 server.close();
