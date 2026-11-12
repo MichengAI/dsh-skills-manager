@@ -307,7 +307,11 @@ export function createRepositoryUI({ react, Modal, Input, Button, Checkbox, Sour
     }
     function installedDestination(key: RepositoryRoot) {
       const root = key.startsWith("preset-") ? findPresetDestination(key) : installRoots.find(root => root.key === key);
-      return root ? destinationName(root) : t('root.' + key);
+      if (root) return destinationName(root);
+      if (key.startsWith("preset-")) return t("repo.scope.preset") + " · " + key.replace(/^preset-/, "");
+      const labelKey = "root." + key;
+      const label = t(labelKey);
+      return label === labelKey ? key : label;
     }
     function copyTarget(copy: RepoCopy): CopyTarget | null {
       if (copy.installedWorkspace) {

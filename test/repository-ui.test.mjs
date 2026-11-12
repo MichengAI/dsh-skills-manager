@@ -107,6 +107,11 @@ const api = async (path, options) => {
     if (!mockCatalogCopies.some(copy => copy.id === catalogId && copy.installedRoot === installedRoot && copy.installedWorkspace === body.workspace)) mockCatalogCopies.push({ id: catalogId, name: installedName, installedRoot, ...(body.workspace ? { installedWorkspace: body.workspace } : {}), canUninstall: true });
     return { name: installedName, root: installedRoot };
   }
+  if (path.endsWith("/installMany")) {
+    await new Promise((resolve) => { finishInstall = resolve; });
+    if (failInstall) throw new Error("下载超时，请重试");
+    return { results: (body.items || []).map((item) => ({ ...item, ok: true })) };
+  }
   if (path.endsWith("/install")) {
     await new Promise((resolve) => { finishInstall = resolve; });
     if (failInstall) throw new Error("下载超时，请重试");
@@ -145,7 +150,8 @@ let languagePrefix = "";
 const rootTranslations = { "root.codex": "Codex", "root.claude": "Claude", "root.windsurf-user": "Windsurf User" };
 const t = (key) => key === "format.locale" ? "zh-CN" : languagePrefix + (rootTranslations[key] || key);
 let ui;
-function render() { cursor = 0; ui = useUI({ active, t, onInstalled: async () => { installedCalls++; if (failInstalledRefresh) throw new Error("本地列表刷新失败"); } }); }
+let presetDestinations = [];
+function render() { cursor = 0; ui = useUI({ active, t, presetDestinations, onInstalled: async () => { installedCalls++; if (failInstalledRefresh) throw new Error("本地列表刷新失败"); } }); }
 // 目标选择器是函数组件：带 userDestinations 的节点展开成它渲染出的子树，其余沿用原遍历。
 function nodes(node) {
   if (!node || typeof node !== "object") return [];
@@ -983,6 +989,37 @@ await clickNode(find(n => n.type === "button" && n.props.className === "dssm-sou
 const unsafeTrash = nodes(all().find(n => n.props.className === "dssm-repo-copy")).find(n => isAction(n, "repo.uninstall"));
 assert.equal(unsafeTrash?.props.disabled, true, "不可用的预设路径仍禁止点击卸载");
 assert.ok(all().some(n => n.children.includes("repo.destinationUnavailable")), "不可用预设仍展示不可用提示");
+// 验证 bulk-done 对预设安装目标显示预设名称，且未知/已删预设副本回落时绝不泄漏字面量 root.preset-* 键
+repos[0].skills[0] = { path: "skills/pdf", name: "pdf", description: "PDF 文档", status: "available", installedRoot: null, canUninstall: false };
+installRoots = structuredClone(configuredRoots);
+presetDestinations = [{ key: "preset-ghost-mode", name: "预设: 幽灵模式", path: "D:/ghost-mode", available: true }];
+resetMount(); render(); flushEffects(); await settle();
+await clickNode(find(n => n.type === "button" && n.props.className === "dssm-source-toggle"));
+const availCheck = nodes(all().find(n => n.props.className === "dssm-repo-row")).find(n => n.type === "host-checkbox");
+availCheck.props.onChange(true);
+render(); await settle();
+await click("repo.bulk.install");
+const presetScopeSelect = modalNodes().find(n => n.type === OfficialSelect && n.props.label === "dest.scope");
+presetScopeSelect.props.onChange("preset");
+render();
+const bulkApplyPromise = clickModal("repo.bulk.apply");
+await new Promise(setImmediate);
+finishInstall();
+await bulkApplyPromise;
+const doneDetails = modalNodes().filter(n => n.props.className === "dssm-bulk-detail").map(n => n.children.join(""));
+assert.equal(doneDetails.some(text => text.includes("root.preset-")), false, "批量安装结果绝不暴露 root.preset-* 字面量键");
+assert.ok(doneDetails.some(text => text.includes("预设: 幽灵模式")), "批量安装结果准确展示目标预设名");
+await clickModal("repo.close");
+presetDestinations = [];
+repos[0].skills[0] = {
+  path: "skills/pdf", name: "pdf", description: "PDF 文档", status: "installed", tracked: true, installedRoot: "preset-deleted-mode", canUninstall: true,
+  installations: [{ installedRoot: "preset-deleted-mode", tracked: true, updateAvailable: false, canRollback: false, canUninstall: true, status: "installed" }],
+};
+resetMount(); render(); flushEffects(); await settle();
+await clickNode(find(n => n.type === "button" && n.props.className === "dssm-source-toggle"));
+const deletedCopyLeads = nodes(all().find(n => n.props.className === "dssm-repo-copy")).filter(n => n.props.className === "dssm-location-lead").map(n => n.children.join(""));
+assert.equal(deletedCopyLeads.some(text => text.includes("root.preset-")), false, "缺失预设副本不暴露 root.preset-* 字面量键");
+assert.ok(deletedCopyLeads.some(text => text.includes("repo.scope.preset · deleted-mode")), "缺失预设副本回落成可读预设名");
 repos.splice(0, repos.length, ...prevReposSnapshot);
 installRoots = prevRootsSnapshot;
 unmount();
