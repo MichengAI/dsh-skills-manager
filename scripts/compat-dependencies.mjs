@@ -8,6 +8,7 @@ const CORDIS_PINS = Object.freeze({
   "0.2.1-rc.4": "4.0.5",
   "0.2.1-rc.5": "4.0.5",
   "0.2.2-rc.1": "4.1.0",
+  "0.2.2-rc.2": "4.1.0",
 });
 const CORDIS_PLUGIN_PINS = Object.freeze({
   "4.0.4": {

@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.4.3] - 2026-11-12
+
+### Compatibility & Maintenance
+
+- Verified full compatibility with DeepSeek Harness `0.2.2-rc.2`, covering all `0.2.x` RC hosts (`0.2.0-rc.1` through `0.2.2-rc.2`).
+- Align development dependencies with official `0.2.2-rc.2`, Cordis `4.1.0`, and Schemastery `3.19.0`, and update compatibility badges and verified host lists across all README manuals.
+
+[中文](CHANGELOG.zh-CN.md)
+
 ## [1.4.2] - 2026-11-12
 
 ### New Features
