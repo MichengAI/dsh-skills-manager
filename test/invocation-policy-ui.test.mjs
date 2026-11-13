@@ -92,6 +92,15 @@ const noneSkill = {
 };
 assert.equal(skillDeclaredInvocationKind(noneSkill), 'none');
 
+// 调用策略非法（invocationPolicyValid: false）：宿主解析失败直接丢弃，声明调用方式必须判定为 'none'（不可调用）
+const invalidPolicySkill = {
+  modelInvocable: false,
+  userInvocable: true,
+  invocationPolicyValid: false,
+  managerEnabled: true
+};
+assert.equal(skillDeclaredInvocationKind(invalidPolicySkill), 'none', '策略非法的技能在宿主中被丢弃，声明调用方式必须判为 none');
+
 // 3. 验证徽标渲染与防视觉冗余：
 // P2-1 核心修复：只有 manual 才渲染徽标；all、none 绝不渲染徽标！
 // P2-2 核心修复：必须使用宿主原语 Tag（tone="neutral"）而非手绘 span
@@ -247,6 +256,11 @@ const blockedBadgeFound = findVNode(blockedTokenRow, n => n.props && n.props.cla
 assert.ok(blockedBadgeFound, 'P3-3 变异防御：不可调用技能行必须渲染 token 徽标');
 assert.ok(blockedBadgeFound.props.title && blockedBadgeFound.props.title.includes('不可调用'), 'P3-3 变异防御：不可调用技能必须显示不可调用提示');
 
+const invalidPolicyTokenRow = renderSkillTested(fakeRoot, { name: 'my-invalid-tool', descriptionTokens: 12, bodyTokens: 25, ...invalidPolicySkill, enabled: true });
+const invalidPolicyBadgeFound = findVNode(invalidPolicyTokenRow, n => n.props && n.props.className === 'dssm-token-badge');
+assert.ok(invalidPolicyBadgeFound, 'P3-3 变异防御：策略非法技能行必须渲染 token 徽标');
+assert.ok(invalidPolicyBadgeFound.props.title && invalidPolicyBadgeFound.props.title.includes('不可调用'), 'P3-3 变异防御：策略非法技能必须显示不可调用提示（宿主加载丢弃）');
+
 // 7. P3-3 详情弹窗装配层验证（防变异穿透：真实装配 DOM 树断言，防止返回值丢弃或假绿）
 const detailModalStart = source.indexOf('      if (modal === "detail") {');
 const detailModalEnd = source.indexOf('      if (modal && typeof modal === "object" && modal.type === "trash-confirm")', detailModalStart);
@@ -275,6 +289,12 @@ assert.ok(detailTokensVNode, 'P3-3 变异防御：详情弹窗必须真实装配
 const detailTokenTexts = extractText(detailTokensVNode).join(' ');
 assert.ok(detailTokenTexts.includes('简介 ≈50 token') && detailTokenTexts.includes('正文 ≈120 token'), 'P3-3 变异防御：详情弹窗必须准确展示简介与正文 token 拆分');
 assert.ok(detailTokenTexts.includes('当前技能仅手动调用，不随技能目录常驻系统提示词'), 'P3-3 变异防御：详情弹窗针对仅手动技能准确提示不常驻系统提示词');
+
+const renderedBlockedModal = makeDetailModal('detail', fakeDetailData, noneSkill);
+const blockedTokensVNode = findVNode(renderedBlockedModal, n => n.props && n.props.className === 'dssm-detail-tokens');
+assert.ok(blockedTokensVNode, 'P3-3 变异防御：不可调用技能弹窗必须真实装配 .dssm-detail-tokens');
+const blockedTokenTexts = extractText(blockedTokensVNode).join(' ');
+assert.ok(blockedTokenTexts.includes('当前技能不可调用或调用策略无效'), 'P3-3 变异防御：不可调用技能详情说明必须准确提示不可调用');
 
 // 8. 验证 CSS 样式包含徽标定义与详情策略定义
 assert.match(source, /\.dssm-invocation-badge\{/, 'CSS 样式中必须定义 .dssm-invocation-badge');

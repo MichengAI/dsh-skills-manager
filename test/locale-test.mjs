@@ -791,10 +791,11 @@ eq(
     { skill: { enabled: true, invocationPolicyValid: true, modelInvocable: true, userInvocable: true, descriptionTokens: 25, shadowedBy: { root: "dsh", name: "x" } } },
     { skill: { enabled: true, invocationPolicyValid: true, modelInvocable: false, userInvocable: true, descriptionTokens: 50 } }, // 仅手动调用（模型不可感知），不常驻系统提示词，不计入
     { skill: { enabled: true, invocationPolicyValid: true, modelInvocable: true, effectiveModelInvocable: false, userInvocable: true, descriptionTokens: 35 } }, // 模型不可感知，不计入
+    { skill: { enabled: true, invocationPolicyValid: false, modelInvocable: true, effectiveModelInvocable: true, userInvocable: true, descriptionTokens: 60 } }, // 调用策略非法（宿主丢弃），不计入
     { skill: { enabled: true, invocationPolicyValid: true, modelInvocable: true, userInvocable: true } },
   ]),
   40,
-  "token summation counts only enabled, model-invocable, non-shadowed skills carrying token data",
+  "token summation counts only enabled, valid, model-invocable, non-shadowed skills carrying token data",
 );
 eq(sumEnabledDescriptionTokens([]), 0, "empty view sums to zero tokens");
 ok(
