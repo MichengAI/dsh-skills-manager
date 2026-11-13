@@ -203,6 +203,8 @@ assert.equal(/\.dssm-repo-description\{[^}]*line-height:18px/.test(repoSource), 
 assert.equal(repoSource.includes("▾") || repoSource.includes("▸"), false, "仓库折叠不再用文字三角");
 assert.match(repoSource, /dssm-source-toggle/, "仓库折叠是受控按钮，展开状态立刻落地");
 assert.doesNotMatch(repoSource, /h\(Collapse,/, "仓库折叠不再使用 Ant Collapse");
+assert.match(repositoryLocales.zh["token.detailLine"], /简介.*≈\{description\}.*正文.*≈\{body\}/, "仓库详情具备中文 token 估算提示");
+assert.match(repositoryLocales.en["token.detailLine"], /Description.*≈\{description\}.*Body.*≈\{body\}/, "仓库详情具备英文 token 估算提示");
 assert.deepEqual(Object.keys(repositoryLocales.en).sort(), Object.keys(repositoryLocales.zh).sort(), "中英文词条必须同步");
 assert.equal(repoSource.includes("SKILLSH_TOP10") || repoSource.includes("CLAWHUB_TOP10"), false, "线上目录榜单不再硬编码静态条目");
 const allowedDestinationKeys = ["dsh", "agents"];

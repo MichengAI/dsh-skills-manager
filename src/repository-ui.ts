@@ -58,6 +58,7 @@ export const repositoryLocales = {
     "repo.bulk.doneTitle": "批量结果", "repo.bulk.result": "批量完成：成功 {ok} · 失败 {failed} · 跳过 {skipped} · 未执行 {notRun}", "repo.bulk.retry": "重试失败项", "repo.bulk.refreshWarning": "批量操作已完成，但列表刷新失败；请手动刷新确认。", "repo.bulk.nothingToRetry": "失败项已不可重试（状态已变化），请刷新列表后重新选择。",
     "repo.bulk.status.ok": "成功", "repo.bulk.status.failed": "失败", "repo.bulk.status.skipped": "跳过", "repo.bulk.status.notRun": "未执行",
     "repo.bulk.reason.conflict": "同名冲突", "repo.bulk.reason.unchanged": "无变化", "repo.bulk.reason.localModified": "本地已修改", "repo.bulk.reason.unavailable": "位置不可用", "repo.bulk.reason.error": "预检失败",
+    "token.detailLine": "简介 ≈{description} token · 正文 ≈{body} token",
   },
   en: {
     "repo.catalog.unknownLocation": "Location unknown",
@@ -91,6 +92,7 @@ export const repositoryLocales = {
     "repo.bulk.doneTitle": "Bulk results", "repo.bulk.result": "Batch finished: {ok} succeeded · {failed} failed · {skipped} skipped · {notRun} not run", "repo.bulk.retry": "Retry failed items", "repo.bulk.refreshWarning": "The batch finished but the list refresh failed. Refresh manually to confirm.", "repo.bulk.nothingToRetry": "These items can no longer be retried (their state changed). Refresh the list and select again.",
     "repo.bulk.status.ok": "Done", "repo.bulk.status.failed": "Failed", "repo.bulk.status.skipped": "Skipped", "repo.bulk.status.notRun": "Not run",
     "repo.bulk.reason.conflict": "Name conflict", "repo.bulk.reason.unchanged": "No changes", "repo.bulk.reason.localModified": "Locally modified", "repo.bulk.reason.unavailable": "Location unavailable", "repo.bulk.reason.error": "Preflight failed",
+    "token.detailLine": "Description ≈{description} tokens · Body ≈{body} tokens",
   },
 };
 
