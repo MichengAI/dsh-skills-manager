@@ -66,8 +66,10 @@ try {
   // 存量兼容断言：模拟旧版本 state.json 中未持久化 token 字段的仓库条目，detail() 必须动态兜底估算
   const repoStatePath = join(sandbox, "home/skills-manager/repositories.json");
   const rawRepoState = JSON.parse(await readFile(repoStatePath, "utf8"));
-  delete rawRepoState.repositories[0].skills[0].descriptionTokens;
-  delete rawRepoState.repositories[0].skills[0].bodyTokens;
+  const targetSkill = rawRepoState.repositories[0].skills.find((s) => s.path === "skills/pdf");
+  assert.ok(targetSkill, "必须在仓库状态中找到目标条目 skills/pdf");
+  delete targetSkill.descriptionTokens;
+  delete targetSkill.bodyTokens;
   const { writeFile: writeFsFile } = await import("node:fs/promises");
   await writeFsFile(repoStatePath, JSON.stringify(rawRepoState, null, 2), "utf8");
   const fallbackDetail = await manager.detail({ id: added.id, path: "skills/pdf" });

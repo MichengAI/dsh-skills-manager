@@ -1,5 +1,5 @@
 import { parseSkillDoc } from "./core.js";
-import { estimateTokens } from "./token-count.js";
+import { estimateTokens, truncateCatalogDescription } from "./token-count.js";
 
 const IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 const SAFE_PATH = /^(?!\/)(?!.*(?:^|\/)\.\.(?:\/|$))[A-Za-z0-9._/-]+$/;
@@ -110,7 +110,7 @@ function skillDocSummary(markdown: string) {
     name,
     description,
     body: parsed.body,
-    descriptionTokens: estimateTokens(description || ""),
+    descriptionTokens: estimateTokens(truncateCatalogDescription(description || "")),
     bodyTokens: estimateTokens(parsed.body),
   };
 }

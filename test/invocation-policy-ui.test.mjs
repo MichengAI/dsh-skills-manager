@@ -43,6 +43,7 @@ const requiredKeys = [
   'detail.policy.all',
   'detail.policy.manualOnly',
   'detail.policy.blocked',
+  'token.badgeTip.manualOnly',
 ];
 
 for (const key of requiredKeys) {
@@ -224,6 +225,11 @@ const tokenBadgeFound = findVNode(tokenRow, n => n.props && n.props.className ==
 assert.ok(tokenBadgeFound, 'P3-3 变异防御：带有 descriptionTokens 的技能列表行必须渲染 .dssm-token-badge 节点');
 assert.ok(extractText(tokenBadgeFound).join('').includes('≈42'), 'P3-3 变异防御：徽标文本必须包含 ≈ 前缀与估算值');
 assert.ok(tokenBadgeFound.props.title && tokenBadgeFound.props.title.includes('常驻系统提示词'), 'P3-3 变异防御：徽标悬浮提示必须包含完整拆分说明');
+
+const manualTokenRow = renderSkillTested(fakeRoot, { name: 'my-manual-token-tool', descriptionTokens: 15, bodyTokens: 60, ...manualOnlySkill });
+const manualTokenBadgeFound = findVNode(manualTokenRow, n => n.props && n.props.className === 'dssm-token-badge');
+assert.ok(manualTokenBadgeFound, 'P3-3 变异防御：带有 descriptionTokens 的仅手动技能行必须渲染 .dssm-token-badge 节点');
+assert.ok(manualTokenBadgeFound.props.title && manualTokenBadgeFound.props.title.includes('不常驻系统提示词'), 'P3-3 变异防御：仅手动技能悬浮提示必须说明不常驻系统提示词');
 
 // 7. P3-3 详情弹窗装配层验证（防变异穿透：真实装配 DOM 树断言，防止返回值丢弃或假绿）
 const detailModalStart = source.indexOf('      if (modal === "detail") {');

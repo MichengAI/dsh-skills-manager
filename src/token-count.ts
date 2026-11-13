@@ -22,13 +22,15 @@ function isCjkCodePoint(cp: number): boolean {
 const WORD_CHARACTER = /[A-Za-z0-9_]/;
 const WHITESPACE = /\s/;
 
-/** 宿主 @deepseek-ai/dsh-tool-skill 注入系统提示词目录时的默认最大简介长度 */
+/** 宿主 @deepseek-ai/dsh-tool-skill 注入系统提示词目录时的默认最大简介长度（对应宿主配置 catalogDescriptionMaxLength） */
 export const DEFAULT_CATALOG_DESCRIPTION_MAX_LENGTH = 500;
 
-/** 对齐宿主目录简介截断规则（超出 500 字符截断至 497 字符并补 "..."） */
+/** 对齐宿主目录简介截断规则（先归一化连续空白与换行，超出 500 字符截断至 497 字符并补 "..."） */
 export function truncateCatalogDescription(description: string, maxLength: number = DEFAULT_CATALOG_DESCRIPTION_MAX_LENGTH): string {
-  if (!description || description.length <= maxLength) return description || "";
-  return description.slice(0, Math.max(0, maxLength - 3)) + "...";
+  if (!description) return "";
+  const normalized = description.replaceAll(/\s+/g, " ").trim();
+  if (normalized.length <= maxLength) return normalized;
+  return normalized.slice(0, Math.max(0, maxLength - 3)) + "...";
 }
 
 /** 纯函数估算文本 token 数；空串与纯空白返回 0。 */

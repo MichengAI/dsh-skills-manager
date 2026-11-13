@@ -55,7 +55,7 @@ import {
   notifyChatCatalog,
   registerAgentSkillProviders,
 } from "../lib/index.js";
-import { estimateTokens } from "../lib/token-count.js";
+import { estimateTokens, truncateCatalogDescription } from "../lib/token-count.js";
 
 let passed = 0;
 let failed = 0;
@@ -1800,6 +1800,38 @@ ok(
     (entry) => !("descriptionTokens" in entry) && !("bodyTokens" in entry),
   ),
   "metadataOnly scan entries do not carry token fields (body is not read)",
+);
+
+// ── 超长简介集成断言：验证 entryOf 与 skillDetail 真实接线 truncateCatalogDescription ──
+const longDescDir = join(dshRoot, "long-desc-integration-skill");
+await mkdir(longDescDir, { recursive: true });
+const longDescText = "custom long description words ".repeat(30) + "end"; // > 900 字符
+await writeFile(
+  join(longDescDir, "SKILL.md"),
+  `---\nname: long-desc-integration-skill\ndescription: ${longDescText}\n---\nintegration body\n`,
+  "utf8",
+);
+const longSkillDetail = await skillDetail("dsh", "long-desc-integration-skill");
+eq(
+  longSkillDetail.descriptionTokens,
+  estimateTokens(truncateCatalogDescription(longDescText)),
+  "skillDetail 真实接线 truncateCatalogDescription 估算超长简介 token",
+);
+ok(
+  longSkillDetail.descriptionTokens < estimateTokens(longDescText),
+  "截断后的 token 估算值必须严格小于未截断值，防变异接线脱落",
+);
+const longScanState = await state();
+const longDshRoot = longScanState.roots.find((r) => r.key === "dsh");
+const longSkillEntry = longDshRoot?.skills.find((s) => s.name === "long-desc-integration-skill");
+eq(
+  longSkillEntry?.descriptionTokens,
+  estimateTokens(truncateCatalogDescription(longDescText)),
+  "state 扫描生成的条目同样真实接线 truncateCatalogDescription",
+);
+ok(
+  longSkillEntry?.descriptionTokens < estimateTokens(longDescText),
+  "state 条目中的截断 token 估算值严格小于未截断值",
 );
 eq(
   (

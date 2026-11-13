@@ -37,11 +37,14 @@ eq(estimateTokens("my_skill"), 2, "下划线标识符：my_skill(8字符)折算�
 eq(DEFAULT_CATALOG_DESCRIPTION_MAX_LENGTH, 500, "宿主目录默认截断长度为 500");
 eq(truncateCatalogDescription("abc"), "abc", "未超过 500 字符保持原样");
 eq(truncateCatalogDescription(""), "", "空串保持原样");
+eq(truncateCatalogDescription("  hello \n\n world  "), "hello world", "截断前对齐宿主先归一化多余连续空白与换行");
 const longDesc = "a".repeat(600);
 const truncated = truncateCatalogDescription(longDesc, 500);
 eq(truncated.length, 500, "超过 500 字符严格截断至 500 字符");
 ok(truncated.endsWith("..."), "截断末尾补 ...");
 eq(truncated.slice(0, 497), "a".repeat(497), "前 497 字符为原内容");
+const multiline = "line1\n\nline2 " + "a".repeat(600);
+eq(truncateCatalogDescription(multiline, 20), "line1 line2 aaaaa...", "多行超长简介先归一化空白再严格截断");
 
 // ── CJK：一字约一个 token ──
 eq(estimateTokens("把行程做成网页"), 7, "中文每字约 1 个 token");
