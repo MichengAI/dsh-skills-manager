@@ -16,7 +16,7 @@
   [![npm package](https://img.shields.io/npm/v/%40michengai%2Fdsh-skills-manager.svg?label=npm%20package)](https://www.npmjs.com/package/@michengai/dsh-skills-manager)
   [![npm descargas](https://img.shields.io/npm/dt/%40michengai%2Fdsh-skills-manager.svg?label=npm%20downloads)](https://www.npmjs.com/package/@michengai/dsh-skills-manager)
   [![DSH Web Plugin](https://img.shields.io/badge/DSH%20Web-Plugin-0f766e.svg)](https://github.com/MichengAI/dsh-skills-manager)
-  [![Compatible hasta DSH 0.2.2-rc.2](https://img.shields.io/badge/DSH-up%20to%200.2.2--rc.2-2563eb.svg)](#instalación)
+  [![Compatible hasta DSH 0.2.2-rc.3](https://img.shields.io/badge/DSH-up%20to%200.2.2--rc.3-2563eb.svg)](#instalación)
 </div>
 
 > DSH Skills Manager es un complemento de DeepSeek Harness (DSH) mantenido por la comunidad y no es un producto oficial de DeepSeek AI.
@@ -159,6 +159,7 @@ Si usas un agente que no figure en la lista anterior, puedes registrarlo mediant
 Skills Manager detecta automáticamente los preajustes de agente configurados en DSH con directorios dedicados y los muestra al final de la lista global:
 - **Preajustes oficiales integrados** (como Modo Creador): las habilidades integradas son de solo lectura para consulta e inspección, sin interruptores engañosos;
 - **Preajustes personalizados**: tus propios preajustes con `customSkillDirs` ofrecen paridad completa con los skills globales — activar o desactivar skills o el origen completo, organizar categorías y notas, creación, importación, instalación y desinstalación desde repositorios, envío a la Papelera y restauración en su carpeta original. Las rutas que se solapan con directorios globales se bloquean de forma segura, y las rutas relativas permanecen de solo lectura por seguridad (usa una ruta absoluta para habilitar la gestión completa).
+- **Estimación de coste en tokens por skill y total en vivo**: muestra insignias con los tokens estimados de cada descripción directamente en la lista y un total en vivo en la barra de estado para el coste permanente del prompt del sistema; distingue skills de solo invocación manual, desactivadas y sobrescritas, con el desglose completo de descripción/cuerpo en el diálogo de detalles.
 
 ## Ecosistema de productos DSH
 

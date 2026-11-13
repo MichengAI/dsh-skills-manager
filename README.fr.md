@@ -16,7 +16,7 @@
   [![npm package](https://img.shields.io/npm/v/%40michengai%2Fdsh-skills-manager.svg?label=npm%20package)](https://www.npmjs.com/package/@michengai/dsh-skills-manager)
   [![npm téléchargements](https://img.shields.io/npm/dt/%40michengai%2Fdsh-skills-manager.svg?label=npm%20downloads)](https://www.npmjs.com/package/@michengai/dsh-skills-manager)
   [![DSH Web Plugin](https://img.shields.io/badge/DSH%20Web-Plugin-0f766e.svg)](https://github.com/MichengAI/dsh-skills-manager)
-  [![Compatible jusqu'à DSH 0.2.2-rc.2](https://img.shields.io/badge/DSH-up%20to%200.2.2--rc.2-2563eb.svg)](#installation)
+  [![Compatible jusqu'à DSH 0.2.2-rc.3](https://img.shields.io/badge/DSH-up%20to%200.2.2--rc.3-2563eb.svg)](#installation)
 </div>
 
 > DSH Skills Manager est un plugin DeepSeek Harness (DSH) maintenu par la communauté et n'est pas un produit officiel de DeepSeek AI.
@@ -131,6 +131,7 @@ Pour ajouter un agent non répertorié, utilisez le menu ➕ et sélectionnez «
 Skills Manager détecte automatiquement les préréglages d'agent dotés de répertoires dédiés dans DSH et les affiche à la fin de la liste globale :
 - **Préréglages officiels intégrés** (comme le Mode Créateur) : les compétences intégrées restent en lecture seule sans interrupteurs superflus ni modification des fichiers hôtes ;
 - **Préréglages personnalisés** : vos préréglages configurés avec `customSkillDirs` bénéficient d'une gestion complète équivalente aux compétences globales — activation/désactivation par compétence ou par source entière, catégories et notes, création, importation, installation depuis des dépôts, mise à la corbeille et restauration. Les chemins chevauchant les répertoires globaux sont bloqués par sécurité, et les chemins relatifs restent en lecture seule par prudence (utilisez un chemin absolu pour activer la gestion complète).
+- **Estimation du coût en tokens par skill et total en direct** : affiche des badges de tokens estimés pour chaque description directement dans la liste et un total en direct dans la barre d'état pour le coût permanent du prompt système ; distingue les skills en invocation manuelle, désactivés et remplacés, avec le détail complet description/corps dans la fenêtre de détails.
 
 ## Écosystème DSH
 

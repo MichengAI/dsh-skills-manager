@@ -16,7 +16,7 @@
   [![npm package](https://img.shields.io/npm/v/%40michengai%2Fdsh-skills-manager.svg?label=npm%20package)](https://www.npmjs.com/package/@michengai/dsh-skills-manager)
   [![npm downloads](https://img.shields.io/npm/dt/%40michengai%2Fdsh-skills-manager.svg?label=npm%20downloads)](https://www.npmjs.com/package/@michengai/dsh-skills-manager)
   [![DSH Web Plugin](https://img.shields.io/badge/DSH%20Web-Plugin-0f766e.svg)](https://github.com/MichengAI/dsh-skills-manager)
-  [![Compatível até DSH 0.2.2-rc.2](https://img.shields.io/badge/DSH-up%20to%200.2.2--rc.2-2563eb.svg)](#instalação)
+  [![Compatível até DSH 0.2.2-rc.3](https://img.shields.io/badge/DSH-up%20to%200.2.2--rc.3-2563eb.svg)](#instalação)
 </div>
 
 > DSH Skills Manager é um plugin do DeepSeek Harness (DSH) mantido pela comunidade e não é um produto oficial da DeepSeek AI.
@@ -131,6 +131,7 @@ Para adicionar um agente ausente na lista, abra o menu ➕ e selecione «Pastas 
 O Skills Manager descobre automaticamente predefinições de agente configuradas com pastas de skills dedicadas no DSH e as exibe ao final da lista global:
 - **Predefinições oficiais integradas** (como o Modo Criador): skills integradas permanecem estritamente em modo somente leitura para inspeção, sem alternadores enganosos;
 - **Predefinições personalizadas**: suas próprias predefinições com `customSkillDirs` têm paridade total com skills padrão — ativação/desativação individual ou da origem inteira, categorias e notas, criação, importação, instalação e desinstalação via repositórios, envio à Lixeira e restauração na pasta original. Caminhos que se sobrepõem a diretórios globais são bloqueados com segurança, e caminhos relativos permanecem somente leitura por precaução (use um caminho absoluto para habilitar o gerenciamento completo).
+- **Estimativa de custo em tokens por skill e total ao vivo**: exibe selos com os tokens estimados de cada descrição diretamente na lista e um total ao vivo na barra de status para o custo permanente do prompt do sistema; diferencia skills de invocação manual, desativadas e substituídas, com a discriminação completa de descrição/corpo no diálogo de detalhes.
 
 ## Ecossistema de produtos DSH
 

@@ -16,7 +16,7 @@
   [![npm package](https://img.shields.io/npm/v/%40michengai%2Fdsh-skills-manager.svg?label=npm%20package)](https://www.npmjs.com/package/@michengai/dsh-skills-manager)
   [![npm ダウンロード数](https://img.shields.io/npm/dt/%40michengai%2Fdsh-skills-manager.svg?label=npm%20downloads)](https://www.npmjs.com/package/@michengai/dsh-skills-manager)
   [![DSH Web Plugin](https://img.shields.io/badge/DSH%20Web-Plugin-0f766e.svg)](https://github.com/MichengAI/dsh-skills-manager)
-  [![DSH 対応バージョン 0.2.2-rc.2](https://img.shields.io/badge/DSH-up%20to%200.2.2--rc.2-2563eb.svg)](#インストール)
+  [![DSH 対応バージョン 0.2.2-rc.3](https://img.shields.io/badge/DSH-up%20to%200.2.2--rc.3-2563eb.svg)](#インストール)
 </div>
 
 > DSH Skills Manager はコミュニティによって保守されている DeepSeek Harness (DSH) プラグインであり、DeepSeek AI の公式製品ではありません。
@@ -167,6 +167,7 @@ description: コードの品質とセキュリティを自動レビューする�
 DSH 内の専用スキルディレクトリを持つエージェントプリセットを自動検出し、グローバル一覧の末尾に表示します：
 - **公式組み込みプリセット**（クリエイターモードなど）：同梱スキルは読み取り専用として安全に表示・詳細確認でき、誤解を招くオン/オフスイッチは表示されません。
 - **カスタムプリセット**：`customSkillDirs` を設定したユーザー独自プリセットでは、個別およびソース全体の有効/無効切り替え（ホスト呼び出しをリアルタイム制御）、カテゴリ整理とメモ機能に加え、新規作成・インポート・リポジトリからのインストールやアンインストール・ゴミ箱への移動と復元まで標準スキルと同等の完全管理に対応しています。グローバルディレクトリと重複する危険なパスは書き込みがブロックされ、相対パスのプリセットは安全のため読み取り専用で表示されます（完全な管理には絶対パスをご指定ください）。
+- **スキルごとのトークンコスト推定とリアルタイム合計**：一覧の各スキル名の横に説明文の推定トークン数をバッジ表示し、ステータスバーにシステムプロンプトへ常駐するトークン合計をリアルタイム表示。手動呼び出しのみ・停止中・上書きされたスキルを区別し、詳細ダイアログでは説明文と本文の内訳を表示します。
 
 ## DSH プロダクトエコシステム
 

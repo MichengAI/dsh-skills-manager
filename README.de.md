@@ -16,7 +16,7 @@
   [![npm package](https://img.shields.io/npm/v/%40michengai%2Fdsh-skills-manager.svg?label=npm%20package)](https://www.npmjs.com/package/@michengai/dsh-skills-manager)
   [![npm Downloads](https://img.shields.io/npm/dt/%40michengai%2Fdsh-skills-manager.svg?label=npm%20downloads)](https://www.npmjs.com/package/@michengai/dsh-skills-manager)
   [![DSH Web Plugin](https://img.shields.io/badge/DSH%20Web-Plugin-0f766e.svg)](https://github.com/MichengAI/dsh-skills-manager)
-  [![Kompatibel bis DSH 0.2.2-rc.2](https://img.shields.io/badge/DSH-up%20to%200.2.2--rc.2-2563eb.svg)](#installation)
+  [![Kompatibel bis DSH 0.2.2-rc.3](https://img.shields.io/badge/DSH-up%20to%200.2.2--rc.3-2563eb.svg)](#installation)
 </div>
 
 > DSH Skills Manager ist ein von der Community gepflegtes DeepSeek Harness (DSH)-Plugin und kein offizielles Produkt von DeepSeek AI.
@@ -131,6 +131,7 @@ Für nicht aufgeführte Agents können Sie im ➕-Menü über «Quellordner…»
 Skills Manager erkennt automatisch Agent-Voreinstellungen in DSH mit eigenen Skill-Ordnern und zeigt sie am Ende der globalen Liste an:
 - **Offizielle Voreinstellungen** (z. B. Creator Mode): Mitgelieferte Skills bleiben strikt schreibgeschützt ohne irreführende Umschalter;
 - **Benutzerdefinierte Voreinstellungen**: Ihre eigenen Presets mit `customSkillDirs` bieten volle Funktionsparität — inklusive Aktivieren/Deaktivieren einzelner Skills oder der gesamten Quelle, Kategorien & Notizen, direktes Erstellen, Importieren und Installieren aus Repositories, Verschieben in den Papierkorb sowie Wiederherstellen. Pfade, die sich mit globalen Verzeichnissen überschneiden, werden sicher blockiert; relative Preset-Pfade bleiben zur Sicherheit schreibgeschützt (verwenden Sie einen absoluten Pfad für die vollständige Verwaltung).
+- **Token-Kostenschätzung pro Skill mit Live-Summe**: zeigt geschätzte Token-Badges für Skill-Beschreibungen direkt in der Liste und eine Live-Summe in der Statusleiste für den dauerhaften System-Prompt-Aufwand; unterscheidet manuell aktivierbare, deaktivierte und überschriebene Skills und bietet vollständige Beschreibungs-/Body-Aufschlüsselungen in den Detaildialogen.
 
 ## DSH Produkt-Ökosystem
 
