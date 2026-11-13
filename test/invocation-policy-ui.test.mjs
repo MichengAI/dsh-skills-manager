@@ -178,13 +178,13 @@ assert.ok(skillStart >= 0 && skillEnd > skillStart, 'renderSkill 必须存在');
 
 const skillBlock = stripTypeScriptTypes(source.slice(skillStart, skillEnd));
 const makeRenderSkill = new Function(
-  'h', 't', 'isSkillEnabled', 'renderInvocationBadge', 'renderSkillStatusIcon', 'enableSwitch', 'renderLinkedNote', 'renderFallback', 'SourceSelect', 'moreIcon', 'busy', 'filters', 'allRoots', 'draggingRef', 'post', 'openDetail', 'setSkillNoteText', 'setModal', 'rootDisplayName',
+  'h', 't', 'isSkillEnabled', 'renderInvocationBadge', 'renderTokenBadge', 'renderSkillStatusIcon', 'enableSwitch', 'renderLinkedNote', 'renderFallback', 'SourceSelect', 'moreIcon', 'busy', 'filters', 'allRoots', 'draggingRef', 'post', 'openDetail', 'setSkillNoteText', 'setModal', 'rootDisplayName',
   skillBlock + '\nreturn renderSkill;'
 );
 
 const fakeRoot = { key: 'dsh', toggleable: true, mutable: true, enabled: true, categories: [] };
 const renderSkillTested = makeRenderSkill(
-  h, tZh, () => true, renderInvocationBadge, () => null, () => h('switch'), () => null, () => null, function SourceSelect() {}, () => null, false, {}, [fakeRoot], { current: null }, () => Promise.resolve(), () => {}, () => {}, () => {}, () => 'DSH'
+  h, tZh, () => true, renderInvocationBadge, () => null, () => null, () => h('switch'), () => null, () => null, function SourceSelect() {}, () => null, false, {}, [fakeRoot], { current: null }, () => Promise.resolve(), () => {}, () => {}, () => {}, () => 'DSH'
 );
 
 function findVNode(node, predicate) {
@@ -216,14 +216,14 @@ assert.ok(detailModalStart >= 0 && detailModalEnd > detailModalStart, '必须存
 
 const detailModalBlock = stripTypeScriptTypes(source.slice(detailModalStart, detailModalEnd));
 const makeDetailModal = new Function(
-  'h', 't', 'Modal', 'PrimitiveButton', 'Input', 'renderDetailPolicy',
+  'h', 't', 'Modal', 'PrimitiveButton', 'Input', 'renderDetailPolicy', 'renderDetailTokens',
   `return function renderDetailModal(modal, detail, detailSkill) {
      const content = [];
      const copyState = 'idle', setCopyState = () => {}, setDetailSkill = () => {}, setModal = () => {}, copyText = () => {};
      ${detailModalBlock}
      return content[0];
    };`
-)(h, tZh, function Modal(props) { return h('Modal', props, props.children); }, function PrimitiveButton(props) { return h('Button', props, props.children); }, { TextArea: function TextArea(props) { return h('textarea', props); } }, renderDetailPolicy);
+)(h, tZh, function Modal(props) { return h('Modal', props, props.children); }, function PrimitiveButton(props) { return h('Button', props, props.children); }, { TextArea: function TextArea(props) { return h('textarea', props); } }, renderDetailPolicy, () => null);
 
 const fakeDetailData = { name: 'my-manual-tool', declaredName: 'My Manual Tool', path: 'D:/skills/my-manual-tool/SKILL.md', body: 'steps', diagnostics: [] };
 const renderedModalVNode = makeDetailModal('detail', fakeDetailData, manualOnlySkill);

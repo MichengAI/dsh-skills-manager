@@ -54,6 +54,10 @@ export interface SkillEntry extends DiscoveredEntry {
     name: string;
     declaredName: string;
     description: string;
+    /** 简介的近似 token 数（简介常驻系统提示词的技能目录）。只在读到正文的完整扫描里携带。 */
+    descriptionTokens?: number;
+    /** 正文的近似 token 数（技能被调用时才加载）。metadataOnly 扫描不读正文，不带该字段。 */
+    bodyTokens?: number;
     modelInvocable: boolean;
     userInvocable: boolean;
     invocationPolicyValid: boolean;
@@ -134,6 +138,9 @@ export interface SkillProvenance {
 }
 export interface SkillView extends Omit<SkillEntry, 'docPath' | 'entryPath' | 'realDocPath' | 'realEntryPath' | 'linked'> {
     path: string;
+    /** 简介/正文的近似 token 数；/state 与 /workspace-skills 的完整扫描都会返回，界面用 ≈ 标注。 */
+    descriptionTokens?: number;
+    bodyTokens?: number;
     managerEnabled: boolean;
     managerOverride: boolean | null;
     effectiveModelInvocable: boolean;
@@ -195,6 +202,9 @@ export interface RepositorySkill {
     name: string;
     description: string;
     body: string;
+    /** 简介/正文的近似 token 数；重新扫描后写入，旧状态文件里的条目可能缺省。 */
+    descriptionTokens?: number;
+    bodyTokens?: number;
     valid: boolean;
     documentHash: string;
     files?: FileDigest[];

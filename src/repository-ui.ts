@@ -715,6 +715,11 @@ export function createRepositoryUI({ react, Modal, Input, Button, Checkbox, Sour
     function openRemove(repo: RepoView) {
       setModal({ type: "remove", repo });
     }
+    // 仓库/目录技能详情里的近似 token 数展示；旧状态文件里的条目可能没有该字段，缺失时不渲染。
+    function repoTokenDetailLine(descriptionTokens?: number, bodyTokens?: number) {
+      if (typeof descriptionTokens !== "number" && typeof bodyTokens !== "number") return null;
+      return h("div", { className: "dssm-repo-metadata" }, t("token.detailLine", { description: descriptionTokens || 0, body: bodyTokens || 0 }));
+    }
     function renderRepoBrandIcon(repo: RepoView) {
       const url = repo.url || "";
       let brand = "GitHub";
@@ -1279,6 +1284,7 @@ export function createRepositoryUI({ react, Modal, Input, Button, Checkbox, Sour
             }, copyState === "copied" ? t("repo.copied") : copyState === "failed" ? t("repo.copyFailed") : t("repo.copyBody")) : null
           ),
           h("p", { className: "dssm-desc" }, detail.description),
+          repoTokenDetailLine(detail.descriptionTokens, detail.bodyTokens),
           h("div", { className: "dssm-detail-path" }, detail.origin),
           h("p", { className: "dssm-note" }, t("repo.installHint")),
           h(Input.TextArea, { className: "dssm-detail-body", readOnly: true, value: detail.body || "", rows: 16 })
@@ -1314,6 +1320,7 @@ export function createRepositoryUI({ react, Modal, Input, Button, Checkbox, Sour
             }, copyState === "copied" ? t("repo.copied") : copyState === "failed" ? t("repo.copyFailed") : t("repo.copyBody")) : null
           ),
           h("p", { className: "dssm-desc" }, detail.description),
+          repoTokenDetailLine(detail.descriptionTokens, detail.bodyTokens),
           h("div", { className: "dssm-detail-path" }, modal.repo.owner + "/" + modal.repo.name + " · " + detail.path),
           h("div", { className: "dssm-repo-metadata" }, t("repo.commit") + " · " + detail.commit),
           h("p", { className: "dssm-note" }, t("repo.installHint")),

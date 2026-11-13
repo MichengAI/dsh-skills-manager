@@ -106,7 +106,7 @@ const makeSkill = new Function('env', `
   const { h, t, filters } = env;
   const isSkillEnabled = () => true, busy = false, allRoots = [], draggingRef = { current: null };
   const moreIcon = () => null, SourceSelect = function SourceSelect() {}, SkillSwitch = function SkillSwitch() {};
-  const renderSkillStatusIcon = () => null, enableSwitch = () => h('switch', {}), renderLinkedNote = () => null, renderFallback = () => null, renderInvocationBadge = () => null;
+  const renderSkillStatusIcon = () => null, enableSwitch = () => h('switch', {}), renderLinkedNote = () => null, renderFallback = () => null, renderInvocationBadge = () => null, renderTokenBadge = () => null;
   const iconButton = (label) => h('button', { 'aria-label': label }), strokeIcon = () => null, canToggleSource = () => true;
   ${skillFns}
   return { renderSkill, sourceExtra };

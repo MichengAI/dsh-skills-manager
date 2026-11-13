@@ -26,6 +26,7 @@ import {
 import { promises as fs, readFileSync } from "node:fs";
 import { createHash, randomUUID } from "node:crypto";
 import { unzipSync } from "fflate";
+import { estimateTokens } from "./token-count.js";
 import {
   discoverReadonlyEntries,
   validDiscoveryName,
@@ -1892,7 +1893,7 @@ function hostAcceptableSkillName(declaredName: string): string | null {
   return null;
 }
 
-function entryOf(name: string, kind: string, docPath: string, doc: Pick<ParsedSkill, "map" | "hasFrontmatter">) {
+function entryOf(name: string, kind: string, docPath: string, doc: Pick<ParsedSkill, "map" | "hasFrontmatter"> & {body?: string}) {
   const declaredName = doc.map.name !== undefined ? unquote(doc.map.name) : "";
   const description =
     doc.map.description !== undefined ? unquote(doc.map.description) : "";
@@ -1932,6 +1933,13 @@ function entryOf(name: string, kind: string, docPath: string, doc: Pick<ParsedSk
     kind,
     docPath,
     description,
+    // 完整扫描读到正文时同时估算简介与正文的近似 token 数；metadataOnly 扫描不读正文，不带该组字段。
+    ...(doc.body === undefined
+      ? {}
+      : {
+          descriptionTokens: estimateTokens(description),
+          bodyTokens: estimateTokens(doc.body),
+        }),
     modelInvocable: !modelDisabled,
     userInvocable: !userDisabled,
     invocationPolicyValid,
@@ -4100,6 +4108,9 @@ export async function skillDetail(key: string, name: string, options: ScopeOptio
     name,
     declaredName: summary.declaredName,
     description: summary.description,
+    // 详情页直接展示；与扫描一致用估算器计算，不引入真实分词器。
+    descriptionTokens: estimateTokens(summary.description),
+    bodyTokens: estimateTokens(doc.body),
     customNote,
     path: entry.docPath,
     kind: entry.kind,
@@ -4475,6 +4486,13 @@ export async function state(options: ScopeOptions = {}) {
         declaredName: e.declaredName,
         kind: e.kind,
         description: e.description,
+        // /state 由完整扫描生成，条目自带近似 token 数；缺失时不补假值。
+        ...(e.bodyTokens === undefined
+          ? {}
+          : {
+              descriptionTokens: e.descriptionTokens,
+              bodyTokens: e.bodyTokens,
+            }),
         modelInvocable: e.modelInvocable,
         userInvocable: e.userInvocable,
         invocationPolicyValid: e.invocationPolicyValid,

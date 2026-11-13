@@ -8,8 +8,11 @@ import { promises as fileSystem } from "node:fs";
 const sandbox = await mkdtemp(join(tmpdir(), "dssm-repository-test-"));
 process.env.DSH_HOME = join(sandbox, "home");
 process.env.USERPROFILE = join(sandbox, "user");
+// Linux/macOS 上 homedir() 读取 HOME；不隔离会把本机真实 Agent 技能目录扫进冲突判定。
+process.env.HOME = join(sandbox, "user");
 const { parseRepositoryInput, createRepositoryManager } = await import("../lib/repositories.js");
 const { installationSourceKey } = await import("../lib/repository-updates.js");
+const { estimateTokens } = await import("../lib/token-count.js");
 
 const doc = (name, description = "测试技能", extra = "") => `---\nname: ${name}\ndescription: ${description}\n${extra}---\n技能正文\n`;
 const defaultTree = () => ({
@@ -56,6 +59,9 @@ try {
   assert.match(list.repositories[0].commit, /^[a-f0-9]{40}$/, "扫描版本以 Git 提交锁定，不再有归档摘要");
   assert.equal(list.repositories[0].skills.find((s) => s.name === "pdf").status, "available");
   assert.equal((await manager.detail({ id: added.id, path: "skills/pdf" })).body, "技能正文");
+  const repoDetail = await manager.detail({ id: added.id, path: "skills/pdf" });
+  assert.equal(repoDetail.descriptionTokens, estimateTokens("Use when: reviewing files"), "仓库详情返回简介 token 估算");
+  assert.equal(repoDetail.bodyTokens, estimateTokens("技能正文"), "仓库详情返回正文 token 估算");
 
   tree = { "skills/pdf/SKILL.md": doc("impostor") };
   const callsBeforeInstall = fetchCalls;

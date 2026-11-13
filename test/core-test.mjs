@@ -55,6 +55,7 @@ import {
   notifyChatCatalog,
   registerAgentSkillProviders,
 } from "../lib/index.js";
+import { estimateTokens } from "../lib/token-count.js";
 
 let passed = 0;
 let failed = 0;
@@ -1772,6 +1773,33 @@ ok(
 ok(
   createdDetail.loadable === true && createdDetail.diagnostics.length === 0,
   "created skill passes diagnostics",
+);
+eq(
+  createdDetail.descriptionTokens,
+  estimateTokens("Create reusable prompts."),
+  "skillDetail returns the estimated description token count",
+);
+eq(
+  createdDetail.bodyTokens,
+  estimateTokens("Follow the user request carefully."),
+  "skillDetail returns the estimated body token count",
+);
+const createdState = await state();
+const createdRootView = createdState.roots.find((item) => item.key === "dsh");
+const createdSkillView = createdRootView?.skills.find(
+  (item) => item.name === "conversation-helper",
+);
+ok(
+  createdSkillView?.descriptionTokens === estimateTokens("Create reusable prompts.") &&
+    createdSkillView?.bodyTokens === estimateTokens("\nFollow the user request carefully.\n"),
+  "state skill views carry the same token estimates as the scan",
+);
+const metadataScan = await scanEntries(dshRoot, { metadataOnly: true });
+ok(
+  metadataScan.entries.every(
+    (entry) => !("descriptionTokens" in entry) && !("bodyTokens" in entry),
+  ),
+  "metadataOnly scan entries do not carry token fields (body is not read)",
 );
 eq(
   (

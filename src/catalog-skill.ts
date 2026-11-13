@@ -1,4 +1,5 @@
 import { parseSkillDoc } from "./core.js";
+import { estimateTokens } from "./token-count.js";
 
 const IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 const SAFE_PATH = /^(?!\/)(?!.*(?:^|\/)\.\.(?:\/|$))[A-Za-z0-9._/-]+$/;
@@ -12,7 +13,7 @@ export type CatalogIdentity =
   | { catalog: "clawhub"; owner: string; slug: string }
   | { catalog: "skillsh"; source: string; skillId: string };
 
-export type CatalogDetail = { name: string; description: string; body: string; origin: string };
+export type CatalogDetail = { name: string; description: string; body: string; origin: string; descriptionTokens: number; bodyTokens: number };
 export type CatalogPackage = { name: string; zip?: string; entries?: { path: string; data: string }[] };
 
 type FetchLike = typeof fetch;
@@ -104,7 +105,14 @@ function skillDocSummary(markdown: string) {
   const parsed = parseSkillDoc(markdown);
   const name = parsed.map.name?.trim();
   const description = parsed.map.description?.trim();
-  return { name, description, body: parsed.body };
+  // 目录详情同样返回近似 token 数，界面与本地技能详情保持一致的 ≈ 展示。
+  return {
+    name,
+    description,
+    body: parsed.body,
+    descriptionTokens: estimateTokens(description || ""),
+    bodyTokens: estimateTokens(parsed.body),
+  };
 }
 
 async function fetchFixed(url: string, fetchImpl: FetchLike, accept: string) {
@@ -122,7 +130,7 @@ export async function readCatalogSkill(input: CatalogRequest, fetchImpl: FetchLi
     const markdown = new TextDecoder().decode(await readBounded(response, MAX_TEXT_BYTES));
     const parsed = skillDocSummary(markdown);
     if (!parsed.name || !parsed.description) throw catalogError("目录技能说明无效", 502, "error.catalog.response");
-    return { name: parsed.name, description: parsed.description, body: parsed.body, origin: urls.origin };
+    return { name: parsed.name, description: parsed.description, body: parsed.body, descriptionTokens: parsed.descriptionTokens, bodyTokens: parsed.bodyTokens, origin: urls.origin };
   }
   const response = await fetchFixed(urls.download, fetchImpl, "application/json");
   const payload = parseFilesJson(await readBounded(response, MAX_TEXT_BYTES));
@@ -130,7 +138,7 @@ export async function readCatalogSkill(input: CatalogRequest, fetchImpl: FetchLi
   if (!document || typeof document.contents !== "string") throw catalogError("目录技能说明无效", 502, "error.catalog.response");
   const parsed = skillDocSummary(document.contents);
   if (!parsed.name || !parsed.description) throw catalogError("目录技能说明无效", 502, "error.catalog.response");
-  return { name: parsed.name, description: parsed.description, body: parsed.body, origin: urls.origin };
+  return { name: parsed.name, description: parsed.description, body: parsed.body, descriptionTokens: parsed.descriptionTokens, bodyTokens: parsed.bodyTokens, origin: urls.origin };
 }
 
 export async function loadCatalogPackage(input: CatalogRequest, fetchImpl: FetchLike = fetch): Promise<CatalogPackage> {

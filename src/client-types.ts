@@ -22,7 +22,7 @@ export type ApiRoutes = RepositoryRoutes & Record<SkillsShSearchPath, SkillsShSe
     '/workspaces': { items: Awaited<ReturnType<typeof listWorkspaces>> };
     '/workspace-skills': Success<Awaited<ReturnType<typeof workspaceSkills>>>;
     '/import': ImportResult;
-    '/catalog/detail': { name: string; description: string; body: string; origin: string };
+    '/catalog/detail': { name: string; description: string; body: string; origin: string; descriptionTokens?: number; bodyTokens?: number };
     '/catalog/install': { name: string; root: string };
     '/detail': Detail;
     '/root-path': { ok: true; root: { key: string; path: string; defaultPath?: string } };

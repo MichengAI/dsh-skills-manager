@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { catalogUrls, readCatalogSkill, loadCatalogPackage } from "../lib/catalog-skill.js";
+import { estimateTokens } from "../lib/token-count.js";
 
 const clawhub = catalogUrls({ catalog: "clawhub", owner: "pskoett", slug: "self-improving-agent" });
 assert.equal(clawhub.detail, "https://clawhub.ai/api/v1/skills/self-improving-agent/file?path=SKILL.md&owner=pskoett");
@@ -30,7 +31,8 @@ const fetchImpl = async (url, options) => {
 const detail = await readCatalogSkill({ catalog: "clawhub", owner: "pskoett", slug: "demo" }, fetchImpl);
 assert.equal(detail.name, "demo");
 assert.equal(detail.description, "A real skill");
-assert.match(detail.body, /^# Demo/m);
+assert.equal(detail.descriptionTokens, estimateTokens("A real skill"), "目录详情返回简介 token 估算");
+assert.equal(detail.bodyTokens, estimateTokens(detail.body), "目录详情返回正文 token 估算");
 assert.equal(calls[0].redirect, "error", "目录读取不跟随重定向");
 assert.equal(calls[0].url, "https://clawhub.ai/api/v1/skills/demo/file?path=SKILL.md&owner=pskoett");
 
