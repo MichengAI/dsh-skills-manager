@@ -779,6 +779,22 @@ eq(
   JSON.stringify({ total: 5, enabled: 2, disabled: 1, shadowed: 1, invalid: 1 }),
   "summary counts match status-filter buckets",
 );
+const sumEnabledDescriptionTokens = bundle.sumEnabledDescriptionTokens;
+ok(
+  typeof sumEnabledDescriptionTokens === "function",
+  "factory exports enabled-description token summation",
+);
+eq(
+  sumEnabledDescriptionTokens([
+    { skill: { enabled: true, invocationPolicyValid: true, modelInvocable: true, userInvocable: true, descriptionTokens: 40 } },
+    { skill: { enabled: false, invocationPolicyValid: true, modelInvocable: true, userInvocable: true, descriptionTokens: 10 } },
+    { skill: { enabled: true, invocationPolicyValid: true, modelInvocable: true, userInvocable: true, descriptionTokens: 25, shadowedBy: { root: "dsh", name: "x" } } },
+    { skill: { enabled: true, invocationPolicyValid: true, modelInvocable: true, userInvocable: true } },
+  ]),
+  40,
+  "token summation counts only enabled, non-shadowed skills carrying token data",
+);
+eq(sumEnabledDescriptionTokens([]), 0, "empty view sums to zero tokens");
 ok(
   DICT.zh["dest.scope.workspace"] && DICT.en["dest.scope.workspace"] && DICT.zh["workspace.noSkills"] && DICT.en["workspace.noSkills"] && DICT.en["trash.source"],
   "workspace destination, project page and Trash source labels are localized in both languages",
