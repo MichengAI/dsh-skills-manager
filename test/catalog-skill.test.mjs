@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { catalogUrls, readCatalogSkill, loadCatalogPackage } from "../lib/catalog-skill.js";
-import { estimateTokens } from "../lib/token-count.js";
+import { estimateTokens, truncateCatalogDescription } from "../lib/token-count.js";
 
 const clawhub = catalogUrls({ catalog: "clawhub", owner: "pskoett", slug: "self-improving-agent" });
 assert.equal(clawhub.detail, "https://clawhub.ai/api/v1/skills/self-improving-agent/file?path=SKILL.md&owner=pskoett");
@@ -36,6 +36,22 @@ assert.equal(detail.descriptionTokens, estimateTokens("A real skill"), "目录�
 assert.equal(detail.bodyTokens, estimateTokens(detail.body), "目录详情返回正文 token 估算");
 assert.equal(calls[0].redirect, "error", "目录读取不跟随重定向");
 assert.equal(calls[0].url, "https://clawhub.ai/api/v1/skills/demo/file?path=SKILL.md&owner=pskoett");
+
+// 验证超长简介目录详情真实接线 truncateCatalogDescription
+const longDescCatalog = "long catalog description words ".repeat(30) + "end";
+const catalogWithLongDesc = await readCatalogSkill(
+  { catalog: "clawhub", owner: "pskoett", slug: "long-skill" },
+  async () => new Response(`---\nname: long-skill\ndescription: ${longDescCatalog}\n---\n\n# Long\n`, { status: 200, headers: { "content-type": "text/markdown" } }),
+);
+assert.equal(
+  catalogWithLongDesc.descriptionTokens,
+  estimateTokens(truncateCatalogDescription(longDescCatalog)),
+  "目录详情必须真实接线 truncateCatalogDescription 进行 500 字符截断估算",
+);
+assert.ok(
+  catalogWithLongDesc.descriptionTokens < estimateTokens(longDescCatalog),
+  "目录详情截断 token 必须严格小于未截断值，防变异接线脱落",
+);
 
 await assert.rejects(loadCatalogPackage({ catalog: "skillsh", source: "owner/repo", skillId: "skill" }, fetchImpl), (error) => error.code === "error.catalog.response", "skills.sh 文件路径不能穿越安装目录");
 const folded = await readCatalogSkill({ catalog: "skillsh", source: "owner/repo", skillId: "ponytail" }, async () => new Response(JSON.stringify({ files: [{ path: "SKILL.md", contents: "---\nname: ponytail\ndescription: >\n  Lazy senior dev mode: the smallest change.\n---\n\n# Ponytail\n" }] }), { status: 200, headers: { "content-type": "application/json" } }));

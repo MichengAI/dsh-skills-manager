@@ -12,13 +12,15 @@ process.env.USERPROFILE = join(sandbox, "user");
 process.env.HOME = join(sandbox, "user");
 const { parseRepositoryInput, createRepositoryManager } = await import("../lib/repositories.js");
 const { installationSourceKey } = await import("../lib/repository-updates.js");
-const { estimateTokens } = await import("../lib/token-count.js");
+const { estimateTokens, truncateCatalogDescription } = await import("../lib/token-count.js");
 
 const doc = (name, description = "测试技能", extra = "") => `---\nname: ${name}\ndescription: ${description}\n${extra}---\n技能正文\n`;
+const longRepoDesc = "Use when: reviewing large files ".repeat(30) + "end";
 const defaultTree = () => ({
   "skills/pdf/SKILL.md": doc("pdf", "Use when: reviewing files"),
   "skills/pdf/references/help.txt": "参考资料",
   "skills/docx/SKILL.md": doc("docx"),
+  "skills/long/SKILL.md": doc("long", longRepoDesc),
 });
 let tree = defaultTree();
 let commit = "a".repeat(40);
@@ -55,9 +57,20 @@ try {
   assert.equal((await manager.list()).repositories.length, 1);
   await manager.refresh({ id: added.id });
   let list = await manager.list();
-  assert.equal(list.repositories[0].skills.length, 2);
+  assert.equal(list.repositories[0].skills.length, 3);
   assert.match(list.repositories[0].commit, /^[a-f0-9]{40}$/, "扫描版本以 Git 提交锁定，不再有归档摘要");
   assert.equal(list.repositories[0].skills.find((s) => s.name === "pdf").status, "available");
+  const longSkill = list.repositories[0].skills.find((s) => s.name === "long");
+  assert.ok(longSkill, "必须扫描到 long 技能");
+  assert.equal(
+    longSkill.descriptionTokens,
+    estimateTokens(truncateCatalogDescription(longRepoDesc)),
+    "仓库扫描阶段简介 token 必须真实接线 truncateCatalogDescription 截断",
+  );
+  assert.ok(
+    longSkill.descriptionTokens < estimateTokens(longRepoDesc),
+    "仓库扫描阶段截断 token 估算必须严格小于未截断值，防变异接线脱落",
+  );
   assert.equal((await manager.detail({ id: added.id, path: "skills/pdf" })).body, "技能正文");
   const repoDetail = await manager.detail({ id: added.id, path: "skills/pdf" });
   assert.equal(repoDetail.descriptionTokens, estimateTokens("Use when: reviewing files"), "仓库详情返回简介 token 估算");
@@ -181,7 +194,7 @@ try {
   broken = true;
   await manager.refresh({ id: added.id });
   list = await manager.list();
-  assert.equal(list.repositories[0].skills.length, 2, "刷新失败保留上次目录");
+  assert.equal(list.repositories[0].skills.length, 3, "刷新失败保留上次目录");
   assert.equal(list.repositories[0].error.code, "error.repo.network");
   broken = "timeout";
   assert.equal((await manager.refresh({ id: added.id })).error.code, "error.repo.network", "数字错误码不会导致二次异常");

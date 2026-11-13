@@ -44,6 +44,10 @@ const requiredKeys = [
   'detail.policy.manualOnly',
   'detail.policy.blocked',
   'token.badgeTip.manualOnly',
+  'token.badgeTip.blocked',
+  'token.badgeTip.disabled',
+  'token.note.manualOnly',
+  'token.note.disabled',
 ];
 
 for (const key of requiredKeys) {
@@ -53,15 +57,15 @@ for (const key of requiredKeys) {
 
 // 2. 验证调用方式判定函数导出与行为
 const fnStart = source.indexOf('    function skillDeclaredInvocationKind(');
-const fnEnd = source.indexOf('    function isSkillEnabled(', fnStart);
+const fnEnd = source.indexOf('    function countKey(', fnStart);
 assert.ok(fnStart >= 0 && fnEnd > fnStart, '必须存在 skillDeclaredInvocationKind 辅助函数');
 
 // P3-1 验证死代码已清理：源码中不应再包含 skillEffectiveInvocationKind
 assert.equal(source.includes('function skillEffectiveInvocationKind'), false, '必须清除生产死代码 skillEffectiveInvocationKind');
 
 const fnBlock = stripTypeScriptTypes(source.slice(fnStart, fnEnd));
-const { skillDeclaredInvocationKind } = new Function(
-  fnBlock + '\nreturn { skillDeclaredInvocationKind };'
+const { skillDeclaredInvocationKind, isSkillEnabled } = new Function(
+  fnBlock + '\nreturn { skillDeclaredInvocationKind, isSkillEnabled };'
 )();
 
 // 默认全开
@@ -178,10 +182,10 @@ const tokenBadgeEnd = source.indexOf('      function renderDetailPolicy(', token
 assert.ok(tokenBadgeStart >= 0 && tokenBadgeEnd > tokenBadgeStart, 'renderTokenBadge 与 renderDetailTokens 必须存在');
 const tokenBadgeBlock = stripTypeScriptTypes(source.slice(tokenBadgeStart, tokenBadgeEnd));
 const makeTokenHelpers = new Function(
-  'h', 't',
+  'h', 't', 'skillDeclaredInvocationKind', 'isSkillEnabled',
   tokenBadgeBlock + '\nreturn { renderTokenBadge, renderDetailTokens };'
 );
-const { renderTokenBadge: realRenderTokenBadge, renderDetailTokens: realRenderDetailTokens } = makeTokenHelpers(h, tZh);
+const { renderTokenBadge: realRenderTokenBadge, renderDetailTokens: realRenderDetailTokens } = makeTokenHelpers(h, tZh, skillDeclaredInvocationKind, isSkillEnabled);
 
 const skillStart = source.indexOf('      function renderSkill(root:');
 const skillEnd = source.indexOf('      var rows =', skillStart);
@@ -225,11 +229,23 @@ const tokenBadgeFound = findVNode(tokenRow, n => n.props && n.props.className ==
 assert.ok(tokenBadgeFound, 'P3-3 变异防御：带有 descriptionTokens 的技能列表行必须渲染 .dssm-token-badge 节点');
 assert.ok(extractText(tokenBadgeFound).join('').includes('≈42'), 'P3-3 变异防御：徽标文本必须包含 ≈ 前缀与估算值');
 assert.ok(tokenBadgeFound.props.title && tokenBadgeFound.props.title.includes('常驻系统提示词'), 'P3-3 变异防御：徽标悬浮提示必须包含完整拆分说明');
+assert.equal(tokenBadgeFound.props.tabIndex, 0, 'P3-3 a11y: 徽标必须支持键盘 Tab 聚焦 (tabIndex=0)');
+assert.equal(tokenBadgeFound.props.role, 'note', 'P3-3 a11y: 徽标必须暴露 role=note 语义');
 
 const manualTokenRow = renderSkillTested(fakeRoot, { name: 'my-manual-token-tool', descriptionTokens: 15, bodyTokens: 60, ...manualOnlySkill });
 const manualTokenBadgeFound = findVNode(manualTokenRow, n => n.props && n.props.className === 'dssm-token-badge');
 assert.ok(manualTokenBadgeFound, 'P3-3 变异防御：带有 descriptionTokens 的仅手动技能行必须渲染 .dssm-token-badge 节点');
-assert.ok(manualTokenBadgeFound.props.title && manualTokenBadgeFound.props.title.includes('不常驻系统提示词'), 'P3-3 变异防御：仅手动技能悬浮提示必须说明不常驻系统提示词');
+assert.ok(manualTokenBadgeFound.props.title && manualTokenBadgeFound.props.title.includes('仅手动调用，不常驻系统提示词'), 'P3-3 变异防御：仅手动技能悬浮提示必须说明不常驻系统提示词');
+
+const disabledTokenRow = renderSkillTested(fakeRoot, { name: 'my-disabled-tool', descriptionTokens: 20, bodyTokens: 50, ...defaultSkill, enabled: false });
+const disabledBadgeFound = findVNode(disabledTokenRow, n => n.props && n.props.className === 'dssm-token-badge');
+assert.ok(disabledBadgeFound, 'P3-3 变异防御：停用技能行必须渲染 token 徽标');
+assert.ok(disabledBadgeFound.props.title && disabledBadgeFound.props.title.includes('未启用，不常驻系统提示词'), 'P3-3 变异防御：停用技能必须显示未启用提示');
+
+const blockedTokenRow = renderSkillTested(fakeRoot, { name: 'my-blocked-tool', descriptionTokens: 10, bodyTokens: 30, ...noneSkill, enabled: true });
+const blockedBadgeFound = findVNode(blockedTokenRow, n => n.props && n.props.className === 'dssm-token-badge');
+assert.ok(blockedBadgeFound, 'P3-3 变异防御：不可调用技能行必须渲染 token 徽标');
+assert.ok(blockedBadgeFound.props.title && blockedBadgeFound.props.title.includes('不可调用'), 'P3-3 变异防御：不可调用技能必须显示不可调用提示');
 
 // 7. P3-3 详情弹窗装配层验证（防变异穿透：真实装配 DOM 树断言，防止返回值丢弃或假绿）
 const detailModalStart = source.indexOf('      if (modal === "detail") {');
@@ -258,6 +274,7 @@ const detailTokensVNode = findVNode(renderedModalVNode, n => n.props && n.props.
 assert.ok(detailTokensVNode, 'P3-3 变异防御：详情弹窗必须真实装配 .dssm-detail-tokens');
 const detailTokenTexts = extractText(detailTokensVNode).join(' ');
 assert.ok(detailTokenTexts.includes('简介 ≈50 token') && detailTokenTexts.includes('正文 ≈120 token'), 'P3-3 变异防御：详情弹窗必须准确展示简介与正文 token 拆分');
+assert.ok(detailTokenTexts.includes('当前技能仅手动调用，不随技能目录常驻系统提示词'), 'P3-3 变异防御：详情弹窗针对仅手动技能准确提示不常驻系统提示词');
 
 // 8. 验证 CSS 样式包含徽标定义与详情策略定义
 assert.match(source, /\.dssm-invocation-badge\{/, 'CSS 样式中必须定义 .dssm-invocation-badge');
