@@ -1,6 +1,6 @@
 # Changelog
 
-## [1.4.4] - 2026-11-13
+## [1.4.5] - 2026-11-13
 
 ### Settings UI Standardization
 
