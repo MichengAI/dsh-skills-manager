@@ -2,7 +2,7 @@
 // 断言：CJK 每字约 1 个 token；其余按词块折算；空串与纯空白返回 0。
 // 运行：node test/token-count.test.mjs
 
-import { estimateTokens } from "../lib/token-count.js";
+import { estimateTokens, truncateCatalogDescription, DEFAULT_CATALOG_DESCRIPTION_MAX_LENGTH } from "../lib/token-count.js";
 
 let passed = 0;
 let failed = 0;
@@ -31,6 +31,17 @@ eq(estimateTokens("code-review-helper"), 7, "连字符拆词：code(1) -(1) revi
 eq(estimateTokens("..."), 2, "连续标点两两合并");
 eq(estimateTokens("A1 b2"), 2, "字母数字混排词各按 1 块计");
 eq(estimateTokens("2024"), 1, "四位数字按 1 块计");
+eq(estimateTokens("my_skill"), 2, "下划线标识符：my_skill(8字符)折算为 ceil(8/5) = 2 块，不被当成标点切断");
+
+// ── 宿主 500 字符目录截断对齐 ──
+eq(DEFAULT_CATALOG_DESCRIPTION_MAX_LENGTH, 500, "宿主目录默认截断长度为 500");
+eq(truncateCatalogDescription("abc"), "abc", "未超过 500 字符保持原样");
+eq(truncateCatalogDescription(""), "", "空串保持原样");
+const longDesc = "a".repeat(600);
+const truncated = truncateCatalogDescription(longDesc, 500);
+eq(truncated.length, 500, "超过 500 字符严格截断至 500 字符");
+ok(truncated.endsWith("..."), "截断末尾补 ...");
+eq(truncated.slice(0, 497), "a".repeat(497), "前 497 字符为原内容");
 
 // ── CJK：一字约一个 token ──
 eq(estimateTokens("把行程做成网页"), 7, "中文每字约 1 个 token");

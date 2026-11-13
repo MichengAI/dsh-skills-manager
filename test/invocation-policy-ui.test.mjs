@@ -171,7 +171,17 @@ const { renderDetailPolicy: renderDetailPolicyEn } = new Function(
 const textsEn = extractText(renderDetailPolicyEn(manualOnlySkill)).join(' ');
 assert.ok(textsEn.includes('Invocation: Manual only (disable-model-invocation: true)'), '英文环境单字段调用方式正常本地化');
 
-// 6. P3-3 装配层真实渲染覆盖（防变异穿透：防止行渲染漏挂徽标）
+// 6. P3-3 装配层真实渲染覆盖（防变异穿透：防止行渲染漏挂徽标与 token 徽标）
+const tokenBadgeStart = source.indexOf('      function renderTokenBadge(');
+const tokenBadgeEnd = source.indexOf('      function renderDetailPolicy(', tokenBadgeStart);
+assert.ok(tokenBadgeStart >= 0 && tokenBadgeEnd > tokenBadgeStart, 'renderTokenBadge 与 renderDetailTokens 必须存在');
+const tokenBadgeBlock = stripTypeScriptTypes(source.slice(tokenBadgeStart, tokenBadgeEnd));
+const makeTokenHelpers = new Function(
+  'h', 't',
+  tokenBadgeBlock + '\nreturn { renderTokenBadge, renderDetailTokens };'
+);
+const { renderTokenBadge: realRenderTokenBadge, renderDetailTokens: realRenderDetailTokens } = makeTokenHelpers(h, tZh);
+
 const skillStart = source.indexOf('      function renderSkill(root:');
 const skillEnd = source.indexOf('      var rows =', skillStart);
 assert.ok(skillStart >= 0 && skillEnd > skillStart, 'renderSkill 必须存在');
@@ -184,7 +194,7 @@ const makeRenderSkill = new Function(
 
 const fakeRoot = { key: 'dsh', toggleable: true, mutable: true, enabled: true, categories: [] };
 const renderSkillTested = makeRenderSkill(
-  h, tZh, () => true, renderInvocationBadge, () => null, () => null, () => h('switch'), () => null, () => null, function SourceSelect() {}, () => null, false, {}, [fakeRoot], { current: null }, () => Promise.resolve(), () => {}, () => {}, () => {}, () => 'DSH'
+  h, tZh, () => true, renderInvocationBadge, realRenderTokenBadge, () => null, () => h('switch'), () => null, () => null, function SourceSelect() {}, () => null, false, {}, [fakeRoot], { current: null }, () => Promise.resolve(), () => {}, () => {}, () => {}, () => 'DSH'
 );
 
 function findVNode(node, predicate) {
@@ -209,6 +219,12 @@ const noneRow = renderSkillTested(fakeRoot, { name: 'my-none-tool', ...noneSkill
 const noneBadgeFound = findVNode(noneRow, n => n.props && n.props.className === 'dssm-invocation-badge');
 assert.equal(noneBadgeFound, null, 'P3-3 变异防御：双关技能的列表行 DOM 中绝不能装配徽标');
 
+const tokenRow = renderSkillTested(fakeRoot, { name: 'my-token-tool', descriptionTokens: 42, bodyTokens: 88, ...defaultSkill });
+const tokenBadgeFound = findVNode(tokenRow, n => n.props && n.props.className === 'dssm-token-badge');
+assert.ok(tokenBadgeFound, 'P3-3 变异防御：带有 descriptionTokens 的技能列表行必须渲染 .dssm-token-badge 节点');
+assert.ok(extractText(tokenBadgeFound).join('').includes('≈42'), 'P3-3 变异防御：徽标文本必须包含 ≈ 前缀与估算值');
+assert.ok(tokenBadgeFound.props.title && tokenBadgeFound.props.title.includes('常驻系统提示词'), 'P3-3 变异防御：徽标悬浮提示必须包含完整拆分说明');
+
 // 7. P3-3 详情弹窗装配层验证（防变异穿透：真实装配 DOM 树断言，防止返回值丢弃或假绿）
 const detailModalStart = source.indexOf('      if (modal === "detail") {');
 const detailModalEnd = source.indexOf('      if (modal && typeof modal === "object" && modal.type === "trash-confirm")', detailModalStart);
@@ -223,14 +239,19 @@ const makeDetailModal = new Function(
      ${detailModalBlock}
      return content[0];
    };`
-)(h, tZh, function Modal(props) { return h('Modal', props, props.children); }, function PrimitiveButton(props) { return h('Button', props, props.children); }, { TextArea: function TextArea(props) { return h('textarea', props); } }, renderDetailPolicy, () => null);
+)(h, tZh, function Modal(props) { return h('Modal', props, props.children); }, function PrimitiveButton(props) { return h('Button', props, props.children); }, { TextArea: function TextArea(props) { return h('textarea', props); } }, renderDetailPolicy, realRenderDetailTokens);
 
-const fakeDetailData = { name: 'my-manual-tool', declaredName: 'My Manual Tool', path: 'D:/skills/my-manual-tool/SKILL.md', body: 'steps', diagnostics: [] };
+const fakeDetailData = { name: 'my-manual-tool', declaredName: 'My Manual Tool', path: 'D:/skills/my-manual-tool/SKILL.md', body: 'steps', descriptionTokens: 50, bodyTokens: 120, diagnostics: [] };
 const renderedModalVNode = makeDetailModal('detail', fakeDetailData, manualOnlySkill);
 const detailPolicyVNode = findVNode(renderedModalVNode, n => n.props && n.props.className === 'dssm-detail-policy');
 assert.ok(detailPolicyVNode, 'P3-3 变异防御：详情弹窗真实渲染 DOM 树中必须存在 .dssm-detail-policy 结构节点');
 const modalPolicyTexts = extractText(detailPolicyVNode).join(' ');
 assert.ok(modalPolicyTexts.includes(DICT.zh['detail.policy.manualOnly']), 'P3-3 变异防御：详情弹窗真实装配必须传入 detailSkill 并渲染对应策略文案，防止误传 detail 导致文案错误');
+
+const detailTokensVNode = findVNode(renderedModalVNode, n => n.props && n.props.className === 'dssm-detail-tokens');
+assert.ok(detailTokensVNode, 'P3-3 变异防御：详情弹窗必须真实装配 .dssm-detail-tokens');
+const detailTokenTexts = extractText(detailTokensVNode).join(' ');
+assert.ok(detailTokenTexts.includes('简介 ≈50 token') && detailTokenTexts.includes('正文 ≈120 token'), 'P3-3 变异防御：详情弹窗必须准确展示简介与正文 token 拆分');
 
 // 8. 验证 CSS 样式包含徽标定义与详情策略定义
 assert.match(source, /\.dssm-invocation-badge\{/, 'CSS 样式中必须定义 .dssm-invocation-badge');

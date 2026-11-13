@@ -48,7 +48,7 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
         "filter.workspace": "工作区", "filter.source": "来源", "filter.all": "全部来源", "filter.option": "{name}（{count}）", "search": "搜索", "search.placeholder": "搜索技能名称、描述或备注", "search.clear": "清除搜索",
         "empty.search": "没有匹配的技能。", "empty.source": "该来源目录不存在或暂时没有技能。", "loading": "正在加载技能…", "note.missing": "未提供简介", "skill.linked": "外部目录链接，只读", "source.toggle": "启停来源", "skill.toggle": "启停技能", "category.toggle": "启停分类", "category.create": "新建分类", "category.uncategorized": "未分类", "category.assign": "归入{name}", "category.rename": "重命名", "category.delete": "删除分类", "category.note": "分类只记在这个来源里，不移动文件。", "category.name": "分类名称", "category.empty": "还没有技能。从条目的「更多」归入。", "category.progress": "{count} 项 · {enabled}/{usable} 启用", "category.actions": "分类操作", "category.created": "已添加分类「{name}」。文件没有新建目录。", "category.renamed": "已重命名。技能文件名没有变化。", "category.deleted": "已删除分类「{name}」。技能回到未分类，没有进回收站。", "category.assigned": "已将 {name} 归入「{category}」。文件没有移动。", "category.dragTip": "拖拽调整顺序或移动到其他分类", "category.moved": "已调整技能 {name} 的分类或顺序。", "confirm.category.title": "删除分类？", "confirm.category.desc": "「{name}」会消失，里面的技能回到未分类。文件不会移动。", "error.category.duplicate": "已有同名分类: {name}", "error.category.name": "分类名称不能为空，且不能超过 24 个字符", "error.category.notFound": "分类不存在", "error.category.root": "技能来源不存在: {root}", "error.category.position": "技能排序位置无效", "error.category.target": "排序目标不属于目标分类",
         "detail.title": "技能详情", "detail.description": "简介", "detail.customNote": "自定义简介", "detail.document": "SKILL.md", "detail.body": "正文", "detail.frontmatter": "Frontmatter", "detail.diagnostics": "诊断", "detail.path": "源文件", "detail.noIssues": "未发现诊断问题。", "detail.copyBody": "复制正文", "detail.copied": "已复制", "detail.copyFailed": "复制失败",
-        "token.badgeTip": "简介 ≈{description} token（常驻系统提示词）；正文 ≈{body} token（调用时加载）。数字为估算值。", "token.detailLine": "简介 ≈{description} token · 正文 ≈{body} token", "token.note": "token 数为插件估算（CJK 每字约 1 个，其余按词块折算），非精确分词。简介随技能目录常驻系统提示词，正文仅在调用时加载。", "token.summaryLabel": "已启用技能的简介 token 合计 · 随技能目录常驻系统提示词 · 估算值",
+        "token.badgeTip": "简介 ≈{description} token（常驻系统提示词）；正文 ≈{body} token（调用时加载）。数字为估算值。", "token.detailLine": "简介 ≈{description} token · 正文 ≈{body} token", "token.note": "token 数为插件估算（CJK 每字约 1 个，其余按词块折算）。简介随技能目录常驻系统提示词（仅模型可见技能计入，超过 500 字符按宿主截断估算），正文仅在调用时加载。", "token.summaryLabel": "模型可见技能的简介 token 合计 · 随技能目录常驻系统提示词 · 估算值",
         "invocation.manualOnly": "仅手动", "invocation.manualOnlyTip": "模型不可自动感知；聊天框输入 / 可手动调用", "detail.invocation": "调用方式", "detail.policy.all": "模型 + 手动", "detail.policy.manualOnly": "仅手动调用（disable-model-invocation: true）", "detail.policy.blocked": "不可调用",
         "skill.editNote": "编辑备注", "note.title": "自定义简介 / 备注", "note.label": "备注内容", "note.placeholder": "记录这个技能是干嘛的、什么时候用…", "note.help": "保存在插件内部显示层，不修改原 SKILL.md。清空可还原为原简介。", "note.clear": "清空", "note.updated": "已更新「{name}」的自定义简介。", "note.cleared": "已清除「{name}」的自定义简介。",
         "error.note.root": "技能来源不存在: {root}", "error.note.tooLarge": "自定义简介过长（最多 {max} 个字符）",
@@ -85,7 +85,7 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
         "filter.workspace": "Workspace", "filter.source": "Source", "filter.all": "All sources", "filter.option": "{name} ({count})", "search": "Search", "search.placeholder": "Search skill names, descriptions or notes", "search.clear": "Clear search",
         "empty.search": "No matching skills.", "empty.source": "This source does not exist or has no skills yet.", "loading": "Loading skills…", "note.missing": "No description provided", "skill.linked": "External directory link, read-only", "source.toggle": "Toggle source", "skill.toggle": "Toggle skill", "category.toggle": "Toggle category", "category.create": "New category", "category.uncategorized": "Uncategorized", "category.assign": "Move to {name}", "category.rename": "Rename", "category.delete": "Delete category", "category.note": "Categories stay in this source and do not move files.", "category.name": "Category name", "category.empty": "No skills yet. Use More on a skill to place it here.", "category.progress": "{count} · {enabled}/{usable} enabled", "category.actions": "Category actions", "category.created": "Added category “{name}”. No directory was created.", "category.renamed": "Renamed. Skill file names are unchanged.", "category.deleted": "Deleted category “{name}”. Skills returned to Uncategorized and were not trashed.", "category.assigned": "Moved {name} to “{category}”. The file was not moved.", "category.dragTip": "Drag to reorder or move to another category", "category.moved": "Updated the category or order for {name}.", "confirm.category.title": "Delete category?", "confirm.category.desc": "“{name}” will be removed. Its skills return to Uncategorized. Files are not moved.", "error.category.duplicate": "A category with this name already exists: {name}", "error.category.name": "Category name is required and must be at most 24 characters", "error.category.notFound": "Category not found", "error.category.root": "Skill source not found: {root}", "error.category.position": "Invalid skill ordering position", "error.category.target": "The target skill is not in the destination category",
         "detail.title": "Skill details", "detail.description": "Description", "detail.customNote": "Custom note", "detail.document": "SKILL.md", "detail.body": "Body", "detail.frontmatter": "Frontmatter", "detail.diagnostics": "Diagnostics", "detail.path": "Source file", "detail.noIssues": "No diagnostic issues found.", "detail.copyBody": "Copy body", "detail.copied": "Copied", "detail.copyFailed": "Copy failed",
-        "token.badgeTip": "Description ≈{description} tokens (always in the system prompt); body ≈{body} tokens (loaded on invocation). Counts are estimates.", "token.detailLine": "Description ≈{description} tokens · Body ≈{body} tokens", "token.note": "Token counts are plugin estimates (about one per CJK character, word chunks elsewhere), not exact tokenizer output. The description stays in the system prompt catalog; the body loads only when the skill is invoked.", "token.summaryLabel": "description tokens across enabled skills · always in the system prompt · estimate",
+        "token.badgeTip": "Description ≈{description} tokens (always in the system prompt); body ≈{body} tokens (loaded on invocation). Counts are estimates.", "token.detailLine": "Description ≈{description} tokens · Body ≈{body} tokens", "token.note": "Token counts are plugin estimates (about one per CJK character, word chunks elsewhere). The description stays in the system prompt catalog (only for model-invocable skills, capped at 500 characters per host limit); the body loads only when the skill is invoked.", "token.summaryLabel": "description tokens across model-invocable skills · always in the system prompt · estimate",
         "invocation.manualOnly": "Manual only", "invocation.manualOnlyTip": "Model cannot invoke automatically; manual invocation via / remains available", "detail.invocation": "Invocation", "detail.policy.all": "Model + Manual", "detail.policy.manualOnly": "Manual only (disable-model-invocation: true)", "detail.policy.blocked": "Blocked",
         "skill.editNote": "Edit note", "note.title": "Custom description / Note", "note.label": "Note", "note.placeholder": "Record what this skill does and when to use it…", "note.help": "Saved in the plugin display layer without modifying SKILL.md. Clear to revert to original description.", "note.clear": "Clear", "note.updated": "Updated custom note for “{name}”.", "note.cleared": "Cleared custom note for “{name}”.",
         "error.note.root": "Skill source not found: {root}", "error.note.tooLarge": "Custom note is too long (maximum {max} characters)",
@@ -320,11 +320,15 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
       list.forEach(function (row) { summary[skillStatus(row.skill)]++; });
       return summary;
     }
-    // 已启用（未被更高优先级副本覆盖、可调用）技能的简介 token 合计：
-    // 与状态栏“已启用”同一判定口径，即随技能目录常驻系统提示词的持续成本。
+    // 已启用且模型可见（未被更高优先级副本覆盖、模型可自动调用）技能的简介 token 合计：
+    // 与宿主生成模型侧技能目录（snapshot.skills.filter(isModelInvocable)）同一口径，
+    // 即随技能目录常驻系统提示词的持续成本（仅手动调用技能不常驻系统提示词目录）。
     function sumEnabledDescriptionTokens(list: {skill: Partial<SkillView>}[]) {
       return list.reduce(function (total: number, row: {skill: Partial<SkillView>}) {
-        return skillStatus(row.skill) === "enabled" && typeof row.skill.descriptionTokens === "number"
+        return skillStatus(row.skill) === "enabled" &&
+          row.skill.effectiveModelInvocable !== false &&
+          row.skill.modelInvocable !== false &&
+          typeof row.skill.descriptionTokens === "number"
           ? total + row.skill.descriptionTokens!
           : total;
       }, 0);
@@ -931,16 +935,20 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
       // 行内只放简介 token 数（简介常驻系统提示词，是持续成本）；完整拆分放悬浮提示。
       function renderTokenBadge(descriptionTokens?: number, bodyTokens?: number) {
         if (typeof descriptionTokens !== "number") return null;
+        var descStr = descriptionTokens.toLocaleString(t("format.locale"));
+        var bodyStr = typeof bodyTokens === "number" ? bodyTokens.toLocaleString(t("format.locale")) : "0";
         return h("span", {
           className: "dssm-token-badge",
-          title: t("token.badgeTip", { description: descriptionTokens, body: typeof bodyTokens === "number" ? bodyTokens : 0 }),
-          "aria-label": t("token.badgeTip", { description: descriptionTokens, body: typeof bodyTokens === "number" ? bodyTokens : 0 }),
-        }, "≈" + descriptionTokens);
+          title: t("token.badgeTip", { description: descStr, body: bodyStr }),
+          "aria-label": t("token.badgeTip", { description: descStr, body: bodyStr }),
+        }, "≈" + descStr);
       }
       function renderDetailTokens(descriptionTokens?: number, bodyTokens?: number) {
         if (typeof descriptionTokens !== "number" && typeof bodyTokens !== "number") return null;
+        var descStr = typeof descriptionTokens === "number" ? descriptionTokens.toLocaleString(t("format.locale")) : "0";
+        var bodyStr = typeof bodyTokens === "number" ? bodyTokens.toLocaleString(t("format.locale")) : "0";
         return h("div", { className: "dssm-detail-tokens" },
-          h("span", { className: "dssm-token-line" }, t("token.detailLine", { description: descriptionTokens || 0, body: bodyTokens || 0 })),
+          h("span", { className: "dssm-token-line" }, t("token.detailLine", { description: descStr, body: bodyStr })),
           h("span", { className: "dssm-token-note" }, t("token.note")));
       }
       function renderDetailPolicy(skill: SkillView | null) {

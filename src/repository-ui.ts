@@ -720,7 +720,10 @@ export function createRepositoryUI({ react, Modal, Input, Button, Checkbox, Sour
     // 仓库/目录技能详情里的近似 token 数展示；旧状态文件里的条目可能没有该字段，缺失时不渲染。
     function repoTokenDetailLine(descriptionTokens?: number, bodyTokens?: number) {
       if (typeof descriptionTokens !== "number" && typeof bodyTokens !== "number") return null;
-      return h("div", { className: "dssm-repo-metadata" }, t("token.detailLine", { description: descriptionTokens || 0, body: bodyTokens || 0 }));
+      var loc = getLocale?.() || t("format.locale");
+      var descStr = typeof descriptionTokens === "number" ? descriptionTokens.toLocaleString(loc) : "0";
+      var bodyStr = typeof bodyTokens === "number" ? bodyTokens.toLocaleString(loc) : "0";
+      return h("div", { className: "dssm-repo-metadata" }, t("token.detailLine", { description: descStr, body: bodyStr }));
     }
     function renderRepoBrandIcon(repo: RepoView) {
       const url = repo.url || "";

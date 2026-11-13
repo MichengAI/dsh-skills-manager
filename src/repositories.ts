@@ -6,7 +6,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { managerHomePath, resolveWorkspaceTarget, repositoryDestinations, trashRootPath, listTrash, restoreTrash as restoreSkillTrash, permanentlyDeleteTrash, parseSkillDoc, importUploadedSkill, deleteSkill, isSafeDeleteFailure, setSkillEnabled, readManagerState, state, createWorkspaceIndex, type indexRegisteredWorkspaces } from "./core.js";
 import { createRepositoryUpdater, fileIndex, signature, readSkillTree, repositoryInstallRoot, recordInstallRoot, selectInstallRecord, isRepositoryRootKey } from "./repository-updates.js";
 import { parseGitUrl, fetchGitRepository, probeGitRemote } from "./repository-git.js";
-import { estimateTokens } from "./token-count.js";
+import { estimateTokens, truncateCatalogDescription } from "./token-count.js";
 
 const STATE_LIMIT = 16 << 20;
 const STATE_READ_LIMIT = 64 << 20;
@@ -336,8 +336,8 @@ export function createRepositoryManager({
         name: name || directory.split("/").pop() || repoName,
         description,
         body: parsed.body.trim(),
-        // 扫描时顺手给出简介/正文的近似 token 数；与本地技能详情同一估算器。
-        descriptionTokens: estimateTokens(description),
+        // 扫描时顺手给出简介/正文的近似 token 数；简介对齐宿主 500 字符硬截断规则。
+        descriptionTokens: estimateTokens(truncateCatalogDescription(description)),
         bodyTokens: estimateTokens(parsed.body.trim()),
         documentHash: hash(bytes),
         valid: parsed.hasFrontmatter && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name) && !/^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i.test(name) && name.length <= 100 && !!description,
@@ -798,7 +798,13 @@ export function createRepositoryManager({
     detail: async ({ id, path }: SkillRequest) => {
       const repo = repository(await read(), id), skill = repo.skills.find((s) => s.path === path);
       if (!skill) throw failure("技能不在仓库列表中");
-      return { ...skill, commit: repo.commit };
+      // 旧状态文件可能未持久化 token 字段，在此对缺失字段动态兜底计算，免除强制全量重扫。
+      return {
+        ...skill,
+        descriptionTokens: skill.descriptionTokens ?? (skill.description ? estimateTokens(truncateCatalogDescription(skill.description)) : 0),
+        bodyTokens: skill.bodyTokens ?? (skill.body ? estimateTokens(skill.body) : 0),
+        commit: repo.commit,
+      };
     },
     restoreTrash: (id: string, options: MutationOptions = {}) => serialize(async () => {
       const metadata = (await listTrash()).find(item => item.id === id);

@@ -31,6 +31,7 @@ const fetchImpl = async (url, options) => {
 const detail = await readCatalogSkill({ catalog: "clawhub", owner: "pskoett", slug: "demo" }, fetchImpl);
 assert.equal(detail.name, "demo");
 assert.equal(detail.description, "A real skill");
+assert.match(detail.body, /^# Demo/m);
 assert.equal(detail.descriptionTokens, estimateTokens("A real skill"), "目录详情返回简介 token 估算");
 assert.equal(detail.bodyTokens, estimateTokens(detail.body), "目录详情返回正文 token 估算");
 assert.equal(calls[0].redirect, "error", "目录读取不跟随重定向");

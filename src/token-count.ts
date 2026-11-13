@@ -15,13 +15,21 @@ function isCjkCodePoint(cp: number): boolean {
     (cp >= 0xa960 && cp <= 0xa97f) || // 谚文扩展 A
     (cp >= 0xac00 && cp <= 0xd7ff) || // 谚文音节
     (cp >= 0xf900 && cp <= 0xfaff) || // 兼容表意文字
-    (cp >= 0xff00 && cp <= 0xff9f) || // 全角形式与半角假名
-    (cp >= 0x20000 && cp <= 0x3fffd) // 扩展 B 及之后的表意平面
+    (cp >= 0xff00 && cp <= 0xff9f) // 全角形式与半角假名（扩展 B 及之后的表意文字 cp > 0xffff，由外层短路覆盖）
   );
 }
 
-const WORD_CHARACTER = /[A-Za-z0-9]/;
+const WORD_CHARACTER = /[A-Za-z0-9_]/;
 const WHITESPACE = /\s/;
+
+/** 宿主 @deepseek-ai/dsh-tool-skill 注入系统提示词目录时的默认最大简介长度 */
+export const DEFAULT_CATALOG_DESCRIPTION_MAX_LENGTH = 500;
+
+/** 对齐宿主目录简介截断规则（超出 500 字符截断至 497 字符并补 "..."） */
+export function truncateCatalogDescription(description: string, maxLength: number = DEFAULT_CATALOG_DESCRIPTION_MAX_LENGTH): string {
+  if (!description || description.length <= maxLength) return description || "";
+  return description.slice(0, Math.max(0, maxLength - 3)) + "...";
+}
 
 /** 纯函数估算文本 token 数；空串与纯空白返回 0。 */
 export function estimateTokens(text: string): number {

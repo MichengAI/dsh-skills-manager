@@ -63,6 +63,17 @@ try {
   assert.equal(repoDetail.descriptionTokens, estimateTokens("Use when: reviewing files"), "仓库详情返回简介 token 估算");
   assert.equal(repoDetail.bodyTokens, estimateTokens("技能正文"), "仓库详情返回正文 token 估算");
 
+  // 存量兼容断言：模拟旧版本 state.json 中未持久化 token 字段的仓库条目，detail() 必须动态兜底估算
+  const repoStatePath = join(sandbox, "home/skills-manager/repositories.json");
+  const rawRepoState = JSON.parse(await readFile(repoStatePath, "utf8"));
+  delete rawRepoState.repositories[0].skills[0].descriptionTokens;
+  delete rawRepoState.repositories[0].skills[0].bodyTokens;
+  const { writeFile: writeFsFile } = await import("node:fs/promises");
+  await writeFsFile(repoStatePath, JSON.stringify(rawRepoState, null, 2), "utf8");
+  const fallbackDetail = await manager.detail({ id: added.id, path: "skills/pdf" });
+  assert.equal(fallbackDetail.descriptionTokens, estimateTokens("Use when: reviewing files"), "存量仓库条目在 detail() 优雅兜底简介 token 估算");
+  assert.equal(fallbackDetail.bodyTokens, estimateTokens("技能正文"), "存量仓库条目在 detail() 优雅兜底正文 token 估算");
+
   tree = { "skills/pdf/SKILL.md": doc("impostor") };
   const callsBeforeInstall = fetchCalls;
   const installed = await manager.install({ id: added.id, path: "skills/pdf" });

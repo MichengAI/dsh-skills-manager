@@ -26,7 +26,7 @@ import {
 import { promises as fs, readFileSync } from "node:fs";
 import { createHash, randomUUID } from "node:crypto";
 import { unzipSync } from "fflate";
-import { estimateTokens } from "./token-count.js";
+import { estimateTokens, truncateCatalogDescription } from "./token-count.js";
 import {
   discoverReadonlyEntries,
   validDiscoveryName,
@@ -1934,10 +1934,11 @@ function entryOf(name: string, kind: string, docPath: string, doc: Pick<ParsedSk
     docPath,
     description,
     // 完整扫描读到正文时同时估算简介与正文的近似 token 数；metadataOnly 扫描不读正文，不带该组字段。
+    // 简介对齐宿主硬截断（超出 500 字符按宿主截断估算），反映常驻系统提示词真实成本。
     ...(doc.body === undefined
       ? {}
       : {
-          descriptionTokens: estimateTokens(description),
+          descriptionTokens: estimateTokens(truncateCatalogDescription(description)),
           bodyTokens: estimateTokens(doc.body),
         }),
     modelInvocable: !modelDisabled,
@@ -4108,8 +4109,8 @@ export async function skillDetail(key: string, name: string, options: ScopeOptio
     name,
     declaredName: summary.declaredName,
     description: summary.description,
-    // 详情页直接展示；与扫描一致用估算器计算，不引入真实分词器。
-    descriptionTokens: estimateTokens(summary.description),
+    // 详情页直接展示；与扫描一致用估算器计算，不引入真实分词器。简介按宿主截断口径估算。
+    descriptionTokens: estimateTokens(truncateCatalogDescription(summary.description)),
     bodyTokens: estimateTokens(doc.body),
     customNote,
     path: entry.docPath,
