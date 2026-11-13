@@ -1,17 +1,19 @@
 # Changelog
 
-## [1.4.5] - 2026-11-13
+## [1.4.6] - 2026-11-13
 
 ### Skill Token Cost Estimation & Display
 
 - **Inline description token badges**: displays estimated description token counts directly in skill rows, with full description/body token breakdowns on hover and keyboard/screen-reader accessibility support.
 - **Persistent system prompt token total**: the status bar now displays the live sum of description tokens across all active, model-invocable skills, giving users clear visibility into persistent system prompt costs.
-- **Invocation policy and status awareness**: distinguishes manual-only (`disable-model-invocation: true`), blocked, and disabled skills with precise tooltip notes clarifying that they do not stay in the persistent prompt catalog.
+- **Invocation policy and status awareness**: distinguishes manual-only (`disable-model-invocation: true`), blocked, disabled, and overridden skills with precise tooltip notes clarifying that they do not stay in the persistent prompt catalog.
 - **Detailed token breakdown in modals**: skill detail views now present formatted token counts for both description and body alongside runtime loading notes.
 
 ### Compatibility
 
 - Verified full compatibility with DeepSeek Harness `0.2.2-rc.3`, smoothly supporting the latest Web and Desktop runtimes.
+
+## [1.4.5] - 2026-11-13
 
 ### Settings UI Standardization
 

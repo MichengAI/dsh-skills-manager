@@ -34,6 +34,7 @@ Bring skills from your computer and projects into DSH without switching between 
 - **Wide reading experience**: 760px responsive detail modal with monospace syntax styling, vertical resizing, and a one-click "Copy body" action.
 - **Trash & safe rollback**: Soft delete protects skills from accidental loss, allowing complete restoration with provenance and update history preserved.
 - **Custom source folders**: Point an external agent source at another folder from the panel without moving any file. DSH and Shared Agent stay configured by the host.
+- **Skill Token Cost Estimation & Live Totals**: Displays inline estimated token badges for skill descriptions in the list and live totals in the status bar for persistent system prompt overhead; clearly distinguishes manual-only, disabled, and overridden skills with complete description/body breakdowns in detail modals.
 
 ## Screenshots
 
@@ -75,7 +76,7 @@ dsh plugin --profile web add @michengai/dsh-skills-manager@latest --registry=htt
 
 Restart DSH, refresh the page, and open **Settings → Skills**. To update, update in the host plugin manager or run the installation command again.
 
-- Plugin `1.4.5` is tested with DeepSeek Harness `0.2.0-rc.1`, `0.2.0-rc.2`, `0.2.1-rc.1`, `0.2.1-rc.2`, `0.2.1-rc.3`, `0.2.1-rc.4`, `0.2.1-rc.5`, `0.2.2-rc.1`, `0.2.2-rc.2`, `0.2.2-rc.3`.
+- Plugin `1.4.6` is tested with DeepSeek Harness `0.2.0-rc.1`, `0.2.0-rc.2`, `0.2.1-rc.1`, `0.2.1-rc.2`, `0.2.1-rc.3`, `0.2.1-rc.4`, `0.2.1-rc.5`, `0.2.2-rc.1`, `0.2.2-rc.2`, `0.2.2-rc.3`.
 - Host compatibility: Full DeepSeek Harness `0.2.x` line (`>=0.2.0-rc.1 <0.3.0-0`), forwards-compatible with subsequent `0.2.x` RC releases without requiring routine plugin version bumps. Legacy versions and breaking changes in the `0.3.0` generation are rejected by the version gate. If you still use a `0.1.x` host, install plugin `1.1.23` instead of `@latest`.
 - **Reverse proxy deployment**: Supports hosting DSH behind prefix-stripping reverse proxies (e.g. `/app/dsh/`). API and update endpoints resolve against the page base URI (`document.baseURI`).
 
