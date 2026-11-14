@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.9] - 2026-11-15
+
+### Complex Skill Catalog Installation & Mid-Run Cancellation
+
+- **Uncap complex skill catalog install limits**: resolved an issue where installing complex productivity skills containing extensive templates, scripts, and references (such as `ppt-master`) from community catalogs was erroneously blocked as invalid or oversized data (#93). Full support is now in place for complex skill packages spanning hundreds of files and tens of MiBs.
+- **Cancel catalog installations at any time**: a responsive Stop button is now provided in the installation modal during network download. Users can halt slow downloads or cancel actions whenever needed; the request is safely aborted and the UI promptly restored without leaving the modal locked.
+
 ## [1.4.8] - 2026-11-14
 
 ### Full File Access Mode Skill Creation Deadlock Fix

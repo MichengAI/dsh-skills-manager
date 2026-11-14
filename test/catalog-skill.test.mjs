@@ -132,6 +132,39 @@ await assert.rejects(
 );
 assert.equal(inflightStream.locked, false, "中途取消后必须释放读取锁");
 
+// 模拟真实网络流在 reader.read() 挂起等待下一个分块时被外部 signal 中断
+const readerAbortController = new AbortController();
+const delayedStream = new ReadableStream({
+  pull(controller) {
+    return new Promise(resolve => {
+      readerAbortController.signal.addEventListener("abort", () => {
+        controller.error(new Error("aborted"));
+        resolve();
+      });
+      setTimeout(() => readerAbortController.abort(), 10);
+    });
+  }
+});
+await assert.rejects(
+  loadCatalogPackage(skillshIdentity, async () => new Response(delayedStream), readerAbortController.signal),
+  error => error.code === "error.catalog.cancelled" && error.statusCode === 499,
+  "reader.read 挂起等待时外部触发 abort 必须返回 499 和 cancelled 错误码"
+);
+
+// 验证内部超时产生的 AbortError 绝不被误判为 499 用户取消
+const timeoutAbortError = new Error("The operation was aborted due to timeout");
+timeoutAbortError.name = "AbortError";
+const timeoutStream = new ReadableStream({
+  pull() {
+    throw timeoutAbortError;
+  }
+});
+await assert.rejects(
+  loadCatalogPackage(skillshIdentity, async () => new Response(timeoutStream)),
+  error => error.code === "error.catalog.response" && error.statusCode === 502,
+  "内部超时打断正文读取绝不能被误判为 499 用户取消，必须返回 502 错误"
+);
+
 for (const operation of [readCatalogSkill, loadCatalogPackage]) {
   await assert.rejects(operation(skillshIdentity, async () => new Response(JSON.stringify({ files: Array.from({ length: 1001 }, () => ({ path: "SKILL.md", contents: skillDoc })) }))), error => error.code === "error.catalog.response", "超过 1000 个文件必须拦截");
   await assert.rejects(operation(skillshIdentity, async () => new Response("{}", { headers: { "content-length": "33554433" } })), error => error.code === "error.catalog.response");

@@ -687,8 +687,16 @@ function apply(ctx: HostContext, config?: PluginConfig) {
         const target = await workspaceTarget(b);
         if (target && "ok" in target && target.ok === false) return target;
         const pack = await loadCatalogPackage(b, fetch, request?.signal);
+        if (request?.signal?.aborted) {
+          throw Object.assign(new Error("目录技能请求已取消"), { statusCode: 499, code: "error.catalog.cancelled" });
+        }
         const catalogId = b.catalog === "skillsh" ? `skillsh:${b.source}/${b.skillId}` : `clawhub:${b.owner}/${b.slug}`;
-        return enqueueMutation(() => repositories.installCatalog(catalogId, pack, { root: b.root, ...(b.workspace === undefined ? {} : { workspace: b.workspace }) }));
+        return enqueueMutation(() => {
+          if (request?.signal?.aborted) {
+            throw Object.assign(new Error("目录技能请求已取消"), { statusCode: 499, code: "error.catalog.cancelled" });
+          }
+          return repositories.installCatalog(catalogId, pack, { root: b.root, ...(b.workspace === undefined ? {} : { workspace: b.workspace }) });
+        });
       }, { queued: false, afterSuccess: afterWrite }),
     },
     {

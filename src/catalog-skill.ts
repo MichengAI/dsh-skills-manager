@@ -86,7 +86,7 @@ async function readBounded(response: Response, limit: number, signal?: AbortSign
     }
   } catch (error) {
     await reader.cancel().catch(() => undefined);
-    if (signal?.aborted || (error instanceof Error && "code" in error && error.code === "error.catalog.cancelled") || (error instanceof Error && error.name === "AbortError")) {
+    if (signal?.aborted || (error instanceof Error && "code" in error && error.code === "error.catalog.cancelled")) {
       throw catalogError("目录技能请求已取消", 499, "error.catalog.cancelled");
     }
     if (error instanceof Error && "code" in error && error.code === "error.catalog.response" && "statusCode" in error && error.statusCode === 502) throw error;

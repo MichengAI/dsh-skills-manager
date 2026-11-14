@@ -697,7 +697,7 @@ export function createRepositoryUI({ react, Modal, Input, Button, Checkbox, Sour
         } catch (caught) {
           if (controller.signal.aborted) {
             if (mounted.current) setFeedback({ key: "repo.installCancelled", name: target.name });
-            await load();
+            try { await load(); } catch {}
             return;
           }
           throw caught;
@@ -846,7 +846,7 @@ export function createRepositoryUI({ react, Modal, Input, Button, Checkbox, Sour
               setInstallation(null);
               setFeedback({ key: action === 'install' ? 'repo.installCancelled' : 'repo.uninstallCancelled', name: selected.skill.name });
             }
-            await load();
+            try { await load(); } catch {}
             return;
           }
           const error = caught as CodedError;
@@ -1455,7 +1455,7 @@ export function createRepositoryUI({ react, Modal, Input, Button, Checkbox, Sour
             } catch (caught) {
               if (controller.signal.aborted) {
                 if (mounted.current) setFeedback({ key: "repo.uninstallCancelled", name: copy.name });
-                await load();
+                try { await load(); } catch {}
                 return;
               }
               throw caught;
