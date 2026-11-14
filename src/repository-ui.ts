@@ -40,7 +40,7 @@ export const repositoryLocales = {
     "repo.subsource.github": "Git 仓库", "repo.subsource.skillsh": "skills.sh", "repo.subsource.clawhub": "ClawHub", "repo.subsource.popular": "热门下载 Top 100", "repo.catalog.states": "全部状态", "repo.catalog.uninstalled": "未安装", "repo.catalog.searchClawhub": "搜索 ClawHub 技能", "repo.catalog.searchLoading": "正在搜索 ClawHub…", "repo.catalog.searchEmpty": "没有找到匹配的 ClawHub 技能。", "repo.catalog.searchError": "ClawHub 搜索失败，请重试。", "repo.catalog.searchSkillsh": "搜索 skills.sh 技能", "repo.catalog.skillshLoading": "正在搜索 skills.sh…", "repo.catalog.skillshEmpty": "没有找到匹配的 skills.sh 技能。", "repo.catalog.skillshError": "skills.sh 搜索失败，请重试。", "repo.sort.installs": "安装量从高到低", "repo.sort.name": "名称 A-Z", "repo.subsource.catalogNote": "ClawHub 下载量榜 · 最多 100 条，仅对当前显示条目排序", "repo.catalog.empty": "ClawHub 当前没有匹配的技能。", "repo.catalog.loading": "正在加载 ClawHub 榜单…", "repo.catalog.loadError": "ClawHub 榜单加载失败。请检查网络后重试。", "repo.catalog.retry": "重试", "repo.catalog.loadingMore": "正在加载更多…", "repo.catalog.downloads": "下载", "repo.catalog.installs": "安装", "repo.catalog.stars": "星标",
     "repo.hint": "从已订阅的 Git 仓库或第三方目录发现技能，安装到用户目录的 DSH skills 或 Shared Agent，或已登记项目的 .dsh/skills。", "repo.footer": "刷新会检查仓库与技能更新，不会自动替换本地文件。历史备份不会自动清理，占用空间会随更新增加。",
     "repo.search": "搜索仓库技能", "repo.all": "全部仓库", "repo.states": "全部状态", "repo.available": "可安装", "repo.installed": "已安装", "repo.conflict": "同名冲突", "repo.invalid": "格式无效", "repo.install": "安装", "repo.detail": "详情",
-    "repo.installing": "安装中…", "repo.installProgress": "正在读取并校验技能文件，请稍候…", "repo.installSuccess": "安装成功并已启用，可在对话中用斜杠调用。", "repo.installCancelled": "安装已取消。",
+    "repo.installing": "安装中…", "repo.installProgress": "正在读取并校验技能文件，请稍候…", "repo.installSuccess": "安装成功并已启用，可在对话中用斜杠调用。", "repo.installCancelled": "安装已取消。", "repo.uninstallCancelled": "卸载已取消。",
     "repo.installDestination": "安装位置", "repo.rootDsh": "DSH skills", "repo.rootAgents": "Shared Agent", "repo.rootDshHint": "仅供 DSH 使用，路径以当前 DSH_HOME 为准。", "repo.rootExternalHint": "使用该目录的其他 Agent 也能读取此技能。", "repo.installLocationsHint": "用户目录可选 DSH skills 或 Shared Agent；已登记项目仅写入 .dsh/skills。选择器显示实际路径。缺少的目录会在确认安装后创建。不安全的路径不可选。",
     "repo.uninstall": "卸载", "repo.confirmUninstall": "移至回收站", "repo.uninstallHint": "仅将此仓库已跟踪的安装副本移至回收站，包括本地修改。之后可在回收站恢复。", "repo.uninstallExternalWarning": "卸载该技能也会影响使用所选目录的其他 Agent。", "repo.uninstalling": "卸载中…", "repo.uninstallProgress": "正在将已安装的技能移至回收站，请稍候…", "repo.uninstallSuccess": "技能已移至回收站，可在回收站恢复。",
     "repo.empty": "还没有技能仓库，添加一个 Git 仓库开始。", "repo.noSkills": "没有匹配的技能。可刷新仓库或调整筛选。",
@@ -75,7 +75,7 @@ export const repositoryLocales = {
     "repo.subsource.github": "Git Repos", "repo.subsource.skillsh": "skills.sh", "repo.subsource.clawhub": "ClawHub", "repo.subsource.popular": "Top 100 by downloads", "repo.catalog.states": "All statuses", "repo.catalog.uninstalled": "Not installed", "repo.catalog.searchClawhub": "Search ClawHub skills", "repo.catalog.searchLoading": "Searching ClawHub…", "repo.catalog.searchEmpty": "No matching ClawHub skills were found.", "repo.catalog.searchError": "ClawHub search failed. Please retry.", "repo.catalog.searchSkillsh": "Search skills.sh", "repo.catalog.skillshLoading": "Searching skills.sh…", "repo.catalog.skillshEmpty": "No matching skills.sh skills were found.", "repo.catalog.skillshError": "skills.sh search failed. Please retry.", "repo.sort.installs": "Installs: high to low", "repo.sort.name": "Name A–Z", "repo.subsource.catalogNote": "ClawHub download ranking · Up to 100; sort only displayed items", "repo.catalog.empty": "No matching skills were returned by ClawHub.", "repo.catalog.loading": "Loading ClawHub ranking…", "repo.catalog.loadError": "Failed to load the ClawHub ranking. Check your connection and retry.", "repo.catalog.retry": "Retry", "repo.catalog.loadingMore": "Loading more…", "repo.catalog.downloads": "downloads", "repo.catalog.installs": "installs", "repo.catalog.stars": "stars",
     "repo.hint": "Discover skills from subscribed Git repositories or community registries, and install them to user DSH skills or Shared Agent, or a registered project's .dsh/skills.", "repo.footer": "Refresh checks repositories and skill updates without replacing local files. Historical backups are not cleaned automatically and use additional disk space.",
     "repo.search": "Search repository skills", "repo.all": "All repositories", "repo.states": "All statuses", "repo.available": "Available", "repo.installed": "Installed", "repo.conflict": "Name conflict", "repo.invalid": "Invalid format", "repo.install": "Install", "repo.detail": "Details",
-    "repo.installing": "Installing…", "repo.installProgress": "Reading and verifying skill files. Please wait…", "repo.installSuccess": "Installed and enabled. Invoke it from the slash menu.", "repo.installCancelled": "Installation cancelled.",
+    "repo.installing": "Installing…", "repo.installProgress": "Reading and verifying skill files. Please wait…", "repo.installSuccess": "Installed and enabled. Invoke it from the slash menu.", "repo.installCancelled": "Installation cancelled.", "repo.uninstallCancelled": "Uninstallation cancelled.",
     "repo.installDestination": "Installation destination", "repo.rootDsh": "DSH skills", "repo.rootAgents": "Shared Agent", "repo.rootDshHint": "For DSH only. The path uses your current DSH_HOME.", "repo.rootExternalHint": "Other agents using this directory can read this skill too.", "repo.installLocationsHint": "User directories offer DSH skills or Shared Agent; registered projects write only to .dsh/skills. The chooser shows actual paths. Missing directories are created after confirmation. Unsafe paths cannot be selected.",
     "repo.uninstall": "Uninstall", "repo.confirmUninstall": "Move to Trash", "repo.uninstallHint": "Move only this repository’s tracked installed copy, including local edits, to Trash. You can restore it from Trash later.", "repo.uninstallExternalWarning": "Uninstalling this skill also affects other agents that use the selected directory.", "repo.uninstalling": "Uninstalling…", "repo.uninstallProgress": "Moving the installed skill to Trash. Please wait…", "repo.uninstallSuccess": "Skill moved to Trash. You can restore it from Trash.",
     "repo.empty": "No repositories yet. Add a Git repository to get started.", "repo.noSkills": "No matching skills. Refresh the repository or adjust your filters.",
@@ -679,10 +679,10 @@ export function createRepositoryUI({ react, Modal, Input, Button, Checkbox, Sour
       if (!modal || modal.type !== "catalog-install" || !destinationReady(destination, workspaces, installRoots, presetDestinations)) return;
       const target = modal.target;
       const scope = destinationPayload(destination);
-      const controller = new AbortController();
-      installAbortRef.current = controller;
-      setInstallStopping(false);
       return perform(async () => {
+        const controller = new AbortController();
+        installAbortRef.current = controller;
+        setInstallStopping(false);
         try {
           const installed = await api("/catalog/install", { method: "POST", headers, body: JSON.stringify({ ...target, ...scope }), signal: controller.signal });
           if (!mounted.current) return;
@@ -697,6 +697,7 @@ export function createRepositoryUI({ react, Modal, Input, Button, Checkbox, Sour
         } catch (caught) {
           if (controller.signal.aborted) {
             if (mounted.current) setFeedback({ key: "repo.installCancelled", name: target.name });
+            await load();
             return;
           }
           throw caught;
@@ -831,10 +832,10 @@ export function createRepositoryUI({ react, Modal, Input, Button, Checkbox, Sour
       if (action === 'install' && !destinationReady(chosen, workspaces, installRoots, presetDestinations)) return;
       const scope = action === 'install' ? destinationPayload(chosen) : selected.copy && copyTarget(selected.copy);
       if (!scope) return;
-      const controller = new AbortController();
-      installAbortRef.current = controller;
-      setInstallStopping(false);
       return perform(async () => {
+        const controller = new AbortController();
+        installAbortRef.current = controller;
+        setInstallStopping(false);
         const target = { id: selected.repo.id, path: selected.skill.path, ...scope };
         setInstallation({ ...target, action, pending: true, key: 'repo.' + action + 'Progress' });
         try {
@@ -843,8 +844,9 @@ export function createRepositoryUI({ react, Modal, Input, Button, Checkbox, Sour
           if (controller.signal.aborted) {
             if (mounted.current) {
               setInstallation(null);
-              setFeedback({ key: "repo.installCancelled", name: selected.skill.name });
+              setFeedback({ key: action === 'install' ? 'repo.installCancelled' : 'repo.uninstallCancelled', name: selected.skill.name });
             }
+            await load();
             return;
           }
           const error = caught as CodedError;
@@ -1288,7 +1290,11 @@ export function createRepositoryUI({ react, Modal, Input, Button, Checkbox, Sour
                 modal.copy ? h('div', { className: 'dssm-repo-metadata' }, copyName(modal.copy)) : null,
                 modal.copy?.installedRoot === 'agents' && !modal.copy.installedWorkspace ? h('p', { className: 'dssm-feedback dssm-warning', role: 'alert' }, t('repo.uninstallExternalWarning')) : null,
                 busy ? h('div', { role: 'status', 'aria-live': 'polite' }, t('repo.uninstallProgress')) : null, feedbackNode);
-              footer = h(react.Fragment, null, button('repo.cancel', close), button(busy ? 'repo.uninstalling' : 'repo.confirmUninstall', changeInstallation, true, !modal.copy || !copyTarget(modal.copy), true));
+              footer = h(react.Fragment, null,
+                busy
+                  ? stopButton(installStopping ? "repo.stopping" : "repo.stop", cancelCurrentInstall, installStopping)
+                  : button('repo.cancel', close),
+                button(busy ? 'repo.uninstalling' : 'repo.confirmUninstall', changeInstallation, true, busy || !modal.copy || !copyTarget(modal.copy), true));
             }
             if (modal.type === "review" || modal.type === "rollback") {
               body = h("div", { className: "dssm-repo-panel" },
@@ -1397,7 +1403,11 @@ export function createRepositoryUI({ react, Modal, Input, Button, Checkbox, Sour
           h('div', { className: 'dssm-repo-metadata' }, catalogCopyName(modal.copy)),
           modal.copy.installedRoot === "agents" && !modal.copy.installedWorkspace ? h('p', { className: 'dssm-feedback dssm-warning', role: 'alert' }, t('repo.uninstallExternalWarning')) : null,
           busy ? h('div', { role: 'status', 'aria-live': 'polite' }, t('repo.uninstallProgress')) : null, feedbackNode);
-        footer = h(react.Fragment, null, button('repo.cancel', close), button(busy ? 'repo.uninstalling' : 'repo.confirmUninstall', confirmCatalogUninstall, true, false, true));
+        footer = h(react.Fragment, null,
+          busy
+            ? stopButton(installStopping ? "repo.stopping" : "repo.stop", cancelCurrentInstall, installStopping)
+            : button('repo.cancel', close),
+          button(busy ? 'repo.uninstalling' : 'repo.confirmUninstall', confirmCatalogUninstall, true, false, true));
       }
       if (modal.type === "detail" && modal.detail) {
         const detail = modal.detail;
@@ -1431,13 +1441,28 @@ export function createRepositoryUI({ react, Modal, Input, Button, Checkbox, Sour
           if (!modal || modal.type !== "catalog-uninstall") return;
           const copy = modal.copy;
           return perform(async () => {
-            await api("/delete", { method: "POST", headers, body: JSON.stringify({ name: copy.name, root: copy.installedRoot, ...(copy.installedWorkspace ? { workspace: copy.installedWorkspace } : {}) }) });
-            if (!mounted.current) return;
-            setCatalogCopies(prev => prev.filter(item => item !== copy && !(item.id === copy.id && item.installedRoot === copy.installedRoot && item.installedWorkspace === copy.installedWorkspace)));
-            setFeedback({ key: "repo.uninstallSuccess", name: copy.name });
-                        setModal(null);
-                        const refreshed = await Promise.allSettled([load(), Promise.resolve().then(() => onInstalled?.())]);
-                        if (mounted.current && refreshed.some(result => result.status === "rejected")) setFeedback({ key: "repo.catalog.uninstallRefreshWarning", name: copy.name });
+            const controller = new AbortController();
+            installAbortRef.current = controller;
+            setInstallStopping(false);
+            try {
+              await api("/delete", { method: "POST", headers, body: JSON.stringify({ name: copy.name, root: copy.installedRoot, ...(copy.installedWorkspace ? { workspace: copy.installedWorkspace } : {}) }), signal: controller.signal });
+              if (!mounted.current) return;
+              setCatalogCopies(prev => prev.filter(item => item !== copy && !(item.id === copy.id && item.installedRoot === copy.installedRoot && item.installedWorkspace === copy.installedWorkspace)));
+              setFeedback({ key: "repo.uninstallSuccess", name: copy.name });
+              setModal(null);
+              const refreshed = await Promise.allSettled([load(), Promise.resolve().then(() => onInstalled?.())]);
+              if (mounted.current && refreshed.some(result => result.status === "rejected")) setFeedback({ key: "repo.catalog.uninstallRefreshWarning", name: copy.name });
+            } catch (caught) {
+              if (controller.signal.aborted) {
+                if (mounted.current) setFeedback({ key: "repo.uninstallCancelled", name: copy.name });
+                await load();
+                return;
+              }
+              throw caught;
+            } finally {
+              installAbortRef.current = null;
+              if (mounted.current) setInstallStopping(false);
+            }
           }, false);
         }
         function renderCatalogActions(id: string, unknown: boolean, openDetail: () => void, openInstall: () => void) {

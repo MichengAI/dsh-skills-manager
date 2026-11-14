@@ -107,9 +107,30 @@ const abortedController = new AbortController();
 abortedController.abort();
 await assert.rejects(
   loadCatalogPackage(skillshIdentity, async () => new Response(JSON.stringify({ files: [{ path: "SKILL.md", contents: skillDoc }] })), abortedController.signal),
-  error => error.code === "error.catalog.cancelled",
+  error => error.code === "error.catalog.cancelled" && error.statusCode === 499,
   "传入中断信号必须触发取消并返回 cancelled 错误码"
 );
+
+// 中途取消测试：流式读取过程中触发 abort，绝不退化为 500
+const inflightController = new AbortController();
+let streamPulls = 0;
+const inflightStream = new ReadableStream({
+  pull(controller) {
+    streamPulls++;
+    if (streamPulls === 1) {
+      controller.enqueue(new TextEncoder().encode('{"files":[{"path":"SKILL.md","contents":"'));
+      inflightController.abort();
+    } else {
+      controller.close();
+    }
+  }
+});
+await assert.rejects(
+  loadCatalogPackage(skillshIdentity, async () => new Response(inflightStream), inflightController.signal),
+  error => error.code === "error.catalog.cancelled" && error.statusCode === 499,
+  "流式读取中途触发中断必须返回 499 和 error.catalog.cancelled 业务错误码"
+);
+assert.equal(inflightStream.locked, false, "中途取消后必须释放读取锁");
 
 for (const operation of [readCatalogSkill, loadCatalogPackage]) {
   await assert.rejects(operation(skillshIdentity, async () => new Response(JSON.stringify({ files: Array.from({ length: 1001 }, () => ({ path: "SKILL.md", contents: skillDoc })) }))), error => error.code === "error.catalog.response", "超过 1000 个文件必须拦截");

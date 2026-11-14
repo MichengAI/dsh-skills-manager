@@ -75,6 +75,7 @@ const catalogFetch = async (input) => {
 globalThis.fetch = async () => { throw new Error("目录客户端不得直连外部网络"); };
 let workspaceRows = [];
 let finishInstall, finishUninstall;
+let holdCatalogInstall = false, finishCatalogInstall;
 let failInstall = false, failUninstall = false;
 let finishRefresh, finishDetail;
 let holdRefresh = false, failRefresh = false;
@@ -100,8 +101,20 @@ const api = async (path, options) => {
   if (path === "/workspaces") return { items: structuredClone(workspaceRows) };
   if (path === "/catalog/detail") return { name: body.name, description: "目录技能说明", body: "# " + body.name, origin: body.catalog === "skillsh" ? body.source + "/" + body.skillId : body.owner + "/" + body.slug };
   if (path === "/catalog/install") {
+    if (holdCatalogInstall) {
+      await new Promise((resolve, reject) => {
+        finishCatalogInstall = resolve;
+        if (options?.signal) {
+          options.signal.addEventListener("abort", () => {
+            const err = new Error("The operation was aborted");
+            err.name = "AbortError";
+            reject(err);
+          });
+        }
+      });
+    }
     const catalogId = body.catalog === "skillsh" ? `skillsh:${body.source}/${body.skillId}` : `clawhub:${body.owner}/${body.slug}`;
-        if (!mockCatalogInstalls.includes(catalogId)) mockCatalogInstalls.push(catalogId);
+    if (!mockCatalogInstalls.includes(catalogId)) mockCatalogInstalls.push(catalogId);
     const installedRoot = body.root || "dsh";
     const installedName = body.catalog === "clawhub" ? body.slug : body.skillId;
     if (!mockCatalogCopies.some(copy => copy.id === catalogId && copy.installedRoot === installedRoot && copy.installedWorkspace === body.workspace)) mockCatalogCopies.push({ id: catalogId, name: installedName, installedRoot, ...(body.workspace ? { installedWorkspace: body.workspace } : {}), canUninstall: true });
@@ -127,7 +140,16 @@ const api = async (path, options) => {
     Object.assign(repos[0].skills[0], { status: "installed", tracked: true, installedRoot: body.root, canUninstall: true });
   }
   if (path.endsWith("/uninstall")) {
-    await new Promise((resolve) => { finishUninstall = resolve; });
+    await new Promise((resolve, reject) => {
+      finishUninstall = resolve;
+      if (options?.signal) {
+        options.signal.addEventListener("abort", () => {
+          const err = new Error("The operation was aborted");
+          err.name = "AbortError";
+          reject(err);
+        });
+      }
+    });
     if (failUninstall) throw new Error("回收站写入失败");
     Object.assign(repos[0].skills[0], { status: "available", tracked: false, installedRoot: null, canUninstall: false, updateAvailable: false, canRollback: false });
   }
@@ -343,6 +365,19 @@ assert.equal(modalNodes().find(n => n.type === Input.TextArea)?.props.value, "# 
 await clickNode(rowActions(catalogRow("Skill 001"))[1]);
 assert.equal(dialog()?.props.title, "repo.install", "安装沿用现有安装位置选择");
 assert.equal(radio("dsh").props.checked, true, "目录安装默认仍是 DSH，不改动后续仓库安装的选择");
+
+// 测试目录安装中途点击停止
+holdCatalogInstall = true;
+const beforeCatalogCancelCalls = countCalls("/repositories");
+clickModal("repo.install"); await settle();
+assert.ok(modalAction("repo.stop"), "目录技能安装进行中显示停止按钮");
+assert.equal(modalAction("repo.stop").props.disabled, false);
+await clickModal("repo.stop"); await settle();
+holdCatalogInstall = false;
+assert.ok(find(node => node.props.role === "status" && node.children.some(child => typeof child === "string" && child.includes("repo.installCancelled"))), "目录安装停止后提示安装已取消");
+assert.ok(modalAction("repo.cancel"), "停止后恢复取消按钮");
+assert.ok(countCalls("/repositories") > beforeCatalogCancelCalls, "目录安装取消后必须触发重新校准列表");
+
 failInstalledRefresh = true;
 failRepositoryList = true;
 await clickModal("repo.install");
@@ -615,12 +650,25 @@ assert.equal(modalAction("repo.cancel").props.variant, "outline", "取消保持�
 assert.equal(modalAction("repo.cancel").props.className, undefined, "取消不挂自定义类");
 await clickModal("repo.cancel");
 assert.equal(countCalls("/repositories/uninstall"), 0);
+
+// 测试仓库卸载中途点击停止
+await click("repo.uninstall");
+clickModal("repo.confirmUninstall"); await settle();
+assert.ok(modalAction("repo.stop"), "卸载请求进行中显示停止按钮");
+await clickModal("repo.stop"); await settle();
+assert.equal(ui.content.props["aria-busy"], false, "停止后退出忙碌状态");
+assert.ok(find(n => n.props.role === "status" && n.children.some(child => typeof child === "string" && child.includes("repo.uninstallCancelled"))), "卸载停止后提示卸载已取消");
+assert.ok(modalAction("repo.cancel"), "停止后恢复取消按钮");
+await clickModal("repo.cancel");
+assert.equal(dialog(), undefined, "取消后弹窗成功关闭");
+
 await click("repo.uninstall");
 const uninstallConfirm = modalAction("repo.confirmUninstall");
 const beforeUninstallList = countCalls("/repositories");
+const beforeUninstallCalls = countCalls("/repositories/uninstall");
 await clickNode(uninstallConfirm);
 uninstallConfirm.props.onClick(); await settle();
-assert.equal(countCalls("/repositories/uninstall"), 1, "双击确认只卸载一次");
+assert.equal(countCalls("/repositories/uninstall"), beforeUninstallCalls + 1, "双击确认只卸载一次");
 assert.equal(ui.content.props["aria-busy"], true);
 assert.ok(rowAction("repo.uninstalling").props.disabled && rowAction("repo.uninstalling").props.icon, "卸载中仍是禁用图标");
 assert.equal(rowAction("repo.uninstalling").props.danger, true, "卸载中的垃圾桶也保持红色");

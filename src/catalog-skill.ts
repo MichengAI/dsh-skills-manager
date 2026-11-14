@@ -86,7 +86,9 @@ async function readBounded(response: Response, limit: number, signal?: AbortSign
     }
   } catch (error) {
     await reader.cancel().catch(() => undefined);
-    if (signal?.aborted || (error instanceof Error && "code" in error && error.code === "error.catalog.cancelled")) throw error;
+    if (signal?.aborted || (error instanceof Error && "code" in error && error.code === "error.catalog.cancelled") || (error instanceof Error && error.name === "AbortError")) {
+      throw catalogError("目录技能请求已取消", 499, "error.catalog.cancelled");
+    }
     if (error instanceof Error && "code" in error && error.code === "error.catalog.response" && "statusCode" in error && error.statusCode === 502) throw error;
     throw catalogError("目录技能响应无效或读取中断", 502, "error.catalog.response");
   } finally { reader.releaseLock(); }
@@ -126,10 +128,20 @@ function skillDocSummary(markdown: string) {
 async function fetchFixed(url: string, fetchImpl: FetchLike, accept: string, signal?: AbortSignal) {
   if (signal?.aborted) throw catalogError("目录技能请求已取消", 499, "error.catalog.cancelled");
   let response: Response;
-  const timeoutSignal = AbortSignal.timeout(30_000);
-  const combinedSignal = signal
-    ? (typeof AbortSignal.any === "function" ? AbortSignal.any([timeoutSignal, signal]) : signal)
-    : timeoutSignal;
+  const timeoutSignal = AbortSignal.timeout(120_000);
+  let combinedSignal = timeoutSignal;
+  if (signal) {
+    if (typeof AbortSignal.any === "function") {
+      combinedSignal = AbortSignal.any([timeoutSignal, signal]);
+    } else {
+      const controller = new AbortController();
+      const onAbort = () => controller.abort(signal.reason);
+      const onTimeout = () => controller.abort(timeoutSignal.reason);
+      signal.addEventListener("abort", onAbort, { once: true });
+      timeoutSignal.addEventListener("abort", onTimeout, { once: true });
+      combinedSignal = controller.signal;
+    }
+  }
   try {
     response = await fetchImpl(url, { headers: { accept }, redirect: "error", signal: combinedSignal });
   } catch (error) {
