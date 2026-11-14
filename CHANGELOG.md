@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.4.7] - 2026-11-14
+
+### Repository Bulk Operations & Cancellation Support
+
+- **Uncap batch operation limits**: removed the 100-item batch ceiling across repository selection, bulk installation, uninstallation, and updates. Users can now select and bulk-process large repositories containing hundreds of skills (such as `google/skills` with nearly 200 skills) in a single action (#90).
+- **Live batch progress feedback**: display real-time operation progress and skill names during bulk tasks, with text truncation preventing layout overflow for long skill identifiers.
+- **Cancel batch operations at any time**: a responsive Stop button is available in the dialog footer throughout bulk execution. Users can safely halt running batches at any point; completed items are preserved and the summary accurately reports both finished and unexecuted skills (#90).
+
 ## [1.4.6] - 2026-11-13
 
 ### Skill Token Cost Estimation & Display
