@@ -679,6 +679,8 @@ export function createRepositoryUI({ react, Modal, Input, Button, Checkbox, Sour
       if (!modal || modal.type !== "catalog-install" || !destinationReady(destination, workspaces, installRoots, presetDestinations)) return;
       const target = modal.target;
       const scope = destinationPayload(destination);
+      const catalogId = target.catalog === "skillsh" ? `skillsh:${target.source}/${target.skillId}` : `clawhub:${target.owner}/${target.slug}`;
+      const installedRoot = scope.root || "dsh";
       return perform(async () => {
         const controller = new AbortController();
         installAbortRef.current = controller;
@@ -686,9 +688,7 @@ export function createRepositoryUI({ react, Modal, Input, Button, Checkbox, Sour
         try {
           const installed = await api("/catalog/install", { method: "POST", headers, body: JSON.stringify({ ...target, ...scope }), signal: controller.signal });
           if (!mounted.current) return;
-          const catalogId = target.catalog === "skillsh" ? `skillsh:${target.source}/${target.skillId}` : `clawhub:${target.owner}/${target.slug}`;
           setCatalogInstallIds(prev => prev.includes(catalogId) ? prev : [...prev, catalogId]);
-          const installedRoot = scope.root || "dsh";
           setCatalogCopies(prev => prev.some(copy => copy.id === catalogId && copy.installedRoot === installedRoot && copy.installedWorkspace === scope.workspace) ? prev : [...prev, { id: catalogId, name: installed.name, installedRoot, ...(scope.workspace ? { installedWorkspace: scope.workspace } : {}), canUninstall: true }]);
           setFeedback({ key: "repo.installSuccess", name: target.name });
           setModal(null);
@@ -696,8 +696,20 @@ export function createRepositoryUI({ react, Modal, Input, Button, Checkbox, Sour
           if (mounted.current && refreshed.some(result => result.status === "rejected")) setFeedback({ key: "repo.catalog.installRefreshWarning", name: target.name });
         } catch (caught) {
           if (controller.signal.aborted) {
-            if (mounted.current) setFeedback({ key: "repo.installCancelled", name: target.name });
-            // 取消态必须保持：刷新失败只表示列表暂时没校准，不能反过来覆盖「已取消」提示。
+            // 客户端中断只代表放弃了响应：下载被服务端同步中止，但中断若正好落在写盘阶段，
+            // 服务端仍会完成原子导入。必须先向服务端核对真实结果，不能一律报「已取消」。
+            const settled = await api("/repositories").then((data: any) => data, () => null);
+            const landed = (settled?.catalogCopies || []).some((copy: any) => copy.id === catalogId && copy.installedRoot === installedRoot && copy.installedWorkspace === scope.workspace);
+            if (!mounted.current) return;
+            if (landed) {
+              setCatalogInstallIds(prev => prev.includes(catalogId) ? prev : [...prev, catalogId]);
+              setCatalogCopies(settled.catalogCopies);
+              setFeedback({ key: "repo.installSuccess", name: target.name });
+              setModal(null);
+            } else {
+              setFeedback({ key: "repo.installCancelled", name: target.name });
+            }
+            // 取消态必须保持：刷新失败只表示列表暂时没校准，不能反过来覆盖上面的结果提示。
             try { await load(); } catch {}
             return;
           }

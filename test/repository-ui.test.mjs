@@ -378,6 +378,19 @@ assert.ok(find(node => node.props.role === "status" && node.children.some(child 
 assert.ok(modalAction("repo.cancel"), "停止后恢复取消按钮");
 assert.ok(countCalls("/repositories") > beforeCatalogCancelCalls, "目录安装取消后必须触发重新校准列表");
 
+// 中断晚到（写盘已完成的窗口）：必须核对服务端真实结果，报告安装成功而不是假取消。
+// 用未参与后续流程的 Skill 007，避免污染 Skill 001 的安装断言。
+await clickNode(rowActions(catalogRow("Skill 007"))[1]);
+mockCatalogCopies.push({ id: "clawhub:owner-7/skill-007", name: "skill-007", installedRoot: "dsh", canUninstall: true });
+holdCatalogInstall = true;
+clickModal("repo.install"); await settle();
+await clickModal("repo.stop"); await settle();
+holdCatalogInstall = false;
+assert.ok(find(node => node.props.role === "status" && node.children.some(child => typeof child === "string" && child.includes("repo.installSuccess"))), "中断晚于写盘时必须报告安装成功，不能假报已取消");
+assert.equal(find(node => node.props.role === "status" && node.children.some(child => typeof child === "string" && child.includes("repo.installCancelled"))), undefined, "写盘已完成时绝不能出现「已取消」提示");
+assert.equal(dialog(), undefined, "确认已落盘后关闭弹窗");
+await clickNode(rowActions(catalogRow("Skill 001"))[1]);
+
 failInstalledRefresh = true;
 failRepositoryList = true;
 await clickModal("repo.install");
