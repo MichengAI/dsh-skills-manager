@@ -111,7 +111,7 @@ const mockSkill = i => ({
   installedRoot: null
 });
 
-test('issue 90: google/skills 194 项以上全选不再禁用安装按钮且无 100 项上限告警', async () => {
+test('issue 90: google/skills 194 项以上全选不再禁用安装按钮且无批量上限告警', async () => {
   const skills = Array.from({ length: 194 }, (_, i) => mockSkill(i + 1));
   const h = uiHarness(skills, { locale: 'zh' });
   await h.settle();
@@ -122,11 +122,9 @@ test('issue 90: google/skills 194 项以上全选不再禁用安装按钮且无 
   selectAllBox.props.onChange(true);
   await h.settle();
 
-  // 验证不出现“单次操作最多 100 项”的告警
-  const hasLimitAlert = h.all().some(
-    n => n.props.role === 'alert' && n.children.some(c => typeof c === 'string' && c.includes('100'))
-  );
-  assert.equal(hasLimitAlert, false, '不应展示 100 项上限拦截告警');
+  // 验证不出现批量上限告警（不存在 role='alert' 的批量上限告警）
+  const hasLimitAlert = h.all().some(n => n.props?.role === 'alert');
+  assert.equal(hasLimitAlert, false, '不应展示 role=alert 的批量上限告警');
 
   // 验证安装按钮正常可用（按钮文案为“安装 194”，disabled 为 false）
   const installBtn = h.byText('安装 194');
