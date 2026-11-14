@@ -136,7 +136,6 @@ const BULK_CSS = `
 .dssm-bulk-results .dssm-bulk-name,.dssm-bulk-results .dssm-bulk-reason{min-width:0;overflow-wrap:anywhere}
 .dssm-bulk-progress{display:flex;align-items:center;gap:8px;margin:8px 0 2px}
 .dssm-bulk-progress-text{font-size:12px;color:var(--dsw-alias-label-secondary,#b9b9b9);white-space:nowrap}
-.dssm-modal .dssm-repo-panel{box-sizing:border-box;max-height:min(70vh,560px);overflow-y:auto;overscroll-behavior:contain}
 `;
 
 /** 返回动作区与内容区，使现有标题、页签顺序保持不变。 */
@@ -1286,9 +1285,9 @@ export function createRepositoryUI({ react, Modal, Input, Button, Checkbox, Sour
             h("span", { className: "dssm-bulk-detail" }, item.repo.owner + "/" + item.repo.name + " · " + item.skill.path + (item.copy ? " · " + locationLabel(item.copy) : "")),
             h("span", { className: "dssm-bulk-reason" }, bucketLabel(item.bucket)),
             item.error ? h("span", { className: "dssm-bulk-reason" }, message(item.error)) : null))),
-          state.op === "install" && !running ? h(DestinationPicker, { t, value: destination, disabled: busy, allowAgents: true, workspaces, userDestinations: installRoots, presetDestinations,
-            onChange: (next: Partial<DestinationValue>) => { if (!locked.current) setDestination({ ...destination, ...next }); } }) : null,
-          state.op === "install" && !running ? h("p", { className: "dssm-note" }, t("repo.installHint")) : null,
+          state.op === "install" ? h(DestinationPicker, { t, value: destination, disabled: busy || running, allowAgents: true, workspaces, userDestinations: installRoots, presetDestinations,
+            onChange: (next: Partial<DestinationValue>) => { if (!locked.current && !running) setDestination({ ...destination, ...next }); } }) : null,
+          state.op === "install" ? h("p", { className: "dssm-note" }, t("repo.installHint")) : null,
           counts["local-modified"] ? h(Checkbox, { className: "dssm-bulk-policy", checked: state.policy.localModified === "overwrite", disabled: busy || running,
               label: t("repo.bulk.policyLocalModified"), onChange: (checked: boolean) => { const policy = { ...state.policy, localModified: checked ? "overwrite" as const : "skip" as const }; setBulkPolicy(policy); setBulk(prev => prev ? { ...prev, policy } : prev); } }) : null,
           running ? null : h("p", { className: "dssm-note", role: "status" }, t("repo.bulk.executable", { count: executable, skipped: state.items.length - executable })),
