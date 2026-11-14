@@ -206,6 +206,7 @@ test('issue 90: 大批量安装过程中可随时点击停止并保留已安装�
   // 此时前 4 个已装完，第 5 个 pending 中，停止按钮可见
   const stopBtn = h.byText('停止');
   assert.ok(stopBtn, '运行中必须显示“停止”按钮');
+  assert.equal(stopBtn.props.disabled, false, '运行中的停止按钮绝不能被 busy 禁用');
   stopBtn.props.onClick();
   await h.settle();
 
@@ -223,6 +224,50 @@ test('issue 90: 大批量安装过程中可随时点击停止并保留已安装�
         )
     ),
     '结果弹窗正确展示中断后的状态（成功 5，未执行 189）'
+  );
+});
+
+test('issue 90: 批量卸载运行中停止按钮可用且能正确停止', async () => {
+  const installedSkills = Array.from({ length: 196 }, (_, i) => ({
+    ...mockSkill(i + 1),
+    status: 'installed',
+    installations: [{ installedRoot: 'dsh', tracked: true, canUninstall: true }]
+  }));
+  const h = uiHarness(installedSkills, { locale: 'zh' });
+  await h.settle();
+  h.find(n => n.type === 'host-checkbox' && n.props.label === h.t('repo.bulk.selectRepoShort')).props.onChange(true);
+  await h.settle();
+  h.byText('卸载 196').props.onClick();
+  await h.settle();
+
+  let pendingResolve;
+  let count = 0;
+  h.setHandler(async (path, options) => {
+    if (path.endsWith('/uninstallMany')) {
+      count++;
+      if (count === 3) {
+        return new Promise(r => { pendingResolve = r; });
+      }
+      return { results: [{ ok: true }] };
+    }
+    return {};
+  });
+
+  h.byText('开始执行').props.onClick();
+  await h.settle();
+
+  const stopBtn = h.byText('停止');
+  assert.ok(stopBtn, '卸载运行中必须显示“停止”按钮');
+  assert.equal(stopBtn.props.disabled, false, '卸载运行中的停止按钮绝不能为 disabled');
+  stopBtn.props.onClick();
+  await h.settle();
+
+  pendingResolve({ results: [{ ok: true }] });
+  await h.settle();
+
+  assert.ok(
+    h.all().some(n => n.children.some(c => typeof c === 'string' && c.includes('批量完成：成功 3 · 失败 0 · 跳过 0 · 未执行 193'))),
+    '卸载中断结果展示正确'
   );
 });
 

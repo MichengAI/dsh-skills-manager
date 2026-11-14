@@ -206,6 +206,7 @@ test('running batch can be stopped and records cancelled items as notRun', async
   h.byText('Run batch').props.onClick(); await h.settle();
   const stopBtn = h.byText('Stop');
   assert.ok(stopBtn, 'stop button is visible while running');
+  assert.equal(stopBtn.props.disabled, false, '停止按钮在运行中绝不能被 busy 禁用');
   stopBtn.props.onClick(); await h.settle();
   finishAlpha({ results: [{ id: 'r', path: 'alpha', ok: true }] });
   await h.settle();

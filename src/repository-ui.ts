@@ -705,9 +705,12 @@ export function createRepositoryUI({ react, Modal, Input, Button, Checkbox, Sour
       };
     }, [active, subsource]);
     function button(key: string, action: () => unknown, secondary = true, disabled = false, danger = false) {
-          const className = danger ? "dssm-btn-danger" : undefined;
-          return h(PrimitiveButton, { variant: secondary ? "outline" : "primary", className: className, disabled: busy || disabled, onClick: action }, t(key));
-        }
+      const className = danger ? "dssm-btn-danger" : undefined;
+      return h(PrimitiveButton, { variant: secondary ? "outline" : "primary", className: className, disabled: busy || disabled, onClick: action }, t(key));
+    }
+    function stopButton(key: string, action: () => unknown, disabled = false) {
+      return h(PrimitiveButton, { variant: "outline", className: "dssm-btn-danger", disabled: disabled, onClick: action }, t(key));
+    }
     function rowGlyph(d: string) {
       return h("svg", { viewBox: "0 0 16 16", width: 16, height: 16, "aria-hidden": true, focusable: "false" }, h("path", { d: d, fill: "none", stroke: "currentColor", strokeWidth: 1.5, strokeLinecap: "round", strokeLinejoin: "round" }));
     }
@@ -1279,7 +1282,7 @@ export function createRepositoryUI({ react, Modal, Input, Button, Checkbox, Sour
             h("div", { className: "dssm-bulk-progress-main" },
               h(LoadingIconComponent, { size: 14, className: "dssm-repo-spinner" }),
               h("span", { className: "dssm-bulk-progress-text" }, progressText)),
-            button(stopping ? "repo.bulk.stopping" : "repo.bulk.stop", stopBulk, true, stopping, true)) : null,
+            stopButton(stopping ? "repo.bulk.stopping" : "repo.bulk.stop", stopBulk, stopping)) : null,
           running ? h("p", { className: "dssm-note" }, t("repo.bulk.blockingHint")) : null,
           h("ul", { className: "dssm-bulk-summary" }, Object.keys(counts).map(bucket => h("li", { key: bucket }, bucketLabel(bucket as BulkBucket) + " · " + counts[bucket]))),
           h("ul", { className: "dssm-bulk-results" }, state.items.map(item => h("li", { key: item.key },
@@ -1295,7 +1298,7 @@ export function createRepositoryUI({ react, Modal, Input, Button, Checkbox, Sour
           running ? null : h("p", { className: "dssm-note", role: "status" }, t("repo.bulk.executable", { count: executable, skipped: state.items.length - executable })),
           feedbackNode);
         footer = running
-          ? h(react.Fragment, null, button(stopping ? "repo.bulk.stopping" : "repo.bulk.stop", stopBulk, true, stopping, true))
+          ? h(react.Fragment, null, stopButton(stopping ? "repo.bulk.stopping" : "repo.bulk.stop", stopBulk, stopping))
           : h(react.Fragment, null, button("repo.cancel", close), button("repo.bulk.apply", applyBulk, false, kickoffDisabled));
       }
       if (modal.type === "bulk-done" && bulk) {
