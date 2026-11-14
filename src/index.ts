@@ -536,7 +536,7 @@ function apply(ctx: HostContext, config?: PluginConfig) {
 
   const handlePost = async (
     req: Request,
-    action: (body: RequestBody, scope: { projectCwds: string[] } | null) => Promise<unknown>,
+    action: (body: RequestBody, scope: { projectCwds: string[] } | null, req: Request) => Promise<unknown>,
     options?: { maxBytes?: number; afterSuccess?: (body: RequestBody) => void; isRepo?: boolean; queued?: boolean }
   ) => {
     const mutationError = validateMutationRequest(req);
@@ -560,7 +560,7 @@ function apply(ctx: HostContext, config?: PluginConfig) {
     const execute = async () => {
       const scope = await workspaceScope(body);
       if (scope && "ok" in scope && scope.ok === false) return scope;
-      return action(body, scope as { projectCwds: string[] } | null);
+      return action(body, scope as { projectCwds: string[] } | null, req);
     };
     const afterSuccess = options?.afterSuccess ? () => options.afterSuccess!(body) : undefined;
     return runFetch(() => (options?.queued !== false ? enqueueMutation(execute) : execute()), afterSuccess);
@@ -674,7 +674,7 @@ function apply(ctx: HostContext, config?: PluginConfig) {
     {
       path: `${API_PREFIX}/catalog/install`,
       methods: ["POST"],
-      fetch: (req) => handlePost(req, async (b) => {
+      fetch: (req) => handlePost(req, async (b, _scope, request) => {
         if (b.root !== undefined && b.root !== "dsh" && b.root !== "agents") {
           const matchesPreset = (rootsList: SkillRoot[]) => typeof b.root === "string" && rootsList.some((r) => r.key === b.root && r.mutable && r.native === false);
           let isValidPreset = matchesPreset(await getPresetRootsCached(ctx));
@@ -686,7 +686,7 @@ function apply(ctx: HostContext, config?: PluginConfig) {
         if (b.workspace !== undefined && b.root !== undefined && b.root !== "dsh") throw Object.assign(new Error("工作区只能安装到项目 DSH skills"), { statusCode: 400, code: "error.repo.invalid" });
         const target = await workspaceTarget(b);
         if (target && "ok" in target && target.ok === false) return target;
-        const pack = await loadCatalogPackage(b);
+        const pack = await loadCatalogPackage(b, fetch, request?.signal);
         const catalogId = b.catalog === "skillsh" ? `skillsh:${b.source}/${b.skillId}` : `clawhub:${b.owner}/${b.slug}`;
         return enqueueMutation(() => repositories.installCatalog(catalogId, pack, { root: b.root, ...(b.workspace === undefined ? {} : { workspace: b.workspace }) }));
       }, { queued: false, afterSuccess: afterWrite }),

@@ -113,7 +113,16 @@ const api = async (path, options) => {
     return { results: (body.items || []).map((item) => ({ ...item, ok: true })) };
   }
   if (path.endsWith("/install")) {
-    await new Promise((resolve) => { finishInstall = resolve; });
+    await new Promise((resolve, reject) => {
+      finishInstall = resolve;
+      if (options?.signal) {
+        options.signal.addEventListener("abort", () => {
+          const err = new Error("The operation was aborted");
+          err.name = "AbortError";
+          reject(err);
+        });
+      }
+    });
     if (failInstall) throw new Error("下载超时，请重试");
     Object.assign(repos[0].skills[0], { status: "installed", tracked: true, installedRoot: body.root, canUninstall: true });
   }
@@ -564,6 +573,8 @@ radio("dsh").props.onChange(); render();
 assert.deepEqual(checkedRoots(), ["agents"], "安装期间合成事件也不能改变选中位置");
 assert.ok(modalNodes().some(n => n.props.role === "status" && n.children.includes("repo.installProgress")));
 dialog().props.onClose(); render(); assert.ok(dialog(), "忙碌期间不能关闭弹窗");
+assert.ok(modalAction("repo.stop"), "安装中左侧取消按钮切换为停止按钮");
+assert.equal(modalAction("repo.stop").props.disabled, false, "停止按钮在安装中可用，允许随时停止");
 finishInstall(); await settle();
 assert.deepEqual(calls.find(c => c.path === "/repositories/install").body, { id: "one", path: "skills/pdf", root: "agents" });
 assert.equal(countCalls("/repositories"), beforeInstallList + 1, "安装完成必须 reload 仓库");
@@ -624,6 +635,19 @@ assert.equal(dialog(), undefined);
 assert.equal(rowAction("repo.uninstall"), undefined);
 assert.equal(rowAction("repo.install").props.disabled, false, "卸载后 Install 立即恢复，无需手工刷新");
 assert.ok(find(n => n.props.role === "status" && n.children.includes("repo.uninstallSuccess")));
+
+// 测试安装中途随时停止
+await click("repo.install"); chooseRoot("dsh");
+const beforeCancelInstallCalls = countCalls("/repositories/install");
+clickModal("repo.install"); await settle();
+assert.ok(modalAction("repo.stop"), "安装请求进行中显示停止按钮");
+await clickModal("repo.stop"); await settle();
+assert.equal(ui.content.props["aria-busy"], false, "停止后退出忙碌状态");
+assert.ok(find(n => n.props.role === "status" && n.children.some(child => typeof child === "string" && child.includes("repo.installCancelled"))), "停止后提示安装已取消");
+assert.ok(modalAction("repo.cancel"), "停止后恢复取消按钮");
+chooseRoot("agents");
+await clickModal("repo.cancel");
+assert.equal(dialog(), undefined, "取消后弹窗成功关闭");
 
 // 记住选择；错误显示在弹窗/当前行，失败后可重试。
 await click("repo.install");

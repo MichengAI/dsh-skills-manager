@@ -76,7 +76,7 @@ for (const payload of [null, [], 1, "text", {}, { files: null }, { files: {} }, 
 
 for (const [operation, input, chunkSize] of [
   [readCatalogSkill, { catalog: "clawhub", owner: "owner", slug: "skill" }, 700_000],
-  [loadCatalogPackage, { catalog: "clawhub", owner: "owner", slug: "skill" }, 5_000_000],
+  [loadCatalogPackage, { catalog: "clawhub", owner: "owner", slug: "skill" }, 20_000_000],
 ]) {
   let pulls = 0, cancelled = false;
   const stream = new ReadableStream({ pull(controller) { pulls++; if (pulls <= 2) controller.enqueue(new Uint8Array(chunkSize)); else controller.close(); }, cancel() { cancelled = true; } }, { highWaterMark: 0 });
@@ -89,9 +89,31 @@ const skillDoc = "---\nname: example\ndescription: Example\n---\n\nUse it.\n";
 const successfulPackage = await loadCatalogPackage(skillshIdentity, async () => new Response(JSON.stringify({ files: [{ path: "SKILL.md", contents: skillDoc }, { path: "scripts/demo.txt", contents: "示例" }] })));
 assert.equal(successfulPackage.name, "example");
 assert.equal(Buffer.from(successfulPackage.entries[1].data, "base64").toString("utf8"), "示例");
+const multiFiles = Array.from({ length: 200 }, (_, i) => ({ path: i === 0 ? "SKILL.md" : `refs/file-${i}.txt`, contents: i === 0 ? skillDoc : `content-${i}` }));
+const complexPackage = await loadCatalogPackage(skillshIdentity, async () => new Response(JSON.stringify({ files: multiFiles })));
+assert.equal(complexPackage.name, "example", "包含 200 个文件的复合技能必须能成功解析并返回包名");
+assert.equal(complexPackage.entries.length, 200, "包含 200 个文件的复合技能必须保留全部文件");
+
+const complexDetail = await readCatalogSkill(skillshIdentity, async () => new Response(JSON.stringify({ files: multiFiles })));
+assert.equal(complexDetail.name, "example", "包含 200 个文件的技能详情必须能正常读取");
+
+// 构造 2.5 MiB 的 skills.sh 技能响应（对齐 ppt-master 真实规模），readCatalogSkill 必须能成功解析
+const largeContent = "x".repeat(2_500_000);
+const largeDetail = await readCatalogSkill(skillshIdentity, async () => new Response(JSON.stringify({ files: [{ path: "SKILL.md", contents: skillDoc }, { path: "large.txt", contents: largeContent }] })));
+assert.equal(largeDetail.name, "example", "大于 1MB 的 skills.sh 详情必须能成功读取");
+
+// 中断信号测试：传入被 abort 的 signal 时必须立即抛出取消错误
+const abortedController = new AbortController();
+abortedController.abort();
+await assert.rejects(
+  loadCatalogPackage(skillshIdentity, async () => new Response(JSON.stringify({ files: [{ path: "SKILL.md", contents: skillDoc }] })), abortedController.signal),
+  error => error.code === "error.catalog.cancelled",
+  "传入中断信号必须触发取消并返回 cancelled 错误码"
+);
+
 for (const operation of [readCatalogSkill, loadCatalogPackage]) {
-  await assert.rejects(operation(skillshIdentity, async () => new Response(JSON.stringify({ files: Array.from({ length: 101 }, () => ({ path: "SKILL.md", contents: skillDoc })) }))), error => error.code === "error.catalog.response");
-  await assert.rejects(operation(skillshIdentity, async () => new Response("{}", { headers: { "content-length": "8388609" } })), error => error.code === "error.catalog.response");
+  await assert.rejects(operation(skillshIdentity, async () => new Response(JSON.stringify({ files: Array.from({ length: 1001 }, () => ({ path: "SKILL.md", contents: skillDoc })) }))), error => error.code === "error.catalog.response", "超过 1000 个文件必须拦截");
+  await assert.rejects(operation(skillshIdentity, async () => new Response("{}", { headers: { "content-length": "33554433" } })), error => error.code === "error.catalog.response");
 }
 for (const operation of [readCatalogSkill, loadCatalogPackage]) {
   await assert.rejects(operation(skillshIdentity, async () => { throw new TypeError("网络不可达"); }), error => error.code === "error.catalog.upstream" && error.statusCode === 502, "网络异常也必须返回目录错误码");
