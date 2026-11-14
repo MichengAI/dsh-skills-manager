@@ -5,7 +5,8 @@
 ### Complex Skill Catalog Installation & Mid-Run Cancellation
 
 - **Uncap complex skill catalog install limits**: resolved an issue where installing complex productivity skills containing extensive templates, scripts, and references (such as `ppt-master`) from community catalogs was erroneously blocked as invalid or oversized data (#93). Full support is now in place for complex skill packages spanning hundreds of files and tens of MiBs.
-- **Cancel catalog installations at any time**: a responsive Stop button is now provided in the installation modal during network download. Users can halt slow downloads or cancel actions whenever needed; the request is safely aborted and the UI promptly restored without leaving the modal locked.
+- **Stop catalog downloads**: when installing from an online catalog, the modal offers a Stop button during the download phase. Users can halt slow downloads at any time; the download is aborted without writing any files and the UI becomes usable again immediately.
+- **Honest cancellation boundaries**: local repository install, uninstall, and delete are atomic writes that would leave partial state if interrupted, so they no longer show a stop button and simply report progress. Bulk operations can still be stopped safely between items.
 
 ## [1.4.8] - 2026-11-14
 
