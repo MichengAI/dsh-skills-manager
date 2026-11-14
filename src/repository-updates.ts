@@ -193,7 +193,7 @@ export function createRepositoryUpdater({ read, write, repository, download, ser
   function bulkItems(input: { items?: BulkUpdateItem[] }, emptyLabel: string) {
     const rawItems = Array.isArray(input?.items) ? input.items : [];
     if (!rawItems.length) throw failure(`${emptyLabel}项为空`, "error.repo.empty");
-    if (rawItems.length > 100) throw failure(`${emptyLabel}项超过上限（最多 100 项）`, "error.repo.tooMany");
+    if (rawItems.length > 1000) throw failure(`${emptyLabel}项超过上限（最多 1000 项）`, "error.repo.tooMany");
     return rawItems as Array<Record<string, unknown>>;
   }
   return {

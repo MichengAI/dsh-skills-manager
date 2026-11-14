@@ -106,11 +106,12 @@ test('modified overwrite policy uses host checkbox and disables during execution
   finish({results:[{ok:true}]}); await h.settle();
 });
 
-test('more than 100 eligible items shows a limit and disables request', async () => {
+test('more than 100 eligible items allows request without limit warning', async () => {
   const h=harness(Array.from({length:101},(_,i)=>skill('s'+i))); await h.settle(); await selectAll(h);
-  assert.ok(h.all().some(n=>n.props.role==='alert' && n.children.some(c=>typeof c==='string' && c.includes('100'))));
-  assert.equal(h.byText('Install 101').props.disabled, true);
-  assert.equal(h.calls.some(c=>c.path.endsWith('Many')),false);
+  assert.equal(h.all().some(n=>n.props.role==='alert' && n.children.some(c=>typeof c==='string' && c.includes('100'))), false);
+  assert.equal(h.byText('Install 101').props.disabled, false);
+  h.byText('Install 101').props.onClick(); await h.settle();
+  assert.ok(h.find(n=>n.type==='modal'), 'modal opens for > 100 items');
 });
 
 test('update progress is indeterminate while request runs', async () => {
@@ -164,7 +165,7 @@ for (const [op, button, endpoint] of [
   ['uninstall', 'Uninstall 1', '/uninstallMany'],
   ['update', 'Check updates 1', '/updateMany'],
   ['rollback', 'Restore previous 1', '/updateMany'],
-]) test(`${op} uses indeterminate progress without requesting shared progress`, async () => {
+]) test(`${op} displays item progress without requesting shared progress`, async () => {
   const originalSet = globalThis.setInterval, originalClear = globalThis.clearInterval;
   const intervals = new Set(); let finish;
   globalThis.setInterval = fn => { const handle={fn}; intervals.add(handle); return handle; };
@@ -181,10 +182,37 @@ for (const [op, button, endpoint] of [
     assert.ok(h.all().some(n=>n.props.className==='dssm-bulk-progress' && n.props.role==='status'), 'running status remains visible');
     assert.ok(h.all().some(n=>n.props.className==='dssm-repo-spinner'), 'indeterminate spinner remains visible');
     assert.equal(h.all().some(n=>n.props.className==='dssm-bulk-progress-bar'), false, 'no determinate bar');
-    assert.equal(h.all().some(n=>(n.props.role==='status' || n.props.className==='dssm-bulk-progress-text') && n.children.some(c=>typeof c==='string' && /\d+\s*\/\s*\d+|\d+%/.test(c))), false, 'no numerical progress');
+    assert.ok(h.all().some(n=>(n.props.role==='status' || n.props.className==='dssm-bulk-progress-text') && n.children.some(c=>typeof c==='string' && c.includes('1/1'))), 'displays item progress');
     finish({results:[{id:'r',path:'alpha',root:'dsh',ok:true}]}); await h.settle();
     assert.ok(h.all().some(n=>n.children.some(c=>typeof c==='string' && c.includes('Batch finished:'))), 'result remains visible');
   } finally { finish?.({results:[]}); globalThis.setInterval=originalSet; globalThis.clearInterval=originalClear; }
+});
+
+test('running batch can be stopped and records cancelled items as notRun', async () => {
+  const h = harness([skill('alpha'), skill('beta')]);
+  let finishAlpha;
+  h.setHandler(async (path, options) => {
+    if (path.endsWith('/installMany')) {
+      const items = JSON.parse(options.body).items;
+      if (items[0].path === 'alpha') {
+        return new Promise(resolve => { finishAlpha = resolve; });
+      }
+      return { results: [{ id: 'r', path: items[0].path, ok: true }] };
+    }
+    return {};
+  });
+  await h.settle(); await selectAll(h);
+  h.byText('Install 2').props.onClick(); await h.settle();
+  h.byText('Run batch').props.onClick(); await h.settle();
+  const stopBtn = h.byText('Stop');
+  assert.ok(stopBtn, 'stop button is visible while running');
+  stopBtn.props.onClick(); await h.settle();
+  finishAlpha({ results: [{ id: 'r', path: 'alpha', ok: true }] });
+  await h.settle();
+  assert.ok(h.all().some(n => n.children.some(c => typeof c === 'string' && c.includes('Batch finished:'))));
+  assert.ok(h.all().some(n => n.children.includes('alpha') && n.props.className === 'dssm-bulk-name'));
+  assert.ok(h.all().some(n => n.children.includes('beta') && n.props.className === 'dssm-bulk-name'));
+  assert.ok(h.all().some(n => n.children.includes('Stopped')));
 });
 
 test('update preflight failures are not reported as no updates', async () => {

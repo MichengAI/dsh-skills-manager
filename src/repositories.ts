@@ -869,7 +869,7 @@ export function createRepositoryManager({
     installMany: (input: { items?: Array<{ id?: unknown; path?: unknown }>; root?: unknown; workspace?: string }, registered?: string[]) => serialize(async () => {
       const rawItems = Array.isArray(input?.items) ? input.items : [];
       if (!rawItems.length) throw failure("批量安装项为空", "error.repo.empty");
-      if (rawItems.length > 100) throw failure("批量安装项超过上限（最多 100 项）", "error.repo.tooMany");
+      if (rawItems.length > 1000) throw failure("批量安装项超过上限（最多 1000 项）", "error.repo.tooMany");
       let root: any, workspaceRoot: string | undefined;
       let presetRoots: SkillRoot[] | undefined;
       if (input.workspace !== undefined) {
@@ -947,7 +947,7 @@ export function createRepositoryManager({
     uninstallMany: (input: { items?: Array<{ id?: unknown; path?: unknown; root?: unknown; workspace?: unknown }> }, registered?: string[]) => serialize(async () => {
       const rawItems = Array.isArray(input?.items) ? input.items : [];
       if (!rawItems.length) throw failure("批量卸载项为空", "error.repo.empty");
-      if (rawItems.length > 100) throw failure("批量卸载项超过上限（最多 100 项）", "error.repo.tooMany");
+      if (rawItems.length > 1000) throw failure("批量卸载项超过上限（最多 1000 项）", "error.repo.tooMany");
       const data = await read();
       const index = requestIndex();
       const presetRoots = await fetchPresetRoots();

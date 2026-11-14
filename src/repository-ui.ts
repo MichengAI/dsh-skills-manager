@@ -57,7 +57,8 @@ export const repositoryLocales = {
     "repo.bulk.policyLocalModified": "本地已修改项：备份后覆盖", "repo.bulk.apply": "开始执行", "repo.bulk.executable": "将执行 {count} 项，跳过 {skipped} 项",
     "repo.bulk.doneTitle": "批量结果", "repo.bulk.result": "批量完成：成功 {ok} · 失败 {failed} · 跳过 {skipped} · 未执行 {notRun}", "repo.bulk.retry": "重试失败项", "repo.bulk.refreshWarning": "批量操作已完成，但列表刷新失败；请手动刷新确认。", "repo.bulk.nothingToRetry": "失败项已不可重试（状态已变化），请刷新列表后重新选择。",
     "repo.bulk.status.ok": "成功", "repo.bulk.status.failed": "失败", "repo.bulk.status.skipped": "跳过", "repo.bulk.status.notRun": "未执行",
-    "repo.bulk.reason.conflict": "同名冲突", "repo.bulk.reason.unchanged": "无变化", "repo.bulk.reason.localModified": "本地已修改", "repo.bulk.reason.unavailable": "位置不可用", "repo.bulk.reason.error": "预检失败",
+    "repo.bulk.reason.conflict": "同名冲突", "repo.bulk.reason.unchanged": "无变化", "repo.bulk.reason.localModified": "本地已修改", "repo.bulk.reason.unavailable": "位置不可用", "repo.bulk.reason.error": "预检失败", "repo.bulk.reason.cancelled": "已停止",
+    "repo.bulk.stop": "停止", "repo.bulk.stopping": "正在停止…", "repo.bulk.progressRunning": "{op} {current}/{total} · {name}",
     "token.detailLine": "简介 ≈{description} token · 正文 ≈{body} token",
   },
   en: {
@@ -91,7 +92,8 @@ export const repositoryLocales = {
     "repo.bulk.policyLocalModified": "Locally modified items: back up and overwrite", "repo.bulk.apply": "Run batch", "repo.bulk.executable": "{count} will run, {skipped} will be skipped",
     "repo.bulk.doneTitle": "Bulk results", "repo.bulk.result": "Batch finished: {ok} succeeded · {failed} failed · {skipped} skipped · {notRun} not run", "repo.bulk.retry": "Retry failed items", "repo.bulk.refreshWarning": "The batch finished but the list refresh failed. Refresh manually to confirm.", "repo.bulk.nothingToRetry": "These items can no longer be retried (their state changed). Refresh the list and select again.",
     "repo.bulk.status.ok": "Done", "repo.bulk.status.failed": "Failed", "repo.bulk.status.skipped": "Skipped", "repo.bulk.status.notRun": "Not run",
-    "repo.bulk.reason.conflict": "Name conflict", "repo.bulk.reason.unchanged": "No changes", "repo.bulk.reason.localModified": "Locally modified", "repo.bulk.reason.unavailable": "Location unavailable", "repo.bulk.reason.error": "Preflight failed",
+    "repo.bulk.reason.conflict": "Name conflict", "repo.bulk.reason.unchanged": "No changes", "repo.bulk.reason.localModified": "Locally modified", "repo.bulk.reason.unavailable": "Location unavailable", "repo.bulk.reason.error": "Preflight failed", "repo.bulk.reason.cancelled": "Stopped",
+    "repo.bulk.stop": "Stop", "repo.bulk.stopping": "Stopping…", "repo.bulk.progressRunning": "{op} {current}/{total} · {name}",
     "token.detailLine": "Description ≈{description} tokens · Body ≈{body} tokens",
   },
 };
@@ -226,6 +228,9 @@ export function createRepositoryUI({ react, Modal, Input, Button, Checkbox, Sour
     }, [selectedKeys]);
     const [bulk, setBulk] = react.useState<BulkState | null>(null);
     const [bulkPolicy, setBulkPolicy] = react.useState<BulkPolicy>({ localModified: 'skip' });
+    const abortRef = react.useRef(false);
+    const [runningProgress, setRunningProgress] = react.useState<{ current: number; total: number; name?: string } | null>(null);
+    const [stopping, setStopping] = react.useState(false);
     const [destination, setDestination] = react.useState<DestinationValue>(defaultDestination());
     const [workspaces, setWorkspaces] = react.useState<WorkspaceRow[]>([]);
     const [subsource, setSubsource] = react.useState<'github' | 'skillsh' | 'clawhub'>('github');
@@ -880,7 +885,7 @@ export function createRepositoryUI({ react, Modal, Input, Button, Checkbox, Sour
     function openBulkInstall(picked: Array<{ repo: RepoView; skill: RepoSkill }> = selection.installs) {
       const items: BulkItem[] = picked.filter(item => item.skill.status === 'available')
         .map(item => ({ key: installKey(item.repo, item.skill), repo: item.repo, skill: item.skill, bucket: 'available' as BulkBucket }));
-      if (items.length && items.length <= 100) scheduleBulk('install', items);
+      if (items.length) scheduleBulk('install', items);
     }
     function openBulkCopies(op: 'update' | 'uninstall' | 'rollback', picked = selection.copies) {
       const items: BulkItem[] = [];
@@ -895,7 +900,7 @@ export function createRepositoryUI({ react, Modal, Input, Button, Checkbox, Sour
       return preflightBulk(op, items);
     }
     function preflightBulk(op: 'update' | 'uninstall' | 'rollback', rawItems: BulkItem[]) {
-      if (!rawItems.length || rawItems.length > 100) return;
+      if (!rawItems.length) return;
       const items = op === 'uninstall' ? rawItems.map(item => ({ ...item, bucket: 'uninstallable' as BulkBucket })) : rawItems;
       if (op === 'uninstall') { scheduleBulk(op, items); return; }
       return perform(async () => {
@@ -913,8 +918,14 @@ export function createRepositoryUI({ react, Modal, Input, Button, Checkbox, Sour
         if (requests.length) {
           if (mounted.current) setFeedback({ key: 'repo.bulk.checkingAll', params: { total: requests.length } });
           try {
-            const body = await post('previewMany', { items: requests.map(entry => ({ id: entry.item.repo.id, path: entry.item.skill.path, ...entry.scope, rollback: entry.rollback })) });
-            const results = body && Array.isArray((body as { results?: unknown[] }).results) ? (body as { results: Array<{ id: string; path: string; rollback?: boolean; ok: boolean; token?: string; commit?: string | null; localModified?: boolean; changes?: unknown; error?: string; code?: string; params?: unknown }> }).results : [];
+            const CHUNK_SIZE = 100;
+            const results: Array<{ id: string; path: string; rollback?: boolean; ok: boolean; token?: string; commit?: string | null; localModified?: boolean; changes?: unknown; error?: string; code?: string; params?: unknown }> = [];
+            for (let i = 0; i < requests.length; i += CHUNK_SIZE) {
+              const chunk = requests.slice(i, i + CHUNK_SIZE);
+              const body = await post('previewMany', { items: chunk.map(entry => ({ id: entry.item.repo.id, path: entry.item.skill.path, ...entry.scope, rollback: entry.rollback })) });
+              const chunkResults = body && Array.isArray((body as { results?: unknown[] }).results) ? (body as { results: Array<{ id: string; path: string; rollback?: boolean; ok: boolean; token?: string; commit?: string | null; localModified?: boolean; changes?: unknown; error?: string; code?: string; params?: unknown }> }).results : [];
+              results.push(...chunkResults);
+            }
             for (let index = 0; index < items.length; index++) {
               if (checked[index]) continue;
               const entry = requests[slots[index]];
@@ -940,10 +951,16 @@ export function createRepositoryUI({ react, Modal, Input, Button, Checkbox, Sour
         scheduleBulk(op, checked);
       }, false, true);
     }
+    function stopBulk() {
+      abortRef.current = true;
+      if (mounted.current) setStopping(true);
+    }
     async function applyBulk() {
       const state = bulk;
       if (!state || state.phase !== 'preflight' || locked.current) return;
       const items = state.items;
+      abortRef.current = false;
+      setStopping(false);
       // 执行期间保持预检弹窗并锁定关闭，避免用户干预仍在进行的批量操作。
       setBulk({ ...state, phase: 'running' });
       const task = perform(async () => {
@@ -955,59 +972,77 @@ export function createRepositoryUI({ react, Modal, Input, Button, Checkbox, Sour
           if (reason) { outcomes.set(item.key, { status: 'skipped', reason }); continue; }
           runnable.push(item);
         }
+        if (runnable.length && mounted.current) {
+          setRunningProgress({ current: 0, total: runnable.length, name: runnable[0]?.skill.name });
+        }
         const scope = state.op === 'install' ? destinationPayload(destination) : null;
         if (state.op === 'install' && runnable.length && scope) {
-          // 批量安装一次请求完成：服务端只做一次状态扫描与状态写入，不再逐项重启。
-          try {
-            const body = await post('installMany', { items: runnable.map(item => ({ id: item.repo.id, path: item.skill.path })), ...scope });
-            const results = body && Array.isArray((body as { results?: unknown[] }).results) ? (body as { results: Array<{ id: string; path: string; ok: boolean; error?: string; code?: string; params?: unknown }> }).results : [];
-            const byKey = new Map<string, { ok: boolean; error?: string; code?: string; params?: unknown }>();
-            for (const result of results) byKey.set('install\u0001' + result.id + '\u0001' + result.path, result);
-            for (const item of runnable) {
-              const result = byKey.get(item.key);
+          for (let index = 0; index < runnable.length; index++) {
+            if (abortRef.current) {
+              for (let remaining = index; remaining < runnable.length; remaining++) {
+                outcomes.set(runnable[remaining].key, { status: 'notRun', reason: 'cancelled' });
+              }
+              break;
+            }
+            const item = runnable[index];
+            if (mounted.current) setRunningProgress({ current: index + 1, total: runnable.length, name: item.skill.name });
+            try {
+              const body = await post('installMany', { items: [{ id: item.repo.id, path: item.skill.path }], ...scope });
+              const results = body && Array.isArray((body as { results?: unknown[] }).results) ? (body as { results: Array<{ id: string; path: string; ok: boolean; error?: string; code?: string; params?: unknown }> }).results : [];
+              const result = results[0];
               if (!result) outcomes.set(item.key, { status: 'failed', error: Object.assign(new Error(t('repo.bulk.failed')), { code: 'error.repo.invalid' }) });
               else if (result.ok) outcomes.set(item.key, { status: 'ok' });
               else outcomes.set(item.key, { status: 'failed', error: Object.assign(new Error(result.error || t('repo.bulk.failed')), { code: result.code, params: result.params }) });
+            } catch (caught) {
+              outcomes.set(item.key, { status: 'failed', error: caught });
             }
-          } catch (caught) {
-            for (const item of runnable) outcomes.set(item.key, { status: 'failed', error: caught });
           }
         } else if (state.op === 'uninstall' && runnable.length) {
-          // 批量卸载一次请求完成：服务端只做一次状态扫描与状态写入，逐项移入回收站。
-          try {
-            const body = await post('uninstallMany', { items: runnable.map(item => ({ id: item.repo.id, path: item.skill.path, ...(item.copy?.installedRoot ? { root: item.copy.installedRoot } : {}), ...(item.copy?.installedWorkspace ? { workspace: item.copy.installedWorkspace } : {}) })) });
-            const results = body && Array.isArray((body as { results?: unknown[] }).results) ? (body as { results: Array<{ id: string; path: string; root?: string; workspace?: string; ok: boolean; error?: string; code?: string; params?: unknown }> }).results : [];
-            const leftover = results.slice();
-            const byKey = new Map<string, { ok: boolean; error?: string; code?: string; params?: unknown }>();
-            for (const result of results) byKey.set('copy\u0001' + result.id + '\u0001' + result.path + '\u0001' + (result.root || '') + '\u0001' + (result.workspace || ''), result);
-            for (const item of runnable) {
-              let result = byKey.get(item.key);
-              if (!result) {
-                const fallback = leftover.findIndex(candidate => candidate.id === item.repo.id && candidate.path === item.skill.path);
-                if (fallback >= 0) { result = leftover[fallback]; leftover.splice(fallback, 1); }
+          for (let index = 0; index < runnable.length; index++) {
+            if (abortRef.current) {
+              for (let remaining = index; remaining < runnable.length; remaining++) {
+                outcomes.set(runnable[remaining].key, { status: 'notRun', reason: 'cancelled' });
               }
+              break;
+            }
+            const item = runnable[index];
+            if (mounted.current) setRunningProgress({ current: index + 1, total: runnable.length, name: item.skill.name });
+            try {
+              const body = await post('uninstallMany', { items: [{ id: item.repo.id, path: item.skill.path, ...(item.copy?.installedRoot ? { root: item.copy.installedRoot } : {}), ...(item.copy?.installedWorkspace ? { workspace: item.copy.installedWorkspace } : {}) }] });
+              const results = body && Array.isArray((body as { results?: unknown[] }).results) ? (body as { results: Array<{ id: string; path: string; root?: string; workspace?: string; ok: boolean; error?: string; code?: string; params?: unknown }> }).results : [];
+              const result = results[0];
               if (!result) outcomes.set(item.key, { status: 'failed', error: Object.assign(new Error(t('repo.bulk.failed')), { code: 'error.repo.invalid' }) });
               else if (result.ok) outcomes.set(item.key, { status: 'ok' });
               else outcomes.set(item.key, { status: 'failed', error: Object.assign(new Error(result.error || t('repo.bulk.failed')), { code: result.code, params: result.params }) });
+            } catch (caught) {
+              outcomes.set(item.key, { status: 'failed', error: caught });
             }
-          } catch (caught) {
-            for (const item of runnable) outcomes.set(item.key, { status: 'failed', error: caught });
           }
         } else if (runnable.length) {
-          // 批量更新/回滚一次请求完成：服务端逐项复用单技能 replace 事务（token/备份/回滚逻辑不变），结果按请求顺序返回。
-          try {
-            const body = await post('updateMany', { items: runnable.map(item => ({ id: item.repo.id, path: item.skill.path, ...(copyTarget(item.copy!) || {}), rollback: state.op === 'rollback', token: item.token, overwrite: item.bucket === 'local-modified' && state.policy.localModified === 'overwrite' })) });
-            const results = body && Array.isArray((body as { results?: unknown[] }).results) ? (body as { results: Array<{ id: string; path: string; ok: boolean; error?: string; code?: string; params?: unknown }> }).results : [];
-            for (let index = 0; index < runnable.length; index++) {
-              const item = runnable[index];
-              const result = results[index];
+          for (let index = 0; index < runnable.length; index++) {
+            if (abortRef.current) {
+              for (let remaining = index; remaining < runnable.length; remaining++) {
+                outcomes.set(runnable[remaining].key, { status: 'notRun', reason: 'cancelled' });
+              }
+              break;
+            }
+            const item = runnable[index];
+            if (mounted.current) setRunningProgress({ current: index + 1, total: runnable.length, name: item.skill.name });
+            try {
+              const body = await post('updateMany', { items: [{ id: item.repo.id, path: item.skill.path, ...(copyTarget(item.copy!) || {}), rollback: state.op === 'rollback', token: item.token, overwrite: item.bucket === 'local-modified' && state.policy.localModified === 'overwrite' }] });
+              const results = body && Array.isArray((body as { results?: unknown[] }).results) ? (body as { results: Array<{ id: string; path: string; ok: boolean; error?: string; code?: string; params?: unknown }> }).results : [];
+              const result = results[0];
               if (!result) outcomes.set(item.key, { status: 'failed', error: Object.assign(new Error(t('repo.bulk.failed')), { code: 'error.repo.invalid' }) });
               else if (result.ok) outcomes.set(item.key, { status: 'ok' });
               else outcomes.set(item.key, { status: 'failed', error: Object.assign(new Error(result.error || t('repo.bulk.failed')), { code: result.code, params: result.params }) });
+            } catch (caught) {
+              outcomes.set(item.key, { status: 'failed', error: caught });
             }
-          } catch (caught) {
-            for (const item of runnable) outcomes.set(item.key, { status: 'failed', error: caught });
           }
+        }
+        if (mounted.current) {
+          setRunningProgress(null);
+          setStopping(false);
         }
         const mapped: BulkResult[] = items.map(item => {
           const outcome = outcomes.get(item.key) || { status: 'notRun' as const };
@@ -1230,7 +1265,12 @@ export function createRepositoryUI({ react, Modal, Input, Button, Checkbox, Sour
         const counts = bucketCounts(state.items);
         const executable = bulkExecutableCount(state);
         const kickoffDisabled = !executable || busy || (state.op === "install" && !destinationReady(destination, workspaces, installRoots, presetDestinations));
-        const progressText = state.op === "install" ? t("repo.installing") : state.op === "uninstall" ? t("repo.uninstalling") : t("repo.bulk.replacing");
+        const opText = state.op === "install" ? t("repo.installing") : state.op === "uninstall" ? t("repo.uninstalling") : t("repo.bulk.replacing");
+        const progressText = stopping || abortRef.current
+          ? t("repo.bulk.stopping")
+          : (runningProgress && runningProgress.total > 0
+              ? t("repo.bulk.progressRunning", { op: opText, current: runningProgress.current, total: runningProgress.total, name: runningProgress.name || "" })
+              : opText);
         description = t("repo.bulk.preflightHint");
         body = h("div", { className: "dssm-repo-panel", "aria-busy": busy || running },
           h("div", { className: "dssm-name" }, t("repo.bulk." + state.op + "Title", { count: state.items.length })),
@@ -1251,7 +1291,9 @@ export function createRepositoryUI({ react, Modal, Input, Button, Checkbox, Sour
               label: t("repo.bulk.policyLocalModified"), onChange: (checked: boolean) => { const policy = { ...state.policy, localModified: checked ? "overwrite" as const : "skip" as const }; setBulkPolicy(policy); setBulk(prev => prev ? { ...prev, policy } : prev); } }) : null,
           running ? null : h("p", { className: "dssm-note", role: "status" }, t("repo.bulk.executable", { count: executable, skipped: state.items.length - executable })),
           feedbackNode);
-        footer = running ? null : h(react.Fragment, null, button("repo.cancel", close), button("repo.bulk.apply", applyBulk, false, kickoffDisabled));
+        footer = running
+          ? h(react.Fragment, null, button(stopping ? "repo.bulk.stopping" : "repo.bulk.stop", stopBulk, true, stopping, true))
+          : h(react.Fragment, null, button("repo.cancel", close), button("repo.bulk.apply", applyBulk, false, kickoffDisabled));
       }
       if (modal.type === "bulk-done" && bulk) {
         const state = bulk;
@@ -1466,11 +1508,10 @@ export function createRepositoryUI({ react, Modal, Input, Button, Checkbox, Sour
     const bulkBar = subsource === 'github' && selectionCount > 0 ? h('div', { className: 'dssm-bulk-bar', role: 'toolbar', 'aria-label': t('repo.bulk.toolbar') },
       h('span', { className: 'dssm-bulk-count' }, t('repo.bulk.selected', { count: selectionCount })),
       h('span', { className: 'dssm-bulk-count' }, t('repo.bulk.scope')),
-      Object.values(bulkEligible).some(count => count > 100) ? h('span', { role: 'alert' }, t('repo.bulk.limit')) : null,
-      selection.installs.length ? h(PrimitiveButton, { variant: 'outline', size: 'sm', disabled: bulkDisabled || !bulkEligible.install || bulkEligible.install > 100, onClick: () => openBulkInstall() }, t('repo.bulk.install', { count: bulkEligible.install })) : null,
-      selection.copies.length ? h(PrimitiveButton, { variant: 'outline', size: 'sm', disabled: bulkDisabled || !bulkEligible.update || bulkEligible.update > 100, onClick: () => openBulkCopies('update') }, t('repo.bulk.update', { count: bulkEligible.update })) : null,
-      selection.copies.length ? h(PrimitiveButton, { variant: 'outline', size: 'sm', disabled: bulkDisabled || !bulkEligible.uninstall || bulkEligible.uninstall > 100, onClick: () => openBulkCopies('uninstall') }, t('repo.bulk.uninstall', { count: bulkEligible.uninstall })) : null,
-      selection.copies.length ? h(PrimitiveButton, { variant: 'outline', size: 'sm', disabled: bulkDisabled || !bulkEligible.rollback || bulkEligible.rollback > 100, onClick: () => openBulkCopies('rollback') }, t('repo.bulk.rollback', { count: bulkEligible.rollback })) : null,
+      selection.installs.length ? h(PrimitiveButton, { variant: 'outline', size: 'sm', disabled: bulkDisabled || !bulkEligible.install, onClick: () => openBulkInstall() }, t('repo.bulk.install', { count: bulkEligible.install })) : null,
+      selection.copies.length ? h(PrimitiveButton, { variant: 'outline', size: 'sm', disabled: bulkDisabled || !bulkEligible.update, onClick: () => openBulkCopies('update') }, t('repo.bulk.update', { count: bulkEligible.update })) : null,
+      selection.copies.length ? h(PrimitiveButton, { variant: 'outline', size: 'sm', disabled: bulkDisabled || !bulkEligible.uninstall, onClick: () => openBulkCopies('uninstall') }, t('repo.bulk.uninstall', { count: bulkEligible.uninstall })) : null,
+      selection.copies.length ? h(PrimitiveButton, { variant: 'outline', size: 'sm', disabled: bulkDisabled || !bulkEligible.rollback, onClick: () => openBulkCopies('rollback') }, t('repo.bulk.rollback', { count: bulkEligible.rollback })) : null,
       h(PrimitiveButton, { variant: 'ghost', size: 'sm', disabled: busy, onClick: clearSelection }, t('repo.bulk.clear'))
     ) : null;
 
