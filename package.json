@@ -64,6 +64,7 @@
     "prepack": "npm run typecheck && npm run build",
     "prepublishOnly": "npm run verify",
     "test:compat": "node scripts/test-host-compatibility.mjs",
+    "test:network": "node --test test/google-skills-remote.test.mjs",
     "typecheck": "tsc --noEmit"
   },
   "publishConfig": {
