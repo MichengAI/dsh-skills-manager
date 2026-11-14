@@ -134,10 +134,8 @@ const BULK_CSS = `
 .dssm-bulk-results .dssm-bulk-status.failed{color:var(--dsw-alias-state-error-primary,#ef7272)}
 .dssm-bulk-results .dssm-bulk-detail{margin-left:auto;min-width:0;overflow-wrap:anywhere;color:var(--dsw-alias-label-tertiary,#a0a0a0);max-width:50%}
 .dssm-bulk-results .dssm-bulk-name,.dssm-bulk-results .dssm-bulk-reason{min-width:0;overflow-wrap:anywhere}
-.dssm-bulk-progress{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:8px 0 6px;padding:6px 10px;border-radius:var(--dsw-radius-md,10px);background:var(--dsw-alias-bg-layer-1,transparent);border:0.5px solid var(--dsw-alias-border-l2,#494949)}
-.dssm-bulk-progress-main{display:flex;align-items:center;gap:8px;min-width:0;flex:1}
-.dssm-bulk-progress-text{font-size:12px;color:var(--dsw-alias-label-secondary,#b9b9b9);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.dssm-bulk-progress button{flex:none;margin-left:auto}
+.dssm-bulk-progress{display:flex;align-items:center;gap:8px;margin:8px 0 2px}
+.dssm-bulk-progress-text{font-size:12px;color:var(--dsw-alias-label-secondary,#b9b9b9);white-space:nowrap}
 .dssm-modal .dssm-repo-panel{box-sizing:border-box;max-height:min(70vh,560px);overflow-y:auto;overscroll-behavior:contain}
 `;
 
@@ -1279,10 +1277,8 @@ export function createRepositoryUI({ react, Modal, Input, Button, Checkbox, Sour
         body = h("div", { className: "dssm-repo-panel", "aria-busy": busy || running },
           h("div", { className: "dssm-name" }, t("repo.bulk." + state.op + "Title", { count: state.items.length })),
           running ? h("div", { role: "status", "aria-live": "polite", className: "dssm-bulk-progress" },
-            h("div", { className: "dssm-bulk-progress-main" },
-              h(LoadingIconComponent, { size: 14, className: "dssm-repo-spinner" }),
-              h("span", { className: "dssm-bulk-progress-text" }, progressText)),
-            stopButton(stopping ? "repo.bulk.stopping" : "repo.bulk.stop", stopBulk, stopping)) : null,
+            h(LoadingIconComponent, { size: 14, className: "dssm-repo-spinner" }),
+            h("span", { className: "dssm-bulk-progress-text" }, progressText)) : null,
           running ? h("p", { className: "dssm-note" }, t("repo.bulk.blockingHint")) : null,
           h("ul", { className: "dssm-bulk-summary" }, Object.keys(counts).map(bucket => h("li", { key: bucket }, bucketLabel(bucket as BulkBucket) + " · " + counts[bucket]))),
           h("ul", { className: "dssm-bulk-results" }, state.items.map(item => h("li", { key: item.key },
