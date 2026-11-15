@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.4.10] - 2026-11-15
+
+### Entry Location Preference Persistence Fix
+
+- **Persist entry location preference across restarts**: fixed an issue where configuring the skills manager entry location to "sidebar only" (or any chosen preference) would be reset to show in both locations upon restarting DeepSeek Harness, causing the skills manager item to unexpectedly reappear in the settings page (#94). Selected placement preferences now remain stable and preserved across application restarts.
+
 ## [1.4.9] - 2026-11-15
 
 ### Complex Skill Catalog Installation & Mid-Run Cancellation

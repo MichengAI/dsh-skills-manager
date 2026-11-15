@@ -20,14 +20,43 @@ try {
 
   const defaultVal = await core.getSidebarEntry();
   assert.equal(defaultVal, false, "sidebarEntry 默认关闭");
+  assert.equal(await core.getEntryLocation(), "settings", "entryLocation 默认仅设置");
+
+  // 测试 setEntryLocation 的落盘持久化与重启重读
+  await core.setEntryLocation("sidebar");
+  assert.equal(await core.getEntryLocation(), "sidebar", "setEntryLocation('sidebar') 返回并生效");
+  let reloadedState = (await core.readManagerState()).state;
+  assert.equal(reloadedState.entryLocation, "sidebar", "磁盘持久化必须保存 entryLocation: sidebar");
+  assert.equal(await core.getEntryLocation(), "sidebar", "从磁盘重新加载后必须保持 sidebar 不被重置");
+
+  await core.setEntryLocation("both");
+  assert.equal(await core.getEntryLocation(), "both", "setEntryLocation('both') 生效");
+  reloadedState = (await core.readManagerState()).state;
+  assert.equal(reloadedState.entryLocation, "both", "磁盘持久化必须保存 entryLocation: both");
+
+  await core.setEntryLocation("settings");
+  assert.equal(await core.getEntryLocation(), "settings", "setEntryLocation('settings') 生效");
+  reloadedState = (await core.readManagerState()).state;
+  assert.equal(reloadedState.entryLocation, "settings", "磁盘持久化必须保存 entryLocation: settings");
+
+  // 非法参数校验
+  await assert.rejects(
+    async () => core.setEntryLocation("invalid"),
+    (err) => err.code === "error.proto.invalidParams",
+    "非法 location 拒绝写入"
+  );
 
   const enabled = await core.setSidebarEntry(true);
   assert.equal(enabled, true, "setSidebarEntry(true) 返回 true");
   assert.equal(await core.getSidebarEntry(), true, "getSidebarEntry() 返回已更新的值 true");
+  assert.equal(await core.getEntryLocation(), "both", "setSidebarEntry(true) 会更新 entryLocation 为 both");
+  assert.equal((await core.readManagerState()).state.entryLocation, "both", "setSidebarEntry(true) 磁盘落盘为 both");
 
   const disabled = await core.setSidebarEntry(false);
   assert.equal(disabled, false, "setSidebarEntry(false) 返回 false");
   assert.equal(await core.getSidebarEntry(), false, "getSidebarEntry() 返回已更新的值 false");
+  assert.equal(await core.getEntryLocation(), "settings", "setSidebarEntry(false) 会更新 entryLocation 为 settings");
+  assert.equal((await core.readManagerState()).state.entryLocation, "settings", "setSidebarEntry(false) 磁盘落盘为 settings");
 
   // 参数非法校验
   await assert.rejects(

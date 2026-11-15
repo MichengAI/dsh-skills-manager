@@ -2122,7 +2122,7 @@ function defaultManagerState(): ManagerState {
     disabledSkills[root.key] = [];
     enabledSkills[root.key] = [];
   }
-  return { version: 1, sources, disabledSkills, enabledSkills, sidebarEntry: false, categories: Object.create(null), categoryMembers: Object.create(null), categoryOrder: Object.create(null), customNotes: Object.create(null) };
+  return { version: 1, sources, disabledSkills, enabledSkills, entryLocation: "settings", sidebarEntry: false, categories: Object.create(null), categoryMembers: Object.create(null), categoryOrder: Object.create(null), customNotes: Object.create(null) };
 }
 
 function validStateSkillName(name: unknown): name is string {
@@ -2189,6 +2189,7 @@ function validManagerStateDocument(value: ManagerState) {
   )
     return false;
   if (value.sidebarEntry !== undefined && typeof value.sidebarEntry !== "boolean") return false;
+  if (value.entryLocation !== undefined && value.entryLocation !== "both" && value.entryLocation !== "sidebar" && value.entryLocation !== "settings") return false;
   for (const root of userRoots()) {
     if (root.key === "dsh") {
       if (value.sources.dsh !== undefined && typeof value.sources.dsh !== "boolean") return false;
@@ -2267,8 +2268,12 @@ function normalizeManagerState(value: ManagerState) {
   const normalized = defaultManagerState();
   if (!value || typeof value !== "object" || Array.isArray(value))
     return normalized;
-  if (typeof value.sidebarEntry === "boolean") {
+  if (value.entryLocation === "both" || value.entryLocation === "sidebar" || value.entryLocation === "settings") {
+    normalized.entryLocation = value.entryLocation;
+    normalized.sidebarEntry = value.entryLocation !== "settings";
+  } else if (typeof value.sidebarEntry === "boolean") {
     normalized.sidebarEntry = value.sidebarEntry;
+    normalized.entryLocation = value.sidebarEntry ? "both" : "settings";
   }
   for (const root of userRoots()) {
     if (
