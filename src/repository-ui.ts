@@ -281,7 +281,7 @@ export function createRepositoryUI({ react, Modal, Input, Button, Checkbox, Sour
     const mounted = react.useRef(true);
     react.useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
     async function load() {
-      const data = await api("/repositories");
+      const data = await api("/repositories") as ApiRoutes["/repositories"];
       if (mounted.current) {
         const fullRoots = data.installRoots || [];
         const roots = fullRoots.filter(root => root.key === "dsh" || root.key === "agents");
@@ -293,6 +293,22 @@ export function createRepositoryUI({ react, Modal, Input, Button, Checkbox, Sour
         // 工作区列表只读登记信息，失败不影响仓库列表本身。
         api('/workspaces').then(listed => { if (mounted.current) setWorkspaces(listed.items || []); }).catch(() => undefined);
       }
+      return data;
+    }
+    /**
+     * 中断后核对目录安装是否真的落盘。
+     * 写盘与读状态是两条并发路径，紧跟 abort 的第一次读取可能读不到刚写好的副本，
+     * 因此按短间隔重试三次再下结论；每次读取失败都只算「暂时没读到」，不当作未落盘。
+     */
+    async function catalogInstallLanded(match: (copy: ApiRoutes["/repositories"]["catalogCopies"][number]) => boolean) {
+      for (const delay of [0, 350, 900]) {
+        if (delay) await new Promise(resolve => setTimeout(resolve, delay));
+        try {
+          const data = await load();
+          if ((data?.catalogCopies || []).some(match)) return true;
+        } catch { /* 单次读取失败不足以判定未落盘，继续下一轮重试 */ }
+      }
+      return false;
     }
     function findPresetDestination(key: string): RepositoryDestination | undefined {
       const fromRepo = allInstallRoots.find((item) => item.key === key);
@@ -697,20 +713,15 @@ export function createRepositoryUI({ react, Modal, Input, Button, Checkbox, Sour
         } catch (caught) {
           if (controller.signal.aborted) {
             // 客户端中断只代表放弃了响应：下载被服务端同步中止，但中断若正好落在写盘阶段，
-            // 服务端仍会完成原子导入。必须先向服务端核对真实结果，不能一律报「已取消」。
-            const settled = await api("/repositories").then((data: any) => data, () => null);
-            const landed = (settled?.catalogCopies || []).some((copy: any) => copy.id === catalogId && copy.installedRoot === installedRoot && copy.installedWorkspace === scope.workspace);
+            // 服务端仍会完成原子导入。先带重试核对真实结果，再决定报成功还是已取消。
+            const landed = await catalogInstallLanded(copy => copy.id === catalogId && copy.installedRoot === installedRoot && copy.installedWorkspace === scope.workspace);
             if (!mounted.current) return;
             if (landed) {
-              setCatalogInstallIds(prev => prev.includes(catalogId) ? prev : [...prev, catalogId]);
-              setCatalogCopies(settled.catalogCopies);
               setFeedback({ key: "repo.installSuccess", name: target.name });
               setModal(null);
             } else {
               setFeedback({ key: "repo.installCancelled", name: target.name });
             }
-            // 取消态必须保持：刷新失败只表示列表暂时没校准，不能反过来覆盖上面的结果提示。
-            try { await load(); } catch {}
             return;
           }
           throw caught;

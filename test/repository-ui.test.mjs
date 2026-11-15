@@ -76,6 +76,7 @@ globalThis.fetch = async () => { throw new Error("目录客户端不得直连外
 let workspaceRows = [];
 let finishInstall, finishUninstall;
 let holdCatalogInstall = false, finishCatalogInstall;
+let catalogInstallLandsAfterAbortMs = null;
 let failInstall = false, failUninstall = false;
 let finishRefresh, finishDetail;
 let holdRefresh = false, failRefresh = false;
@@ -101,11 +102,20 @@ const api = async (path, options) => {
   if (path === "/workspaces") return { items: structuredClone(workspaceRows) };
   if (path === "/catalog/detail") return { name: body.name, description: "目录技能说明", body: "# " + body.name, origin: body.catalog === "skillsh" ? body.source + "/" + body.skillId : body.owner + "/" + body.slug };
   if (path === "/catalog/install") {
+    const catalogId = body.catalog === "skillsh" ? `skillsh:${body.source}/${body.skillId}` : `clawhub:${body.owner}/${body.slug}`;
+    const installedRoot = body.root || "dsh";
+    const installedName = body.catalog === "clawhub" ? body.slug : body.skillId;
+    const landCopy = () => {
+      if (!mockCatalogInstalls.includes(catalogId)) mockCatalogInstalls.push(catalogId);
+      if (!mockCatalogCopies.some(copy => copy.id === catalogId && copy.installedRoot === installedRoot && copy.installedWorkspace === body.workspace)) mockCatalogCopies.push({ id: catalogId, name: installedName, installedRoot, ...(body.workspace ? { installedWorkspace: body.workspace } : {}), canUninstall: true });
+    };
     if (holdCatalogInstall) {
       await new Promise((resolve, reject) => {
         finishCatalogInstall = resolve;
         if (options?.signal) {
           options.signal.addEventListener("abort", () => {
+            // 真实时序：中断到达时服务端可能已进入写盘，副本在中断之后才落盘。
+            if (catalogInstallLandsAfterAbortMs !== null) setTimeout(landCopy, catalogInstallLandsAfterAbortMs);
             const err = new Error("The operation was aborted");
             err.name = "AbortError";
             reject(err);
@@ -113,11 +123,7 @@ const api = async (path, options) => {
         }
       });
     }
-    const catalogId = body.catalog === "skillsh" ? `skillsh:${body.source}/${body.skillId}` : `clawhub:${body.owner}/${body.slug}`;
-    if (!mockCatalogInstalls.includes(catalogId)) mockCatalogInstalls.push(catalogId);
-    const installedRoot = body.root || "dsh";
-    const installedName = body.catalog === "clawhub" ? body.slug : body.skillId;
-    if (!mockCatalogCopies.some(copy => copy.id === catalogId && copy.installedRoot === installedRoot && copy.installedWorkspace === body.workspace)) mockCatalogCopies.push({ id: catalogId, name: installedName, installedRoot, ...(body.workspace ? { installedWorkspace: body.workspace } : {}), canUninstall: true });
+    landCopy();
     return { name: installedName, root: installedRoot };
   }
   if (path.endsWith("/installMany")) {
@@ -207,6 +213,10 @@ const settle = async () => {
   }
   await new Promise(setImmediate);
   render();
+};
+// 中断后的结果核对带 350ms / 900ms 重试；本文件 setTimeout 受控，必须显式推进时钟。
+const waitForRecheck = async () => {
+  for (const step of [400, 500, 500]) { mock.timers.tick(step); await settle(); }
 };
 const clickNode = async node => { assert.ok(node, "必须找到可点击元素"); assert.ok(!node.props.disabled, "真实点击不能触发禁用按钮"); node.props.onClick(); await settle(); };
 const click = key => clickNode(find(n => isAction(n, key)));
@@ -366,26 +376,30 @@ await clickNode(rowActions(catalogRow("Skill 001"))[1]);
 assert.equal(dialog()?.props.title, "repo.install", "安装沿用现有安装位置选择");
 assert.equal(radio("dsh").props.checked, true, "目录安装默认仍是 DSH，不改动后续仓库安装的选择");
 
-// 测试目录安装中途点击停止
+// 测试目录安装中途点击停止：服务端没有落盘，重试核对也读不到副本 → 报已取消
 holdCatalogInstall = true;
+catalogInstallLandsAfterAbortMs = null;
 const beforeCatalogCancelCalls = countCalls("/repositories");
 clickModal("repo.install"); await settle();
 assert.ok(modalAction("repo.stop"), "目录技能安装进行中显示停止按钮");
 assert.equal(modalAction("repo.stop").props.disabled, false);
-await clickModal("repo.stop"); await settle();
+await clickModal("repo.stop");
+await waitForRecheck();
 holdCatalogInstall = false;
 assert.ok(find(node => node.props.role === "status" && node.children.some(child => typeof child === "string" && child.includes("repo.installCancelled"))), "目录安装停止后提示安装已取消");
 assert.ok(modalAction("repo.cancel"), "停止后恢复取消按钮");
 assert.ok(countCalls("/repositories") > beforeCatalogCancelCalls, "目录安装取消后必须触发重新校准列表");
 
-// 中断晚到（写盘已完成的窗口）：必须核对服务端真实结果，报告安装成功而不是假取消。
+// 中断晚到（写盘已完成的窗口）：副本在中断之后才落盘，必须核对真实结果并报告安装成功。
 // 用未参与后续流程的 Skill 007，避免污染 Skill 001 的安装断言。
 await clickNode(rowActions(catalogRow("Skill 007"))[1]);
-mockCatalogCopies.push({ id: "clawhub:owner-7/skill-007", name: "skill-007", installedRoot: "dsh", canUninstall: true });
 holdCatalogInstall = true;
+catalogInstallLandsAfterAbortMs = 400;
 clickModal("repo.install"); await settle();
-await clickModal("repo.stop"); await settle();
+await clickModal("repo.stop");
+await waitForRecheck();
 holdCatalogInstall = false;
+catalogInstallLandsAfterAbortMs = null;
 assert.ok(find(node => node.props.role === "status" && node.children.some(child => typeof child === "string" && child.includes("repo.installSuccess"))), "中断晚于写盘时必须报告安装成功，不能假报已取消");
 assert.equal(find(node => node.props.role === "status" && node.children.some(child => typeof child === "string" && child.includes("repo.installCancelled"))), undefined, "写盘已完成时绝不能出现「已取消」提示");
 assert.equal(dialog(), undefined, "确认已落盘后关闭弹窗");
