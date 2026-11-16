@@ -104,7 +104,16 @@ function projectSourceDefinition(kind?: string) {
   return PROJECT_SOURCES.find((source) => `project-${source.key}` === kind);
 }
 const USER_DSH_POLICY_RANK = 399;
-export function getBundledSkillRank(): number {
+export function getBundledSkillRank(baseDir?: string): number {
+  if (baseDir) {
+    try {
+      const req = createRequire(baseDir);
+      const mod = req("@deepseek-ai/dsh-skill");
+      if (mod && typeof mod.BUNDLED_SKILL_RANK === "number") {
+        return mod.BUNDLED_SKILL_RANK;
+      }
+    } catch {}
+  }
   try {
     const req = createRequire(import.meta.url);
     const mod = req("@deepseek-ai/dsh-skill");
@@ -114,8 +123,8 @@ export function getBundledSkillRank(): number {
   } catch {}
   return 600;
 }
-function userBundledPolicyRank(): number {
-  return getBundledSkillRank() - 1;
+function userBundledPolicyRank(baseDir?: string): number {
+  return getBundledSkillRank(baseDir) - 1;
 }
 const WINDOWS_DEVICE_NAME_RE =
   /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?$/i;
@@ -157,12 +166,23 @@ export function resolveAgentsHome() {
   return process.env.DSH_AGENTS_HOME || join(homedir(), ".agents");
 }
 
-export const OFFICIAL_OFFICE_SKILL_NAMES = [
+export const KNOWN_OFFICE_SKILL_NAMES = [
   "office",
   "office-docx",
   "office-pptx",
   "office-xlsx",
 ] as const;
+
+export const OFFICIAL_OFFICE_SKILL_NAMES = KNOWN_OFFICE_SKILL_NAMES;
+
+export function isOfficialOfficeSkillName(name: string): boolean {
+  if ((KNOWN_OFFICE_SKILL_NAMES as readonly string[]).includes(name)) {
+    return true;
+  }
+  // 前向兼容：允许官方后续新增的形如 office-xxx 的合法技能名称，
+  // 但严格过滤掉测试注入/碰撞目录（如 collision-*、test-* 等）
+  return /^office(-[a-z0-9]+)+$/i.test(name) && !/collision|temp|dummy|test/i.test(name);
+}
 
 export interface OfficeSkillsCandidateOptions {
   env?: Record<string, string | undefined>;
@@ -208,7 +228,18 @@ export function candidateOfficeSkillsDirs(options: OfficeSkillsCandidateOptions 
     }
   };
 
-  // 1. 优先从当前启动入口（argv[1]）推导，精准对齐运行中的宿主环境
+  const resourcesPath = options.resourcesPath ?? (process as { resourcesPath?: unknown }).resourcesPath;
+  const isDesktopHost = typeof resourcesPath === "string" || (execPath && /dsh.*desktop|electron/i.test(execPath));
+
+  // 1. 若当前运行在桌面端宿主（Electron），优先使用桌面端自身打包资源（resourcesPath）
+  if (isDesktopHost && typeof resourcesPath === "string" && resourcesPath.trim()) {
+    candidates.push(
+      join(resourcesPath.trim(), "app.asar.unpacked", "dsh", "node_modules", "@deepseek-ai", "dsh-skill-office", "assets"),
+      join(resourcesPath.trim(), "app.asar", "dsh", "node_modules", "@deepseek-ai", "dsh-skill-office", "assets"),
+    );
+  }
+
+  // 2. 优先从当前启动入口（argv[1]）推导，精准对齐运行中的宿主环境
   if (argv && argv[1]) {
     try {
       const entryPath = resolve(argv[1]);
@@ -219,7 +250,7 @@ export function candidateOfficeSkillsDirs(options: OfficeSkillsCandidateOptions 
     } catch {}
   }
 
-  // 2. 当前 Node 环境的全局 node_modules（基于 execPath）
+  // 3. 当前 Node 环境的全局 node_modules（基于 execPath）
   if (execPath) {
     const nodeDir = dirname(execPath);
     if (platform === "win32") {
@@ -252,23 +283,21 @@ export function candidateOfficeSkillsDirs(options: OfficeSkillsCandidateOptions 
     }
   }
 
-  // 3. Electron / 桌面打包资源（resourcesPath）
-  const resourcesPath = options.resourcesPath ?? (process as { resourcesPath?: unknown }).resourcesPath;
-  if (typeof resourcesPath === "string" && resourcesPath.trim()) {
+  // 4. 非桌面宿主下如果存在 resourcesPath（备用候选）
+  if (!isDesktopHost && typeof resourcesPath === "string" && resourcesPath.trim()) {
     candidates.push(
       join(resourcesPath.trim(), "app.asar.unpacked", "dsh", "node_modules", "@deepseek-ai", "dsh-skill-office", "assets"),
       join(resourcesPath.trim(), "app.asar", "dsh", "node_modules", "@deepseek-ai", "dsh-skill-office", "assets"),
     );
   }
 
-  // 4. 本地代码上下文（import.meta.url 与当前工作目录 package.json）
+  // 5. 本地代码上下文（import.meta.url 与当前工作目录 package.json）
   const metaPkg = resolvePkg("@deepseek-ai/dsh-skill-office/package.json", import.meta.url);
   if (metaPkg) candidates.push(join(dirname(metaPkg), "assets"));
   const cwdPkg = resolvePkg("@deepseek-ai/dsh-skill-office/package.json", resolve(cwd, "package.json"));
   if (cwdPkg) candidates.push(join(dirname(cwdPkg), "assets"));
 
-  // 5. Profile 目录（严格防穿透：过滤由于软链串味到桌面端旧副本的路径）
-  const isDesktopHost = typeof resourcesPath === "string" || (execPath && /dsh.*desktop|electron/i.test(execPath));
+  // 6. Profile 目录（严格防穿透：过滤由于软链串味到桌面端旧副本的路径）
   const tryProfileBase = (profilePkgPath: string) => {
     const pkg = resolvePkg("@deepseek-ai/dsh-skill-office/package.json", profilePkgPath);
     if (pkg) {
@@ -286,22 +315,24 @@ export function candidateOfficeSkillsDirs(options: OfficeSkillsCandidateOptions 
   tryProfileBase(join(home, ".dsh", "profiles", "web", "package.json"));
   tryProfileBase(join(home, ".dsh", "profiles", "desktop", "package.json"));
 
-  // 6. 桌面端应用常驻路径兜底（最后兜底）
-  if (platform === "win32") {
-    candidates.push(
-      join(home, "AppData", "Roaming", "DSH Codex Desktop", "dsh-runtime", "node_modules", "@deepseek-ai", "dsh", "node_modules", "@deepseek-ai", "dsh-skill-office", "assets"),
-      join(home, "AppData", "Roaming", "deepseek-harness-desktop", "dsh-runtime", "node_modules", "@deepseek-ai", "dsh", "node_modules", "@deepseek-ai", "dsh-skill-office", "assets"),
-    );
-  } else if (platform === "darwin") {
-    candidates.push(
-      join(home, "Library", "Application Support", "DSH Codex Desktop", "dsh-runtime", "node_modules", "@deepseek-ai", "dsh", "node_modules", "@deepseek-ai", "dsh-skill-office", "assets"),
-      join(home, "Library", "Application Support", "deepseek-harness-desktop", "dsh-runtime", "node_modules", "@deepseek-ai", "dsh", "node_modules", "@deepseek-ai", "dsh-skill-office", "assets"),
-    );
-  } else {
-    candidates.push(
-      join(home, ".config", "DSH Codex Desktop", "dsh-runtime", "node_modules", "@deepseek-ai", "dsh", "node_modules", "@deepseek-ai", "dsh-skill-office", "assets"),
-      join(home, ".config", "deepseek-harness-desktop", "dsh-runtime", "node_modules", "@deepseek-ai", "dsh", "node_modules", "@deepseek-ai", "dsh-skill-office", "assets"),
-    );
+  // 7. 桌面端应用常驻路径兜底（仅在桌面宿主环境下作为兜底，非桌面宿主严禁跨宿主探测）
+  if (isDesktopHost) {
+    if (platform === "win32") {
+      candidates.push(
+        join(home, "AppData", "Roaming", "DSH Codex Desktop", "dsh-runtime", "node_modules", "@deepseek-ai", "dsh", "node_modules", "@deepseek-ai", "dsh-skill-office", "assets"),
+        join(home, "AppData", "Roaming", "deepseek-harness-desktop", "dsh-runtime", "node_modules", "@deepseek-ai", "dsh", "node_modules", "@deepseek-ai", "dsh-skill-office", "assets"),
+      );
+    } else if (platform === "darwin") {
+      candidates.push(
+        join(home, "Library", "Application Support", "DSH Codex Desktop", "dsh-runtime", "node_modules", "@deepseek-ai", "dsh", "node_modules", "@deepseek-ai", "dsh-skill-office", "assets"),
+        join(home, "Library", "Application Support", "deepseek-harness-desktop", "dsh-runtime", "node_modules", "@deepseek-ai", "dsh", "node_modules", "@deepseek-ai", "dsh-skill-office", "assets"),
+      );
+    } else {
+      candidates.push(
+        join(home, ".config", "DSH Codex Desktop", "dsh-runtime", "node_modules", "@deepseek-ai", "dsh", "node_modules", "@deepseek-ai", "dsh-skill-office", "assets"),
+        join(home, ".config", "deepseek-harness-desktop", "dsh-runtime", "node_modules", "@deepseek-ai", "dsh", "node_modules", "@deepseek-ai", "dsh-skill-office", "assets"),
+      );
+    }
   }
 
   return Array.from(new Set(candidates));
@@ -364,7 +395,7 @@ export function userRoots(): SkillRoot[] {
       mutable: false,
       toggleable: true,
       native: true,
-      rank: getBundledSkillRank(),
+      rank: getBundledSkillRank(officeDir),
     });
   }
 
@@ -2278,7 +2309,7 @@ async function scanDeduplicatedRoots(roots: SkillRoot[] = userRoots(), options: 
   for (const [root, scan] of results) {
     if (root.key === "dsh-office") {
       scan.entries = scan.entries.filter((entry) =>
-        (OFFICIAL_OFFICE_SKILL_NAMES as readonly string[]).includes(entry.name),
+        isOfficialOfficeSkillName(entry.name),
       );
     }
     scans.set(root.key, scan);
@@ -4422,7 +4453,7 @@ export async function listProviderCandidates(options: ScopeOptions = {}) {
           : root.key === "dsh"
             ? USER_DSH_POLICY_RANK
             : root.key === "dsh-office"
-              ? userBundledPolicyRank()
+              ? userBundledPolicyRank(root.path)
               : (entry.providerRank ?? root.rank)),
       locator: {
         rootKey: root.key,

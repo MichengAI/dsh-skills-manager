@@ -119,16 +119,22 @@ process.env.DSH_CLAUDE_HOME = join(tmp, "claude");
 process.env.DSH_GEMINI_HOME = join(tmp, "gemini");
 process.env.DSH_OPENCODE_HOME = join(tmp, "opencode");
 process.env.DSH_CURSOR_HOME = join(tmp, "cursor");
+process.env.DSH_OFFICE_SKILLS_DIR = join(tmp, "office-assets");
 const dshRoot = join(process.env.DSH_HOME, "skills");
 const agentsRoot = join(process.env.DSH_AGENTS_HOME, "skills");
 const ccswitchRoot = join(testUserHome, ".cc-switch", "skills");
 const codexRoot = join(process.env.DSH_CODEX_HOME, "skills");
 const cursorRoot = join(process.env.DSH_CURSOR_HOME, "skills");
+const officeRoot = process.env.DSH_OFFICE_SKILLS_DIR;
 await mkdir(dshRoot, { recursive: true });
 await mkdir(agentsRoot, { recursive: true });
 await mkdir(ccswitchRoot, { recursive: true });
 await mkdir(codexRoot, { recursive: true });
 await mkdir(cursorRoot, { recursive: true });
+await mkdir(officeRoot, { recursive: true });
+for (const name of ["office", "office-docx", "office-pptx", "office-xlsx"]) {
+  await makeSkill(officeRoot, name, `---\nname: ${name}\ndescription: Office skill for ${name}\n---\n`);
+}
 
 const ccswitchDefinition = userRoots().find((root) => root.key === "ccswitch");
 ok(
