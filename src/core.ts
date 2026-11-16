@@ -176,6 +176,13 @@ export function resolveOfficeSkillsDir(): string {
   tryBase(join(home, ".dsh", "profiles", "desktop", "package.json"));
 
   if (process.platform === "win32") {
+    if (process.execPath) {
+      const nodeDir = dirname(process.execPath);
+      candidates.push(
+        join(nodeDir, "node_global", "node_modules", "@deepseek-ai", "dsh", "node_modules", "@deepseek-ai", "dsh-skill-office", "assets"),
+        join(nodeDir, "node_modules", "@deepseek-ai", "dsh", "node_modules", "@deepseek-ai", "dsh-skill-office", "assets"),
+      );
+    }
     candidates.push(
       join(home, "AppData", "Roaming", "DSH Codex Desktop", "dsh-runtime", "node_modules", "@deepseek-ai", "dsh", "node_modules", "@deepseek-ai", "dsh-skill-office", "assets"),
       join(home, "AppData", "Roaming", "deepseek-harness-desktop", "dsh-runtime", "node_modules", "@deepseek-ai", "dsh", "node_modules", "@deepseek-ai", "dsh-skill-office", "assets"),
@@ -186,12 +193,24 @@ export function resolveOfficeSkillsDir(): string {
       );
     }
   } else if (process.platform === "darwin") {
+    if (process.execPath) {
+      const nodeDir = dirname(process.execPath);
+      candidates.push(
+        join(nodeDir, "..", "lib", "node_modules", "@deepseek-ai", "dsh", "node_modules", "@deepseek-ai", "dsh-skill-office", "assets"),
+      );
+    }
     candidates.push(
       join(home, "Library", "Application Support", "DSH Codex Desktop", "dsh-runtime", "node_modules", "@deepseek-ai", "dsh", "node_modules", "@deepseek-ai", "dsh-skill-office", "assets"),
       join(home, "Library", "Application Support", "deepseek-harness-desktop", "dsh-runtime", "node_modules", "@deepseek-ai", "dsh", "node_modules", "@deepseek-ai", "dsh-skill-office", "assets"),
       "/usr/local/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-skill-office/assets",
     );
   } else {
+    if (process.execPath) {
+      const nodeDir = dirname(process.execPath);
+      candidates.push(
+        join(nodeDir, "..", "lib", "node_modules", "@deepseek-ai", "dsh", "node_modules", "@deepseek-ai", "dsh-skill-office", "assets"),
+      );
+    }
     candidates.push(
       join(home, ".config", "DSH Codex Desktop", "dsh-runtime", "node_modules", "@deepseek-ai", "dsh", "node_modules", "@deepseek-ai", "dsh-skill-office", "assets"),
       join(home, ".config", "deepseek-harness-desktop", "dsh-runtime", "node_modules", "@deepseek-ai", "dsh", "node_modules", "@deepseek-ai", "dsh-skill-office", "assets"),
