@@ -23,7 +23,8 @@ import {
   isAbsolute,
   sep,
 } from "node:path";
-import { promises as fs, readFileSync } from "node:fs";
+import { promises as fs, readFileSync, existsSync, statSync } from "node:fs";
+import { createRequire } from "node:module";
 import { createHash, randomUUID } from "node:crypto";
 import { unzipSync } from "fflate";
 import { estimateTokens, truncateCatalogDescription } from "./token-count.js";
@@ -103,6 +104,7 @@ function projectSourceDefinition(kind?: string) {
   return PROJECT_SOURCES.find((source) => `project-${source.key}` === kind);
 }
 const USER_DSH_POLICY_RANK = 399;
+const USER_BUNDLED_POLICY_RANK = 599;
 const WINDOWS_DEVICE_NAME_RE =
   /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?$/i;
 const MAX_SOURCE_DEPTH = 64;
@@ -143,6 +145,80 @@ export function resolveAgentsHome() {
   return process.env.DSH_AGENTS_HOME || join(homedir(), ".agents");
 }
 
+let cachedOfficeSkillsDir: string | undefined;
+
+export function resolveOfficeSkillsDir(): string {
+  if (process.env.DSH_OFFICE_SKILLS_DIR && process.env.DSH_OFFICE_SKILLS_DIR.trim()) {
+    return resolve(process.env.DSH_OFFICE_SKILLS_DIR.trim());
+  }
+  if (cachedOfficeSkillsDir && existsSync(cachedOfficeSkillsDir)) {
+    return cachedOfficeSkillsDir;
+  }
+  const candidates: string[] = [];
+  const tryBase = (base: string) => {
+    try {
+      const req = createRequire(base);
+      try {
+        const pkg = req.resolve("@deepseek-ai/dsh-skill-office/package.json");
+        candidates.push(join(dirname(pkg), "assets"));
+      } catch {}
+      try {
+        const dshPkg = req.resolve("@deepseek-ai/dsh/package.json");
+        candidates.push(join(dirname(dshPkg), "node_modules", "@deepseek-ai", "dsh-skill-office", "assets"));
+      } catch {}
+    } catch {}
+  };
+
+  tryBase(import.meta.url);
+  tryBase(resolve("package.json"));
+  const home = homedir();
+  tryBase(join(home, ".dsh", "profiles", "web", "package.json"));
+  tryBase(join(home, ".dsh", "profiles", "desktop", "package.json"));
+
+  if (process.platform === "win32") {
+    candidates.push(
+      join(home, "AppData", "Roaming", "DSH Codex Desktop", "dsh-runtime", "node_modules", "@deepseek-ai", "dsh", "node_modules", "@deepseek-ai", "dsh-skill-office", "assets"),
+      join(home, "AppData", "Roaming", "deepseek-harness-desktop", "dsh-runtime", "node_modules", "@deepseek-ai", "dsh", "node_modules", "@deepseek-ai", "dsh-skill-office", "assets"),
+    );
+    if (process.env.APPDATA) {
+      candidates.push(
+        join(process.env.APPDATA, "npm", "node_modules", "@deepseek-ai", "dsh", "node_modules", "@deepseek-ai", "dsh-skill-office", "assets"),
+      );
+    }
+  } else if (process.platform === "darwin") {
+    candidates.push(
+      join(home, "Library", "Application Support", "DSH Codex Desktop", "dsh-runtime", "node_modules", "@deepseek-ai", "dsh", "node_modules", "@deepseek-ai", "dsh-skill-office", "assets"),
+      join(home, "Library", "Application Support", "deepseek-harness-desktop", "dsh-runtime", "node_modules", "@deepseek-ai", "dsh", "node_modules", "@deepseek-ai", "dsh-skill-office", "assets"),
+      "/usr/local/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-skill-office/assets",
+    );
+  } else {
+    candidates.push(
+      join(home, ".config", "DSH Codex Desktop", "dsh-runtime", "node_modules", "@deepseek-ai", "dsh", "node_modules", "@deepseek-ai", "dsh-skill-office", "assets"),
+      join(home, ".config", "deepseek-harness-desktop", "dsh-runtime", "node_modules", "@deepseek-ai", "dsh", "node_modules", "@deepseek-ai", "dsh-skill-office", "assets"),
+      "/usr/local/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-skill-office/assets",
+      "/usr/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-skill-office/assets",
+    );
+  }
+
+  const resourcesPath = (process as { resourcesPath?: unknown }).resourcesPath;
+  if (typeof resourcesPath === "string" && resourcesPath.trim()) {
+    candidates.push(
+      join(resourcesPath.trim(), "app.asar.unpacked", "dsh", "node_modules", "@deepseek-ai", "dsh-skill-office", "assets"),
+      join(resourcesPath.trim(), "app.asar", "dsh", "node_modules", "@deepseek-ai", "dsh-skill-office", "assets"),
+    );
+  }
+
+  for (const c of candidates) {
+    try {
+      if (existsSync(c) && statSync(c).isDirectory()) {
+        cachedOfficeSkillsDir = resolve(c);
+        return cachedOfficeSkillsDir;
+      }
+    } catch {}
+  }
+  return join(resolveDshHome(), "bundled-office-skills");
+}
+
 /**
  * DSH 及常见 Agent 的用户级技能目录。
  *
@@ -160,6 +236,16 @@ export function userRoots(): SkillRoot[] {
       toggleable: true,
       native: true,
       rank: 400,
+    },
+    {
+      key: "dsh-office",
+      localeKey: "dshOffice",
+      path: resolveOfficeSkillsDir(),
+      label: "官方 Office",
+      mutable: false,
+      toggleable: true,
+      native: true,
+      rank: 600,
     },
     {
       key: "agents",
@@ -4171,7 +4257,7 @@ export async function listProviderCandidates(options: ScopeOptions = {}) {
     if (!hasNativeCopy && !hasExplicitDisable && !policy.sourceEnabled) continue;
     const project = root.scope === "project";
     // Shared Agent 继续由 manager 提供递归发现与链接副本，不因开放文件管理而丢失调用候选。
-    const policyOnly = root.mutable && root.key !== "agents";
+    const policyOnly = (root.mutable && root.key !== "agents") || root.key === "dsh-office";
     // 回退副本也必须覆盖组内更高优先级的原生条目，防止宿主重新选中已停用副本。
     const overlayRank = group.length > 1
       ? Math.min(...group.map((item) => Math.min(item.root.rank, item.entry.providerRank ?? item.root.rank))) - 1
@@ -4208,7 +4294,9 @@ export async function listProviderCandidates(options: ScopeOptions = {}) {
           ? 299
           : root.key === "dsh"
             ? USER_DSH_POLICY_RANK
-            : (entry.providerRank ?? root.rank)),
+            : root.key === "dsh-office"
+              ? USER_BUNDLED_POLICY_RANK
+              : (entry.providerRank ?? root.rank)),
       locator: {
         rootKey: root.key,
         entryName: entry.name,

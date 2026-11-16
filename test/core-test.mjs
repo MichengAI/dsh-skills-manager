@@ -3725,8 +3725,12 @@ try {
 const snap = await state();
 eq(
   snap.roots.length,
-  22,
+  23,
   "state returns DSH, CC Switch, Copilot, Cursor, first-tier Agents, WorkBuddy, Qoder, and common Agent roots",
+);
+ok(
+  snap.roots.some((root) => root.key === "dsh-office"),
+  "state includes official dsh-office source",
 );
 ok(
   snap.roots.some((root) => root.key === "antigravity"),

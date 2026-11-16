@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.11] - 2026-11-16
+
+### Official Office Built-in Skills Management Support
+
+- **Manage DSH official Office built-in skills**: added full support for discovering and managing official Office skills introduced in DeepSeek Harness 0.2.2-rc.2 and above (such as `office`, `office-docx`, `office-pptx`, and `office-xlsx`) (#95).
+- **Source and per-skill toggle control**: the "Official Office" source now automatically appears in the skills list, allowing users to view skill details, estimate Token costs, and add categories or custom notes; seamlessly supports toggling the entire Office source or individual Office skills, ensuring disabled skills are immediately excluded from model invocation.
+
 ## [1.4.10] - 2026-11-15
 
 ### Entry Location Preference Persistence Fix
