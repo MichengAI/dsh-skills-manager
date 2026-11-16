@@ -161,6 +161,7 @@ DeepSeek Harness 宿主加载机制对技能标识符遵循规范命名约束：
 | 来源 | 全局目录 | 环境变量 | 项目目录 |
 | --- | --- | --- | --- |
 | <img src="assets/brands/dsh.png" width="16" height="16" alt="DSH" valign="middle"> DSH | `~/.dsh/skills` | `DSH_HOME` | `<project>/.dsh/skills` |
+| <img src="assets/brands/dsh.png" width="16" height="16" alt="Official Office" valign="middle"> 官方 Office | 随 DSH 宿主分发内置 | `DSH_OFFICE_SKILLS_DIR` | — |
 | <img src="assets/brands/agents.svg" width="16" height="16" alt="Shared Agent" valign="middle"> 公共 Agent | `~/.agents/skills` | `DSH_AGENTS_HOME` | `<project>/.agents/skills` |
 | <img src="assets/brands/cc-switch.png" width="16" height="16" alt="CC Switch" valign="middle"> CC Switch | `~/.cc-switch/skills` | — | — |
 | <img src="assets/brands/codex.svg" width="16" height="16" alt="Codex" valign="middle"> Codex | `~/.codex/skills` | `DSH_CODEX_HOME` | `<project>/.codex/skills` |

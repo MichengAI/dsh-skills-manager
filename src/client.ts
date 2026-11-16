@@ -1106,7 +1106,7 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
         var actions: React.ReactNode[] = [];
         if (filters.group !== "repo") actions.push(iconButton(t("category.create"), strokeIcon("M8 2.5v11M2.5 8h11"), function () { setCategoryName(""); setModal({ type: "category-create", root: root.key, workspace: workspacePath }); }, false, busy));
         // 外部只读来源可以改读取位置；DSH / 官方 Office / 公共 Agent / 预设模式均不由 roots.json 覆盖，不在这里开放。
-        if (!workspacePath && root.mutable !== true && root.native !== true && root.kind !== "preset" && root.scope !== "preset" && root.key !== "dsh-office") actions.push(iconButton(t("rootPath.edit"), strokeIcon("M2.5 4.5h3l1.3 1.5h6.7v6h-11z"), function () { openRootPath(root); }, false, busy));
+        if (!workspacePath && root.mutable !== true && root.native !== true && root.kind !== "preset" && root.scope !== "preset") actions.push(iconButton(t("rootPath.edit"), strokeIcon("M2.5 4.5h3l1.3 1.5h6.7v6h-11z"), function () { openRootPath(root); }, false, busy));
         if (canToggleSource(root)) actions.push(h(SkillSwitch, { on: root.enabled, disabled: busy, label: t("source.toggle") + " " + displayName, onClick: function () { post(root.enabled ? "/source-disable" : "/source-enable", scoped); } }));
         return h("span", { className: "dssm-source-actions", onClick: function (event: React.MouseEvent) { event.stopPropagation(); } }, actions);
       }

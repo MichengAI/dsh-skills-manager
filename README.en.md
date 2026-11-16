@@ -161,6 +161,7 @@ The DeepSeek Harness loader enforces strict identifier policies:
 | Source | Global directory | Environment variable | Project directory |
 | --- | --- | --- | --- |
 | <img src="assets/brands/dsh.png" width="16" height="16" alt="DSH" valign="middle"> DSH | `~/.dsh/skills` | `DSH_HOME` | `<project>/.dsh/skills` |
+| <img src="assets/brands/dsh.png" width="16" height="16" alt="Official Office" valign="middle"> Official Office | Bundled with DSH host | `DSH_OFFICE_SKILLS_DIR` | — |
 | <img src="assets/brands/agents.svg" width="16" height="16" alt="Shared Agent" valign="middle"> Shared Agent | `~/.agents/skills` | `DSH_AGENTS_HOME` | `<project>/.agents/skills` |
 | <img src="assets/brands/cc-switch.png" width="16" height="16" alt="CC Switch" valign="middle"> CC Switch | `~/.cc-switch/skills` | — | — |
 | <img src="assets/brands/codex.svg" width="16" height="16" alt="Codex" valign="middle"> Codex | `~/.codex/skills` | `DSH_CODEX_HOME` | `<project>/.codex/skills` |
