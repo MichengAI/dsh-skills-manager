@@ -24,6 +24,7 @@ assert.equal(cordisPin("0.2.1-rc.2"), "4.0.5");
 assert.equal(cordisPin("0.2.2-rc.1"), "4.1.0");
 assert.equal(cordisPin("0.2.2-rc.2"), "4.1.0");
 assert.equal(cordisPin("0.2.2-rc.3"), "4.1.0");
+assert.equal(cordisPin("0.2.2-rc.4"), "4.1.0");
 assert.equal(hostCordisOverrides("0.2.1-rc.1")["@deepseek-ai/schemastery"], "3.18.5");
 assert.equal(hostCordisOverrides("0.2.1-rc.2")["@deepseek-ai/schemastery"], "3.18.5");
 assert.equal(hostCordisOverrides("0.2.1-rc.3")["@deepseek-ai/schemastery"], "3.18.5");
@@ -37,8 +38,8 @@ for (const host of supportedHosts) {
   const overrides = hostCordisOverrides(host);
   for (const name of requiredPins) assert.ok(overrides[name], `${host} 缺少 ${name}`);
 }
-assert.equal(developmentHost, "0.2.2-rc.3");
-assert.deepEqual(supportedHosts, ["0.2.0-rc.1", "0.2.0-rc.2", "0.2.1-rc.1", "0.2.1-rc.2", "0.2.1-rc.3", "0.2.1-rc.4", "0.2.1-rc.5", "0.2.2-rc.1", "0.2.2-rc.2", "0.2.2-rc.3"]);
+assert.equal(developmentHost, "0.2.2-rc.4");
+assert.deepEqual(supportedHosts, ["0.2.0-rc.1", "0.2.0-rc.2", "0.2.1-rc.1", "0.2.1-rc.2", "0.2.1-rc.3", "0.2.1-rc.4", "0.2.1-rc.5", "0.2.2-rc.1", "0.2.2-rc.2", "0.2.2-rc.3", "0.2.2-rc.4"]);
 assert.deepEqual(parseOptions(["--keep"]).versions, supportedHosts);
 assert.equal(parseOptions(["--keep", supportedHosts[0]]).keep, true);
 assert.deepEqual(parseOptions([supportedHosts[0], "--keep"]).versions, [supportedHosts[0]]);
