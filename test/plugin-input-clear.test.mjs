@@ -1,11 +1,12 @@
 // 宿主 Input 没有清除按钮；本插件的 allowClear 包装要补上 ×，清空后调用方照常收到空值。
 import assert from "node:assert/strict";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
 
 const react = { createElement: (type, props, ...children) => ({ type, props: props || {}, children: children.flat(Infinity).filter((child) => child != null && typeof child !== "boolean") }) };
 const HostInput = function HostInput() {};
-const bundled = await build({ entryPoints: [new URL("../src/plugin-ui.ts", import.meta.url).pathname], bundle: true, write: false, format: "cjs", platform: "browser", external: ["react", "@deepseek-ai/dsh-client-ui-primitives"] });
+const bundled = await build({ entryPoints: [fileURLToPath(new URL("../src/plugin-ui.ts", import.meta.url))], bundle: true, write: false, format: "cjs", platform: "browser", external: ["react", "@deepseek-ai/dsh-client-ui-primitives"] });
 const module = { exports: {} };
 new Function("require", "module", "exports", bundled.outputFiles[0].text)((id) => {
   if (id === "react") return { default: react, ...react };
