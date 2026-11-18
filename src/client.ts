@@ -1621,7 +1621,18 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
         };
         content.push(h(Modal, { key: modal.type, title: renaming ? t("category.rename") : t("category.create"), closeLabel: t("btn.close"), onClose: function () { setModal(null); } },
           h("div", { className: "dssm-form" },
-            h("label", { className: "dssm-field" }, h("span", { className: "dssm-label" }, t("category.name")), h(Input, { value: categoryName, maxLength: 24, "aria-label": t("category.name"), onChange: function (event) { setCategoryName(event.target.value); }, onPressEnter: submitCategory })),
+            h("label", { className: "dssm-field" }, h("span", { className: "dssm-label" }, t("category.name")), h(Input, {
+              value: categoryName,
+              maxLength: 24,
+              "aria-label": t("category.name"),
+              onChange: function (event) { setCategoryName(event.target.value); },
+              onKeyDown: function (event: React.KeyboardEvent<HTMLInputElement>) {
+                if (event.key === "Enter" && !event.nativeEvent.isComposing) {
+                  event.preventDefault();
+                  submitCategory();
+                }
+              },
+            })),
             h("p", { className: "dssm-help" }, t("category.note"))
           ),
           h("div", { className: "dssm-modal-actions" },

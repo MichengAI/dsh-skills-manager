@@ -49,8 +49,6 @@ declare module '@deepseek-ai/dsh-client-ui-primitives' {
   export function Input(props: {
     icon?: ReactNode
     className?: string
-    allowClear?: boolean
-    onPressEnter?: (event: React.KeyboardEvent<HTMLInputElement>) => void
   } & InputHTMLAttributes<HTMLInputElement>): ReactElement
 
   export interface SegmentedTab<Value extends string = string> {

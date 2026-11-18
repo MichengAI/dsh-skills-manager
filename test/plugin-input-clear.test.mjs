@@ -15,6 +15,8 @@ new Function("require", "module", "exports", bundled.outputFiles[0].text)((id) =
 }, module, module.exports);
 const { createInput, inputCss } = module.exports;
 
+const originalHTMLInputElement = globalThis.HTMLInputElement;
+
 class FakeInput {
   constructor() { this.events = []; this.focused = false; this.current = "keyword"; }
   get value() { return this.current; }
@@ -85,4 +87,8 @@ test("Esc clears only when there is text and keeps the caller's onKeyDown", () =
 test("clear button styles use host theme tokens", () => {
   assert.match(inputCss, /\.dssm-input-clear\{[^}]*var\(--dsw-alias-label-tertiary\)/);
   assert.match(inputCss, /\.dssm-input-clear:hover\{[^}]*var\(--dsw-alias-interactive-bg-hover\)/);
+});
+
+test.after(() => {
+  globalThis.HTMLInputElement = originalHTMLInputElement;
 });

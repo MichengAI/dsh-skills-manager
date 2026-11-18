@@ -332,6 +332,29 @@ try {
   }
   assert.deepEqual(modalFailures, [], "分类创建/重命名/删除均携带原工作区登记路径");
 
+  // 分类创建弹窗：输入框按 Enter 键必须触发提交（使用标准 onKeyDown，杜绝宿主未实现的 onPressEnter）
+  {
+    const source = sources().find(node => textOf(node).includes("alpha-one"));
+    nodes(source).find(node => node.props["aria-label"] === t("category.create")).props.onClick();
+    render();
+    const input = find(node => node.props["aria-label"] === t("category.name"));
+    assert.ok(input, "应展示分类输入框");
+    input.props.onChange({ target: { value: "回车创建分类" } });
+    render();
+    const updatedInput = find(node => node.props["aria-label"] === t("category.name"));
+    assert.equal(typeof updatedInput.props.onKeyDown, "function", "分类输入框必须提供原生的 onKeyDown 处理器");
+    let prevented = false;
+    updatedInput.props.onKeyDown({
+      key: "Enter",
+      preventDefault: () => { prevented = true; },
+      nativeEvent: { isComposing: false },
+    });
+    await settle();
+    const call = calls.filter(c => c.url.endsWith("/category-create")).at(-1);
+    assert.equal(call?.body.name, "回车创建分类", "按 Enter 键应发起创建请求");
+    assert.equal(prevented, true, "按 Enter 键应阻止表单默认行为");
+  }
+
   await tab("全局技能");
   find((node) => node.props["aria-label"] === t("btn.add") || node.props["aria-label"] === t("btn.create")).props.onClick();
   await settle();
