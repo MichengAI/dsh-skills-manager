@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.4.12] - 2026-11-18
+
+### Search Input Clear Button
+
+- **Search input clear button**: added a dedicated clear button (`×`) on the right side of search inputs across skill lists, repositories, and discovery catalogs (#96).
+- **Quick clear via click or Esc**: the clear button appears when there is text in the search box; clicking it or pressing `Esc` instantly clears the search query and restores the full list while retaining input focus.
+
+### Category Modal Keyboard Interaction
+
+- **Submit category on Enter**: pressing `Enter` inside the category name input when creating or renaming a category now immediately submits the action, providing a seamless keyboard workflow.
+
+### Compatibility
+
+- Verified full compatibility with DeepSeek Harness `0.2.2-rc.4`, smoothly supporting the latest Web and Desktop runtimes.
+
 ## [1.4.11] - 2026-11-16
 
 ### Official Office Built-in Skills Management Support

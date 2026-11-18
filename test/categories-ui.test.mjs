@@ -353,6 +353,18 @@ try {
     const call = calls.filter(c => c.url.endsWith("/category-create")).at(-1);
     assert.equal(call?.body.name, "回车创建分类", "按 Enter 键应发起创建请求");
     assert.equal(prevented, true, "按 Enter 键应阻止表单默认行为");
+
+    // 输入法正在组合输入（isComposing: true）时不应触发提交，也不阻止事件默认行为
+    const callsCountBefore = calls.length;
+    let composingPrevented = false;
+    updatedInput.props.onKeyDown({
+      key: "Enter",
+      preventDefault: () => { composingPrevented = true; },
+      nativeEvent: { isComposing: true },
+    });
+    await settle();
+    assert.equal(calls.length, callsCountBefore, "输入法输入中按 Enter 不应触发提交");
+    assert.equal(composingPrevented, false, "输入法输入中按 Enter 不应阻止事件默认行为");
   }
 
   await tab("全局技能");
