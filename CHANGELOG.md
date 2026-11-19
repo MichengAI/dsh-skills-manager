@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.5.0] - 2026-11-19
+
+### Host Compatibility Matrix
+
+- **DeepSeek Harness 0.2.2-rc.5 support**: verified full compatibility with DeepSeek Harness `0.2.2-rc.5`, aligning the supported host matrix to `>=0.2.2-rc.1 <0.3.0-0`. Users on `0.1.x` hosts should install plugin `1.1.23`; users on `0.2.0.x` or `0.2.1.x` hosts should install plugin `1.4.12` instead of `@latest`.
+
+### Native Switch Interaction
+
+- **Host-native Switch alignment**: updated toggle switches across skill lists and details to align with the host's native Switch styling and interactive feedback, delivering consistent toggle transitions and accessible state indication.
+
+### Skill Management Experience
+
+- **Smoother skill workflows**: optimized search responsiveness, category keyboard submissions, and local skill package parsing for a cleaner, faster management workflow.
+
 ## [1.4.12] - 2026-11-18
 
 ### Search Input Clear Button
