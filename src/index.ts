@@ -40,9 +40,7 @@ import {
   workspaceSkills,
   logPath,
   getEntryLocation,
-  getSidebarEntry,
   setEntryLocation,
-  setSidebarEntry,
   collectPresetRoots,
 } from "./core.js";
 import { createRepositoryManager } from "./repositories.js";

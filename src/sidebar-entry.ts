@@ -1,5 +1,5 @@
 import * as React from "react";
-import { SegmentedControl, Switch as PrimitiveSwitch } from "@deepseek-ai/dsh-client-ui-primitives";
+import { SegmentedControl } from "@deepseek-ai/dsh-client-ui-primitives";
 import type { ClientContext, Translate } from "./client-types.js";
 import type { EntryLocation } from "./types.js";
 import { SKILL_PATHS } from "./settings-nav-icon.js";

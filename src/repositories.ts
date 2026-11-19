@@ -944,7 +944,7 @@ export function createRepositoryManager({
       return { results };
     }),
     // 批量卸载：同一队列逐项持久化意图并移入回收站。
-    uninstallMany: (input: { items?: Array<{ id?: unknown; path?: unknown; root?: unknown; workspace?: unknown }> }, registered?: string[]) => serialize(async () => {
+    uninstallMany: (input: { items?: Array<{ id?: unknown; path?: unknown; root?: unknown; workspace?: unknown }> }, _registered?: string[]) => serialize(async () => {
       const rawItems = Array.isArray(input?.items) ? input.items : [];
       if (!rawItems.length) throw failure("批量卸载项为空", "error.repo.empty");
       if (rawItems.length > 1000) throw failure("批量卸载项超过上限（最多 1000 项）", "error.repo.tooMany");

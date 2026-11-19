@@ -1,6 +1,5 @@
 import { promises as fs } from "node:fs";
 import { join } from "node:path";
-import { randomUUID } from "node:crypto";
 import { spawn, type ChildProcess, type ChildProcessWithoutNullStreams } from "node:child_process";
 import type { RepositoryInput, RepositorySource, CodedError } from "./types.js";
 

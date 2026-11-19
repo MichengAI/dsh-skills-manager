@@ -205,13 +205,13 @@ assert.ok(skillStart >= 0 && skillEnd > skillStart, 'renderSkill 必须存在');
 
 const skillBlock = stripTypeScriptTypes(source.slice(skillStart, skillEnd));
 const makeRenderSkill = new Function(
-  'h', 't', 'isSkillEnabled', 'renderInvocationBadge', 'renderTokenBadge', 'renderSkillStatusIcon', 'enableSwitch', 'renderLinkedNote', 'renderFallback', 'SourceSelect', 'moreIcon', 'busy', 'filters', 'allRoots', 'draggingRef', 'post', 'openDetail', 'setSkillNoteText', 'setModal', 'rootDisplayName',
+  'h', 't', 'isSkillEnabled', 'renderInvocationBadge', 'renderTokenBadge', 'renderSkillStatusIcon', 'SkillSwitch', 'renderLinkedNote', 'renderFallback', 'SourceSelect', 'moreIcon', 'busy', 'filters', 'allRoots', 'draggingRef', 'post', 'openDetail', 'setSkillNoteText', 'setModal', 'rootDisplayName',
   skillBlock + '\nreturn renderSkill;'
 );
 
 const fakeRoot = { key: 'dsh', toggleable: true, mutable: true, enabled: true, categories: [] };
 const renderSkillTested = makeRenderSkill(
-  h, tZh, () => true, renderInvocationBadge, realRenderTokenBadge, () => null, () => h('switch'), () => null, () => null, function SourceSelect() {}, () => null, false, {}, [fakeRoot], { current: null }, () => Promise.resolve(), () => {}, () => {}, () => {}, () => 'DSH'
+  h, tZh, () => true, renderInvocationBadge, realRenderTokenBadge, () => null, function SkillSwitch() { return h('switch'); }, () => null, () => null, function SourceSelect() {}, () => null, false, {}, [fakeRoot], { current: null }, () => Promise.resolve(), () => {}, () => {}, () => {}, () => 'DSH'
 );
 
 function findVNode(node, predicate) {

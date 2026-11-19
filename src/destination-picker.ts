@@ -1,7 +1,7 @@
 import type * as React from "react";
 import type { SourceSelectProps, Translate } from "./client-types.js";
 import type { WorkspaceRow } from "./core.js";
-import type { DestinationKit, DestinationValue, DestinationPickerProps, UserDestination, PresetDestination } from "./destination-types.js";
+import type { DestinationKit, DestinationValue, DestinationPickerProps, PresetDestination } from "./destination-types.js";
 
 export type { DestinationKit, DestinationValue, UserDestination, PresetDestination } from "./destination-types.js";
 

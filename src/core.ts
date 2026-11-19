@@ -1,4 +1,4 @@
-import type { EntryLocation, SkillRoot, RepositoryDestination, RootInput, Diagnostic, OperationError, CodedError, Log, DiscoveredEntry, SkillEntry, ParsedSkill, Scan, ManagerState, SkillCategory, PolicyResult, Policy, SkillItem, ViewItem, RootView, SkillView, ScopeOptions, MutationOptions, RenameOptions, UploadInput, CreateInput, ImportCandidate, ImportPending, ImportConflict, ImportFailure, ImportResult } from "./types.js";
+import type { EntryLocation, SkillRoot, RepositoryDestination, RootInput, Diagnostic, OperationError, CodedError, Log, DiscoveredEntry, SkillEntry, ParsedSkill, Scan, ManagerState, PolicyResult, Policy, SkillItem, ViewItem, RootView, SkillView, ScopeOptions, MutationOptions, RenameOptions, UploadInput, CreateInput, ImportCandidate, ImportPending, ImportConflict, ImportFailure, ImportResult } from "./types.js";
 // dsh-skills-manager core —— 纯 Node 技能文件管理核心（仅 ZIP 解压使用 fflate，可独立单测）
 //
 // 覆盖 DSH 用户级与活动 Session 项目级技能根：
@@ -1771,10 +1771,6 @@ export function entryPath(root: string, name: string) {
   const rootPath = resolve(root);
   const path = resolve(rootPath, name);
   return isSameOrDescendant(rootPath, path) && rootPath !== path ? path : null;
-}
-
-function isDshRoot(root: RootInput) {
-  return typeof root === "string" && resolve(root) === resolve(dshRootPath());
 }
 
 // ── 命名规整 ────────────────────────────────────────────────────────────────
@@ -3770,7 +3766,7 @@ async function replaceWithCopy(source: string, dest: string, isDir: boolean, exi
     for (const item of backups.reverse()) {
       try {
         await renameWithRetry(item.backup, item.path);
-      } catch (caught) { const rollbackError = caught as CodedError;
+      } catch {
         rollbackFailures.push(item.backup);
       }
     }
@@ -4037,7 +4033,7 @@ function normalizeUploadPath(input: string) {
   const directory = raw.endsWith("/");
   const parts = raw
     .split("/")
-    .filter((part, index, all) =>
+    .filter((_, index, all) =>
       directory && index === all.length - 1 ? false : true,
     );
   if (

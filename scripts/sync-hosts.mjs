@@ -21,6 +21,9 @@ for (const [field, value] of [
     if (name.startsWith("@deepseek-ai/dsh-")) manifest[field][name] = value;
   }
 }
+if (manifest.engines && typeof manifest.engines === "object" && manifest.engines.dsh) {
+  manifest.engines.dsh = peerRange;
+}
 const expected = JSON.stringify(manifest, null, 2) + "\n";
 const write = process.argv.includes("--write");
 if (write) await writeFile(manifestUrl, expected);
@@ -47,6 +50,21 @@ for (const [file, pattern, line] of [
     "README.zh-CN.md",
     /^- `[^`]+` 已验证兼容 DeepSeek Harness .*$/m,
     `- \`${manifest.version}\` 已验证兼容 DeepSeek Harness ${supportedHosts.map((v) => "`" + v + "`").join("、")}。`,
+  ],
+  [
+    "README.en.md",
+    /^- Host compatibility: .*$/m,
+    `- Host compatibility: DeepSeek Harness \`0.2.x\` (\`${peerRange}\`), forwards-compatible with subsequent \`0.2.x\` RC releases without requiring routine plugin version bumps. Legacy versions and breaking changes in the \`0.3.0\` generation are rejected by the version gate. If you still use a \`0.1.x\` host, install plugin \`1.1.23\` instead of \`@latest\`.`,
+  ],
+  [
+    "README.md",
+    /^- 宿主支持范围：.*$/m,
+    `- 宿主支持范围：DeepSeek Harness \`0.2.x\`（\`${peerRange}\`），自动支持后续全部 0.2.x RC 版本，同代宿主升级无需重复等待发版。早期版本与 \`0.3.0\` 代际破坏性更新由版本门拦截。仍在使用 \`0.1.x\` 的，请安装插件 \`1.1.23\`，不要装 \`@latest\`。`,
+  ],
+  [
+    "README.zh-CN.md",
+    /^- 宿主支持范围：.*$/m,
+    `- 宿主支持范围：DeepSeek Harness \`0.2.x\`（\`${peerRange}\`），自动支持后续全部 0.2.x RC 版本，同代宿主升级无需重复等待发版。早期版本与 \`0.3.0\` 代际破坏性更新由版本门拦截。仍在使用 \`0.1.x\` 的，请安装插件 \`1.1.23\`，不要装 \`@latest\`。`,
   ],
   [
     "README.en.md",

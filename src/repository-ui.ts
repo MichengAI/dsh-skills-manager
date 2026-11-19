@@ -9,7 +9,6 @@ type RepoCopy = { installedRoot: RepositoryRoot | null; installedWorkspace?: str
 type RepoSkill = RepoView['skills'][number] & { installations?: RepoCopy[] };
 type CopyTarget = { root?: RepositoryRoot; workspace?: string };
 type Feedback = {error?: boolean; payload?: unknown; key?: string; name?: string; text?: string; params?: Record<string, unknown>};
-type InstallRoot = RepositoryRoot;
 type Installation = Feedback & CopyTarget & {id: string; path: string; pending?: boolean; action?: 'install' | 'uninstall'};
 type CatalogCopy = { id: string; name: string; installedRoot: RepositoryRoot; installedWorkspace?: string; canUninstall?: boolean };
 type RepoModal = {type: 'add' | 'manage'} | {type: 'remove'; repo: RepoView} | {type: 'install' | 'uninstall'; repo: RepoView; skill: RepoSkill; copy?: RepoCopy} | {type: 'detail'; repo: RepoView; detail?: ApiRoutes['/repositories/detail']; loading?: boolean; failed?: boolean} | {type: 'catalog-detail'; detail?: ApiRoutes['/catalog/detail']; loading?: boolean; failed?: boolean} | {type: 'catalog-install'; target: CatalogTarget} | {type: 'catalog-uninstall'; copy: CatalogCopy} | {type: 'review' | 'rollback'; repo: RepoView; skill: RepoSkill; copy: RepoCopy; detail: ApiRoutes['/repositories/preview']} | {type: 'bulk-review'} | {type: 'bulk-done'};

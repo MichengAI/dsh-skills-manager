@@ -63,6 +63,16 @@ try {
         Input: (props) => react.createElement("span", { className: props.className }, react.createElement("input", props)),
         Modal: (props) => props.open ? react.createElement("div", { role: "dialog", title: props.title }, props.children, props.footer) : null,
         Menu: (props) => react.createElement("div", { "data-menu-open": props.open }, props.anchor, props.open ? props.items?.map(it => react.createElement("button", { key: it.id, onClick: () => props.onSelect(it.id) }, it.label)) : null),
+        Switch: function Switch(props) {
+          return react.createElement("button", {
+            type: "button",
+            role: "switch",
+            "aria-checked": props.checked,
+            "aria-label": props.label,
+            disabled: props.disabled,
+            onClick: () => (props.onClick ? props.onClick() : props.onChange?.(!props.checked)),
+          });
+        },
       };
     }
     throw new Error("unexpected require: " + id);
@@ -117,7 +127,7 @@ try {
         children: []
       }];
     }
-    if (node.type?.name === "SkillSwitch" || node.props?.closeLabel || (typeof node.type === "function" && node.props && "on" in node.props && typeof node.props.label === "string")) return nodes(node.type({ ...node.props, children: node.children }));
+    if (node.type?.name === "SkillSwitch" || node.type?.name === "Switch" || node.props?.closeLabel || (typeof node.type === "function" && node.props && "on" in node.props && typeof node.props.label === "string")) return nodes(node.type({ ...node.props, children: node.children }));
     if (typeof node.type === "function" && node.props && "userDestinations" in node.props) return nodes(node.type(node.props));
     const nested = linkedNodes(node.children);
     if (typeof node.type === "function") {
@@ -281,7 +291,7 @@ try {
   assert.equal(keptToggle.props.role, "switch", "技能启停使用 switch 角色");
   assert.equal(keptToggle.props["aria-checked"], true, "已启用的技能开关 aria 状态为 true");
   const css = nodes().filter((node) => node.type === "style").map((node) => node.children.join("")).join("");
-  assert.match(css, /\.dssm-enable-switch\[aria-checked=true\]\{background:var\(--dsw-alias-brand-primary/, "开启使用宿主品牌色");
+  assert.doesNotMatch(css, /\.dssm-enable-switch/, "不再手绘开关样式，改用官方 Switch 原语");
   assert.match(css, /\.dssm-skill-row\{[^}]*padding:11px 13px/, "技能行留白对齐仓库行");
   assert.match(css, /\.dssm-skill-desc\{[^}]*--dsw-alias-label-tertiary/, "描述用次级文字色");
   assert.match(css, /\.dssm-icon-action\{[^}]*background:transparent[^}]*border-color:var\(--dsw-alias-border-l2/, "行内描边使用宿主主题令牌和透明底色");
