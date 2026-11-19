@@ -375,11 +375,9 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
       return h(PrimitiveSwitch, {
         checked: props.on,
         label: props.label,
-        "aria-label": props.label,
         disabled: props.disabled,
-        onClick: props.onClick,
         onChange: function () { props.onClick(); }
-      } as any);
+      });
     }
 
     function hostButton(label: React.ReactNode, onClick: () => void, kind: "primary" | "outline" | "danger" = "primary", disabled?: boolean) {

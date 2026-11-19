@@ -81,6 +81,36 @@ for (const [file, pattern, line] of [
     /^  \[!\[DSH 支持至 [^[]+\]\(https:\/\/img\.shields\.io\/badge\/DSH-%E6%94%AF%E6%8C%81%E8%87%B3%20[^)]+\)\]\(#安装\)$/m,
     `  [![DSH 支持至 ${latestHost}](https://img.shields.io/badge/DSH-%E6%94%AF%E6%8C%81%E8%87%B3%20${shieldsHost}-2563eb.svg)](#安装)`,
   ],
+  [
+    "README.de.md",
+    /^  \[!\[Kompatibel bis DSH [^[]+\]\(https:\/\/img\.shields\.io\/badge\/DSH-up%20to%20[^)]+\)\]\(#installation\)$/m,
+    `  [![Kompatibel bis DSH ${latestHost}](https://img.shields.io/badge/DSH-up%20to%20${shieldsHost}-2563eb.svg)](#installation)`,
+  ],
+  [
+    "README.es.md",
+    /^  \[!\[Compatible hasta DSH [^[]+\]\(https:\/\/img\.shields\.io\/badge\/DSH-up%20to%20[^)]+\)\]\(#instalación\)$/m,
+    `  [![Compatible hasta DSH ${latestHost}](https://img.shields.io/badge/DSH-up%20to%20${shieldsHost}-2563eb.svg)](#instalación)`,
+  ],
+  [
+    "README.fr.md",
+    /^  \[!\[Compatible jusqu'à DSH [^[]+\]\(https:\/\/img\.shields\.io\/badge\/DSH-up%20to%20[^)]+\)\]\(#installation\)$/m,
+    `  [![Compatible jusqu'à DSH ${latestHost}](https://img.shields.io/badge/DSH-up%20to%20${shieldsHost}-2563eb.svg)](#installation)`,
+  ],
+  [
+    "README.ja.md",
+    /^  \[!\[DSH 対応バージョン [^[]+\]\(https:\/\/img\.shields\.io\/badge\/DSH-up%20to%20[^)]+\)\]\(#インストール\)$/m,
+    `  [![DSH 対応バージョン ${latestHost}](https://img.shields.io/badge/DSH-up%20to%20${shieldsHost}-2563eb.svg)](#インストール)`,
+  ],
+  [
+    "README.pt.md",
+    /^  \[!\[Compatível até DSH [^[]+\]\(https:\/\/img\.shields\.io\/badge\/DSH-up%20to%20[^)]+\)\]\(#instalação\)$/m,
+    `  [![Compatível até DSH ${latestHost}](https://img.shields.io/badge/DSH-up%20to%20${shieldsHost}-2563eb.svg)](#instalação)`,
+  ],
+  [
+    "README.ru.md",
+    /^  \[!\[Поддерживается до DSH [^[]+\]\(https:\/\/img\.shields\.io\/badge\/DSH-up%20to%20[^)]+\)\]\(#установка\)$/m,
+    `  [![Поддерживается до DSH ${latestHost}](https://img.shields.io/badge/DSH-up%20to%20${shieldsHost}-2563eb.svg)](#установка)`,
+  ],
 ]) {
   const url = new URL("../" + file, import.meta.url);
   const content = await readFile(url, "utf8");

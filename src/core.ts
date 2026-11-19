@@ -2745,6 +2745,7 @@ export async function setEntryLocation(location: EntryLocation): Promise<EntryLo
   return location;
 }
 
+// 向后兼容保留导出：供外部或旧版测试消费，内部统一走 getEntryLocation/setEntryLocation。
 export async function getSidebarEntry(): Promise<boolean> {
   const location = await getEntryLocation();
   return location !== "settings";
@@ -4033,9 +4034,7 @@ function normalizeUploadPath(input: string) {
   const directory = raw.endsWith("/");
   const parts = raw
     .split("/")
-    .filter((_, index, all) =>
-      directory && index === all.length - 1 ? false : true,
-    );
+    .filter((_, index, all) => !(directory && index === all.length - 1));
   if (
     !parts.length ||
     parts.length > MAX_SOURCE_DEPTH ||

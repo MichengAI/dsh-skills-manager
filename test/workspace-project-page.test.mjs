@@ -94,7 +94,7 @@ try {
             "aria-checked": props.checked,
             "aria-label": props.label,
             disabled: props.disabled,
-            onClick: () => (props.onClick ? props.onClick() : props.onChange?.(!props.checked)),
+            onClick: () => props.onChange?.(!props.checked),
           });
         },
       };

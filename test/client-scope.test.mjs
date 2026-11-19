@@ -62,6 +62,16 @@ try {
         Input: (props) => react.createElement("span", { className: props.className }, react.createElement("input", props)),
         Modal: (props) => props.open ? react.createElement("div", { role: "dialog", title: props.title, description: props.description, className: props.className, onClose: props.onClose }, props.description, props.children, props.footer) : null,
         Menu: (props) => react.createElement("div", { "data-menu-open": props.open }, props.anchor, props.open ? props.items?.map(it => react.createElement("button", { key: it.id, onClick: () => props.onSelect(it.id) }, it.label)) : null),
+        Switch: function Switch(props) {
+          return react.createElement("button", {
+            type: "button",
+            role: "switch",
+            "aria-checked": props.checked,
+            "aria-label": props.label,
+            disabled: props.disabled,
+            onClick: () => props.onChange?.(!props.checked),
+          });
+        },
       };
     }
     throw new Error("unexpected require: " + id);
@@ -128,7 +138,7 @@ try {
         children: []
       }];
     }
-    if (node.type?.name === "SkillSwitch" || node.props?.closeLabel || (typeof node.type === "function" && node.props && "on" in node.props && typeof node.props.label === "string")) return nodes(node.type({ ...node.props, children: node.children }));
+    if (node.type?.name === "SkillSwitch" || node.type?.name === "Switch" || node.props?.closeLabel || (typeof node.type === "function" && node.props && "on" in node.props && typeof node.props.label === "string")) return nodes(node.type({ ...node.props, children: node.children }));
     // 目标选择器是普通函数组件：渲染出它的子树，才能断言其中的控件。
     if (typeof node.type === "function" && node.props && "userDestinations" in node.props) return nodes(node.type(node.props));
     const nested = linkedNodes(node.children);
