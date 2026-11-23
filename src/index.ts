@@ -422,6 +422,11 @@ function safeGetMethod(target: unknown, name: string): ((...args: any[]) => any)
   }
 }
 
+function hasConnectionFetch(target: unknown): boolean {
+  const conn = safeGetService<HostContext["connection"]>(target, "connection");
+  return typeof conn?.fetch?.register === "function";
+}
+
 /**
  * 探测当前执行环境是否处于 danger-full-access 文件沙箱模式。
  * 当宿主已明确放开完全文件访问权限时，创建技能写入全局目录无需弹窗二次审批，
@@ -1022,8 +1027,8 @@ function apply(ctx: HostContext, config?: PluginConfig) {
 
   // 方案 A：优先官方标准 connection.fetch.register
   const registerConnectionRoutes = (connCtx: HostContext) => {
-    const connection = safeGetService<HostContext["connection"]>(connCtx, "connection");
-    if (!connection?.fetch?.register) return () => {};
+    if (!hasConnectionFetch(connCtx)) return () => {};
+    const connection = safeGetService<HostContext["connection"]>(connCtx, "connection")!;
 
     // 官方 connection 服务一旦就绪，立即彻底注销 webServer 回退路由，消除 longest-prefix 压制
     unregisterFallback();
@@ -1060,12 +1065,12 @@ function apply(ctx: HostContext, config?: PluginConfig) {
     const webServer = safeGetService<HostContext["webServer"]>(webCtx, "webServer");
     if (!webServer?.register) return () => {};
 
-    // 若 connection 已存在，官方通道优先，绝不注册 webServer 回退路由
-    if (safeGetService(ctx, "connection")) return () => {};
+    // 若 connection.fetch 已就绪，官方通道优先，绝不注册 webServer 回退路由
+    if (hasConnectionFetch(ctx)) return () => {};
 
     const doRegister = () => {
-      // 二次检查 connection
-      if (safeGetService(ctx, "connection")) return () => {};
+      // 二次检查 connection.fetch
+      if (hasConnectionFetch(ctx)) return () => {};
 
       const routeMap = new Map<string, ApiFetchRoute>();
       for (const r of routes) routeMap.set(r.path, r);
@@ -1077,8 +1082,7 @@ function apply(ctx: HostContext, config?: PluginConfig) {
           path: API_PREFIX,
           handler: async (req, res) => {
             // 惰性让位：若 connection 此时已就绪，立即注销自身回退路由并让位
-            const activeConn = safeGetService<HostContext["connection"]>(ctx, "connection");
-            if (activeConn?.fetch?.register) {
+            if (hasConnectionFetch(ctx)) {
               unregisterFallback();
               sendJsonResponse(res, 503, {
                 ok: false,
@@ -1110,12 +1114,25 @@ function apply(ctx: HostContext, config?: PluginConfig) {
               return;
             }
 
-            // 严格路径校验：仅支持根挂载及已声明的反向代理前缀 /app/dsh，其余路径一律 404
+            // 路径校验与定位：支持根挂载及任意合法反向代理前缀（按路径段边界定位 API_PREFIX）
             const u = new URL(req.url!, "http://localhost");
             const path = u.pathname.replace(/\/+$/, "");
-            let candidatePath = path;
-            if (candidatePath.startsWith("/app/dsh/")) {
-              candidatePath = candidatePath.slice("/app/dsh".length);
+            let candidatePath = "";
+            const idx = path.lastIndexOf(API_PREFIX);
+            if (idx === 0) {
+              candidatePath = path;
+            } else if (idx > 0) {
+              const prefix = path.slice(0, idx);
+              // 反代前缀必须由合法路径段构成（以 / 开头，不含空段 // 或路径穿越 ..）
+              if (prefix.startsWith("/") && !prefix.includes("//") && !prefix.split("/").includes("..")) {
+                candidatePath = path.slice(idx);
+              } else {
+                sendJsonResponse(res, 404, { ok: false, code: "error.proto.notFound", error: `unknown action: ${path}` });
+                return;
+              }
+            } else {
+              sendJsonResponse(res, 404, { ok: false, code: "error.proto.notFound", error: `unknown action: ${path}` });
+              return;
             }
             if (candidatePath !== API_PREFIX && !candidatePath.startsWith(`${API_PREFIX}/`)) {
               sendJsonResponse(res, 404, { ok: false, code: "error.proto.notFound", error: `unknown action: ${path}` });
@@ -1193,8 +1210,7 @@ function apply(ctx: HostContext, config?: PluginConfig) {
                     if (totalBytes > MAX_BRIDGE_BODY_BYTES) {
                       settled = true;
                       cleanup();
-                      req.pause();
-                      req.resume(); // 丢弃多余字节，不要立即销毁 socket 确保 413 响应正常送达
+                      // 移除 data 监听器丢弃多余数据流，绝不调用 req.destroy() 以确保 413 响应完整送达客户端
                       const err: CodedError = new Error("request body too large");
                       err.statusCode = 413;
                       err.code = "error.proto.bodyTooLarge";
@@ -1284,8 +1300,7 @@ function apply(ctx: HostContext, config?: PluginConfig) {
   let connectionDisposer: (() => void) | undefined;
   let webServerDisposer: (() => void) | undefined;
 
-  const initialConnection = safeGetService<HostContext["connection"]>(ctx, "connection");
-  if (initialConnection?.fetch?.register) {
+  if (hasConnectionFetch(ctx)) {
     // 官方 connection 服务已就绪：同步在当前上下文注册，错误立即向当前 plugin fiber 冒泡
     connectionDisposer = registerConnectionRoutes(ctx);
   } else {
@@ -1297,7 +1312,9 @@ function apply(ctx: HostContext, config?: PluginConfig) {
       });
       // 监听晚到的 connection 服务（消除启动顺序竞态）：一旦就绪立即注销 webServer 回退并接管
       hostInject(["connection"], (connScope: HostContext) => {
-        connectionDisposer = registerConnectionRoutes(connScope);
+        if (hasConnectionFetch(connScope)) {
+          connectionDisposer = registerConnectionRoutes(connScope);
+        }
       });
     } else {
       if (safeGetService(ctx, "webServer")) {

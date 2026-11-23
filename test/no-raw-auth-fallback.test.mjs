@@ -289,28 +289,37 @@ test('webServer bridge handles loopback request and respects lifecycle disposer'
   assert.equal(isDisposed(), true, 'disposer must invoke webServer route dispose');
 });
 
-test('webServer bridge strictly rejects unanchored or malicious prefix paths with 404', async () => {
+test('webServer bridge strictly rejects non-segment-boundary and invalid prefix paths with 404', async () => {
   const { ctx, raw } = context(undefined);
   apply(ctx);
   const handler = raw[0].handler;
 
-  // /evil-attacker/api/... 必须返回 404，不能被剥离后返回 200
-  const evilPrefixReq = mockReqRes({
-    url: '/evil-attacker/api/michengai/dsh-skills-manager/state',
+  // 1. /evil_api/... 前一位是 _ 而非 /（非路径段边界），必须返回 404
+  const nonBoundaryReq = mockReqRes({
+    url: '/evil_api/michengai/dsh-skills-manager/state',
   });
-  await handler(evilPrefixReq.req, evilPrefixReq.res);
-  assert.equal(evilPrefixReq.getStatus(), 404);
-  const evilData = JSON.parse(evilPrefixReq.getBody());
-  assert.equal(evilData.code, 'error.proto.notFound');
+  await handler(nonBoundaryReq.req, nonBoundaryReq.res);
+  assert.equal(nonBoundaryReq.getStatus(), 404);
+  const nonBoundaryData = JSON.parse(nonBoundaryReq.getBody());
+  assert.equal(nonBoundaryData.code, 'error.proto.notFound');
 
-  // /x/y/z/api/... 也必须返回 404
-  const multiLevelReq = mockReqRes({
-    url: '/x/y/z/api/michengai/dsh-skills-manager/state',
+  // 2. /evil-prefix-api/... 同样非标准路径段边界，必须返回 404
+  const evilDashReq = mockReqRes({
+    url: '/evil-prefix-api/michengai/dsh-skills-manager/state',
   });
-  await handler(multiLevelReq.req, multiLevelReq.res);
-  assert.equal(multiLevelReq.getStatus(), 404);
-  const multiData = JSON.parse(multiLevelReq.getBody());
-  assert.equal(multiData.code, 'error.proto.notFound');
+  await handler(evilDashReq.req, evilDashReq.res);
+  assert.equal(evilDashReq.getStatus(), 404);
+  const evilDashData = JSON.parse(evilDashReq.getBody());
+  assert.equal(evilDashData.code, 'error.proto.notFound');
+
+  // 3. /api/michengai/dsh-skills-manager-extra/state 非法子路径，必须返回 404
+  const invalidSubpathReq = mockReqRes({
+    url: '/api/michengai/dsh-skills-manager-extra/state',
+  });
+  await handler(invalidSubpathReq.req, invalidSubpathReq.res);
+  assert.equal(invalidSubpathReq.getStatus(), 404);
+  const invalidData = JSON.parse(invalidSubpathReq.getBody());
+  assert.equal(invalidData.code, 'error.proto.notFound');
 });
 
 test('webServer bridge immediately settles when client aborts in-flight request (no hang)', async () => {
@@ -389,4 +398,131 @@ test('startup race: connection service arriving late unregisters fallback and ta
   // 断言：webServer 回退路由被立即注销让位，connection 路由接管
   assert.equal(webServerDisposed, true, 'webServer route MUST be disposed when connection arrives');
   assert.ok(connectionRoutesRegistered > 0, 'connection.fetch routes MUST be registered');
+});
+
+test('webServer bridge accepts arbitrary proxy prefixes on path segment boundaries', async () => {
+  const { ctx, raw } = context(undefined);
+  apply(ctx);
+  const handler = raw[0].handler;
+
+  // 1. /dsh/api/... 单段反向代理前缀，必须返回 200
+  const dshPrefixReq = mockReqRes({
+    url: '/dsh/api/michengai/dsh-skills-manager/state',
+  });
+  await handler(dshPrefixReq.req, dshPrefixReq.res);
+  assert.equal(dshPrefixReq.getStatus(), 200, '/dsh/api/... 应当返回 200');
+
+  // 2. /custom-prefix/sub/api/... 多级合法路径段前缀，必须返回 200
+  const customPrefixReq = mockReqRes({
+    url: '/custom-prefix/sub/api/michengai/dsh-skills-manager/state',
+  });
+  await handler(customPrefixReq.req, customPrefixReq.res);
+  assert.equal(customPrefixReq.getStatus(), 200, '/custom-prefix/sub/api/... 应当返回 200');
+
+  // 3. /app/dsh/api/... 经典前缀依然保持返回 200
+  const appDshReq = mockReqRes({
+    url: '/app/dsh/api/michengai/dsh-skills-manager/state',
+  });
+  await handler(appDshReq.req, appDshReq.res);
+  assert.equal(appDshReq.getStatus(), 200, '/app/dsh/api/... 应当返回 200');
+});
+
+test('webServer bridge still registers fallback when connection object exists but has no fetch.register', async () => {
+  let fallbackRegistered = false;
+  const mockCtx = {
+    inject(deps, callback) {
+      if (deps.includes('webServer')) callback(this);
+    },
+    effect(setup) { return setup(); },
+    skills: { registerProvider() { return () => {}; } },
+    tools: { register() { return () => {}; } },
+    sessions: {},
+    webServer: {
+      register(route) {
+        fallbackRegistered = true;
+        return () => {};
+      },
+    },
+    // connection 壳存在，但没有 fetch.register（如特定宿主或测试桩）
+    connection: {},
+  };
+
+  apply(mockCtx);
+  assert.equal(fallbackRegistered, true, 'connection 壳无 fetch 时，webServer 回退路由依然必须正常注册，不得静默短路');
+});
+
+test('webServer bridge lazy handover returns 503 and disposes fallback route if connection becomes available during request', async () => {
+  let fallbackDisposed = false;
+  let webServerHandler;
+
+  const mockCtx = {
+    inject(deps, callback) {
+      if (deps.includes('webServer')) callback(this);
+    },
+    effect(setup) { return setup(); },
+    skills: { registerProvider() { return () => {}; } },
+    tools: { register() { return () => {}; } },
+    sessions: {},
+    webServer: {
+      register(route) {
+        webServerHandler = route.handler;
+        return () => { fallbackDisposed = true; };
+      },
+    },
+    connection: undefined,
+  };
+
+  apply(mockCtx);
+  assert.ok(webServerHandler, 'webServer handler 必须已注册');
+
+  // 模拟在请求处理瞬间 connection 变为就绪（带 fetch.register）
+  mockCtx.connection = {
+    fetch: {
+      register() { return () => {}; },
+    },
+  };
+
+  const reqRes = mockReqRes({
+    url: '/api/michengai/dsh-skills-manager/state',
+  });
+  await webServerHandler(reqRes.req, reqRes.res);
+
+  assert.equal(reqRes.getStatus(), 503, '惰性让位必须响应 503');
+  const data = JSON.parse(reqRes.getBody());
+  assert.equal(data.code, 'error.proto.serviceUnavailable');
+  assert.equal(fallbackDisposed, true, '惰性让位必须立即触发注销回退路由');
+});
+
+test('webServer bridge returns 413 when incremental chunks exceed 2MB body limit', async () => {
+  const { ctx, raw } = context(undefined);
+  apply(ctx);
+  const handler = raw[0].handler;
+
+  const reqRes = mockReqRes({
+    method: 'POST',
+    url: '/api/michengai/dsh-skills-manager/detail',
+    headers: {
+      'content-type': 'application/json',
+      'x-dsh-skills-manager': '1',
+    },
+    deferEnd: true,
+  });
+
+  const handlerPromise = handler(reqRes.req, reqRes.res);
+
+  // 发送 2.5MB 分块数据（分 3 次发送，每次 1MB / 1MB / 512KB）
+  const chunk1 = Buffer.alloc(1024 * 1024, 'a');
+  const chunk2 = Buffer.alloc(1024 * 1024, 'b');
+  const chunk3 = Buffer.alloc(512 * 1024, 'c');
+
+  reqRes.req.emit('data', chunk1);
+  reqRes.req.emit('data', chunk2);
+  reqRes.req.emit('data', chunk3);
+  reqRes.req.emit('end');
+
+  await handlerPromise;
+
+  assert.equal(reqRes.getStatus(), 413, '增量分块超出限制必须返回 413');
+  const data = JSON.parse(reqRes.getBody());
+  assert.equal(data.code, 'error.proto.bodyTooLarge');
 });
