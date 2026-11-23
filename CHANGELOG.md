@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.3] - 2026-11-23
+
+### Multiline Skill Description Separators
+
+- **Preserve separators in multiline descriptions**: supported retaining horizontal separator lines (`---`) inside block scalar descriptions (`|-`, `|`, `>-`) without truncating description content or dropping following metadata (#99).
+- **Ensure skill metadata integrity**: guaranteed that skill names, authors, and configuration fields defined after multiline descriptions are properly recognized and displayed in the skill manager UI (#99).
+
 ## [1.5.2] - 2026-11-23
 
 ### Lightweight Host and Reverse Proxy Support

@@ -76,7 +76,7 @@ dsh plugin --profile web add @michengai/dsh-skills-manager@latest --registry=htt
 
 Restart DSH, refresh the page, and open **Settings → Skills**. To update, update in the host plugin manager or run the installation command again.
 
-- Plugin `1.5.2` is tested with DeepSeek Harness `0.2.2-rc.1`, `0.2.2-rc.2`, `0.2.2-rc.3`, `0.2.2-rc.4`, `0.2.2-rc.5`.
+- Plugin `1.5.3` is tested with DeepSeek Harness `0.2.2-rc.1`, `0.2.2-rc.2`, `0.2.2-rc.3`, `0.2.2-rc.4`, `0.2.2-rc.5`.
 - Host compatibility: DeepSeek Harness `0.2.x` (`>=0.2.2-rc.1 <0.3.0-0`), forwards-compatible with subsequent `0.2.x` RC releases without requiring routine plugin version bumps. Legacy versions and breaking changes in the `0.3.0` generation are rejected by the version gate. If you still use a `0.1.x` host, install plugin `1.1.23`; if you use a `0.2.0.x` or `0.2.1.x` host, install plugin `1.4.12` instead of `@latest`.
 - **Reverse proxy deployment**: Supports hosting DSH behind prefix-stripping reverse proxies (e.g. `/app/dsh/`). API and update endpoints resolve against the page base URI (`document.baseURI`).
 
