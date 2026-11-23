@@ -37,7 +37,16 @@ export interface Agent {
         get?: (key: 'skills') => Skills | undefined;
     };
 }
+interface WebServerRoute {
+    kind: 'exact' | 'prefix';
+    path: string;
+    handler: (request: any, response: any) => Promise<void> | void;
+}
+interface WebServer {
+    register: (route: WebServerRoute) => (() => void) | undefined;
+}
 interface Services {
+    webServer?: WebServer;
     workspaceRegistry: WorkspaceRegistry;
     sessions: Sessions;
     agents: {
@@ -67,6 +76,7 @@ export interface HostContext {
     get?: <K extends keyof Services>(key: K) => Services[K] | undefined;
     sessions?: Sessions;
     skills: Skills;
+    webServer?: WebServer;
     connection?: {
         fetch: {
             register: (route: {

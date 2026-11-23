@@ -5,8 +5,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import * as plugin from "../lib/index.js";
 
-test("方案 A 契约检查：inject 必须包含 connection 服务", () => {
-  assert.ok(plugin.inject.includes("connection"), "plugin.inject 必须包含 connection");
+test("服务依赖契约检查：声明必要的全局核心服务（connection 走动态安全探测以兼容轻量宿主）", () => {
+  assert.ok(plugin.inject.includes("skills"), "plugin.inject 必须包含 skills");
+  assert.ok(plugin.inject.includes("tools"), "plugin.inject 必须包含 tools");
+  assert.ok(plugin.inject.includes("sessions"), "plugin.inject 必须包含 sessions");
 });
 
 test("方案 A 契约检查：管理 API 必须全面通过 ctx.connection.fetch.register 注册", async () => {

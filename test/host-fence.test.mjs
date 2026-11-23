@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { apply, inject } from "../lib/index.js";
 
-// 用例 1: 验证插件声明的 inject 包含 connection，且不依赖私有/未声明服务
-assert.ok(inject.includes("connection"), "inject 必须包含 connection 服务");
+// 用例 1: 验证插件声明的 inject 包含核心服务，且绝不依赖私有/未声明服务（connection 改为动态可选探测以兼容轻量单机宿主）
+assert.ok(inject.includes("skills"), "inject 必须包含 skills 服务");
 assert.ok(!inject.includes("webStartup"), "inject 绝不能依赖 webStartup");
 assert.ok(!inject.includes("webRuntime"), "inject 绝不能依赖 webRuntime");
 

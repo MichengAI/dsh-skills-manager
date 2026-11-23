@@ -53,7 +53,7 @@ import { searchSkillsSh } from "./skills-sh-catalog.js";
 import { loadCatalogPackage, readCatalogSkill } from "./catalog-skill.js";
 
 const name = "skills-manager";
-const inject = ["connection", "skills", "tools", "sessions"];
+const inject = ["skills", "tools", "sessions"];
 const CLIENT_MARKER_HEADER = "x-dsh-skills-manager";
 const MAX_LOG_BYTES = 1 << 20;
 // 文件夹上传允许 64 MiB 原始内容；Base64 会膨胀约 1/3，再为最多 1000 条路径预留余量。
@@ -118,6 +118,59 @@ function validateMutationRequest(req: Request) {
   const contentType = String(req.headers.get("content-type") || "").split(";", 1)[0].trim().toLowerCase();
   if (contentType !== "application/json") return { statusCode: 415, code: "error.proto.contentType", error: "content-type must be application/json" };
   return null;
+}
+
+function extractHostName(hostHeader?: string | null): string {
+  if (!hostHeader) return "";
+  const trimmed = hostHeader.trim().toLowerCase();
+  if (trimmed.startsWith("[")) {
+    const closeIdx = trimmed.indexOf("]");
+    return closeIdx !== -1 ? trimmed.slice(1, closeIdx) : trimmed;
+  }
+  const firstColon = trimmed.indexOf(":");
+  const lastColon = trimmed.lastIndexOf(":");
+  if (firstColon !== -1 && firstColon === lastColon) {
+    return trimmed.slice(0, firstColon);
+  }
+  return trimmed;
+}
+
+function isLoopbackHost(hostname?: string | null): boolean {
+  if (!hostname) return false;
+  const name = hostname.trim().toLowerCase();
+  if (name === "localhost" || name === "localhost." || name === "::1") return true;
+
+  // IPv4 回环 127.0.0.0/8
+  const parts = name.split(".");
+  if (parts.length === 4 && parts[0] === "127") {
+    if (parts.every((p) => /^\d{1,3}$/.test(p) && Number(p) >= 0 && Number(p) <= 255)) {
+      return true;
+    }
+  }
+
+  // IPv4-mapped IPv6：::ffff:127.x.x.x 或十六进制 ::ffff:7fxx:xxxx
+  if (name.startsWith("::ffff:")) {
+    const rest = name.slice(7);
+    if (isLoopbackHost(rest)) return true;
+    const hexMatch = rest.match(/^7f[0-9a-f]{2}:[0-9a-f]{1,4}$/i);
+    if (hexMatch) return true;
+  }
+
+  return false;
+}
+
+function isLoopbackAddress(value?: string | null): boolean {
+  return isLoopbackHost(extractHostName(value));
+}
+
+function sendJsonResponse(res: { writeHead: (code: number, headers?: Record<string, string>) => void; end: (chunk?: string | Buffer) => void }, status: number, payload: unknown) {
+  const body = JSON.stringify(payload);
+  res.writeHead(status, {
+    "content-type": "application/json; charset=utf-8",
+    "cache-control": "no-store",
+    "content-length": String(Buffer.byteLength(body)),
+  });
+  res.end(body);
 }
 
 function jsonResponse(code: number, payload: unknown, headOnly = false): Response {
@@ -945,9 +998,10 @@ function apply(ctx: HostContext, config?: PluginConfig) {
 
   ctx.effect(() => {
     // 方案 A：优先官方标准 connection.fetch.register
-    if (ctx.connection?.fetch?.register) {
+    const connection = safeGetService<HostContext["connection"]>(ctx, "connection");
+    if (connection?.fetch?.register) {
       const disposers = routes.map((route) =>
-        ctx.connection!.fetch.register({
+        connection.fetch.register({
           path: route.path,
           methods: route.methods,
           requestBody: route.requestBody ?? "buffered",
@@ -964,7 +1018,155 @@ function apply(ctx: HostContext, config?: PluginConfig) {
         }
       };
     }
-    ctx.logger?.warn?.("Skills Manager routes require authenticated connection.fetch");
+
+    // 方案 B：无 connection 时自动通过 webServer 桥接（适用于 dsh-go 等轻量/单机宿主）
+    const webServer = safeGetService<HostContext["webServer"]>(ctx, "webServer");
+    if (webServer?.register) {
+      const routeMap = new Map<string, ApiFetchRoute>();
+      for (const r of routes) routeMap.set(r.path, r);
+      let dispose: (() => void) | undefined;
+      try {
+        dispose = webServer.register({
+          kind: "prefix",
+          path: API_PREFIX,
+          handler: async (req, res) => {
+            // 安全守卫 1：校验 HTTP Host 头（防御 DNS Rebinding 攻击）
+            const host = extractHostName(req.headers?.host as string | undefined);
+            if (!host || !isLoopbackHost(host)) {
+              sendJsonResponse(res, 403, { ok: false, code: "error.proto.forbidden", error: "forbidden host header" });
+              return;
+            }
+
+            // 安全守卫 2：限制仅允许本机回环（Loopback）访问，彻底阻断远程外部调用
+            const remote = extractHostName(req.socket?.remoteAddress);
+            if (!remote || !isLoopbackHost(remote)) {
+              sendJsonResponse(res, 403, { ok: false, code: "error.proto.forbidden", error: "forbidden remote access" });
+              return;
+            }
+
+            // 安全守卫 3：如果存在 sec-fetch-site 且不为同源/无来源，拦截跨站调用
+            const site = req.headers?.["sec-fetch-site"];
+            const siteStr = Array.isArray(site) ? site[0] : site;
+            if (siteStr !== undefined && siteStr !== "same-origin" && siteStr !== "none") {
+              sendJsonResponse(res, 403, { ok: false, code: "error.proto.forbidden", error: "forbidden cross-origin request" });
+              return;
+            }
+
+            // 支持前缀部署（如 /app/dsh/api/michengai/dsh-skills-manager/state）
+            const u = new URL(req.url!, "http://localhost");
+            const path = u.pathname.replace(/\/+$/, "");
+            let route = routeMap.get(path);
+            if (!route) {
+              const prefixIdx = path.indexOf(API_PREFIX);
+              if (prefixIdx !== -1) {
+                route = routeMap.get(path.slice(prefixIdx));
+              }
+            }
+            if (!route) {
+              sendJsonResponse(res, 404, { ok: false, code: "error.proto.notFound", error: `unknown action: ${path}` });
+              return;
+            }
+            if (!route.methods.includes(req.method!)) {
+              sendJsonResponse(res, 405, { ok: false, code: "error.proto.methodNotAllowed", error: `method not allowed: ${req.method}` });
+              return;
+            }
+
+            // 请求体体量限制与中断监听
+            const MAX_BRIDGE_BODY_BYTES = MAX_UPLOAD_BODY_BYTES;
+            const contentLength = req.headers?.["content-length"];
+            if (contentLength && Number(contentLength) > MAX_BRIDGE_BODY_BYTES) {
+              sendJsonResponse(res, 413, { ok: false, code: "error.proto.bodyTooLarge", error: "request body too large" });
+              return;
+            }
+
+            const headers = new Headers();
+            for (const [k, v] of Object.entries(req.headers || {})) {
+              if (v !== undefined) {
+                if (Array.isArray(v)) for (const item of v) headers.append(k, item as string);
+                else headers.set(k, v as string);
+              }
+            }
+
+            let aborted = false;
+            const onAborted = () => {
+              aborted = true;
+            };
+            req.on("aborted", onAborted);
+            res.on("close", onAborted);
+
+            try {
+              let bodyBuffer: Buffer | null = null;
+              if (req.method !== "GET" && req.method !== "HEAD") {
+                bodyBuffer = await new Promise<Buffer>((resolve, reject) => {
+                  const chunks: Buffer[] = [];
+                  let totalBytes = 0;
+                  req.on("data", (chunk: Buffer) => {
+                    if (aborted) return;
+                    totalBytes += chunk.length;
+                    if (totalBytes > MAX_BRIDGE_BODY_BYTES) {
+                      aborted = true;
+                      req.destroy();
+                      const err: CodedError = new Error("request body too large");
+                      err.statusCode = 413;
+                      err.code = "error.proto.bodyTooLarge";
+                      reject(err);
+                      return;
+                    }
+                    chunks.push(chunk);
+                  });
+                  req.on("end", () => {
+                    if (!aborted) resolve(Buffer.concat(chunks));
+                  });
+                  req.on("error", reject);
+                });
+              }
+
+              if (aborted) return;
+
+              const fetchReq = new Request(u.toString(), {
+                method: req.method,
+                headers,
+                body: bodyBuffer && bodyBuffer.length > 0 ? new Uint8Array(bodyBuffer) : undefined,
+              });
+              const response = await route.fetch(fetchReq);
+              const responseBuf = Buffer.from(await response.arrayBuffer());
+              if (!res.headersSent) {
+                res.writeHead(response.status, Object.fromEntries(response.headers.entries()));
+                if (req.method === "HEAD") {
+                  res.end();
+                } else {
+                  res.end(responseBuf);
+                }
+              }
+            } catch (caught) {
+              if (res.headersSent) {
+                res.end();
+                return;
+              }
+              const e = caught as CodedError;
+              sendJsonResponse(res, Number.isInteger(e && e.statusCode) ? e.statusCode! : 500, {
+                ok: false,
+                ...(e && typeof e.code === "string" ? { code: e.code } : {}),
+                ...(e && e.params && typeof e.params === "object" && !Array.isArray(e.params) ? { params: e.params } : {}),
+                error: String(e && e.message ? e.message : e),
+              });
+            }
+          },
+        });
+      } catch (err) {
+        ctx.logger?.warn?.(`Skills Manager webServer route registration failed: ${err}`);
+      }
+
+      return () => {
+        try {
+          dispose?.();
+        } catch {
+          /* ignore */
+        }
+      };
+    }
+
+    ctx.logger?.warn?.("Skills Manager routes require authenticated connection.fetch or webServer");
     return () => {};
   }, "skills-manager: API routes");
 }
