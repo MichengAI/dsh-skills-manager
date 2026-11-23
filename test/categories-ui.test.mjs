@@ -426,13 +426,13 @@ try {
   assert.equal(sortCall.body.root, "dsh");
   assert.equal(sortCall.body.direction, "asc");
 
-  // 分类卡片内的上移/下移按钮
+  // 分类卡片内的上移/下移按钮（带分类名称的无障碍 aria-label）
   const betaCat = nodes(dshCard).find(node => node.props.className === "dssm-cat" && node.props["aria-label"] === "Beta分类");
   assert.ok(betaCat, "找到 Beta 分类卡片");
-  const betaMoveUp = nodes(betaCat).find(node => node.props["aria-label"] === t("category.moveUp"));
+  const betaMoveUp = nodes(betaCat).find(node => node.props["aria-label"] === t("category.moveUp") + " Beta分类");
   assert.ok(betaMoveUp, "Beta 分类有上移按钮");
   assert.equal(betaMoveUp.props.disabled, true, "首个分类的上移按钮为 disabled");
-  const betaMoveDown = nodes(betaCat).find(node => node.props["aria-label"] === t("category.moveDown"));
+  const betaMoveDown = nodes(betaCat).find(node => node.props["aria-label"] === t("category.moveDown") + " Beta分类");
   assert.ok(betaMoveDown, "Beta 分类有下移按钮");
   assert.equal(!betaMoveDown.props.disabled, true, "非末尾分类下移按钮可用");
   betaMoveDown.props.onClick();
@@ -442,6 +442,23 @@ try {
   assert.equal(moveDownCall.body.id, "cat-b");
   assert.equal(moveDownCall.body.targetId, "cat-a");
   assert.equal(moveDownCall.body.position, "after");
+
+  // 末项分类（Alpha分类）的上移与下移校验
+  const alphaCat = nodes(dshCard).find(node => node.props.className === "dssm-cat" && node.props["aria-label"] === "Alpha分类");
+  assert.ok(alphaCat, "找到 Alpha 分类卡片");
+  const alphaMoveDown = nodes(alphaCat).find(node => node.props["aria-label"] === t("category.moveDown") + " Alpha分类");
+  assert.ok(alphaMoveDown, "Alpha 分类有下移按钮");
+  assert.equal(alphaMoveDown.props.disabled, true, "末尾分类的下移按钮为 disabled");
+  const alphaMoveUp = nodes(alphaCat).find(node => node.props["aria-label"] === t("category.moveUp") + " Alpha分类");
+  assert.ok(alphaMoveUp, "Alpha 分类有上移按钮");
+  assert.equal(!alphaMoveUp.props.disabled, true, "非首项分类上移按钮可用");
+  alphaMoveUp.props.onClick();
+  await settle();
+  const moveUpCall = calls.filter(c => c.url.endsWith("/category-reorder")).at(-1);
+  assert.equal(moveUpCall.body.root, "dsh");
+  assert.equal(moveUpCall.body.id, "cat-a");
+  assert.equal(moveUpCall.body.targetId, "cat-b");
+  assert.equal(moveUpCall.body.position, "before");
 
   console.log("categories ui ok");
 } finally { globalThis.fetch = originalFetch; }

@@ -1174,10 +1174,10 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
                 setModal({ type: "category-add", root: root.key, id: bucket.id, name: bucket.name, workspace: workspacePath, skills: candidates });
               }, false, busy),
               bucket.locked ? null : iconButton(t("category.rename"), strokeIcon("M9.2 2.8l4 4L6.2 13.8H2.2v-4z"), function () { setCategoryName(bucket.name); setModal({ type: "category-rename", root: root.key, id: bucket.id, name: bucket.name, workspace: workspacePath }); }, false, busy),
-              bucket.locked || !totalUnlocked || totalUnlocked <= 1 ? null : iconButton(t("category.moveUp"), strokeIcon("M4.5 9.5l3.5-3.5 3.5 3.5"), prevCatId ? function () {
+              bucket.locked || !totalUnlocked || totalUnlocked <= 1 ? null : iconButton(t("category.moveUp") + " " + bucket.name, strokeIcon("M4.5 9.5l3.5-3.5 3.5 3.5"), prevCatId ? function () {
                 post("/category-reorder", scoped({ root: root.key, id: bucket.id, targetId: prevCatId, position: "before" }), "category.reordered", { name: bucket.name });
               } : function () {}, false, busy || !prevCatId),
-              bucket.locked || !totalUnlocked || totalUnlocked <= 1 ? null : iconButton(t("category.moveDown"), strokeIcon("M4.5 6.5l3.5 3.5 3.5-3.5"), nextCatId ? function () {
+              bucket.locked || !totalUnlocked || totalUnlocked <= 1 ? null : iconButton(t("category.moveDown") + " " + bucket.name, strokeIcon("M4.5 6.5l3.5 3.5 3.5-3.5"), nextCatId ? function () {
                 post("/category-reorder", scoped({ root: root.key, id: bucket.id, targetId: nextCatId, position: "after" }), "category.reordered", { name: bucket.name });
               } : function () {}, false, busy || !nextCatId),
               bucket.locked ? null : iconButton(t("category.delete"), strokeIcon("M3.5 4.5h9M6.5 4.5V3h3v1.5M5 4.5l.7 8.5h4.6L11 4.5"), function () { setModal({ type: "category-delete", root: root.key, id: bucket.id, name: bucket.name, workspace: workspacePath }); }, true, busy),

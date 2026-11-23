@@ -168,6 +168,19 @@ const gammaIndex = currentCats1.findIndex((c) => c.id === catGamma.category.id);
 const alphaIndex = currentCats1.findIndex((c) => c.id === catAlpha.category.id);
 assert.equal(gammaIndex + 1, alphaIndex, "catGamma 应紧邻在 catAlpha 之前");
 
+// 测试 moveCategory：将 catAlpha 移动到 catBeta 之后 (position: "after")，覆盖下移关键语义
+await moveCategory("dsh", catAlpha.category.id, catBeta.category.id, "after");
+const currentCatsAfter = (await state()).roots.find((r) => r.key === "dsh").categories;
+const alphaIdxAfter = currentCatsAfter.findIndex((c) => c.id === catAlpha.category.id);
+const betaIdxAfter = currentCatsAfter.findIndex((c) => c.id === catBeta.category.id);
+assert.equal(betaIdxAfter + 1, alphaIdxAfter, "catAlpha 应紧邻在 catBeta 之后");
+
+// 测试 moveCategory 防御：targetId === id 自指定时保持原位，不得被移到末尾
+const beforeSelf = (await state()).roots.find((r) => r.key === "dsh").categories.map((c) => c.id);
+await moveCategory("dsh", catAlpha.category.id, catAlpha.category.id, "before");
+const afterSelf = (await state()).roots.find((r) => r.key === "dsh").categories.map((c) => c.id);
+assert.deepEqual(afterSelf, beforeSelf, "targetId === id 自指定时顺序保持不变");
+
 // 测试 moveCategory 移至末尾
 await moveCategory("dsh", catGamma.category.id, undefined, "after");
 const currentCats2 = (await state()).roots.find((r) => r.key === "dsh").categories;
@@ -179,6 +192,11 @@ assert.equal(sortedCatsAsc.ok, undefined, "支持按名称升序排序分类");
 const ascNames = (await state()).roots.find((r) => r.key === "dsh").categories.map((c) => c.name);
 const expectedAsc = [...ascNames].sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }));
 assert.deepEqual(ascNames, expectedAsc, "分类应按名称自然排序");
+
+// 测试 sortCategoriesByName 幂等：重复同向排序直接返回现有列表
+const reSortedCats = await sortCategoriesByName("dsh", "asc");
+assert.equal(reSortedCats.ok, undefined, "重复排序应直接成功返回");
+assert.deepEqual(reSortedCats.categories.map((c) => c.id), sortedCatsAsc.categories.map((c) => c.id), "重复排序结果应保持一致");
 
 // 测试 sortCategoriesByName：按名称降序排序
 const sortedCatsDesc = await sortCategoriesByName("dsh", "desc");

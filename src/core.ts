@@ -3037,6 +3037,8 @@ export async function moveCategory(key: string, id: string, targetId?: string, p
     return categoryError("error.category.position", "分类排序位置无效");
   if (targetId && !list.some((item) => item.id === targetId))
     return categoryError("error.category.notFound", "目标分类不存在", { id: targetId });
+  if (targetId && targetId === id)
+    return { root: ready.rootKey, categories: list };
 
   const remaining = list.filter((item) => item.id !== id);
   let index = targetId ? remaining.findIndex((item) => item.id === targetId) : -1;
@@ -3052,11 +3054,16 @@ export async function moveCategory(key: string, id: string, targetId?: string, p
 export async function sortCategoriesByName(key: string, direction: "asc" | "desc" = "asc", log?: Log, options: ScopeOptions = {}) {
   const ready = await writableCategoryState(key, options);
   if ("ok" in ready) return ready;
-  const list = [...(ready.state.categories[ready.rootKey] || [])];
+  const currentList = ready.state.categories[ready.rootKey] || [];
+  const list = [...currentList];
   list.sort((a, b) => {
     const cmp = a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" });
     return direction === "desc" ? -cmp : cmp;
   });
+  const unchanged = list.length === currentList.length && list.every((item, i) => item.id === currentList[i]?.id);
+  if (unchanged) {
+    return { root: ready.rootKey, categories: currentList };
+  }
   ready.state.categories[ready.rootKey] = list;
   await writeManagerState(ready.state);
   if (log) log("category-sort", `按名称${direction === "desc" ? "降序" : "升序"}排序 ${ready.rootKey} 的分类`);

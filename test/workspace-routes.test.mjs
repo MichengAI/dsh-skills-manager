@@ -302,6 +302,16 @@ try {
   assert.equal(response.status, 200, await response.clone().text());
   const reorderedData = (await response.json()).data;
   assert.equal(reorderedData.categories[0].id, secondCatId, "分类二应重排至首位");
+  // 验证 position: "after" 下移分支
+  response = await post("category-reorder", { root: projectKey, id: secondCatId, targetId: categoryId, position: "after", workspace: registered });
+  assert.equal(response.status, 200, await response.clone().text());
+  const afterData = (await response.json()).data;
+  assert.equal(afterData.categories[1].id, secondCatId, "分类二应移到目标之后");
+  // 验证 targetId === id 防御
+  response = await post("category-reorder", { root: projectKey, id: secondCatId, targetId: secondCatId, position: "before", workspace: registered });
+  assert.equal(response.status, 200, await response.clone().text());
+  const sameData = (await response.json()).data;
+  assert.deepEqual(sameData.categories.map(c => c.id), afterData.categories.map(c => c.id), "自身目标重排顺序保持不变");
   response = await post("category-reorder", { root: projectKey, direction: "asc", workspace: registered });
   assert.equal(response.status, 200, await response.clone().text());
   const sortedNames = (await response.json()).data.categories.map(c => c.name);
