@@ -707,6 +707,84 @@ eq(
   "parseSkillDoc preserves extra indentation on the second literal line",
 );
 
+// ── 多行描述标量中保留缩进的分隔符 (---) 单元测试 ──
+const multilineDocWithSeparators = parseSkillDoc(
+  [
+    "---",
+    "description: |-",
+    "  Intro text.",
+    "  ---",
+    "  Middle section.",
+    "  ---",
+    "  Closing section.",
+    "name: multiline-separators",
+    "author: Alice",
+    "---",
+    "Body line 1.",
+  ].join("\n"),
+);
+eq(
+  multilineDocWithSeparators.hasFrontmatter,
+  true,
+  "parseSkillDoc recognizes frontmatter with multiline separators",
+);
+eq(
+  multilineDocWithSeparators.map.name,
+  "multiline-separators",
+  "parseSkillDoc reads name following multiline separators",
+);
+eq(
+  multilineDocWithSeparators.map.author,
+  "Alice",
+  "parseSkillDoc reads fields after multiline separators",
+);
+eq(
+  multilineDocWithSeparators.map.description,
+  "Intro text.\n---\nMiddle section.\n---\nClosing section.",
+  "parseSkillDoc preserves multiple indented separators in description",
+);
+eq(
+  multilineDocWithSeparators.body,
+  "Body line 1.",
+  "parseSkillDoc extracts body after true closing delimiter",
+);
+
+const foldedWithSeparators = parseSkillDoc(
+  [
+    "---",
+    "name: folded-sep",
+    "description: >-",
+    "  Line one",
+    "  ---",
+    "  Line two",
+    "---",
+    "Body text",
+  ].join("\n"),
+);
+eq(
+  foldedWithSeparators.map.description,
+  "Line one --- Line two",
+  "parseSkillDoc preserves indented separator in folded scalar",
+);
+
+const indentIndicatorWithSeparators = parseSkillDoc(
+  [
+    "---",
+    "name: indent-sep",
+    "description: |2",
+    "  Line one",
+    "    ---",
+    "  Line two",
+    "---",
+    "Body",
+  ].join("\r\n"),
+);
+eq(
+  indentIndicatorWithSeparators.map.description,
+  "Line one\n  ---\nLine two",
+  "parseSkillDoc honors explicit indentation with extra indented separator",
+);
+
 const sectionedSkill = "sectioned-description";
 const sectionedSkillPath = await makeSkill(
   dshRoot,
