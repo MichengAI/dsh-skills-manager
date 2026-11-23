@@ -307,8 +307,9 @@ try {
   assert.equal(response.status, 200, await response.clone().text());
   const afterData = (await response.json()).data;
   assert.equal(afterData.categories[1].id, secondCatId, "分类二应移到目标之后");
-  // 验证 targetId === id 防御
-  response = await post("category-reorder", { root: projectKey, id: secondCatId, targetId: secondCatId, position: "before", workspace: registered });
+  // 验证 targetId === id 防御：前置选取的 categoryId 必须在首位（非末尾），自指定不得被移到末尾
+  assert.equal(afterData.categories[0].id, categoryId, "前置：categoryId 处于非末尾位置");
+  response = await post("category-reorder", { root: projectKey, id: categoryId, targetId: categoryId, position: "before", workspace: registered });
   assert.equal(response.status, 200, await response.clone().text());
   const sameData = (await response.json()).data;
   assert.deepEqual(sameData.categories.map(c => c.id), afterData.categories.map(c => c.id), "自身目标重排顺序保持不变");

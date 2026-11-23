@@ -1,6 +1,6 @@
 // 分类只记在管理器状态里，按来源分开，不移动技能文件。
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, writeFile, readFile, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, writeFile, readFile, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -9,7 +9,7 @@ process.env.DSH_HOME = join(temporary, "dsh");
 process.env.DSH_AGENTS_HOME = join(temporary, "agents");
 process.env.DSH_CODEX_HOME = join(temporary, "codex");
 process.env.HOME = process.env.USERPROFILE = join(temporary, "user");
-const { createCategory, renameCategory, deleteCategory, assignSkillCategory, moveSkillInCategory, moveCategory, sortCategoriesByName, setCategoryEnabled, readManagerState, state, projectRoots, deleteSkill, restoreTrash, permanentlyDeleteTrash } = await import("../lib/core.js");
+const { createCategory, renameCategory, deleteCategory, assignSkillCategory, moveSkillInCategory, moveCategory, sortCategoriesByName, setCategoryEnabled, readManagerState, state, projectRoots, deleteSkill, restoreTrash, permanentlyDeleteTrash, managerStatePath } = await import("../lib/core.js");
 
 const skillText = (name) => `---\nname: ${name}\ndescription: 测试技能\n---\n正文\n`;
 const writeSkill = async (root, name, text = skillText(name)) => {
@@ -175,9 +175,12 @@ const alphaIdxAfter = currentCatsAfter.findIndex((c) => c.id === catAlpha.catego
 const betaIdxAfter = currentCatsAfter.findIndex((c) => c.id === catBeta.category.id);
 assert.equal(betaIdxAfter + 1, alphaIdxAfter, "catAlpha 应紧邻在 catBeta 之后");
 
-// 测试 moveCategory 防御：targetId === id 自指定时保持原位，不得被移到末尾
-const beforeSelf = (await state()).roots.find((r) => r.key === "dsh").categories.map((c) => c.id);
-await moveCategory("dsh", catAlpha.category.id, catAlpha.category.id, "before");
+// 测试 moveCategory 防御：targetId === id 自指定时保持原位，不得被移到末尾（被测分类必须不在末尾，以防假绿）
+const curCatsBeforeSelf = (await state()).roots.find((r) => r.key === "dsh").categories;
+const betaIdx = curCatsBeforeSelf.findIndex((c) => c.id === catBeta.category.id);
+assert.ok(betaIdx >= 0 && betaIdx < curCatsBeforeSelf.length - 1, "前置：被测分类 catBeta 必须不在末尾");
+const beforeSelf = curCatsBeforeSelf.map((c) => c.id);
+await moveCategory("dsh", catBeta.category.id, catBeta.category.id, "before");
 const afterSelf = (await state()).roots.find((r) => r.key === "dsh").categories.map((c) => c.id);
 assert.deepEqual(afterSelf, beforeSelf, "targetId === id 自指定时顺序保持不变");
 
@@ -193,10 +196,13 @@ const ascNames = (await state()).roots.find((r) => r.key === "dsh").categories.m
 const expectedAsc = [...ascNames].sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }));
 assert.deepEqual(ascNames, expectedAsc, "分类应按名称自然排序");
 
-// 测试 sortCategoriesByName 幂等：重复同向排序直接返回现有列表
+// 测试 sortCategoriesByName 幂等：重复同向排序直接返回现有列表，且不得重写状态文件
+const mtimeBefore = (await stat(managerStatePath())).mtimeMs;
 const reSortedCats = await sortCategoriesByName("dsh", "asc");
 assert.equal(reSortedCats.ok, undefined, "重复排序应直接成功返回");
 assert.deepEqual(reSortedCats.categories.map((c) => c.id), sortedCatsAsc.categories.map((c) => c.id), "重复排序结果应保持一致");
+const mtimeAfter = (await stat(managerStatePath())).mtimeMs;
+assert.equal(mtimeAfter, mtimeBefore, "已有序时不应重写状态文件");
 
 // 测试 sortCategoriesByName：按名称降序排序
 const sortedCatsDesc = await sortCategoriesByName("dsh", "desc");

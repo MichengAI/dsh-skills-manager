@@ -76,7 +76,7 @@ dsh plugin --profile web add @michengai/dsh-skills-manager@latest --registry=htt
 
 Restart DSH, refresh the page, and open **Settings → Skills**. To update, update in the host plugin manager or run the installation command again.
 
-- Plugin `1.5.0` is tested with DeepSeek Harness `0.2.2-rc.1`, `0.2.2-rc.2`, `0.2.2-rc.3`, `0.2.2-rc.4`, `0.2.2-rc.5`.
+- Plugin `1.5.1` is tested with DeepSeek Harness `0.2.2-rc.1`, `0.2.2-rc.2`, `0.2.2-rc.3`, `0.2.2-rc.4`, `0.2.2-rc.5`.
 - Host compatibility: DeepSeek Harness `0.2.x` (`>=0.2.2-rc.1 <0.3.0-0`), forwards-compatible with subsequent `0.2.x` RC releases without requiring routine plugin version bumps. Legacy versions and breaking changes in the `0.3.0` generation are rejected by the version gate. If you still use a `0.1.x` host, install plugin `1.1.23`; if you use a `0.2.0.x` or `0.2.1.x` host, install plugin `1.4.12` instead of `@latest`.
 - **Reverse proxy deployment**: Supports hosting DSH behind prefix-stripping reverse proxies (e.g. `/app/dsh/`). API and update endpoints resolve against the page base URI (`document.baseURI`).
 
@@ -104,7 +104,7 @@ Native configuration options are available:
 | **Inspect content** | Click **View details** on any skill row to read `SKILL.md` content and diagnostics in a 760px wide resizable dialog, with one-click **Copy body**. |
 | **Toggle invocation** | Toggle the switch on the right side of a skill row to enable or disable it for DSH without editing third-party files. |
 | **Change an external source folder** | Click **Source folders…** under the ➕ menu in the header or select **Change skills folder** on the source row, type or browse to a folder, and save. **Restore default** returns to the configured default. Only where this plugin reads changes; no files move and external sources stay read-only. |
-| **Organize categories** | Click **New category** within a source, then drag the grab handle (`⋮⋮`) to reorder or move skills across categories. Toggling a category turns all its member skills on or off. |
+| **Organize categories** | Click **New category** within a source (supporting up to 64 chars with tooltips for long names), adjust category order with **Move up/down** or **Sort by name**, and drag the grab handle (`⋮⋮`) to reorder or move skills across categories. Toggling a category turns all its member skills on or off. |
 | **Create & import** | Click **Create skill…** or **Import skill…** under the ➕ menu in the header. Select destination scope (User directory or a registered workspace project) and path. |
 | **Discover & install** | Open the **Discover** tab to browse trending ClawHub skills or search the skills.sh catalog, or click **Add repository** to subscribe to a public GitHub repo. |
 | **Update repository skills** | Click **Refresh**, inspect file diffs with **Review update**, and confirm to update with an automated backup. |

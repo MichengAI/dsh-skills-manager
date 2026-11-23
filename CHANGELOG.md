@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.5.1] - 2026-11-23
+
+### Category Custom Reordering and Natural Sorting
+
+- **Category reordering and natural sorting**: added "Move up" and "Move down" actions on category cards to customize the display order of categories; provided a quick "Sort by name" action in the source toolbar to instantly sort categories in ascending or descending natural order (#98).
+
+### Category Name Length Limit
+
+- **64-character category name limit**: expanded the character limit for category names from 24 to 64 characters, allowing more expressive category names; added truncation styling and full text tooltips for long category names in the interface (#98).
+
 ## [1.5.0] - 2026-11-19
 
 ### Host Compatibility Matrix
