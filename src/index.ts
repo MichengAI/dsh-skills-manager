@@ -19,6 +19,8 @@ import {
   deleteCategory,
   assignSkillCategory,
   moveSkillInCategory,
+  moveCategory,
+  sortCategoriesByName,
   setCategoryEnabled,
   setSkillNote,
   importSkill,
@@ -842,6 +844,18 @@ function apply(ctx: HostContext, config?: PluginConfig) {
       fetch: (req) => handlePost(req, async (b, scope) => moveSkillInCategory(String(b.root || ""), String(b.name || ""), String(b.category || ""), b.targetName ? String(b.targetName) : undefined, b.position === undefined ? "before" : String(b.position), log, scopedOptions(scope, req.headers.get("x-dsh-skills-session"), await getPresetRootsCached(ctx)))),
     },
     {
+      path: `${API_PREFIX}/category-reorder`,
+      methods: ["POST"],
+      fetch: (req) => handlePost(req, async (b, scope) => {
+        const root = String(b.root || "");
+        const options = scopedOptions(scope, req.headers.get("x-dsh-skills-session"), await getPresetRootsCached(ctx));
+        if (b.direction) {
+          return sortCategoriesByName(root, b.direction === "desc" ? "desc" : "asc", log, options);
+        }
+        return moveCategory(root, String(b.id || ""), b.targetId ? String(b.targetId) : undefined, b.position === "after" ? "after" : "before", log, options);
+      }),
+    },
+    {
       path: `${API_PREFIX}/category-enable`,
       methods: ["POST"],
       fetch: (req) => handlePost(req, async (b, scope) => setCategoryEnabled(String(b.root || ""), String(b.category || ""), true, log, scopedOptions(scope, req.headers.get("x-dsh-skills-session"), await getPresetRootsCached(ctx))), { afterSuccess: afterWrite }),
@@ -958,4 +972,4 @@ function apply(ctx: HostContext, config?: PluginConfig) {
 export { activeSessionCwds, apply, inject, name, notifyChatCatalog, registerAgentSkillProviders };
 
 /** 请求体由各业务入口现有校验解析，此类型只声明路由转交的字段。 */
-type RequestBody = CreateInput & UploadInput & SkillRequest & RepositoryInput & {root?: string; source?: string; conflict?: string; dryRun?: boolean; workspace?: unknown; enabled?: boolean; location?: string; category?: string; targetName?: string; position?: "before" | "after"; catalog?: string; skillId?: string; owner?: string; slug?: string; path?: unknown; key?: string; id?: string; label?: unknown; group?: unknown; sources?: unknown[]; note?: string};
+type RequestBody = CreateInput & UploadInput & SkillRequest & RepositoryInput & {root?: string; source?: string; conflict?: string; dryRun?: boolean; workspace?: unknown; enabled?: boolean; location?: string; category?: string; targetName?: string; targetId?: string; position?: "before" | "after"; direction?: "asc" | "desc"; catalog?: string; skillId?: string; owner?: string; slug?: string; path?: unknown; key?: string; id?: string; label?: unknown; group?: unknown; sources?: unknown[]; note?: string};

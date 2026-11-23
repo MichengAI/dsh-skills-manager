@@ -2556,7 +2556,7 @@ function normalizeManagerState(value: ManagerState) {
   return normalized;
 }
 
-const CATEGORY_NAME_MAX = 24;
+const CATEGORY_NAME_MAX = 64;
 const SKILL_NOTE_MAX = 500;
 
 function normalizeCustomNotes(value: ManagerState["customNotes"] | undefined) {
@@ -2984,7 +2984,7 @@ export async function createCategory(key: string, name: string, log?: Log, optio
   if ("ok" in ready) return ready;
   const label = String(name || "").trim();
   if (!label || label.length > CATEGORY_NAME_MAX)
-    return categoryError("error.category.name", "分类名称不能为空，且不能超过 24 个字符");
+    return categoryError("error.category.name", "分类名称不能为空，且不能超过 64 个字符");
   if (ready.state.categories[ready.rootKey].some((item) => item.name === label))
     return categoryError("error.category.duplicate", `已有同名分类: ${label}`, { name: label });
   const category = { id: randomBytes(8).toString("hex"), name: label };
@@ -3003,7 +3003,7 @@ export async function renameCategory(key: string, id: string, name: string, log?
   const category = list.find((item) => item.id === id);
   if (!category) return categoryError("error.category.notFound", "分类不存在", { id });
   if (!label || label.length > CATEGORY_NAME_MAX)
-    return categoryError("error.category.name", "分类名称不能为空，且不能超过 24 个字符");
+    return categoryError("error.category.name", "分类名称不能为空，且不能超过 64 个字符");
   if (list.some((item) => item !== category && item.name === label))
     return categoryError("error.category.duplicate", `已有同名分类: ${label}`, { name: label });
   category.name = label;
@@ -3025,6 +3025,42 @@ export async function deleteCategory(key: string, id: string, log?: Log, options
   await writeManagerState(ready.state);
   if (log) log("category-delete", `删除 ${ready.rootKey} 分类 ${id}，技能留在未分类`);
   return { root: ready.rootKey, id };
+}
+
+export async function moveCategory(key: string, id: string, targetId?: string, position: string = "before", log?: Log, options: ScopeOptions = {}) {
+  const ready = await writableCategoryState(key, options);
+  if ("ok" in ready) return ready;
+  const list = ready.state.categories[ready.rootKey] || [];
+  const current = list.find((item) => item.id === id);
+  if (!current) return categoryError("error.category.notFound", "分类不存在", { id });
+  if (position !== "before" && position !== "after")
+    return categoryError("error.category.position", "分类排序位置无效");
+  if (targetId && !list.some((item) => item.id === targetId))
+    return categoryError("error.category.notFound", "目标分类不存在", { id: targetId });
+
+  const remaining = list.filter((item) => item.id !== id);
+  let index = targetId ? remaining.findIndex((item) => item.id === targetId) : -1;
+  if (index < 0) index = remaining.length;
+  else if (position === "after") index += 1;
+  remaining.splice(index, 0, current);
+  ready.state.categories[ready.rootKey] = remaining;
+  await writeManagerState(ready.state);
+  if (log) log("category-reorder", `调整 ${ready.rootKey} 分类顺序: ${current.name} -> ${position} ${targetId || "末尾"}`);
+  return { root: ready.rootKey, categories: remaining };
+}
+
+export async function sortCategoriesByName(key: string, direction: "asc" | "desc" = "asc", log?: Log, options: ScopeOptions = {}) {
+  const ready = await writableCategoryState(key, options);
+  if ("ok" in ready) return ready;
+  const list = [...(ready.state.categories[ready.rootKey] || [])];
+  list.sort((a, b) => {
+    const cmp = a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" });
+    return direction === "desc" ? -cmp : cmp;
+  });
+  ready.state.categories[ready.rootKey] = list;
+  await writeManagerState(ready.state);
+  if (log) log("category-sort", `按名称${direction === "desc" ? "降序" : "升序"}排序 ${ready.rootKey} 的分类`);
+  return { root: ready.rootKey, categories: list };
 }
 
 export async function assignSkillCategory(key: string, skillName: string, categoryId: string, log?: Log, options: ScopeOptions = {}) {

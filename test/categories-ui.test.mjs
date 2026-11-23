@@ -393,5 +393,55 @@ try {
   assert.equal(nodes(searched).find((node) => node.props["aria-label"] === t("category.toggle") + " 工作").props["aria-checked"], false, "搜索不能把分类开关显示成整组已开启");
   assert.ok(textOf(searched).includes(t("category.progress", { count: 2, enabled: 1, usable: 2 })), "分类数量仍按整组计算");
 
+  // 验证分类长标题截断保护结构与 title 提示
+  const catTitleNode = nodes(searched).find((node) => node.props.className === "dssm-cat-title");
+  assert.ok(catTitleNode, "分类标题节点存在");
+  assert.equal(catTitleNode.props.title, "工作", "分类标题需提供原生 title 悬浮提示完整名称");
+  assert.ok(nodes(catTitleNode).some((node) => node.props.className === "dssm-cat-title-text" && node.children.includes("工作")), "分类标题内部使用 dssm-cat-title-text 实现长文字截断保护");
+
+  // 验证分类创建输入框 maxLength 为 64
+  const dshSource = sources().find(node => node.props["data-source-key"] === "dsh");
+  nodes(dshSource).find(node => node.props["aria-label"] === t("category.create")).props.onClick();
+  render();
+  const catInput = find(node => node.props["aria-label"] === t("category.name"));
+  assert.equal(catInput.props.maxLength, 64, "分类输入框 maxLength 限制应放宽至 64");
+  nodes().filter(node => node.children && node.children.includes(t("btn.cancel")) && node.props.onClick).at(-1)?.props?.onClick();
+  render();
+
+  // 测试多分类下的分类重排按钮与一键按名称排序
+  find((node) => node.props.placeholder === t("search.placeholder")).props.onChange({ target: { value: "" } });
+  globalData.roots[0].categories = [
+    { id: "cat-b", name: "Beta分类" },
+    { id: "cat-a", name: "Alpha分类" }
+  ];
+  render();
+  const dshCard = sources().find(node => node.props["data-source-key"] === "dsh");
+  // 来源头部的按名称排序按钮
+  const sortBtn = nodes(dshCard).find(node => node.props["aria-label"] === t("category.sortByName"));
+  assert.ok(sortBtn, "分类数大于等于2时展示按名称排序按钮");
+  sortBtn.props.onClick();
+  await settle();
+  const sortCall = calls.filter(c => c.url.endsWith("/category-reorder")).at(-1);
+  assert.ok(sortCall, "点击触发 /category-reorder");
+  assert.equal(sortCall.body.root, "dsh");
+  assert.equal(sortCall.body.direction, "asc");
+
+  // 分类卡片内的上移/下移按钮
+  const betaCat = nodes(dshCard).find(node => node.props.className === "dssm-cat" && node.props["aria-label"] === "Beta分类");
+  assert.ok(betaCat, "找到 Beta 分类卡片");
+  const betaMoveUp = nodes(betaCat).find(node => node.props["aria-label"] === t("category.moveUp"));
+  assert.ok(betaMoveUp, "Beta 分类有上移按钮");
+  assert.equal(betaMoveUp.props.disabled, true, "首个分类的上移按钮为 disabled");
+  const betaMoveDown = nodes(betaCat).find(node => node.props["aria-label"] === t("category.moveDown"));
+  assert.ok(betaMoveDown, "Beta 分类有下移按钮");
+  assert.equal(!betaMoveDown.props.disabled, true, "非末尾分类下移按钮可用");
+  betaMoveDown.props.onClick();
+  await settle();
+  const moveDownCall = calls.filter(c => c.url.endsWith("/category-reorder")).at(-1);
+  assert.equal(moveDownCall.body.root, "dsh");
+  assert.equal(moveDownCall.body.id, "cat-b");
+  assert.equal(moveDownCall.body.targetId, "cat-a");
+  assert.equal(moveDownCall.body.position, "after");
+
   console.log("categories ui ok");
 } finally { globalThis.fetch = originalFetch; }

@@ -9,7 +9,7 @@ process.env.DSH_HOME = join(temporary, "dsh");
 process.env.DSH_AGENTS_HOME = join(temporary, "agents");
 process.env.DSH_CODEX_HOME = join(temporary, "codex");
 process.env.HOME = process.env.USERPROFILE = join(temporary, "user");
-const { createCategory, renameCategory, deleteCategory, assignSkillCategory, moveSkillInCategory, setCategoryEnabled, readManagerState, state, projectRoots, deleteSkill, restoreTrash, permanentlyDeleteTrash } = await import("../lib/core.js");
+const { createCategory, renameCategory, deleteCategory, assignSkillCategory, moveSkillInCategory, moveCategory, sortCategoriesByName, setCategoryEnabled, readManagerState, state, projectRoots, deleteSkill, restoreTrash, permanentlyDeleteTrash } = await import("../lib/core.js");
 
 const skillText = (name) => `---\nname: ${name}\ndescription: 测试技能\n---\n正文\n`;
 const writeSkill = async (root, name, text = skillText(name)) => {
@@ -143,6 +143,54 @@ const duplicateName = await createCategory("dsh", "去空格分类");
 assert.equal(duplicateName.code, "error.category.duplicate", "同来源下已存在的同名分类应报错拒绝");
 const selfRename = await renameCategory("dsh", trimmedCategory.category.id, "去空格分类");
 assert.equal(selfRename.category.name, "去空格分类", "重命名为自身名称保持幂等");
+
+// 字符长度测试：支持最长 64 字符，超过 64 字符被拒绝
+const len64Name = "c".repeat(64);
+const cat64 = await createCategory("dsh", len64Name);
+assert.equal(cat64.ok, undefined, "允许创建 64 字符上限的分类");
+assert.equal(cat64.category.name, len64Name);
+const len65Name = "c".repeat(65);
+const cat65 = await createCategory("dsh", len65Name);
+assert.equal(cat65.code, "error.category.name", "超过 64 字符应被拒绝");
+const rename65 = await renameCategory("dsh", cat64.category.id, len65Name);
+assert.equal(rename65.code, "error.category.name", "重命名超过 64 字符应被拒绝");
+await deleteCategory("dsh", cat64.category.id);
+
+// 分类自选排序与按名称排序测试
+const catAlpha = await createCategory("dsh", "Playwright-Alpha");
+const catBeta = await createCategory("dsh", "Playwright-Beta");
+const catGamma = await createCategory("dsh", "Playwright-Gamma");
+// 测试 moveCategory：将 catGamma 移动到 catAlpha 之前
+const movedCategory = await moveCategory("dsh", catGamma.category.id, catAlpha.category.id, "before");
+assert.equal(movedCategory.ok, undefined, "支持将分类移动到目标分类之前");
+const currentCats1 = (await state()).roots.find((r) => r.key === "dsh").categories;
+const gammaIndex = currentCats1.findIndex((c) => c.id === catGamma.category.id);
+const alphaIndex = currentCats1.findIndex((c) => c.id === catAlpha.category.id);
+assert.equal(gammaIndex + 1, alphaIndex, "catGamma 应紧邻在 catAlpha 之前");
+
+// 测试 moveCategory 移至末尾
+await moveCategory("dsh", catGamma.category.id, undefined, "after");
+const currentCats2 = (await state()).roots.find((r) => r.key === "dsh").categories;
+assert.equal(currentCats2[currentCats2.length - 1].id, catGamma.category.id, "catGamma 应被移到末尾");
+
+// 测试 sortCategoriesByName：按名称升序排序
+const sortedCatsAsc = await sortCategoriesByName("dsh", "asc");
+assert.equal(sortedCatsAsc.ok, undefined, "支持按名称升序排序分类");
+const ascNames = (await state()).roots.find((r) => r.key === "dsh").categories.map((c) => c.name);
+const expectedAsc = [...ascNames].sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }));
+assert.deepEqual(ascNames, expectedAsc, "分类应按名称自然排序");
+
+// 测试 sortCategoriesByName：按名称降序排序
+const sortedCatsDesc = await sortCategoriesByName("dsh", "desc");
+assert.equal(sortedCatsDesc.ok, undefined, "支持按名称降序排序分类");
+const descNames = (await state()).roots.find((r) => r.key === "dsh").categories.map((c) => c.name);
+const expectedDesc = [...descNames].sort((a, b) => b.localeCompare(a, undefined, { numeric: true, sensitivity: "base" }));
+assert.deepEqual(descNames, expectedDesc, "分类应按名称降序排序");
+
+// 清理测试分类
+await deleteCategory("dsh", catAlpha.category.id);
+await deleteCategory("dsh", catBeta.category.id);
+await deleteCategory("dsh", catGamma.category.id);
 
 await rm(temporary, { recursive: true, force: true });
 console.log("categories ok");

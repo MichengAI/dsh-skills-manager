@@ -293,6 +293,19 @@ try {
   response = await post("category-move", { root: projectKey, name: "route-create", category: categoryId, workspace: registered });
   assert.equal(response.status, 200, await response.clone().text());
   assert.deepEqual(emitted, [], "排序只改管理器元数据，不刷新宿主技能目录");
+
+  // 验证 /category-reorder 路由：自选排序与按名称自然排序
+  response = await post("category-create", { root: projectKey, name: "路由分类二", workspace: registered });
+  assert.equal(response.status, 200);
+  const secondCatId = (await response.json()).data.category.id;
+  response = await post("category-reorder", { root: projectKey, id: secondCatId, targetId: categoryId, position: "before", workspace: registered });
+  assert.equal(response.status, 200, await response.clone().text());
+  const reorderedData = (await response.json()).data;
+  assert.equal(reorderedData.categories[0].id, secondCatId, "分类二应重排至首位");
+  response = await post("category-reorder", { root: projectKey, direction: "asc", workspace: registered });
+  assert.equal(response.status, 200, await response.clone().text());
+  const sortedNames = (await response.json()).data.categories.map(c => c.name);
+  assert.deepEqual(sortedNames, ["路由分类", "路由分类二"], "按名称自然排序");
   // 验证 /skill-note 路由：作用域、成功与失败校验
   response = await post("skill-note", { root: projectKey, name: "route-create", note: "路由测试备注", workspace: registered });
   assert.equal(response.status, 200, await response.clone().text());
