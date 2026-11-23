@@ -70,6 +70,39 @@ try {
   await reactivated.dispose();
   await reactivated.await();
   assert.equal(fetchRoutes.size, 0);
+
+  // 验证真实 Cordis 运行时的启动顺序竞态：connection 晚到时自动注销 webServer 回退路由并接管
+  const raceCtx = new Context();
+  const raceWebServer = new WebServer(raceCtx, { host: "127.0.0.1", port: 0 });
+  raceCtx.provide("skills", { registerProvider() { return () => {}; } });
+  raceCtx.provide("tools", {});
+  raceCtx.provide("sessions", {});
+
+  const raceFiber = raceCtx.plugin(plugin);
+  await raceFiber.await();
+  assert.ok(raceWebServer.prefixes.has(prefix), "无 connection 时 webServer 回退路由应当生效挂载");
+
+  // 模拟宿主连接服务晚到并 provide
+  const lateFetchRoutes = new Map();
+  raceCtx.provide("connection", {
+    fetch: {
+      register(route) {
+        lateFetchRoutes.set(route.path, route);
+        return () => lateFetchRoutes.delete(route.path);
+      },
+    },
+  });
+  await raceFiber.await();
+
+  // 断言：connection 就绪后，webServer 上的长前缀必须被自动注销，官方通道彻底接管（零 longest-prefix 压制）
+  assert.equal(raceWebServer.prefixes.has(prefix), false, "connection 到达后 webServer 回退路由必须立即自动注销");
+  assert.ok(lateFetchRoutes.size > 0, "connection 到达后必须接管并注册所有 Fetch 路由");
+  assert.ok(lateFetchRoutes.has(`${prefix}/state`));
+
+  await raceFiber.dispose();
+  await raceFiber.await();
+  assert.equal(lateFetchRoutes.size, 0, "卸载后清理所有路由");
+  await raceCtx.fiber.dispose();
 } finally {
   await ctx.fiber.dispose();
 }

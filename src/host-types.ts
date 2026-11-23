@@ -1,3 +1,4 @@
+import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { CreateInput, ScopeOptions } from './types.js';
 import type { ProviderCandidate, createSkill, getProviderSkill } from './core.js';
 /** 七版宿主实际使用的最小服务契约，兼容旧版可选服务与返回值。 */
@@ -40,7 +41,7 @@ export interface Agent {
 interface WebServerRoute {
     kind: 'exact' | 'prefix';
     path: string;
-    handler: (request: any, response: any) => Promise<void> | void;
+    handler: (request: IncomingMessage, response: ServerResponse) => Promise<void> | void;
 }
 interface WebServer {
     register: (route: WebServerRoute) => (() => void) | undefined;

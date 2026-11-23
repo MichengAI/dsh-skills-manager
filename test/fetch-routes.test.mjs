@@ -11,7 +11,7 @@ test("服务依赖契约检查：声明必要的全局核心服务（connection 
   assert.ok(plugin.inject.includes("sessions"), "plugin.inject 必须包含 sessions");
 });
 
-test("方案 A 契约检查：管理 API 必须全面通过 ctx.connection.fetch.register 注册", async () => {
+test("方案 A 契约检查：存在 connection 时管理 API 优先通过 ctx.connection.fetch.register 注册", async () => {
   const registeredRoutes = new Map();
   const disposersCalled = [];
 

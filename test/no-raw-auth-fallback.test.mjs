@@ -288,3 +288,105 @@ test('webServer bridge handles loopback request and respects lifecycle disposer'
   cleanup();
   assert.equal(isDisposed(), true, 'disposer must invoke webServer route dispose');
 });
+
+test('webServer bridge strictly rejects unanchored or malicious prefix paths with 404', async () => {
+  const { ctx, raw } = context(undefined);
+  apply(ctx);
+  const handler = raw[0].handler;
+
+  // /evil-attacker/api/... 必须返回 404，不能被剥离后返回 200
+  const evilPrefixReq = mockReqRes({
+    url: '/evil-attacker/api/michengai/dsh-skills-manager/state',
+  });
+  await handler(evilPrefixReq.req, evilPrefixReq.res);
+  assert.equal(evilPrefixReq.getStatus(), 404);
+  const evilData = JSON.parse(evilPrefixReq.getBody());
+  assert.equal(evilData.code, 'error.proto.notFound');
+
+  // /x/y/z/api/... 也必须返回 404
+  const multiLevelReq = mockReqRes({
+    url: '/x/y/z/api/michengai/dsh-skills-manager/state',
+  });
+  await handler(multiLevelReq.req, multiLevelReq.res);
+  assert.equal(multiLevelReq.getStatus(), 404);
+  const multiData = JSON.parse(multiLevelReq.getBody());
+  assert.equal(multiData.code, 'error.proto.notFound');
+});
+
+test('webServer bridge immediately settles when client aborts in-flight request (no hang)', async () => {
+  const { ctx, raw } = context(undefined);
+  apply(ctx);
+  const handler = raw[0].handler;
+
+  const abortedReq = mockReqRes({
+    method: 'POST',
+    url: '/api/michengai/dsh-skills-manager/detail',
+    headers: {
+      'content-type': 'application/json',
+      'x-dsh-skills-manager': '1',
+    },
+    deferEnd: true,
+  });
+
+  const handlerPromise = handler(abortedReq.req, abortedReq.res);
+
+  // 模拟客户端中途断开连接
+  abortedReq.req.emit('aborted');
+
+  // 验证 handlerPromise 必须在 50ms 内完成 settle，绝不悬挂
+  const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('HUNG: handler did not settle on abort')), 50));
+  await Promise.race([handlerPromise, timeoutPromise]);
+});
+
+test('startup race: connection service arriving late unregisters fallback and takes over', async () => {
+  // 模拟 Cordis 的响应式服务依赖机制
+  const injectedCallbacks = {};
+  let webServerDisposed = false;
+  let connectionRoutesRegistered = 0;
+
+  const mockCtx = {
+    inject(deps, callback) {
+      for (const dep of deps) {
+        if (!injectedCallbacks[dep]) injectedCallbacks[dep] = [];
+        injectedCallbacks[dep].push(callback);
+      }
+    },
+    effect(setup) { return setup(); },
+    skills: { registerProvider() { return () => {}; } },
+    tools: { register() { return () => {}; } },
+    sessions: {},
+    webServer: {
+      register(route) {
+        return () => { webServerDisposed = true; };
+      },
+    },
+    connection: undefined,
+  };
+
+  apply(mockCtx);
+
+  // 1. 触发 webServer 注入（此时 connection 仍未到达，如 dsh-go 或 connection 较慢）
+  if (injectedCallbacks['webServer']) {
+    for (const cb of injectedCallbacks['webServer']) cb(mockCtx);
+  }
+  assert.equal(webServerDisposed, false, 'webServer fallback should be active initially');
+
+  // 2. 模拟 connection 服务延迟就绪
+  mockCtx.connection = {
+    fetch: {
+      register(route) {
+        connectionRoutesRegistered++;
+        return () => {};
+      },
+    },
+  };
+
+  // 触发 connection 注入
+  if (injectedCallbacks['connection']) {
+    for (const cb of injectedCallbacks['connection']) cb(mockCtx);
+  }
+
+  // 断言：webServer 回退路由被立即注销让位，connection 路由接管
+  assert.equal(webServerDisposed, true, 'webServer route MUST be disposed when connection arrives');
+  assert.ok(connectionRoutesRegistered > 0, 'connection.fetch routes MUST be registered');
+});

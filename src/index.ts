@@ -58,6 +58,7 @@ const CLIENT_MARKER_HEADER = "x-dsh-skills-manager";
 const MAX_LOG_BYTES = 1 << 20;
 // 文件夹上传允许 64 MiB 原始内容；Base64 会膨胀约 1/3，再为最多 1000 条路径预留余量。
 const MAX_UPLOAD_BODY_BYTES = 88 << 20;
+const MAX_BRIDGE_BODY_BYTES = MAX_UPLOAD_BODY_BYTES;
 
 function makeLog(): Log {
   const file = logPath();
@@ -406,6 +407,16 @@ function safeGetService<T = unknown>(target: unknown, name: string): T | undefin
   }
   try {
     return targetObj[name] as T;
+  } catch {
+    return undefined;
+  }
+}
+
+function safeGetMethod(target: unknown, name: string): ((...args: any[]) => any) | undefined {
+  if (!target || typeof target !== "object") return undefined;
+  try {
+    const fn = (target as any)[name];
+    return typeof fn === "function" ? fn.bind(target) : undefined;
   } catch {
     return undefined;
   }
@@ -996,12 +1007,30 @@ function apply(ctx: HostContext, config?: PluginConfig) {
     },
   ];
 
-  ctx.effect(() => {
-    // 方案 A：优先官方标准 connection.fetch.register
-    const connection = safeGetService<HostContext["connection"]>(ctx, "connection");
-    if (connection?.fetch?.register) {
+  let disposeWebServerFallback: (() => void) | undefined;
+
+  const unregisterFallback = () => {
+    if (disposeWebServerFallback) {
+      try {
+        disposeWebServerFallback();
+      } catch {
+        /* ignore */
+      }
+      disposeWebServerFallback = undefined;
+    }
+  };
+
+  // 方案 A：优先官方标准 connection.fetch.register
+  const registerConnectionRoutes = (connCtx: HostContext) => {
+    const connection = safeGetService<HostContext["connection"]>(connCtx, "connection");
+    if (!connection?.fetch?.register) return () => {};
+
+    // 官方 connection 服务一旦就绪，立即彻底注销 webServer 回退路由，消除 longest-prefix 压制
+    unregisterFallback();
+
+    const doRegister = () => {
       const disposers = routes.map((route) =>
-        connection.fetch.register({
+        connection.fetch!.register({
           path: route.path,
           methods: route.methods,
           requestBody: route.requestBody ?? "buffered",
@@ -1017,19 +1046,48 @@ function apply(ctx: HostContext, config?: PluginConfig) {
           }
         }
       };
-    }
+    };
 
-    // 方案 B：无 connection 时自动通过 webServer 桥接（适用于 dsh-go 等轻量/单机宿主）
-    const webServer = safeGetService<HostContext["webServer"]>(ctx, "webServer");
-    if (webServer?.register) {
+    const connEffect = safeGetMethod(connCtx, "effect");
+    if (connEffect) {
+      return connEffect(doRegister, "skills-manager: connection fetch routes");
+    }
+    return doRegister();
+  };
+
+  // 方案 B：轻量宿主（如 dsh-go）webServer 路由回退
+  const registerWebServerFallback = (webCtx: HostContext) => {
+    const webServer = safeGetService<HostContext["webServer"]>(webCtx, "webServer");
+    if (!webServer?.register) return () => {};
+
+    // 若 connection 已存在，官方通道优先，绝不注册 webServer 回退路由
+    if (safeGetService(ctx, "connection")) return () => {};
+
+    const doRegister = () => {
+      // 二次检查 connection
+      if (safeGetService(ctx, "connection")) return () => {};
+
       const routeMap = new Map<string, ApiFetchRoute>();
       for (const r of routes) routeMap.set(r.path, r);
-      let dispose: (() => void) | undefined;
+
+      let rawDisposer: (() => void) | undefined;
       try {
-        dispose = webServer.register({
+        rawDisposer = webServer.register({
           kind: "prefix",
           path: API_PREFIX,
           handler: async (req, res) => {
+            // 惰性让位：若 connection 此时已就绪，立即注销自身回退路由并让位
+            const activeConn = safeGetService<HostContext["connection"]>(ctx, "connection");
+            if (activeConn?.fetch?.register) {
+              unregisterFallback();
+              sendJsonResponse(res, 503, {
+                ok: false,
+                code: "error.proto.serviceUnavailable",
+                error: "service transitioned to authenticated connection, please retry",
+              });
+              return;
+            }
+
             // 安全守卫 1：校验 HTTP Host 头（防御 DNS Rebinding 攻击）
             const host = extractHostName(req.headers?.host as string | undefined);
             if (!host || !isLoopbackHost(host)) {
@@ -1052,16 +1110,19 @@ function apply(ctx: HostContext, config?: PluginConfig) {
               return;
             }
 
-            // 支持前缀部署（如 /app/dsh/api/michengai/dsh-skills-manager/state）
+            // 严格路径校验：仅支持根挂载及已声明的反向代理前缀 /app/dsh，其余路径一律 404
             const u = new URL(req.url!, "http://localhost");
             const path = u.pathname.replace(/\/+$/, "");
-            let route = routeMap.get(path);
-            if (!route) {
-              const prefixIdx = path.indexOf(API_PREFIX);
-              if (prefixIdx !== -1) {
-                route = routeMap.get(path.slice(prefixIdx));
-              }
+            let candidatePath = path;
+            if (candidatePath.startsWith("/app/dsh/")) {
+              candidatePath = candidatePath.slice("/app/dsh".length);
             }
+            if (candidatePath !== API_PREFIX && !candidatePath.startsWith(`${API_PREFIX}/`)) {
+              sendJsonResponse(res, 404, { ok: false, code: "error.proto.notFound", error: `unknown action: ${path}` });
+              return;
+            }
+
+            const route = routeMap.get(candidatePath);
             if (!route) {
               sendJsonResponse(res, 404, { ok: false, code: "error.proto.notFound", error: `unknown action: ${path}` });
               return;
@@ -1072,7 +1133,6 @@ function apply(ctx: HostContext, config?: PluginConfig) {
             }
 
             // 请求体体量限制与中断监听
-            const MAX_BRIDGE_BODY_BYTES = MAX_UPLOAD_BODY_BYTES;
             const contentLength = req.headers?.["content-length"];
             if (contentLength && Number(contentLength) > MAX_BRIDGE_BODY_BYTES) {
               sendJsonResponse(res, 413, { ok: false, code: "error.proto.bodyTooLarge", error: "request body too large" });
@@ -1087,25 +1147,54 @@ function apply(ctx: HostContext, config?: PluginConfig) {
               }
             }
 
-            let aborted = false;
-            const onAborted = () => {
-              aborted = true;
-            };
-            req.on("aborted", onAborted);
-            res.on("close", onAborted);
-
             try {
               let bodyBuffer: Buffer | null = null;
               if (req.method !== "GET" && req.method !== "HEAD") {
                 bodyBuffer = await new Promise<Buffer>((resolve, reject) => {
                   const chunks: Buffer[] = [];
                   let totalBytes = 0;
-                  req.on("data", (chunk: Buffer) => {
-                    if (aborted) return;
+                  let settled = false;
+
+                  const safeOff = (emitter: any, event: string, fn: (...args: any[]) => void) => {
+                    try {
+                      if (typeof emitter?.removeListener === "function") emitter.removeListener(event, fn);
+                      else if (typeof emitter?.off === "function") emitter.off(event, fn);
+                    } catch {
+                      /* ignore */
+                    }
+                  };
+
+                  const cleanup = () => {
+                    safeOff(req, "data", onData);
+                    safeOff(req, "end", onEnd);
+                    safeOff(req, "error", onError);
+                    safeOff(req, "aborted", onAbort);
+                    safeOff(res, "close", onClose);
+                  };
+
+                  const onAbort = () => {
+                    if (settled) return;
+                    settled = true;
+                    cleanup();
+                    const err: CodedError = new Error("request aborted");
+                    err.statusCode = 400;
+                    err.code = "error.proto.aborted";
+                    reject(err);
+                  };
+
+                  const onClose = () => {
+                    if (settled || res.writableEnded) return;
+                    onAbort();
+                  };
+
+                  const onData = (chunk: Buffer) => {
+                    if (settled) return;
                     totalBytes += chunk.length;
                     if (totalBytes > MAX_BRIDGE_BODY_BYTES) {
-                      aborted = true;
-                      req.destroy();
+                      settled = true;
+                      cleanup();
+                      req.pause();
+                      req.resume(); // 丢弃多余字节，不要立即销毁 socket 确保 413 响应正常送达
                       const err: CodedError = new Error("request body too large");
                       err.statusCode = 413;
                       err.code = "error.proto.bodyTooLarge";
@@ -1113,15 +1202,29 @@ function apply(ctx: HostContext, config?: PluginConfig) {
                       return;
                     }
                     chunks.push(chunk);
-                  });
-                  req.on("end", () => {
-                    if (!aborted) resolve(Buffer.concat(chunks));
-                  });
-                  req.on("error", reject);
+                  };
+
+                  const onEnd = () => {
+                    if (settled) return;
+                    settled = true;
+                    cleanup();
+                    resolve(Buffer.concat(chunks));
+                  };
+
+                  const onError = (err: Error) => {
+                    if (settled) return;
+                    settled = true;
+                    cleanup();
+                    reject(err);
+                  };
+
+                  req.on("data", onData);
+                  req.on("end", onEnd);
+                  req.on("error", onError);
+                  req.on("aborted", onAbort);
+                  res.on("close", onClose);
                 });
               }
-
-              if (aborted) return;
 
               const fetchReq = new Request(u.toString(), {
                 method: req.method,
@@ -1139,11 +1242,14 @@ function apply(ctx: HostContext, config?: PluginConfig) {
                 }
               }
             } catch (caught) {
-              if (res.headersSent) {
-                res.end();
+              const e = caught as CodedError;
+              if (e && e.code === "error.proto.aborted") {
                 return;
               }
-              const e = caught as CodedError;
+              if (res.headersSent) {
+                try { res.end(); } catch {}
+                return;
+              }
               sendJsonResponse(res, Number.isInteger(e && e.statusCode) ? e.statusCode! : 500, {
                 ok: false,
                 ...(e && typeof e.code === "string" ? { code: e.code } : {}),
@@ -1157,18 +1263,56 @@ function apply(ctx: HostContext, config?: PluginConfig) {
         ctx.logger?.warn?.(`Skills Manager webServer route registration failed: ${err}`);
       }
 
-      return () => {
+      const disposer = () => {
         try {
-          dispose?.();
+          rawDisposer?.();
         } catch {
           /* ignore */
         }
       };
-    }
+      disposeWebServerFallback = disposer;
+      return disposer;
+    };
 
-    ctx.logger?.warn?.("Skills Manager routes require authenticated connection.fetch or webServer");
-    return () => {};
-  }, "skills-manager: API routes");
+    const webEffect = safeGetMethod(webCtx, "effect");
+    if (webEffect) {
+      return webEffect(doRegister, "skills-manager: webServer fallback route");
+    }
+    return doRegister();
+  };
+
+  let connectionDisposer: (() => void) | undefined;
+  let webServerDisposer: (() => void) | undefined;
+
+  const initialConnection = safeGetService<HostContext["connection"]>(ctx, "connection");
+  if (initialConnection?.fetch?.register) {
+    // 官方 connection 服务已就绪：同步在当前上下文注册，错误立即向当前 plugin fiber 冒泡
+    connectionDisposer = registerConnectionRoutes(ctx);
+  } else {
+    // connection 尚不可用：挂载轻量宿主（dsh-go 等）webServer 回退路由
+    const hostInject = safeGetMethod(ctx, "inject");
+    if (hostInject) {
+      hostInject(["webServer"], (webScope: HostContext) => {
+        webServerDisposer = registerWebServerFallback(webScope);
+      });
+      // 监听晚到的 connection 服务（消除启动顺序竞态）：一旦就绪立即注销 webServer 回退并接管
+      hostInject(["connection"], (connScope: HostContext) => {
+        connectionDisposer = registerConnectionRoutes(connScope);
+      });
+    } else {
+      if (safeGetService(ctx, "webServer")) {
+        webServerDisposer = registerWebServerFallback(ctx);
+      } else {
+        ctx.logger?.warn?.("Skills Manager routes require authenticated connection.fetch or webServer");
+      }
+    }
+  }
+
+  return () => {
+    try { connectionDisposer?.(); } catch {}
+    try { webServerDisposer?.(); } catch {}
+    unregisterFallback();
+  };
 }
 
 export { activeSessionCwds, apply, inject, name, notifyChatCatalog, registerAgentSkillProviders };
