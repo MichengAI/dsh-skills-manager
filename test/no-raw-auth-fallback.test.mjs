@@ -493,7 +493,7 @@ test('webServer bridge lazy handover returns 503 and disposes fallback route if 
   assert.equal(fallbackDisposed, true, '惰性让位必须立即触发注销回退路由');
 });
 
-test('webServer bridge returns 413 when incremental chunks exceed 2MB body limit', async () => {
+test('webServer bridge returns 413 when incremental chunks exceed bridge body limit (88MiB)', async () => {
   const { ctx, raw } = context(undefined);
   apply(ctx);
   const handler = raw[0].handler;
@@ -510,19 +510,17 @@ test('webServer bridge returns 413 when incremental chunks exceed 2MB body limit
 
   const handlerPromise = handler(reqRes.req, reqRes.res);
 
-  // 发送 2.5MB 分块数据（分 3 次发送，每次 1MB / 1MB / 512KB）
-  const chunk1 = Buffer.alloc(1024 * 1024, 'a');
-  const chunk2 = Buffer.alloc(1024 * 1024, 'b');
-  const chunk3 = Buffer.alloc(512 * 1024, 'c');
-
-  reqRes.req.emit('data', chunk1);
-  reqRes.req.emit('data', chunk2);
-  reqRes.req.emit('data', chunk3);
-  reqRes.req.emit('end');
+  // 发送增量分块数据（总计 90MB，超过 MAX_BRIDGE_BODY_BYTES 88MiB）
+  // 复用同一个 30MB buffer 发送 3 次，避免占用多余测试内存
+  const chunk = Buffer.alloc(30 * 1024 * 1024, 'x');
+  reqRes.req.emit('data', chunk);
+  reqRes.req.emit('data', chunk);
+  reqRes.req.emit('data', chunk);
 
   await handlerPromise;
 
-  assert.equal(reqRes.getStatus(), 413, '增量分块超出限制必须返回 413');
+  assert.equal(reqRes.getStatus(), 413, '增量分块超出桥接上限必须返回 413');
   const data = JSON.parse(reqRes.getBody());
   assert.equal(data.code, 'error.proto.bodyTooLarge');
+  assert.equal(data.error, 'request body too large', '必须确认为桥接层拦截而非业务路由 readJsonBody 拦截');
 });

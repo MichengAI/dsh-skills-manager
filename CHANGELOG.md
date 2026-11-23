@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.5.2] - 2026-11-23
+
+### Lightweight Host and Reverse Proxy Support
+
+- **Standalone and lightweight host compatibility**: fully supported loading and managing agent skills in lightweight and single-process host environments (such as dsh-go) without central connection services (#84).
+- **Flexible reverse proxy deployment**: supported accessing plugin interfaces through arbitrary reverse proxy sub-paths, ensuring reliable access across varied deployment topologies and intranet environments (#84).
+
+### Network Stability and Transfer Protection
+
+- **Robust transfer handling**: improved response handling when transferring large payloads or encountering interrupted client connections, preventing stalled requests and improving reliability during network instability.
+
 ## [1.5.1] - 2026-11-23
 
 ### Category Custom Reordering and Natural Sorting
