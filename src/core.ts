@@ -1806,7 +1806,8 @@ export function parseSkillDoc(text: string): ParsedSkill {
   if (lines.length > 0 && lines[0].trim() === "---") {
     let end = -1;
     for (let i = 1; i < lines.length; i++) {
-      if (lines[i].trim() === "---") {
+      // 缩进的 --- 可以是 YAML 块标量内容。
+      if (/^---[ \t]*$/.test(lines[i])) {
         end = i;
         break;
       }

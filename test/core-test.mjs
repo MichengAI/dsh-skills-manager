@@ -707,6 +707,31 @@ eq(
   "parseSkillDoc preserves extra indentation on the second literal line",
 );
 
+const sectionedSkill = "sectioned-description";
+const sectionedSkillPath = await makeSkill(
+  dshRoot,
+  sectionedSkill,
+  [
+    "---",
+    "description: |-",
+    "  Convert Markdown notes to plain text.",
+    "  ---",
+    "  Use for notes with several sections.",
+    `name: ${sectionedSkill}`,
+    "---  ",
+    "Keep the headings in the output.",
+  ].join("\r\n"),
+);
+const sectionedDetail = await skillDetail("dsh", sectionedSkill);
+eq(sectionedDetail.loadable, true, "an indented separator does not hide the skill name");
+eq(
+  sectionedDetail.description,
+  "Convert Markdown notes to plain text.\n---\nUse for notes with several sections.",
+  "skill detail preserves an indented separator in the description",
+);
+eq(sectionedDetail.body, "Keep the headings in the output.", "skill detail starts after the closing delimiter");
+await rm(sectionedSkillPath, { recursive: true });
+
 // ── 启用 / 停用 ──
 const goodSkillSource =
   "---\nname: good-skill\ndescription: A good skill.\n---\nbody";
