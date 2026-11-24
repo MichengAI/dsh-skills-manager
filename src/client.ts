@@ -1753,12 +1753,15 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
       }
       ctx.effect(function () { return ctx.locale.register(NS, DICT); });
       var sidebarController: any;
-      installSettingsNavIcon(ctx, function () { return ctx.locale.bind(NS)("title"); });
-
       let offSettingsSection: (() => void) | null = null;
       let offSettingsNavIcon: (() => void) | null = null;
       let settingsSectionSupported = false;
       let settingsNavIconSupported = false;
+      installSettingsNavIcon(
+        ctx,
+        function () { return ctx.locale.bind(NS)("title"); },
+        function () { return settingsNavIconSupported; },
+      );
 
       const mountSettingsSection = () => {
         if (!settingsSectionSupported || offSettingsSection) return;

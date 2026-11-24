@@ -51,8 +51,8 @@ const SKILL_ICON_MASK = `url(\"data:image/svg+xml,${encodeURIComponent(
 )}\")`;
 
 const NAV_ICON_STYLE_ID = "dssm-settings-nav-icon-style";
-const NAV_ICON_CSS = [
-  `[${NAV_ICON_MARKER}] svg { display: none !important; }`,
+export const NAV_ICON_CSS = [
+  `[${NAV_ICON_MARKER}] > svg { display: none !important; }`,
   `[${NAV_ICON_MARKER}]::before {`,
   `  content: '';`,
   `  flex: none;`,
@@ -118,7 +118,11 @@ function ensureNavIconStyle(): void {
  * 100% 对齐 dshmarket：用纯属性标记控制 ::before 伪元素渲染图标。
  * 不修改任何 DOM 节点，避免移动端列表项排版下与文字重叠冲突。
  */
-export function applySettingsNavIcon(button: Element, wantedLabel: () => string): boolean {
+export function applySettingsNavIcon(
+  button: Element,
+  wantedLabel: () => string,
+  isSlotSupported?: () => boolean,
+): boolean {
   if (isSidebarNavButton(button)) {
     if (button.hasAttribute(NAV_ICON_MARKER)) {
       button.removeAttribute(NAV_ICON_MARKER);
@@ -131,8 +135,20 @@ export function applySettingsNavIcon(button: Element, wantedLabel: () => string)
     const hasSlotIcon = Array.from(button.children).some((child) => {
       if (!child || child.tagName !== "SPAN") return false;
       const cls = String((child as Element).className || "");
-      return cls.includes("navIcon") || cls.includes("dcu-sb-glyph");
-    }) || Boolean(button.querySelector?.('span[class*="navIcon"], span[class*="dcu-sb-glyph"]'));
+      const lower = cls.toLowerCase();
+      return (
+        cls.includes("navIcon") ||
+        cls.includes("bt-settings-icon") ||
+        cls.includes("dcu-sb-glyph") ||
+        lower.includes("navicon") ||
+        lower.includes("nav-icon") ||
+        lower.includes("settings-icon") ||
+        lower.includes("settingsicon") ||
+        lower.includes("settings_icon") ||
+        lower.includes("bt-settings") ||
+        (Boolean(isSlotSupported?.()) && Boolean((child as Element).querySelector?.("svg")))
+      );
+    }) || Boolean(button.querySelector?.('span[class*="navIcon"], span[class*="bt-settings-icon"], span[class*="settings-icon"], span[class*="settingsIcon"], span[class*="nav-icon"], span[class*="dcu-sb-glyph"]'));
     if (hasSlotIcon) {
       if (button.hasAttribute(NAV_ICON_MARKER)) {
         button.removeAttribute(NAV_ICON_MARKER);
@@ -162,7 +178,11 @@ export interface NavIconContext {
   effect(callback: () => unknown, label?: string): void;
 }
 
-export function installSettingsNavIcon(ctx: NavIconContext, resolveLabel: () => string): void {
+export function installSettingsNavIcon(
+  ctx: NavIconContext,
+  resolveLabel: () => string,
+  isSlotSupported?: () => boolean,
+): void {
   if (typeof document === "undefined") return;
   ensureNavIconStyle();
 
@@ -174,7 +194,7 @@ export function installSettingsNavIcon(ctx: NavIconContext, resolveLabel: () => 
       scheduled = false;
       if (disposed) return;
       for (const row of document.querySelectorAll(NAV_ROW_SELECTOR)) {
-        applySettingsNavIcon(row, resolveLabel);
+        applySettingsNavIcon(row, resolveLabel, isSlotSupported);
       }
     };
 

@@ -214,6 +214,36 @@ test("当宿主已使用原生插槽容器渲染图标时，不打 marker 避免
   assert.equal(button.getAttribute(NAV_ICON_MARKER), null);
 });
 
+test("DS-Bot 定制宿主（bt-settings-icon）原生插槽渲染时，不打 marker 避免图标被双重绞杀消失", () => {
+  const { doc } = createDom();
+  const button = doc.createElement("button");
+  button.className = "bt-settings-item";
+  button.textContent = "技能";
+  const iconSpan = doc.createElement("span");
+  iconSpan.className = "bt-settings-icon";
+  const svg = doc.createElement("svg");
+  iconSpan.appendChild(svg);
+  button.appendChild(iconSpan);
+  const label = doc.createElement("span");
+  label.className = "bt-settings-label";
+  label.textContent = "技能";
+  button.appendChild(label);
+
+  assert.equal(applySettingsNavIcon(button, () => "技能"), false, "DS-Bot 原生插槽不打 marker");
+  assert.equal(button.hasAttribute(NAV_ICON_MARKER), false, "不能带有 marker 属性");
+
+  // 模拟若有残留 marker，必须能自愈清除
+  button.setAttribute(NAV_ICON_MARKER, "");
+  assert.equal(applySettingsNavIcon(button, () => "技能"), true, "自愈清除残留 marker");
+  assert.equal(button.hasAttribute(NAV_ICON_MARKER), false, "残留 marker 必须被成功清除");
+});
+
+test("NAV_ICON_CSS 严格使用直接子代选择器 > svg，杜绝误伤深层插槽 SVG", async () => {
+  const { NAV_ICON_CSS } = await import("../src/settings-nav-icon.ts");
+  assert.match(NAV_ICON_CSS, /\[data-dssm-nav-icon\]\s*>\s*svg/, "必须使用直接子代选择器 > svg");
+  assert.doesNotMatch(NAV_ICON_CSS, /\[data-dssm-nav-icon\]\s+svg/, "禁止使用后代选择器无差别隐藏深层 svg");
+});
+
 test("老版本宿主图标包在普通 aria-hidden span 里时，仍正常打 marker 渲染图标", () => {
   const { doc } = createDom();
   const button = doc.createElement("button");
