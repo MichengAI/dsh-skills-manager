@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.5] - 2026-11-24
+
+### DeepSeek Harness 0.2.3 Host Compatibility and UI Localization
+
+- **DeepSeek Harness 0.2.3 host support**: fully supported the latest official host 0.2.3-alpha.2, ensuring stable skill management and smooth operation across latest host environments.
+- **UI localization and date formatting resilience**: improved locale and timestamp detection across different host generations, ensuring dates in the trash bin and interface strings adapt seamlessly to user locale preferences.
+
 ## [1.5.4] - 2026-11-24
 
 ### Settings Navigation Icon Compatibility Fix
