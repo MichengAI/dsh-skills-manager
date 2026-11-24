@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.4] - 2026-11-24
+
+### Settings Navigation Icon Compatibility Fix
+
+- **Custom host settings icon restoration**: fixed an issue where the navigation icon for the "Skills" section could disappear or appear blank in custom desktop hosts like DS-Bot, restoring visual consistency with other settings entries (#49).
+- **Navigation icon display stability**: improved icon rendering across various UI skins and desktop host environments to ensure stable and unified appearance (#49).
+
 ## [1.5.3] - 2026-11-23
 
 ### Multiline Skill Description Separators
