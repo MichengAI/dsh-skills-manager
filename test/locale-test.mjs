@@ -1164,5 +1164,13 @@ const britishDate = "2026-09-12T13:04:05Z";
 eq(bundle.formatTrashTime(britishT, britishDate), new Date(britishDate).toLocaleString("en-GB"), "en-GB 日期不被 en-US 字典回退覆盖");
 hostActive = "zh";
 eq(bundle.formatTrashTime(britishT, britishDate), new Date(britishDate).toLocaleString("zh"), "宿主有效 locale 优先于词典格式区域，语言切换实时读取");
+
+// 宿主仅提供 getSnapshot 时同样能解析有效区域
+bundle.apply({ ...fakeCtx, effect() {}, locale: { ...fakeCtx.locale, getSnapshot() { return { active: "fr-FR" }; } } });
+eq(bundle.formatTrashTime(britishT, britishDate), new Date(britishDate).toLocaleString("fr-FR"), "宿主仅提供 getSnapshot 时正常解析有效区域");
+
+// 宿主仅提供 snapshot 属性时同样能解析有效区域
+bundle.apply({ ...fakeCtx, effect() {}, locale: { ...fakeCtx.locale, snapshot: { active: "de-DE" } } });
+eq(bundle.formatTrashTime(britishT, britishDate), new Date(britishDate).toLocaleString("de-DE"), "宿主仅提供 snapshot 属性时正常解析有效区域");
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

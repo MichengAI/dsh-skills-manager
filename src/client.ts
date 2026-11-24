@@ -249,8 +249,11 @@ import { setupSidebarEntry, sidebarLocales, sidebarEntryCss } from "./sidebar-en
     function isSkillEnabled(skill: Partial<SkillView>): boolean { if (skill.enabled !== undefined) return skill.enabled === true; return !!(skill.invocationPolicyValid && skill.modelInvocable && skill.userInvocable && skill.managerEnabled !== false); }
     function countKey(key: string, count: number) { return key + (Number(count) === 1 ? ".one" : ".other"); }
     var localeService: ClientContext["locale"] | undefined;
-    // getLocale().active 是宿主对 locale.preference 的最终有效解析，不读取网页/浏览器语言。
-    function hostLocale() { return localeService?.getLocale?.().active; }
+    // getLocale().active / getSnapshot().active 是宿主对 locale.preference 的最终有效解析，不读取网页/浏览器语言。
+    function hostLocale() {
+      var loc = localeService as any;
+      return (loc?.getLocale?.() || loc?.getSnapshot?.() || loc?.snapshot)?.active;
+    }
     function formatTrashTime(t: Translate, value: string) { return new Date(value).toLocaleString(hostLocale() || t("format.locale")); }
     function rootDisplayName(t: Translate, root: SkillRoot) {
       if (root.kind === "preset" || root.scope === "preset") {

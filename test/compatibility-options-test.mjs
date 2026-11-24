@@ -24,17 +24,22 @@ assert.equal(cordisPin("0.2.2-rc.2"), "4.1.0");
 assert.equal(cordisPin("0.2.2-rc.3"), "4.1.0");
 assert.equal(cordisPin("0.2.2-rc.4"), "4.1.0");
 assert.equal(cordisPin("0.2.2-rc.5"), "4.1.0");
+assert.equal(cordisPin("0.2.3-alpha.2"), "4.2.0-alpha.1");
 assert.equal(hostCordisOverrides("0.2.2-rc.1")["@deepseek-ai/cordis-plugin-loader"], "1.1.0");
 assert.equal(hostCordisOverrides("0.2.2-rc.1")["@deepseek-ai/cordis-plugin-group"], "1.1.0");
 assert.equal(hostCordisOverrides("0.2.2-rc.1")["@deepseek-ai/cordis-plugin-hmr"], "1.1.0");
+assert.equal(hostCordisOverrides("0.2.3-alpha.2")["@deepseek-ai/cordis-plugin-loader"], "1.2.0-alpha.1");
+assert.equal(hostCordisOverrides("0.2.3-alpha.2")["@deepseek-ai/cordis-plugin-group"], "1.2.0-alpha.1");
+assert.equal(hostCordisOverrides("0.2.3-alpha.2")["@deepseek-ai/cordis-plugin-hmr"], "1.2.0-alpha.1");
+assert.equal(hostCordisOverrides("0.2.3-alpha.2")["@deepseek-ai/cordis-plugin-timer"], "1.3.0-alpha.1");
 assert.throws(() => pluginPins("9.9.9"), /缺少 9\.9\.9 的插件 pin/);
 const requiredPins = ["@deepseek-ai/cordis", "@deepseek-ai/cordis-plugin-group", "@deepseek-ai/cordis-plugin-hmr", "@deepseek-ai/cordis-plugin-include", "@deepseek-ai/cordis-plugin-loader", "@deepseek-ai/cordis-plugin-timer"];
 for (const host of supportedHosts) {
   const overrides = hostCordisOverrides(host);
   for (const name of requiredPins) assert.ok(overrides[name], `${host} 缺少 ${name}`);
 }
-assert.equal(developmentHost, "0.2.2-rc.5");
-assert.deepEqual(supportedHosts, ["0.2.2-rc.1", "0.2.2-rc.2", "0.2.2-rc.3", "0.2.2-rc.4", "0.2.2-rc.5"]);
+assert.equal(developmentHost, "0.2.3-alpha.2");
+assert.deepEqual(supportedHosts, ["0.2.2-rc.1", "0.2.2-rc.2", "0.2.2-rc.3", "0.2.2-rc.4", "0.2.2-rc.5", "0.2.3-alpha.2"]);
 assert.deepEqual(parseOptions(["--keep"]).versions, supportedHosts);
 assert.equal(parseOptions(["--keep", supportedHosts[0]]).keep, true);
 assert.deepEqual(parseOptions([supportedHosts[0], "--keep"]).versions, [supportedHosts[0]]);
@@ -52,7 +57,7 @@ assertHostPeers(manifest.peerDependencies);
 for (const [name, range] of Object.entries(manifest.peerDependencies)) {
   if (name.startsWith("@deepseek-ai/dsh-")) assert.equal(range, peerRange, name);
 }
-assert.equal(manifest.devDependencies["@deepseek-ai/cordis"], "4.1.0");
+assert.equal(manifest.devDependencies["@deepseek-ai/cordis"], "4.2.0-alpha.1");
 for (const [name, version] of Object.entries(manifest.devDependencies)) {
   if (name.startsWith("@deepseek-ai/dsh-")) assert.equal(version, developmentHost, name);
 }

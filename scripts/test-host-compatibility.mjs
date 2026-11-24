@@ -261,12 +261,13 @@ try {
   );
   await writeFile(join(sandbox, ".pnpmfile.cjs"),
     `const pinHostDependencies = ${pinHostDependencies.toString()};\nmodule.exports = { hooks: { readPackage: pkg => pinHostDependencies(pkg, ${JSON.stringify(version)}) } };\n`, "utf8");
+  const registry = process.env.DSH_COMPAT_REGISTRY || "https://registry.npmjs.org/";
   const installLog = await run([
     pnpm,
     "install",
     "--ignore-scripts",
     "--fetch-timeout=600000",
-    "--registry=https://registry.npmjs.org/",
+    `--registry=${registry}`,
   ]);
   await writeFile(join(sandbox, "install.log"), installLog);
   for (const [name, expected] of Object.entries(dependencies)) {
@@ -320,7 +321,7 @@ try {
         "web",
         "add",
         join(sandbox, pack[0].filename),
-        "--registry=https://registry.npmjs.org/",
+        `--registry=${registry}`,
       ],
       sandbox,
       env,

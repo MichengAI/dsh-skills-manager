@@ -122,6 +122,8 @@ export interface ClientContext {
         bind: (namespace: string) => Translate;
         /** Public LocaleRuntime snapshot: already resolves locale.preference. */
         getLocale?: () => { active: string };
+        getSnapshot?: () => { active: string };
+        snapshot?: { active: string };
     };
     slots: {
         inject: (name: string, factory: () => unknown) => unknown;
